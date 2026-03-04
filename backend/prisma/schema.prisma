@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Harus menggunakan PostgreSQL untuk relasi Multi-Tenant yang stabil
+  url      = env("DATABASE_URL")
+}
+
+// Model untuk Data Perusahaan (Tenant)
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relasi: Satu perusahaan memiliki banyak karyawan dan absensi
+  users       User[]
+  attendances Attendance[]
+}
+
+// Model untuk Data Karyawan (Terkait dengan Tenant tertentu)
+model User {
+  id        Int      @id @default(autoincrement())
+  companyId Int      // FOREIGN KEY yang wajib ada di setiap tabel (Multi-Tenant Identifier)
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(EMPLOYEE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  attendances Attendance[]
+}
+
+// Model untuk Data Absensi (Terkait dengan Karyawan dan Tenant)
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  companyId Int      // Multi-Tenant Identifier (Agar Query lebih cepat per perusahaan)
+  userId    Int
+  clockIn   DateTime @default(now())
+  clockOut  DateTime?
+  lat       Float?
+  lng       Float?
+  photoUrl  String?
+  status    AttendanceStatus @default(PRESENT)
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  SUPERADMIN // Pemilik Aplikasi SaaS (Anda)
+  ADMIN      // HRD dari Perusahaan Klien
+  EMPLOYEE   // Karyawan Biasa
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
