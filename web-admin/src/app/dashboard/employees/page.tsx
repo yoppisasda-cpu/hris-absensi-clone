@@ -170,7 +170,9 @@ export default function EmployeesPage() {
             alert('Karyawan telah dipindahkan ke daftar Ex-Employee.');
             fetchUsers();
         } catch (error) {
-            alert('Gagal menonaktifkan karyawan.');
+            const err = error as { response?: { data?: { error?: string } } };
+            const errorMessage = err.response?.data?.error || 'Gagal menonaktifkan karyawan.';
+            alert(errorMessage);
         }
     };
 
