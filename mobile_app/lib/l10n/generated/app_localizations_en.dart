@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Talenta Clone';
+  String get appTitle => 'Aivola';
 
   @override
   String get menuHome => 'Home';

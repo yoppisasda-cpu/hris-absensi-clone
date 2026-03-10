@@ -81,7 +81,7 @@ export default function EmployeeAssetsModal({ userId, userName, isOpen, onClose 
                                             <div className="flex items-center gap-3">
                                                 <div className="h-10 w-10 rounded-lg bg-blue-50 border border-blue-100/50 overflow-hidden flex items-center justify-center shrink-0">
                                                     {asset.imageUrl ? (
-                                                        <img src={`http://localhost:5000${asset.imageUrl}`} alt={asset.name} className="h-full w-full object-cover" />
+                                                        <img src={asset.imageUrl} alt={asset.name} className="h-full w-full object-cover" />
                                                     ) : (
                                                         <Laptop className="h-5 w-5 text-blue-600" />
                                                     )}

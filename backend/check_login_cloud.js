@@ -1,0 +1,1 @@
+import axios from 'axios'; axios.post('https://hris-absensi-clone-production.up.railway.app/api/auth/login', {email: 'owner@aivola.id', password: 'admin123'}).then(res => console.log(res.data)).catch(err => console.error(err.response ? err.response.data : err.message));

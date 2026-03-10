@@ -9,7 +9,7 @@ class AppLocalizationsId extends AppLocalizations {
   AppLocalizationsId([String locale = 'id']) : super(locale);
 
   @override
-  String get appTitle => 'Talenta Clone';
+  String get appTitle => 'Aivola';
 
   @override
   String get menuHome => 'Beranda';

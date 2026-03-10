@@ -154,7 +154,7 @@ export default function EmployeeDocumentsModal({ userId, userName, isOpen, onClo
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <a
-                                            href={`http://localhost:5000${doc.fileUrl}`}
+                                            href={doc.fileUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"

@@ -179,7 +179,7 @@ export default function ReimbursementsPage() {
                                         <td className="px-6 py-4">
                                             {claim.receiptUrl ? (
                                                 <button
-                                                    onClick={() => setSelectedImage(`http://localhost:5000${claim.receiptUrl}`)}
+                                                    onClick={() => setSelectedImage(claim.receiptUrl!)}
                                                     className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
                                                 >
                                                     <Eye className="h-4 w-4" />

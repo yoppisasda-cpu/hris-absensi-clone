@@ -238,7 +238,7 @@ export default function AnnouncementsPage() {
                                     {ann.imageUrl && (
                                         <div className="mb-3 rounded-lg overflow-hidden border border-slate-100">
                                             <img
-                                                src={`http://localhost:5000${ann.imageUrl}`}
+                                                src={ann.imageUrl}
                                                 alt={ann.title}
                                                 className="w-full h-32 object-cover"
                                             />

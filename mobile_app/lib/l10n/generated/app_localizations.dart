@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In id, this message translates to:
-  /// **'Talenta Clone'**
+  /// **'Aivola'**
   String get appTitle;
 
   /// No description provided for @menuHome.

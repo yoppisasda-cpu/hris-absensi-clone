@@ -188,11 +188,11 @@ export default function AttendancePage() {
                                         <td className="px-6 py-4 text-center">
                                             {att.photoUrl ? (
                                                 <button
-                                                    onClick={() => setSelectedPhoto(`http://localhost:5000${att.photoUrl}`)}
+                                                    onClick={() => setSelectedPhoto(att.photoUrl!)}
                                                     className="group relative h-10 w-10 overflow-hidden rounded-lg border border-slate-200 inline-block"
                                                 >
                                                     <img
-                                                        src={`http://localhost:5000${att.photoUrl}`}
+                                                        src={att.photoUrl}
                                                         alt="Selfie"
                                                         className="h-full w-full object-cover transition group-hover:scale-110"
                                                     />

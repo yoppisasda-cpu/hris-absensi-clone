@@ -98,7 +98,7 @@ export default function AssetsPage() {
             imageUrl: asset.imageUrl || ''
         });
         setSelectedFile(null);
-        setImagePreview(asset.imageUrl ? `http://localhost:5000${asset.imageUrl}` : null);
+        setImagePreview(asset.imageUrl ? asset.imageUrl : null);
         setIsModalOpen(true);
     };
 
@@ -226,7 +226,7 @@ export default function AssetsPage() {
                                             <div className="flex items-center gap-4">
                                                 <div className="h-12 w-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
                                                     {asset.imageUrl ? (
-                                                        <img src={`http://localhost:5000${asset.imageUrl}`} alt={asset.name} className="h-full w-full object-cover" />
+                                                        <img src={asset.imageUrl} alt={asset.name} className="h-full w-full object-cover" />
                                                     ) : (
                                                         <Laptop className="h-6 w-6 text-slate-300" />
                                                     )}
