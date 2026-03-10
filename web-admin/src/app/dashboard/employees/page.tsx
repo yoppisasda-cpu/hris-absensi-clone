@@ -166,7 +166,7 @@ export default function EmployeesPage() {
         if (!confirm(`Apakah Anda yakin ingin memindahkan ${user.name} ke daftar Ex-Employee?\nKaryawan ini tidak akan bisa login lagi.`)) return;
         
         try {
-            await api.patch(`/users/${user.id}/deactivate`);
+            await api.patch(`/users/${user.id}/deactivate`, {});
             alert('Karyawan telah dipindahkan ke daftar Ex-Employee.');
             fetchUsers();
         } catch (error) {

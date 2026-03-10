@@ -779,7 +779,7 @@ app.patch('/api/users/:id/deactivate', tenantMiddleware, async (req: Request, re
   try {
     const tenantId = (req as any).tenantId;
     const reqUserId = parseInt(req.params.id as string);
-    const { resignDate } = req.body;
+    const { resignDate } = req.body || {};
 
     const checkUser = await prisma.user.findFirst({ where: { id: reqUserId, companyId: tenantId } });
     if (!checkUser) return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
