@@ -194,9 +194,9 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
     (req as any).userRole = decoded.role;
 
     // --- GRADUAL CONTRACT ENFORCEMENT ---
-    // SuperAdmin dikecualikan agar tetap bisa mengelola sistem
     if (decoded.role !== 'SUPERADMIN') {
       const expiryLevel = await getTenantExpiryLevel(tenantId);
+      console.log(`[AUTH] Tenant: ${tenantId}, Role: ${decoded.role}, ExpiryLevel: ${expiryLevel}`);
 
       if (expiryLevel >= 3) {
         return res.status(403).json({ 
@@ -205,6 +205,7 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
       }
 
       if (expiryLevel >= 2 && req.method !== 'GET') {
+        console.warn(`[AUTH] Blocked Write Request for Expired Tenant: ${tenantId}`);
         return res.status(403).json({ 
           error: 'Kontrak Anda telah berakhir lebih dari 15 hari. Mode Read-Only diaktifkan. Anda tidak dapat merubah data atau melakukan absensi.' 
         });
@@ -3856,9 +3857,19 @@ app.get('/api/admin/reports/consolidated', tenantMiddleware, async (req: Request
 });
 
 // --- 3. JALANKAN SERVER ---
+
+// Global Error Handler (Phase Debug)
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error('!!! GLOBAL SERVER ERROR !!!');
+  console.error(err);
+  res.status(500).json({ 
+    error: 'Internal Server Error (Crash)', 
+    message: err.message,
+    path: req.path
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
   console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);
 });
-// reload
-// reload for IP
