@@ -781,16 +781,12 @@ app.patch('/api/users/:id/deactivate', tenantMiddleware, async (req: Request, re
     const reqUserId = parseInt(req.params.id as string);
     const { resignDate } = req.body || {};
 
-    console.log(`[DEACTIVATE] ID: ${reqUserId}, Tenant: ${tenantId}`);
-
-    const userToDeactivate = await prisma.user.findUnique({ where: { id: reqUserId } });
+    const userToDeactivate = await prisma.user.findFirst({ 
+      where: { id: reqUserId, companyId: tenantId } 
+    });
+    
     if (!userToDeactivate) {
-      return res.status(404).json({ error: `Karyawan dengan ID ${reqUserId} tidak ditemukan di sistem.` });
-    }
-
-    if (userToDeactivate.companyId !== tenantId) {
-      console.warn(`[DEACTIVATE] Tenant Mismatch! User ${reqUserId} (Tenant ${userToDeactivate.companyId}) != Admin Tenant ${tenantId}`);
-      return res.status(403).json({ error: `Akses Ditolak: Karyawan ini milik perusahaan lain.` });
+      return res.status(404).json({ error: 'Karyawan tidak ditemukan atau Anda tidak memiliki akses ke data ini.' });
     }
 
     const updatedUser = await prisma.user.update({
