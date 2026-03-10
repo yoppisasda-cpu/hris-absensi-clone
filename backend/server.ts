@@ -27,7 +27,7 @@ const cleanupLocalFile = (filePath: string | null) => {
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_hris_key_123';
 
 app.use(cors());
