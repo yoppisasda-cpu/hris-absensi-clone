@@ -297,24 +297,30 @@ async function sendNotification(companyId: number, userId: number, title: string
 // Z. Endpoint Login Karyawan (Menghasilkan JWT)
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
 
-    console.log(`[LOGIN ATTEMPT] Email: ${email}`);
-    const user = await prisma.user.findUnique({ where: { email } });
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email dan password wajib diisi.' });
+    }
+
+    const trimmedEmail = email.trim();
+    console.log(`[LOGIN ATTEMPT] Email: ${trimmedEmail}`);
+
+    const user = await prisma.user.findUnique({ where: { email: trimmedEmail } });
     if (!user) {
-      console.log(`[LOGIN FAILED] User not found: ${email}`);
+      console.log(`[LOGIN FAILED] User not found: ${trimmedEmail}`);
       return res.status(401).json({ error: 'Email atau password salah.' });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      console.log(`[LOGIN FAILED] Invalid password for: ${email}`);
+      console.log(`[LOGIN FAILED] Invalid password for: ${trimmedEmail}`);
       return res.status(401).json({ error: 'Email atau password salah.' });
     }
 
     // --- ENFORCE ACTIVE STATUS ---
     if (!user.isActive) {
-      console.log(`[LOGIN FAILED] Account inactive for: ${email}`);
+      console.log(`[LOGIN FAILED] Account inactive for: ${trimmedEmail}`);
       return res.status(403).json({ error: 'Akun Anda sudah dinonaktifkan (Ex-Employee). Hubungi HR jika ini kesalahan.' });
     }
 
@@ -350,9 +356,12 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login Error:', error);
-    res.status(500).json({ error: 'Terjadi kesalahan pada server saat login.' });
+    res.status(500).json({ 
+      error: 'Terjadi kesalahan pada server saat login: ' + (error.message || 'Unknown Error'),
+      details: error.stack 
+    });
   }
 });
 
