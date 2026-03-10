@@ -1,0 +1,36 @@
+{
+    "common": {
+        "save": "Save",
+        "saved": "Saved",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "loading": "Loading...",
+        "actions": "Actions",
+        "search": "Search..."
+    },
+    "sidebar": {
+        "dashboard": "Dashboard",
+        "employees": "Employees",
+        "attendance": "Attendance",
+        "leaves": "Leave Requests",
+        "payroll": "Payroll",
+        "announcements": "Announcements",
+        "loans": "Loans",
+        "reimbursement": "Reimbursement",
+        "assets": "Assets",
+        "settings": "Settings"
+    },
+    "payroll": {
+        "title": "Payroll Management",
+        "calculate": "Calculate Salary",
+        "month": "Month",
+        "year": "Year",
+        "status": "Status",
+        "netSalary": "Net Salary",
+        "basicSalary": "Basic Salary",
+        "allowance": "Allowance",
+        "deductions": "Deductions",
+        "bonus": "Bonus/THR"
+    }
+}

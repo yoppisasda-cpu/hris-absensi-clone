@@ -1,0 +1,441 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import api from '@/lib/api';
+import { Wallet, Calculator, CheckCircle, Clock, User, AlertCircle, Download, FileText, Search } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+
+interface PayrollRecord {
+    id: number;
+    userId: number;
+    user: {
+        name: string;
+        email: string;
+    };
+    month: number;
+    year: number;
+    basicSalary: number;
+    allowance: number;
+    overtimeHours: number;
+    overtimePay: number;
+    attendanceCount: number;
+    lateCount: number;
+    deductions: number;
+    loanDeduction: number;
+    bpjsKesehatanDeduction: number;
+    bpjsKetenagakerjaanDeduction: number;
+    sickLeaveDeduction: number;
+    reimbursementPay: number;
+    bonusPay: number;
+    netSalary: number;
+    status: 'DRAFT' | 'PAID';
+    updatedAt: string;
+}
+
+export default function PayrollPage() {
+    const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [error, setError] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Default ke bulan & tahun saat ini
+    const now = new Date();
+    const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+    const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+
+    const fetchPayrolls = async () => {
+        setIsLoading(true);
+        try {
+            const response = await api.get(`/payroll?month=${selectedMonth}&year=${selectedYear}`);
+            setPayrolls(response.data);
+            setError('');
+        } catch (err: any) {
+            setError('Gagal memuat data penggajian.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchPayrolls();
+    }, [selectedMonth, selectedYear]);
+
+    const handleGenerate = async () => {
+        if (!confirm(`Hitung ulang gaji untuk Periode ${selectedMonth}/${selectedYear}?`)) return;
+
+        setIsGenerating(true);
+        try {
+            await api.post('/payroll/generate', { month: selectedMonth, year: selectedYear });
+            alert('Kalkulasi Gaji Berhasil!');
+            fetchPayrolls();
+        } catch (err: any) {
+            alert('Gagal generate payroll: ' + (err.response?.data?.error || 'Kesalahan Server'));
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleExportExcel = () => {
+        if (payrolls.length === 0) return;
+
+        const exportData = payrolls.map(p => ({
+            'Nama Karyawan': p.user.name,
+            'Email': p.user.email,
+            'Bulan': p.month,
+            'Tahun': p.year,
+            'Gaji Pokok': p.basicSalary,
+            'Tunjangan': p.allowance,
+            'Lembur (Jam)': p.overtimeHours,
+            'Upah Lembur': p.overtimePay,
+            'Total Hadir': p.attendanceCount,
+            'Keterlambatan': p.lateCount,
+            'Potongan Absensi': p.deductions,
+            'Potongan Sakit': p.sickLeaveDeduction,
+            'Potongan Kasbon': p.loanDeduction,
+            'BPJS Kesehatan (1%)': p.bpjsKesehatanDeduction,
+            'BPJS Ketenagakerjaan (3%)': p.bpjsKetenagakerjaanDeduction,
+            'Klaim Reimbursement': p.reimbursementPay,
+            'Bonus & THR': p.bonusPay,
+            'Gaji Bersih (THP)': p.netSalary,
+            'Status': p.status === 'PAID' ? 'Sudah Dibayar' : 'Draft/Belum Dibayar'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Rekap Payroll");
+
+        XLSX.writeFile(workbook, `Rekap_Payroll_${selectedMonth}_${selectedYear}.xlsx`);
+    };
+
+    const handlePay = async (id: number) => {
+        try {
+            await api.patch(`/payroll/${id}`, { status: 'PAID' });
+            setPayrolls(prev => prev.map(p => p.id === id ? { ...p, status: 'PAID' } : p));
+        } catch (err: any) {
+            alert('Gagal memproses pembayaran.');
+        }
+    };
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+        }).format(amount);
+    };
+
+    const handleDownloadPDF = (p: PayrollRecord) => {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+
+        // Header
+        doc.setFontSize(18);
+        doc.setTextColor(30, 41, 59); // slate-800
+        doc.text("SLIP GAJI KARYAWAN", pageWidth / 2, 20, { align: "center" });
+
+        doc.setFontSize(11);
+        doc.setTextColor(100, 116, 139); // slate-500
+        doc.text(`Periode: ${p.month} / ${p.year}`, pageWidth / 2, 28, { align: "center" });
+        doc.setDrawColor(226, 232, 240); // slate-200
+        doc.line(20, 35, pageWidth - 20, 35);
+
+        // Employee Info
+        doc.setFontSize(10);
+        doc.setTextColor(30, 41, 59);
+        doc.text(`Nama Karyawan : ${p.user.name}`, 20, 45);
+        doc.text(`Email          : ${p.user.email}`, 20, 52);
+        doc.text(`Status         : ${p.status === 'PAID' ? 'Selesai Dibayar' : 'Draft / Belum Bayar'}`, 20, 59);
+
+        // Table breakdown
+        const tableBody = [
+            ['Gaji Pokok', formatCurrency(p.basicSalary)],
+            ['Tunjangan Jabatan', `+ ${formatCurrency(p.allowance)}`],
+            ['Lembur (${p.overtimeHours} Jam)', `+ ${formatCurrency(p.overtimePay)}`],
+            ['Klaim Reimbursement', `+ ${formatCurrency(p.reimbursementPay)}`],
+            ['Bonus & THR', `+ ${formatCurrency(p.bonusPay)}`],
+            ['Potongan Keterlambatan/Absen', `- ${formatCurrency(p.deductions)}`],
+            ['Potongan Kasbon', `- ${formatCurrency(p.loanDeduction)}`]
+        ];
+
+        if (p.sickLeaveDeduction > 0) {
+            tableBody.push(['Potongan Tunjangan (Sakit)', `- ${formatCurrency(p.sickLeaveDeduction)}`]);
+        }
+
+        if (p.bpjsKesehatanDeduction > 0) {
+            tableBody.push(['Potongan BPJS Kesehatan (1%)', `- ${formatCurrency(p.bpjsKesehatanDeduction)}`]);
+        }
+        if (p.bpjsKetenagakerjaanDeduction > 0) {
+            tableBody.push(['Potongan BPJS Ketenagakerjaan (3%)', `- ${formatCurrency(p.bpjsKetenagakerjaanDeduction)}`]);
+        }
+
+        tableBody.push(
+            [{ content: 'Total Gaji Bersih (Take Home Pay)', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: formatCurrency(p.netSalary), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }] as any
+        );
+
+        (doc as any).autoTable({
+            startY: 70,
+            head: [['Rincian Pendapatan & Potongan', 'Jumlah']],
+            body: tableBody,
+            theme: 'striped',
+            headStyles: { fillColor: [37, 99, 235], fontSize: 10 },
+            styles: { fontSize: 10, cellPadding: 5 },
+            columnStyles: {
+                1: { halign: 'right' }
+            }
+        });
+
+        // Footer
+        const finalY = (doc as any).lastAutoTable.finalY + 25;
+        doc.setFontSize(9);
+        doc.setTextColor(148, 163, 184);
+        doc.text("Dokumen ini dihasilkan secara otomatis oleh sistem HRIS.", 20, finalY);
+        doc.text("Dicetak pada: " + new Date().toLocaleString('id-ID'), 20, finalY + 5);
+
+        doc.setTextColor(30, 41, 59);
+        doc.text("Disetujui Oleh,", pageWidth - 60, finalY);
+        doc.text("( ____________________ )", pageWidth - 70, finalY + 30);
+        doc.text("Manager HRD", pageWidth - 55, finalY + 35);
+
+        doc.save(`Slip_Gaji_${p.user.name}_${p.month}_${p.year}.pdf`);
+    };
+
+    return (
+        <DashboardLayout>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Penggajian (Payroll)</h1>
+                    <p className="text-sm text-slate-500">Otomasi kalkulasi gaji berdasarkan kehadiran & keterlambatan.</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        {Array.from({ length: 12 }, (_, i) => (
+                            <option key={i + 1} value={i + 1}>Bulan {i + 1}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value={2025}>2025</option>
+                        <option value={2026}>2026</option>
+                    </select>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Cari nama atau email..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                    </div>
+                    <button
+                        onClick={handleExportExcel}
+                        disabled={isLoading || payrolls.length === 0}
+                        className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-all disabled:opacity-50"
+                    >
+                        <Download className="h-4 w-4" />
+                        Export Excel
+                    </button>
+                    <button
+                        onClick={handleGenerate}
+                        disabled={isGenerating}
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-all disabled:opacity-50"
+                    >
+                        {isGenerating ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                        ) : (
+                            <Calculator className="h-4 w-4" />
+                        )}
+                        Hitung Gaji
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Total Pengeluaran Gaji</p>
+                    <p className="text-2xl font-bold text-slate-900">
+                        {formatCurrency(payrolls.reduce((acc, curr) => acc + curr.netSalary, 0))}
+                    </p>
+                    <div className="mt-2 flex items-center text-xs text-green-600">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Periode terpilih
+                    </div>
+                </div>
+                <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Total Potongan (Lates)</p>
+                    <p className="text-2xl font-bold text-red-600">
+                        {formatCurrency(payrolls.reduce((acc, curr) => acc + curr.deductions, 0))}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-400">Rp 50.000 / keterlambatan</p>
+                </div>
+                <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Status Pembayaran</p>
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className="text-2xl font-bold text-slate-900">
+                            {payrolls.filter(p => p.status === 'PAID').length} / {payrolls.length}
+                        </span>
+                        <span className="text-sm text-slate-500">Tuntas</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                {isLoading ? (
+                    <div className="flex h-64 items-center justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+                    </div>
+                ) : error ? (
+                    <div className="p-12 text-center text-red-500">{error}</div>
+                ) : payrolls.filter(p =>
+                    p.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    p.user.email.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length === 0 ? (
+                    <div className="flex h-64 flex-col items-center justify-center p-6 text-center text-slate-500">
+                        <Search className="h-12 w-12 text-slate-200 mb-4" />
+                        <p className="font-medium text-lg mb-1">Tidak ada hasil ditemukan</p>
+                        <p className="text-sm">Tidak ada data payroll yang cocok dengan "{searchQuery}"</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-semibold">
+                                <tr>
+                                    <th className="px-6 py-4">Karyawan</th>
+                                    <th className="px-6 py-4">Gaji Pokok</th>
+                                    <th className="px-6 py-4">Tambahan<br />(Tunj/Lembur/Klaim/Bonus)</th>
+                                    <th className="px-6 py-4">Hadir / Terlambat</th>
+                                    <th className="px-6 py-4">Potongan / Pinjaman</th>
+                                    <th className="px-6 py-4">Gaji Bersih</th>
+                                    <th className="px-6 py-4">Status</th>
+                                    <th className="px-6 py-4 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {payrolls.filter(p =>
+                                    p.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                    p.user.email.toLowerCase().includes(searchQuery.toLowerCase())
+                                ).map((p) => (
+                                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
+                                                    {p.user.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-slate-900">{p.user.name}</p>
+                                                    <p className="text-xs text-slate-400">{p.user.email}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 font-medium text-slate-700">
+                                            {formatCurrency(p.basicSalary)}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-green-600 font-medium">Tunj: + {formatCurrency(p.allowance)}</span>
+                                                {p.overtimeHours > 0 && (
+                                                    <span className="text-blue-600 font-medium text-xs">
+                                                        Lembur ({p.overtimeHours}j): + {formatCurrency(p.overtimePay)}
+                                                    </span>
+                                                )}
+                                                {p.reimbursementPay > 0 && (
+                                                    <span className="text-teal-600 font-medium text-xs">
+                                                        Klaim: + {formatCurrency(p.reimbursementPay)}
+                                                    </span>
+                                                )}
+                                                {p.bonusPay > 0 && (
+                                                    <span className="text-orange-600 font-medium text-xs font-bold">
+                                                        Bonus/THR: + {formatCurrency(p.bonusPay)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-slate-700">{p.attendanceCount} Hari</span>
+                                                <span className={`text-xs ${p.lateCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                                    {p.lateCount}x Terlambat
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 font-medium">
+                                            <div className="flex flex-col gap-1">
+                                                {p.deductions > 0 && (
+                                                    <span className="text-red-500 font-medium">- {formatCurrency(p.deductions)} (Absen)</span>
+                                                )}
+                                                {p.loanDeduction > 0 && (
+                                                    <span className="text-orange-600 font-medium">- {formatCurrency(p.loanDeduction)} (Pinjaman)</span>
+                                                )}
+                                                {p.deductions === 0 && p.loanDeduction === 0 && (
+                                                    <span className="text-slate-400">Rp 0</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 font-bold text-blue-600 bg-blue-50/30">
+                                            {formatCurrency(p.netSalary)}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${p.status === 'PAID' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'
+                                                }`}>
+                                                {p.status === 'PAID' ? 'Tuntas' : 'Draft'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => handleDownloadPDF(p)}
+                                                    className="p-1 px-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                    title="Cetak Slip PDF"
+                                                >
+                                                    <FileText className="h-4 w-4" />
+                                                </button>
+                                                {p.status === 'DRAFT' ? (
+                                                    <button
+                                                        onClick={() => handlePay(p.id)}
+                                                        className="inline-flex items-center gap-1 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded transition-all"
+                                                    >
+                                                        Bayar
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400 font-medium">Selesai</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-6 flex items-start gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                <div className="text-xs text-blue-800 leading-relaxed">
+                    <p className="font-bold mb-1">Catatan Penting (Gaji Proporsional):</p>
+                    <ul className="list-disc ml-4 space-y-1">
+                        <li><strong>Hari Kerja Aktif</strong> = Total hari Senin-Jumat dikurangi <strong>Hari Libur Nasional</strong>.</li>
+                        <li><strong>Gaji Harian</strong> = (Gaji Pokok + Tunjangan) dibagi Hari Kerja Aktif.</li>
+                        <li><strong>Gaji Terkumpul</strong> = (Gaji Harian × (Kehadiran + Cuti Disetujui)) + <strong>Lembur</strong> + <strong>Reimbursement</strong>.</li>
+                        <li><strong>Uang Lembur</strong> = Total jam lembur disetujui × Tarif Lembur/Jam.</li>
+                        <li><strong>Gaji Bersih</strong> = Gaji Terkumpul - (Potongan Terlambat + Pinjaman + BPJS).</li>
+                        <li>Karyawan yang <strong>Alpha</strong> (tidak masuk tanpa cuti) otomatis memotong target hari kerja.</li>
+                    </ul>
+                </div>
+            </div>
+        </DashboardLayout>
+    );
+}

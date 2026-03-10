@@ -1,0 +1,36 @@
+{
+    "common": {
+        "save": "Simpan",
+        "saved": "Tersimpan",
+        "cancel": "Batal",
+        "delete": "Hapus",
+        "edit": "Ubah",
+        "loading": "Memuat...",
+        "actions": "Aksi",
+        "search": "Cari..."
+    },
+    "sidebar": {
+        "dashboard": "Dashboard",
+        "employees": "Karyawan",
+        "attendance": "Absensi",
+        "leaves": "Pengajuan Cuti",
+        "payroll": "Penggajian",
+        "announcements": "Pengumuman",
+        "loans": "Pinjaman",
+        "reimbursement": "Reimbursement",
+        "assets": "Aset",
+        "settings": "Pengaturan"
+    },
+    "payroll": {
+        "title": "Manajemen Payroll",
+        "calculate": "Hitung Gaji",
+        "month": "Bulan",
+        "year": "Tahun",
+        "status": "Status",
+        "netSalary": "Gaji Bersih",
+        "basicSalary": "Gaji Pokok",
+        "allowance": "Tunjangan",
+        "deductions": "Potongan",
+        "bonus": "Bonus/THR"
+    }
+}

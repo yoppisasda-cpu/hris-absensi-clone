@@ -1,0 +1,41 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Header from "@/components/layout/Header"
+import Sidebar from "@/components/layout/Sidebar"
+
+export default function DashboardLayout({
+    children,
+}: {
+    children: React.ReactNode
+}) {
+    const router = useRouter();
+
+    useEffect(() => {
+        const token = localStorage.getItem('jwt_token');
+        if (!token) {
+            router.push('/');
+        }
+    }, [router]);
+
+    return (
+        <div className="flex h-screen bg-slate-50" style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc' }}>
+            {/* Sidebar Kiri */}
+            <Sidebar />
+
+            {/* Konten Kanan */}
+            <div className="flex flex-1 flex-col overflow-hidden" style={{ display: 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
+                {/* Header Atas */}
+                <Header />
+
+                {/* Main Workspace */}
+                <main className="flex-1 overflow-y-auto p-6 transition-all duration-300" style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+                    <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ margin: '0 auto', maxWidth: '80rem' }}>
+                        {children}
+                    </div>
+                </main>
+            </div>
+        </div>
+    );
+}
