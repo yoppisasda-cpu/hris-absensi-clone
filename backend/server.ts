@@ -793,6 +793,7 @@ app.patch('/api/users/:id/deactivate', tenantMiddleware, async (req: Request, re
 
     res.json({ message: 'Karyawan telah dipindahkan ke daftar Ex-Employee', user: updatedUser });
   } catch (error) {
+    console.error('Error deactivating employee:', error);
     res.status(500).json({ error: 'Gagal menonaktifkan karyawan.' });
   }
 });
