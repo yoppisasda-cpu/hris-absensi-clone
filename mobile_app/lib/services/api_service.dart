@@ -111,9 +111,15 @@ class ApiService {
   }
 
   // Hit endpoint Absen Keluar (Clock-Out)
-  Future<bool> clockOut() async {
+  Future<bool> clockOut(double lat, double lng, {required String imagePath}) async {
     try {
-      final response = await _dio.patch('/attendance/clock-out');
+      final formData = FormData.fromMap({
+        'lat': lat,
+        'lng': lng,
+        'photo': await MultipartFile.fromFile(imagePath, filename: 'clockout.jpg'),
+      });
+
+      final response = await _dio.patch('/attendance/clock-out', data: formData);
       return response.statusCode == 200;
     } on DioException catch (e) {
       if (e.response != null && e.response?.data['error'] != null) {
@@ -121,7 +127,7 @@ class ApiService {
       }
       throw Exception('Gagal menghubungi server.');
     } catch (e) {
-      throw Exception('Gagal memproses clock-out.');
+      throw Exception('Gagal memproses clock-out: $e');
     }
   }
 

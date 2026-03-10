@@ -899,10 +899,17 @@ app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response)
 });
 
 // C2. Endpoint Karyawan Melakukan Clock-Out
-app.patch('/api/attendance/clock-out', tenantMiddleware, async (req: Request, res: Response) => {
+app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single('photo'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
+    const { lat, lng } = req.body;
+
+    const photoUrl = req.file ? `/uploads/attendance/${req.file.filename}` : null;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ error: 'Koordinat GPS perangkat wajib dilampirkan!' });
+    }
 
     // Cari absensi terakhir hari ini yang belum clock-out
     const today = new Date();
@@ -915,16 +922,54 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, async (req: Request, re
         clockIn: { gte: today },
         clockOut: null
       },
-      orderBy: { clockIn: 'desc' }
+      orderBy: { clockIn: 'desc' },
+      include: { user: { include: { company: true, branch: true } } }
     });
 
     if (!attendance) {
       return res.status(404).json({ error: 'Data absensi aktif hari ini tidak ditemukan.' });
     }
 
+    const user = attendance.user;
+    // @ts-ignore
+    let refLat = user.branch?.latitude || user.company?.latitude;
+    // @ts-ignore
+    let refLng = user.branch?.longitude || user.company?.longitude;
+    // @ts-ignore
+    let refRadius = user.branch?.radius || user.company?.radius || 100;
+    // @ts-ignore
+    let locationName = user.branch ? `Cabang ${user.branch.name}` : `Kantor Pusat`;
+
+    // Blokir jika karyawan di luar radius Geo-Fence
+    if (refLat && refLng && refRadius) {
+      const distance = getDistanceFromLatLonInM(lat, lng, refLat, refLng);
+
+      if (distance > refRadius) {
+        return res.status(400).json({
+          error: `Posisi Anda di luar jangkauan absen ${locationName} (Jarak Anda: ${Math.round(distance)} meter). Toleransi: ${refRadius} meter.`
+        });
+      }
+    }
+
+    // Simpan foto ke Supabase jika ada
+    let finalPhotoUrl = photoUrl;
+    if (photoUrl) {
+      try {
+        const fullPath = path.join(__dirname, photoUrl);
+        finalPhotoUrl = await uploadToSupabase(fullPath, 'attendance');
+      } catch (uploadError) {
+        console.error('Failed to upload to Supabase, keeping local path:', uploadError);
+      }
+    }
+
     const updatedAttendance = await prisma.attendance.update({
       where: { id: attendance.id },
-      data: { clockOut: new Date() }
+      data: { 
+        clockOut: new Date(),
+        clockOutLat: parseFloat(lat),
+        clockOutLng: parseFloat(lng),
+        clockOutPhotoUrl: finalPhotoUrl
+      }
     });
 
     res.json({ message: 'Berhasil Clock-Out', attendance: updatedAttendance });

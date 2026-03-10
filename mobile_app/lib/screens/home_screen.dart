@@ -170,8 +170,43 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _clockOut() async {
     setState(() => _isLoading = true);
+    
     try {
-      final success = await _apiService.clockOut();
+      // 1. Cek & Minta Izin Lokasi GPS
+      var statusLoc = await Permission.locationWhenInUse.status;
+      if (!statusLoc.isGranted) {
+        statusLoc = await Permission.locationWhenInUse.request();
+        if (!statusLoc.isGranted) throw Exception('Izin Lokasi (GPS) Ditolak!');
+      }
+
+      // 2. Cegat Posisi Koordinat Asli HP
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+      );
+
+      // 3. Cek & Minta Izin Kamera
+      var statusCam = await Permission.camera.status;
+      if (!statusCam.isGranted) {
+        statusCam = await Permission.camera.request();
+        if (!statusCam.isGranted) throw Exception('Izin Kamera Ditolak!');
+      }
+
+      // 4. Buka Kamera Depan Untuk Selfie Bukti Kehadiran
+      final ImagePicker picker = ImagePicker();
+      final XFile? photo = await picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: 50,
+      );
+
+      if (photo == null) throw Exception('Anda membatalkan foto selfie.');
+
+      final success = await _apiService.clockOut(
+        position.latitude,
+        position.longitude,
+        imagePath: photo.path,
+      );
+
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

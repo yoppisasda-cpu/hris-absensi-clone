@@ -189,6 +189,9 @@ model Attendance {
   lat       Float?
   lng       Float?
   photoUrl  String?
+  clockOutLat       Float?
+  clockOutLng       Float?
+  clockOutPhotoUrl  String?
   status    AttendanceStatus @default(PRESENT)
 
   // AI Sentiment Analysis (Phase 36)
