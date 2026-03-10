@@ -12,55 +12,616 @@ datasource db {
 
 // Model untuk Data Perusahaan (Tenant)
 model Company {
-  id        Int      @id @default(autoincrement())
-  name      String
+  id                Int     @id @default(autoincrement())
+  name              String
+  latitude          Float? // Titik Pusat Koordinat Kantor
+  longitude         Float?
+  radius            Int?    @default(100) // Batas toleransi radius dlm meter
+  integrationApiKey String? @unique // Rahasia API Key untuk integrasi Kasir/Kopi
+
+  // Detail Kontrak (Phase - Client Management Improvement)
+  picName       String?
+  picPhone      String?
+  contractType  ContractType @default(LUMSUM)
+  contractValue Float        @default(0)
+  contractStart DateTime?
+  contractEnd   DateTime?
+  employeeLimit Int          @default(0)
+
+  // Fitur Aturan Gaji Dinamis (Phase 20)
+  lateDeductionRate    Float                @default(50000) // Potongan per hari terlambat
+  absenceDeductionType AbsenceDeductionType @default(PRO_RATA) // Tipe pemotongan absen
+  absenceDeductionRate Float                @default(0) // Nominal jika tipe potongan FIXED_AMOUNT
+
+  // Fitur Potongan Tunjangan Sakit Dinamis (Phase 22)
+  sickLeaveDeductionRate Float @default(0) // Potongan tunjangan per hari sakit
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relasi: Satu perusahaan memiliki banyak karyawan dan absensi
-  users       User[]
-  attendances Attendance[]
+  users              User[]
+  branches           Branch[] // Daftar Cabang
+  attendances        Attendance[]
+  shifts             Shift[]
+  leaveRequests      LeaveRequest[]
+  payrolls           Payroll[]
+  reimbursements     Reimbursement[]
+  loans              Loan[]
+  holidays           Holiday[]
+  overtimeRequests   OvertimeRequest[]
+  announcements      Announcement[]
+  notifications      Notification[]
+  documents          EmployeeDocument[] // Phase 26
+  assets             Asset[] // Phase 30
+  bonuses            Bonus[] // Phase 31
+  kpiIndicators      KPIIndicator[] // Phase 33
+  kpiScores          KPIScore[] // Phase 33
+  employeeVents      EmployeeVent[] // Phase 37
+  learningObjectives LearningObjective[] // Phase 38
+  knowledgeReviews   KnowledgeReview[] // Phase 38
+  learningMaterials  LearningMaterial[] // Phase 39
+  exams              Exam[]             // Phase 39
+  examAttempts       ExamAttempt[]      // Phase 39
+  
+  // Fitur SaaS Invoicing (Phase 40)
+  invoices           Invoice[]
+}
+
+// Master Data Cabang Perusahaan (Fase 19)
+model Branch {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  name      String // Misal: "Pusat", "Kedai A", "Kedai B"
+  latitude  Float? // Titik Koordinat spesifik cabang ini
+  longitude Float?
+  radius    Int?     @default(100) // Radius absen khusus cabang ini
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users   User[]
 }
 
 // Model untuk Data Karyawan (Terkait dengan Tenant tertentu)
 model User {
-  id        Int      @id @default(autoincrement())
-  companyId Int      // FOREIGN KEY yang wajib ada di setiap tabel (Multi-Tenant Identifier)
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(EMPLOYEE)
+  id              Int       @id @default(autoincrement())
+  companyId       Int // FOREIGN KEY yang wajib ada di setiap tabel (Multi-Tenant Identifier)
+  branchId        Int? // OPSIONAL: Karyawan ditugaskan di cabang mana? (Jika null, berarti Staff Pusat/Multi-Lokasi)
+  shiftId         Int? // OPSIONAL: Karyawan ini ikut jadwal _Shift_ mana?
+  email           String    @unique
+  password        String
+  name            String
+  jobTitle        String? // Jabatan (Fase Profiling)
+  division        String? // Divisi (Fase Profiling)
+  grade           String? // Golongan (Fase Profiling)
+  joinDate        DateTime? // Tanggal Bergabung (Lama Kerja)
+  contractEndDate DateTime? // Tanggal Berakhir Kontrak (Fase 29)
+  role            Role      @default(EMPLOYEE)
+  basicSalary     Float     @default(0) // Gaji Pokok
+  allowance       Float     @default(0) // Tunjangan bulanan tetap
+  overtimeRate    Float     @default(0) // Tarif lembur per jam
+
+  // Fitur Keamanan & Notifikasi (Fase 18)
+  emailNotifications  Boolean @default(true) // Toggle notifikasi via email
+  language            String  @default("id") // Pilihan bahasa: 'id' atau 'en' (Phase 32)
+  bpjsKesehatan       Boolean @default(false)
+  bpjsKetenagakerjaan Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  attendances Attendance[]
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch             Branch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  shift              Shift?              @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  attendances        Attendance[]
+  leaveRequests      LeaveRequest[]
+  payrolls           Payroll[]
+  reimbursements     Reimbursement[]
+  loans              Loan[]
+  overtimeRequests   OvertimeRequest[]
+  documents          EmployeeDocument[] // Dokumen KTP/NPWP/Lainnya (Phase 26)
+  notifications      Notification[]
+  assets             Asset[] // Phase 30
+  bonuses            Bonus[] // Phase 31
+  kpiScores          KPIScore[] // Phase 33
+  employeeVents      EmployeeVent[] // Phase 37
+  learningObjectives LearningObjective[] // Phase 38
+  knowledgeReviews   KnowledgeReview[] // Phase 38
+  examAttempts       ExamAttempt[] // Phase 39
+
+  // Hirarki Atasan (Phase 42)
+  reportToId   Int?
+  reportTo     User?  @relation("ReportingLine", fields: [reportToId], references: [id])
+  subordinates User[] @relation("ReportingLine")
+
+  managedOvertimeRequests OvertimeRequest[] @relation("OvertimeApprover")
+  managedLeaveRequests    LeaveRequest[]    @relation("LeaveApprover")
+}
+
+// Model untuk Lembur Karyawan
+model OvertimeRequest {
+  id            Int            @id @default(autoincrement())
+  companyId     Int
+  userId        Int
+  date          DateTime // Tanggal Lembur
+  durationHours Float // Durasi lembur dalam hitungan jam
+  reason        String
+  status        OvertimeStatus @default(PENDING)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Approver (Fase 42)
+  approverId    Int?           // Atasan yang harus approve
+  approver      User?          @relation("OvertimeApprover", fields: [approverId], references: [id])
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum OvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Master Data Pergantian Jam Kerja (Shift)
+model Shift {
+  id        Int      @id @default(autoincrement())
+  companyId Int // Tenant Pemilik Shift ini
+  title     String // Misal: "Pagi", "Malam"
+  startTime String // String sederhana "08:00"
+  endTime   String // String sederhana "17:00"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users   User[]
 }
 
 // Model untuk Data Absensi (Terkait dengan Karyawan dan Tenant)
 model Attendance {
-  id        Int      @id @default(autoincrement())
-  companyId Int      // Multi-Tenant Identifier (Agar Query lebih cepat per perusahaan)
+  id        Int              @id @default(autoincrement())
+  companyId Int // Multi-Tenant Identifier (Agar Query lebih cepat per perusahaan)
   userId    Int
-  clockIn   DateTime @default(now())
+  clockIn   DateTime         @default(now())
   clockOut  DateTime?
   lat       Float?
   lng       Float?
   photoUrl  String?
   status    AttendanceStatus @default(PRESENT)
 
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // AI Sentiment Analysis (Phase 36)
+  mood      String? // e.g., 'Happy', 'Stressed', 'Tired'
+  moodScore Float? // 0.0 to 1.0 (Positive Sentiment Score)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
   SUPERADMIN // Pemilik Aplikasi SaaS (Anda)
-  ADMIN      // HRD dari Perusahaan Klien
-  EMPLOYEE   // Karyawan Biasa
+  ADMIN // HRD dari Perusahaan Klien
+  MANAGER // Manager/Supervisor (Fase 42)
+  EMPLOYEE // Karyawan Biasa
 }
 
 enum AttendanceStatus {
   PRESENT
   LATE
   ABSENT
+}
+
+// Rekam Jejak Pengajuan Cuti (Fase 11)
+model LeaveRequest {
+  id        Int         @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  startDate DateTime
+  endDate   DateTime
+  reason    String
+  type      LeaveType   @default(ANNUAL)
+  status    LeaveStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Approver (Fase 42)
+  approverId Int?       // Atasan yang harus approve
+  approver   User?      @relation("LeaveApprover", fields: [approverId], references: [id])
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+}
+
+// Rekapitulasi Penggajian (Fase 12)
+model Payroll {
+  id              Int   @id @default(autoincrement())
+  companyId       Int
+  userId          Int
+  month           Int // 1-12
+  year            Int
+  basicSalary     Float
+  allowance       Float @default(0) // Tunjangan (Fase 16)
+  attendanceCount Int // Total hari hadir
+  lateCount       Int
+  deductions      Float // deductions dari absen/telat
+  loanDeduction   Float @default(0)
+
+  // Fitur BPJS (Fase 21)
+  bpjsKesehatanDeduction       Float @default(0)
+  bpjsKetenagakerjaanDeduction Float @default(0)
+
+  // Fitur Potongan Tunjangan Sakit (Fase 22)
+  sickLeaveCount     Int   @default(0) // Total hari sakit
+  sickLeaveDeduction Float @default(0) // Potongan sbg akibat sakit (memotong allowance)
+
+  overtimeHours    Float        @default(0) // Total jam lembur disetujui
+  overtimePay      Float        @default(0) // Uang lembur yang dikumpulkan
+  reimbursementPay Float        @default(0) // Total reimbursement disetujui (Phase 25)
+  bonusPay         Float        @default(0) // Total Bonus/THR disetujui (Phase 31)
+  netSalary        Float // basicSalary + allowance + overtimePay + reimbursementPay + bonusPay - deductions - loanDeduction - bpjs
+  status           SalaryStatus @default(DRAFT)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year]) // Satu karyawan satu baris per bulan
+}
+
+enum SalaryStatus {
+  DRAFT
+  PAID
+}
+
+enum ContractType {
+  LUMSUM
+  SATUAN
+}
+
+enum AbsenceDeductionType {
+  PRO_RATA
+  FIXED_AMOUNT
+}
+
+enum ReimbursementStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Manajemen Pinjaman Karyawan (Fase 17)
+model Loan {
+  id               Int        @id @default(autoincrement())
+  companyId        Int
+  userId           Int
+  amount           Float // Total Pinjaman
+  monthlyDeduction Float // Potongan per bulan
+  remainingAmount  Float // Sisa Pinjaman
+  status           LoanStatus @default(PENDING)
+  description      String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum LoanStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  REJECTED
+}
+
+model Reimbursement {
+  id          Int                 @id @default(autoincrement())
+  companyId   Int
+  userId      Int
+  title       String
+  description String?
+  amount      Float
+  receiptUrl  String? // Path foto kuitansi
+  status      ReimbursementStatus @default(PENDING)
+
+  // Fitur AI (Phase 34)
+  ocrAmount   Float? // Hasil deteksi nominal oleh AI
+  ocrDate     DateTime? // Hasil deteksi tanggal oleh AI
+  ocrCategory String? // Hasil klasifikasi kategori oleh AI
+  isFraud     Boolean   @default(false)
+  fraudReason String? // Alasan jika terdeteksi anomali
+  receiptHash String? // Hash gambar untuk deteksi duplikat
+
+  // Status Pembayaran (Phase 35)
+  isPaid Boolean   @default(false)
+  paidAt DateTime? // Tanggal pembayaran terpisah dari gaji
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Master Data Libur Nasional (Hari Bebas Gaji)
+model Holiday {
+  id        Int       @id @default(autoincrement())
+  companyId Int // Tenant Pemilik
+  date      DateTime // Tanggal Mulai (Start Date)
+  endDate   DateTime? // Tanggal Berakhir (End Date, opsional)
+  name      String // Nama Hari Libur (misal: "HUT RI ke-79")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, date]) // 1 Tenant hanya bisa punya 1 nama libur per hari
+}
+
+// Model untuk Pengumuman Perusahaan (Fase 6)
+model Announcement {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  title      String
+  content    String   @db.Text
+  imageUrl   String? // Banner/Gambar Pengumuman (Phase 26)
+  isPriority Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+// Model untuk Notifikasi (Fase 7)
+model Notification {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Model untuk Dokumentasi Karyawan (Fase 26)
+model EmployeeDocument {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  title     String // Misal: "KTP", "NPWP", "Ijazah"
+  fileUrl   String // Path ke file dokumen
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Model untuk Manajemen Aset Perusahaan (Phase 30)
+model Asset {
+  id           Int       @id @default(autoincrement())
+  companyId    Int
+  userId       Int? // Karyawan pemegang aset (optional)
+  name         String // Misal: "MacBook Pro 2023", "iPhone 15"
+  serialNumber String // No Seri Unik
+  condition    String    @default("GOOD") // GOOD, FAIR, BROKEN
+  imageUrl     String? // Foto Aset (Phase 30 Enhancement)
+  purchaseDate DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, serialNumber]) // No seri harus unik per perusahaan
+}
+
+// --- FASE 31: BONUS & THR SYSTEM ---
+model Bonus {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  userId      Int
+  type        String // "BONUS" atau "THR"
+  amount      Float
+  description String?
+  month       Int // Bulan pencairan (1-12)
+  year        Int // Tahun pencairan
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// --- FASE 33: KPI & PERFORMANCE REVIEW SYSTEM ---
+model KPIIndicator {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  name        String // Misal: "Kualitas Kerja", "Kedisiplinan"
+  description String?
+  target      Float    @default(100)
+  weight      Float    @default(1) // Bobot nilai
+  isSystem    Boolean  @default(false) // Indikator otomatis dari sistem?
+  systemType  String? // Misal: 'ATTENDANCE', 'PUNCTUALITY'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  scores  KPIScore[]
+}
+
+model KPIScore {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  userId      Int
+  indicatorId Int
+  score       Float // Nilai aktual
+  comment     String?
+  month       Int // 1-12
+  year        Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  indicator KPIIndicator @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, indicatorId, month, year])
+}
+
+// --- FASE 37: EMPLOYEE VENT BOX (TEMPAT CURHAT) ---
+model EmployeeVent {
+  id          Int     @id @default(autoincrement())
+  companyId   Int
+  userId      Int? // Optional if anonymous
+  content     String  @db.Text
+  isAnonymous Boolean @default(false)
+
+  // AI Sentiment Analysis
+  sentiment String? // 'Positive', 'Negative', 'Neutral'
+  mood      String? // 'Happy', 'Frustrated', 'Sad', etc.
+  score     Float? // Sentiment score (0.0 to 1.0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// --- FASE 38: LEARNING MANAGEMENT SYSTEM (LMS) ---
+model LearningObjective {
+  id          Int       @id @default(autoincrement())
+  companyId   Int
+  userId      Int
+  title       String
+  description String?   @db.Text
+  category    String? // e.g., 'Technical', 'Soft Skill', 'Leadership'
+  status      String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  progress    Float     @default(0) // 0.0 to 100.0
+  deadline    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model KnowledgeReview {
+  id        Int     @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  title     String
+  score     Float?
+  comments  String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// --- FASE 39: AI-GENERATED EXAM SYSTEM (OTOMASI TES SOP) ---
+model LearningMaterial {
+  id        Int     @id @default(autoincrement())
+  companyId Int
+  title     String
+  content   String  @db.Text
+  fileUrl   String?
+  category  String? // e.g., 'SOP', 'Manual', 'Policy'
+  targetDivision String?
+  targetJobTitle String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  exams   Exam[]
+}
+
+model Exam {
+  id          Int     @id @default(autoincrement())
+  companyId   Int
+  materialId  Int?
+  title       String
+  description String? @db.Text
+  targetDivision String?
+  targetJobTitle String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  material  LearningMaterial? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  questions ExamQuestion[]
+  attempts  ExamAttempt[]
+}
+
+model ExamQuestion {
+  id            Int    @id @default(autoincrement())
+  examId        Int
+  question      String @db.Text
+  options       String @db.Text // JSON string of options
+  correctAnswer String
+
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+}
+
+model ExamAttempt {
+  id        Int    @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  examId    Int
+  score     Float
+  answers   String @db.Text // JSON string of submitted answers
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+}
+
+// --- FASE 40: SAAS AUTOMATIC INVOICING SYSTEM ---
+model Invoice {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  invoiceNumber String   @unique // INV/YYYY/MM/ID-XXX
+  month         Int      // 1-12
+  year          Int
+  amount        Float
+  status        InvoiceStatus @default(UNPAID)
+  contractType  ContractType
+  contractValue Float
+  employeeLimit Int      @default(0)
+  dueDate       DateTime
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, month, year]) // Satu tenant satu invoice per bulan
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PAID
+  CANCELLED
 }

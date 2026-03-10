@@ -1,5 +1,33 @@
-node_modules
-# Keep environment variables out of version control
+node_modules/
+dist/
 .env
+.env.local
 
+# Prisma
 /generated/prisma
+
+# Logs
+*.log
+debug_*.txt
+setup_error.txt
+token.txt
+
+# Diagnostic Scripts
+diag_*.ts
+check_*.ts
+audit_*.ts
+simulate_login.ts
+verify_*.ts
+test_*.ts
+create_*.ts
+list_*.ts
+
+# Big Files / Backups
+*.zip
+*.sql
+*.json
+!package.json
+!package-lock.json
+
+# OCR Data (Uncomment if you want to include in repo, but it makes repo heavy)
+# *.traineddata

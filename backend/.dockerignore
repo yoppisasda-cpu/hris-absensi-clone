@@ -1,0 +1,7 @@
+node_modules
+npm-debug.log
+prisma.zip
+*.tar
+backend.log
+debug_v2.txt
+uploads

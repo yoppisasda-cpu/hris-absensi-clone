@@ -1,18 +1,31 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: hris_postgres_local
+  # 2. Backend
+  backend:
+    build: 
+      context: .
+    container_name: aivola-backend
     restart: always
     environment:
-      POSTGRES_USER: hrisuser
-      POSTGRES_PASSWORD: hrispassword
-      POSTGRES_DB: hris_saas
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - PORT=3000
 
-volumes:
-  postgres_data:
+  # 3. Web Admin
+  web-admin:
+    build: 
+      context: ../web-admin
+      args:
+        - NEXT_PUBLIC_API_URL=https://api.aivola.id/api
+    container_name: aivola-admin
+    restart: always
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+
+  # 4. Cloudflare Tunnel
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: aivola-tunnel
+    restart: always
+    command: ["tunnel", "--no-autoupdate", "run", "--token", "eyJhIjoiYmI3ZTJjNzA2OWM1MjY4ODM0MzdlODg5OWNmMmEyMDUiLCJ0IjoiYzdlZjQwZTEtM2FkNC00ZGE3LWI5YzEtMjNkMDhmZjVkZjg4IiwicyI6IlkyUTJOMlkxTnpRdE5XRXlOQzAwWkRnekxXSmxPRGt0WmpCalpXVTNObU13T0RReiJ9"]
