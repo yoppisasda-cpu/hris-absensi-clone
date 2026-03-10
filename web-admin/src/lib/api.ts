@@ -1,8 +1,23 @@
 import axios from 'axios';
 
 // Ini akan merujuk ke API Backend Node.js yang sudah kita buat sebelumnya
+// Helper to determine the backend URL
+const getBaseURL = () => {
+    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+    
+    // Fallback logic for production domains
+    if (typeof window !== 'undefined') {
+        const host = window.location.hostname;
+        if (host.includes('aivola.id') || host.includes('vercel.app')) {
+            return 'https://hris-absensi-clone-production.up.railway.app/api';
+        }
+    }
+    
+    return 'http://127.0.0.1:5000/api'; // Local development fallback
+};
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000/api',
+    baseURL: getBaseURL(),
 });
 
 // Interceptor otomatis menyisipkan Token JWT (Bearer) Admin yang sedang login
