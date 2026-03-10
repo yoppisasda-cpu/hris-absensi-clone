@@ -1,0 +1,51 @@
+# Common
+node_modules/
+.DS_Store
+*.log
+*.zip
+*.tar
+debug_*.txt
+
+# Backend
+backend/.env
+backend/.env.local
+backend/dist/
+backend/generated/
+backend/prisma/migrations/
+backend/uploads/
+backend/*.log
+backend/diag_*.ts
+backend/check_*.ts
+backend/audit_*.ts
+backend/simulate_login.ts
+backend/verify_*.ts
+backend/test_*.ts
+backend/create_*.ts
+backend/list_*.ts
+backend/*.traineddata
+
+# Web Admin
+web-admin/.next/
+web-admin/out/
+web-admin/build/
+web-admin/.env*
+web-admin/*.tsbuildinfo
+web-admin/next-env.d.ts
+web-admin/lint_output.txt
+web-admin/final_lint.txt
+
+# Mobile App
+mobile_app/.dart_tool/
+mobile_app/.flutter-plugins*
+mobile_app/build/
+mobile_app/.idea/
+mobile_app/*.iml
+mobile_app/pubspec.lock
+mobile_app/analysis_*.txt
+mobile_app/analysis.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

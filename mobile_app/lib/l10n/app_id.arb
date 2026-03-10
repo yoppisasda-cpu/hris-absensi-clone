@@ -1,0 +1,13 @@
+{
+  "appTitle": "Talenta Clone",
+  "menuHome": "Beranda",
+  "menuAttendance": "Absensi",
+  "menuHistory": "Riwayat",
+  "menuProfile": "Profil",
+  "loginTitle": "Masuk ke Akun",
+  "loginEmail": "Email",
+  "loginPassword": "Password",
+  "loginButton": "MASUK",
+  "payrollDetail": "Rincian Slip Gaji",
+  "netSalary": "Gaji Bersih"
+}

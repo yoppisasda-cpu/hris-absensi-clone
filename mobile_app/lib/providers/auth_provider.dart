@@ -7,40 +7,64 @@ class AuthProvider with ChangeNotifier {
   String? _companyId;
   String? _userName;
   int? _userId;
+  String _language = 'id';
 
   bool get isAuthenticated => _isAuthenticated;
   String? get companyId => _companyId;
   String? get userName => _userName;
   int? get userId => _userId;
+  String get language => _language;
 
-  Future<void> login(
-    String tenantId,
-    String userEmail,
-    int id,
-    String name,
-  ) async {
+  Future<void> login(String email, String password) async {
+    final response = await ApiService().login(email, password);
+
+    final token = response['token'];
+    final user = response['user'];
+
     final prefs = await SharedPreferences.getInstance();
 
-    // Simpan local state
-    await prefs.setString('companyId', tenantId);
-    await prefs.setInt('userId', id);
-    await prefs.setString('userName', name);
+    // Simpan local state beserta JWT Token yang didapatkan
+    await prefs.setString('jwt_token', token);
+    await prefs.setString('companyId', user['companyId'].toString());
+    await prefs.setInt('userId', user['id']);
+    await prefs.setString('userName', user['name']);
 
-    _companyId = tenantId;
-    _userId = id;
-    _userName = name;
+    _companyId = user['companyId'].toString();
+    _userId = user['id'];
+    _userName = user['name'];
+    _language = user['language'] ?? 'id';
+
+    await prefs.setString('language', _language);
+
     _isAuthenticated = true;
     notifyListeners();
   }
 
   Future<void> checkAuthStatus() async {
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
     _companyId = prefs.getString('companyId');
     _userId = prefs.getInt('userId');
     _userName = prefs.getString('userName');
+    _language = prefs.getString('language') ?? 'id';
 
-    _isAuthenticated = _companyId != null;
+    // Autentikasi ditentukan dari ketersediaan JWT
+    _isAuthenticated = token != null;
     notifyListeners();
+  }
+
+  Future<void> setLanguage(String lang) async {
+    _language = lang;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('language', lang);
+    notifyListeners();
+
+    // Sync ke backend
+    try {
+      await ApiService().patch('/users/me/settings', {'language': lang});
+    } catch (e) {
+      print('Gagal sync bahasa ke backend: $e');
+    }
   }
 
   Future<void> logout() async {

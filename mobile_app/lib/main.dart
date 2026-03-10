@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/generated/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
@@ -29,6 +31,14 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: [Locale('id'), Locale('en')],
+      locale: Locale('id'), // Default sementara, nanti dihubungkan ke provider
       // Auth Router: Mengatur halaman yang dirender Next jika ter-authentikasi
       home: Consumer<AuthProvider>(
         builder: (ctx, auth, _) {

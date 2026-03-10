@@ -1,0 +1,13 @@
+{
+  "appTitle": "Talenta Clone",
+  "menuHome": "Home",
+  "menuAttendance": "Attendance",
+  "menuHistory": "History",
+  "menuProfile": "Profile",
+  "loginTitle": "Sign In",
+  "loginEmail": "Email",
+  "loginPassword": "Password",
+  "loginButton": "SIGN IN",
+  "payrollDetail": "Payroll Slip Details",
+  "netSalary": "Net Salary"
+}
