@@ -101,6 +101,8 @@ model User {
   basicSalary     Float     @default(0) // Gaji Pokok
   allowance       Float     @default(0) // Tunjangan bulanan tetap
   overtimeRate    Float     @default(0) // Tarif lembur per jam
+  isActive        Boolean   @default(true) // Status Karyawan (Phase: Ex-Employee)
+  resignDate      DateTime? // Tanggal Berhenti (Phase: Ex-Employee)
 
   // Fitur Keamanan & Notifikasi (Fase 18)
   emailNotifications  Boolean @default(true) // Toggle notifikasi via email

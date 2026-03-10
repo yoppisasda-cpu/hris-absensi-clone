@@ -10,13 +10,16 @@ interface Attendance {
     id: number;
     clockIn: string;
     clockOut: string | null;
-    latitude: number;
-    longitude: number;
+    lat: number | null;
+    lng: number | null;
+    clockOutLat: number | null;
+    clockOutLng: number | null;
     user: {
         name: string;
         email: string;
     };
     photoUrl: string | null;
+    clockOutPhotoUrl: string | null;
     mood: string | null;
     moodScore: number | null;
 }
@@ -26,7 +29,7 @@ export default function AttendancePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+    const [selectedPhoto, setSelectedPhoto] = useState<{ url: string, title: string } | null>(null);
 
     const fetchAttendances = async () => {
         try {
@@ -55,8 +58,11 @@ export default function AttendancePage() {
             'Tanggal': new Date(att.clockIn).toLocaleDateString('id-ID'),
             'Jam Masuk': new Date(att.clockIn).toLocaleTimeString('id-ID'),
             'Jam Keluar': att.clockOut ? new Date(att.clockOut).toLocaleTimeString('id-ID') : '-',
-            'Lokasi Lat': att.latitude,
-            'Lokasi Lng': att.longitude,
+            'In Lat': att.lat || '-',
+            'In Lng': att.lng || '-',
+            'Out Lat': att.clockOutLat || '-',
+            'Out Lng': att.clockOutLng || '-',
+            'Mood': att.mood || '-'
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -160,7 +166,8 @@ export default function AttendancePage() {
                                 <tr>
                                     <th className="px-6 py-4">Karyawan</th>
                                     <th className="px-6 py-4 text-nowrap">Tanggal</th>
-                                    <th className="px-6 py-4 text-center">Foto</th>
+                                    <th className="px-6 py-4 text-center">Foto Masuk</th>
+                                    <th className="px-6 py-4 text-center">Foto Pulang</th>
                                     <th className="px-6 py-4 text-center">Clock-In</th>
                                     <th className="px-6 py-4 text-center">Clock-Out</th>
                                     <th className="px-6 py-4 text-center">Mood</th>
@@ -188,12 +195,33 @@ export default function AttendancePage() {
                                         <td className="px-6 py-4 text-center">
                                             {att.photoUrl ? (
                                                 <button
-                                                    onClick={() => setSelectedPhoto(att.photoUrl!)}
+                                                    onClick={() => setSelectedPhoto({ url: att.photoUrl!, title: 'Foto Clock-In' })}
                                                     className="group relative h-10 w-10 overflow-hidden rounded-lg border border-slate-200 inline-block"
                                                 >
                                                     <img
                                                         src={att.photoUrl}
-                                                        alt="Selfie"
+                                                        alt="In"
+                                                        className="h-full w-full object-cover transition group-hover:scale-110"
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition group-hover:opacity-100">
+                                                        <Search className="h-4 w-4 text-white" />
+                                                    </div>
+                                                </button>
+                                            ) : (
+                                                <div className="mx-auto h-10 w-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                                                    <User className="h-5 w-5" />
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {att.clockOutPhotoUrl ? (
+                                                <button
+                                                    onClick={() => setSelectedPhoto({ url: att.clockOutPhotoUrl!, title: 'Foto Clock-Out' })}
+                                                    className="group relative h-10 w-10 overflow-hidden rounded-lg border border-slate-200 inline-block"
+                                                >
+                                                    <img
+                                                        src={att.clockOutPhotoUrl}
+                                                        alt="Out"
                                                         className="h-full w-full object-cover transition group-hover:scale-110"
                                                     />
                                                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition group-hover:opacity-100">
@@ -251,7 +279,7 @@ export default function AttendancePage() {
                 >
                     <div className="relative max-w-lg w-full bg-white rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                            <h3 className="font-bold text-slate-900">Bukti Foto Absensi</h3>
+                            <h3 className="font-bold text-slate-900">{selectedPhoto.title}</h3>
                             <button
                                 onClick={() => setSelectedPhoto(null)}
                                 className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition"
@@ -260,10 +288,10 @@ export default function AttendancePage() {
                             </button>
                         </div>
                         <div className="aspect-[4/3] bg-slate-900 flex items-center justify-center">
-                            <img src={selectedPhoto} alt="Zoom Selfie" className="max-h-full max-w-full object-contain" />
+                            <img src={selectedPhoto.url} alt="Zoom Selfie" className="max-h-full max-w-full object-contain" />
                         </div>
                         <div className="p-4 bg-slate-50 text-center">
-                            <p className="text-xs text-slate-500">Karyawan wajib melakukan selfie saat clock-in sebagai bukti kehadiran valid.</p>
+                            <p className="text-xs text-slate-500">Karyawan wajib melakukan selfie saat absensi sebagai bukti kehadiran valid.</p>
                         </div>
                     </div>
                 </div>

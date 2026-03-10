@@ -311,6 +311,12 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Email atau password salah.' });
     }
 
+    // --- ENFORCE ACTIVE STATUS ---
+    if (!user.isActive) {
+      console.log(`[LOGIN FAILED] Account inactive for: ${email}`);
+      return res.status(403).json({ error: 'Akun Anda sudah dinonaktifkan (Ex-Employee). Hubungi HR jika ini kesalahan.' });
+    }
+
     console.log(`[LOGIN SUCCESS] User: ${user.email}`);
 
     // --- ENFORCE CONTRACT LEVEL 3 (HARD BLOCK) ---
@@ -730,7 +736,11 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
   try {
     const tenantId = (req as any).tenantId;
     const reqUserId = parseInt(req.params.id as string);
-    const { name, email, role, basicSalary, allowance, overtimeRate, jobTitle, division, grade, joinDate, contractEndDate, reportToId } = req.body;
+    const { 
+      name, email, role, basicSalary, allowance, overtimeRate, 
+      jobTitle, division, grade, joinDate, contractEndDate, 
+      reportToId, isActive, resignDate 
+    } = req.body;
 
     // Pastikan karyawan milik tenant yang sama
     const checkUser = await prisma.user.findFirst({ where: { id: reqUserId, companyId: tenantId } });
@@ -742,21 +752,48 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
         name,
         email,
         role,
-        basicSalary: basicSalary ? parseFloat(basicSalary) : 0,
-        allowance: allowance ? parseFloat(allowance) : 0,
-        overtimeRate: overtimeRate ? parseFloat(overtimeRate) : 0,
+        basicSalary: basicSalary ? parseFloat(basicSalary.toString()) : undefined,
+        allowance: allowance ? parseFloat(allowance.toString()) : undefined,
+        overtimeRate: overtimeRate ? parseFloat(overtimeRate.toString()) : undefined,
         jobTitle: jobTitle || null,
         division: division || null,
         grade: grade || null,
         joinDate: joinDate ? new Date(joinDate) : null,
         contractEndDate: contractEndDate ? new Date(contractEndDate) : null,
-        reportToId: reportToId ? parseInt(reportToId) : null
+        reportToId: reportToId ? parseInt(reportToId) : null,
+        isActive: isActive !== undefined ? !!isActive : undefined,
+        resignDate: resignDate ? new Date(resignDate) : undefined
       }
     });
 
     res.json({ message: 'Profil karyawan diperbarui', user: updatedUser });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Gagal memperbarui karyawan.' });
+  }
+});
+
+// B1.6 Endpoint Deaktivasi Karyawan (Move to Ex-Employee)
+app.patch('/api/users/:id/deactivate', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const reqUserId = parseInt(req.params.id as string);
+    const { resignDate } = req.body;
+
+    const checkUser = await prisma.user.findFirst({ where: { id: reqUserId, companyId: tenantId } });
+    if (!checkUser) return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+
+    const updatedUser = await prisma.user.update({
+      where: { id: reqUserId },
+      data: {
+        isActive: false,
+        resignDate: resignDate ? new Date(resignDate) : new Date()
+      }
+    });
+
+    res.json({ message: 'Karyawan telah dipindahkan ke daftar Ex-Employee', user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menonaktifkan karyawan.' });
   }
 });
 
@@ -765,12 +802,14 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId; // Diambil dari middleware
     const userRole = (req as any).userRole;
+    const { status } = req.query; // 'active' atau 'inactive'
 
     // WAJIB: Selalu gunakan klausa `where: { companyId: tenantId }`!
     // Ini memastikan PT. A tidak bisa melihat karyawan PT. B
     const users = await (prisma.user as any).findMany({
-      where: userRole === 'SUPERADMIN' ? {} : {
-        companyId: tenantId
+      where: {
+        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        ...(status === 'inactive' ? { isActive: false } : status === 'active' ? { isActive: true } : { isActive: true }) // Default active
       },
       include: {
         shift: true,

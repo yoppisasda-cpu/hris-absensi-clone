@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop } from 'lucide-react';
+import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2 } from 'lucide-react';
 import EmployeeDocumentsModal from '@/components/dashboard/EmployeeDocumentsModal';
 import EmployeeAssetsModal from '@/components/dashboard/EmployeeAssetsModal';
 
@@ -37,6 +37,8 @@ interface User {
     branch?: Branch;
     contractEndDate?: string;
     reportToId?: number;
+    isActive?: boolean;
+    resignDate?: string;
 }
 
 export default function EmployeesPage() {
@@ -45,6 +47,7 @@ export default function EmployeesPage() {
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [showExpiringOnly, setShowExpiringOnly] = useState(false);
+    const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
 
     // State untuk Modal Form Tambah Karyawan Baru
     const [isEditMode, setIsEditMode] = useState(false);
@@ -69,7 +72,7 @@ export default function EmployeesPage() {
     const fetchUsers = async () => {
         try {
             const [usersRes, shiftsRes, branchesRes] = await Promise.all([
-                api.get('/users'),
+                api.get('/users', { params: { status: activeTab } }),
                 api.get('/shifts'),
                 api.get('/branches')
             ]);
@@ -85,8 +88,9 @@ export default function EmployeesPage() {
     };
 
     useEffect(() => {
+        setIsLoading(true);
         fetchUsers();
-    }, []);
+    }, [activeTab]);
 
     const handleChangeShift = async (userId: number, shiftId: string) => {
         try {
@@ -158,12 +162,38 @@ export default function EmployeesPage() {
         setIsModalOpen(true);
     };
 
+    const handleDeactivate = async (user: User) => {
+        if (!confirm(`Apakah Anda yakin ingin memindahkan ${user.name} ke daftar Ex-Employee?\nKaryawan ini tidak akan bisa login lagi.`)) return;
+        
+        try {
+            await api.patch(`/users/${user.id}/deactivate`);
+            alert('Karyawan telah dipindahkan ke daftar Ex-Employee.');
+            fetchUsers();
+        } catch (error) {
+            alert('Gagal menonaktifkan karyawan.');
+        }
+    };
+
+    const handleReactivate = async (user: User) => {
+        if (!confirm(`Aktifkan kembali ${user.name}?`)) return;
+        
+        try {
+            await api.put(`/users/${user.id}`, { ...user, isActive: true, resignDate: null });
+            alert('Karyawan telah diaktifkan kembali.');
+            setActiveTab('active');
+        } catch (error) {
+            alert('Gagal mengaktifkan kembali karyawan.');
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Manajemen Karyawan</h1>
-                    <p className="text-sm text-slate-500">Kelola data dan akses tim perusahaan Anda.</p>
+                    <p className="text-sm text-slate-500">
+                        {activeTab === 'active' ? 'Kelola data dan akses tim perusahaan Anda.' : 'Data histori karyawan yang sudah tidak bekerja.'}
+                    </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="flex gap-2">
@@ -206,6 +236,28 @@ export default function EmployeesPage() {
                 </div>
             </div>
 
+            {/* Tab Switcher */}
+            <div className="flex border-b border-slate-200 mb-6">
+                <button
+                    onClick={() => setActiveTab('active')}
+                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'active'
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                        }`}
+                >
+                    Karyawan Aktif ({activeTab === 'active' ? users.length : '-'})
+                </button>
+                <button
+                    onClick={() => setActiveTab('inactive')}
+                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'inactive'
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                        }`}
+                >
+                    Ex-Employee ({activeTab === 'inactive' ? users.length : '-'})
+                </button>
+            </div>
+
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 {isLoading ? (
                     <div className="flex h-64 items-center justify-center">
@@ -244,10 +296,10 @@ export default function EmployeesPage() {
                                 <tr>
                                     <th className="px-6 py-4">Nama Lengkap</th>
                                     <th className="px-6 py-4">Kontak (Email)</th>
-                                    <th className="px-6 py-4">Jadwal (Shift)</th>
+                                    <th className="px-6 py-4">{activeTab === 'active' ? 'Jadwal (Shift)' : 'Tanggal Keluar'}</th>
                                     <th className="px-6 py-4 text-center">Gaji Pokok & Tunjangan</th>
                                     <th className="px-6 py-4 text-center">Role Akses</th>
-                                    <th className="px-6 py-4 text-right">Aksi & Rotasi</th>
+                                    <th className="px-6 py-4 text-right">Aksi {activeTab === 'active' ? '& Rotasi' : ''}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -289,13 +341,20 @@ export default function EmployeesPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            {user.shift ? (
-                                                <div className="flex flex-col">
-                                                    <span className="text-slate-800 font-semibold">{user.shift.title}</span>
-                                                    <span className="text-xs text-slate-500 font-mono mt-0.5">{user.shift.startTime} - {user.shift.endTime}</span>
-                                                </div>
+                                            {activeTab === 'active' ? (
+                                                user.shift ? (
+                                                    <div className="flex flex-col">
+                                                        <span className="text-slate-800 font-semibold">{user.shift.title}</span>
+                                                        <span className="text-xs text-slate-500 font-mono mt-0.5">{user.shift.startTime} - {user.shift.endTime}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 italic text-sm">Belum Ditugaskan</span>
+                                                )
                                             ) : (
-                                                <span className="text-slate-400 italic text-sm">Belum Ditugaskan</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-red-600 font-semibold">Resigned</span>
+                                                    <span className="text-xs text-slate-500">{user.resignDate ? new Date(user.resignDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span>
+                                                </div>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
@@ -315,16 +374,19 @@ export default function EmployeesPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <select
-                                                    value={user.shift?.id || ''}
-                                                    onChange={(e) => handleChangeShift(user.id, e.target.value)}
-                                                    className="w-32 text-xs border border-slate-300 rounded py-1 px-1 bg-white text-slate-700 outline-none focus:border-blue-500 transition-colors"
-                                                >
-                                                    <option value="">- Lepas Jadwal -</option>
-                                                    {availableShifts.map(s => (
-                                                        <option key={s.id} value={s.id}>{s.title}</option>
-                                                    ))}
-                                                </select>
+                                                {activeTab === 'active' && (
+                                                    <select
+                                                        value={user.shift?.id || ''}
+                                                        onChange={(e) => handleChangeShift(user.id, e.target.value)}
+                                                        className="w-32 text-xs border border-slate-300 rounded py-1 px-1 bg-white text-slate-700 outline-none focus:border-blue-500 transition-colors"
+                                                    >
+                                                        <option value="">- Lepas Jadwal -</option>
+                                                        {availableShifts.map(s => (
+                                                            <option key={s.id} value={s.id}>{s.title}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
+
                                                 <button
                                                     onClick={() => {
                                                         setSelectedUserForDocs({ id: user.id, name: user.name });
@@ -348,6 +410,24 @@ export default function EmployeesPage() {
                                                 >
                                                     <Laptop className="h-4 w-4" />
                                                 </button>
+
+                                                {activeTab === 'active' ? (
+                                                    <button
+                                                        onClick={() => handleDeactivate(user)}
+                                                        className="p-1 px-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                        title="Menonaktifkan (Ex-Employee)"
+                                                    >
+                                                        <UserX className="h-4 w-4" />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleReactivate(user)}
+                                                        className="p-1 px-2 text-green-500 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                                        title="Aktifkan Kembali"
+                                                    >
+                                                        <UserCheck className="h-4 w-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -552,6 +632,6 @@ export default function EmployeesPage() {
                 isOpen={isAssetsModalOpen}
                 onClose={() => setIsAssetsModalOpen(false)}
             />
-        </DashboardLayout >
+        </DashboardLayout>
     );
 }
