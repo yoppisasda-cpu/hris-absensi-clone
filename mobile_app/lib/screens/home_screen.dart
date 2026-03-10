@@ -518,33 +518,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: GestureDetector(
                   onTap: _isLoading
                       ? null
-                      : (_attendance == null
+                      : (_attendance == null || _attendance!['clockOut'] != null
                             ? _clockIn
-                            : (_attendance!['clockOut'] == null
-                                  ? _clockOut
-                                  : null)),
+                            : _clockOut),
                   child: Container(
                     height: 160,
                     width: 160,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
-                        colors: _attendance == null
+                        colors: _attendance == null || _attendance!['clockOut'] != null
                             ? [Colors.blue[400]!, Colors.blue[700]!]
-                            : (_attendance!['clockOut'] == null
-                                  ? [Colors.red[400]!, Colors.red[700]!]
-                                  : [Colors.grey[400]!, Colors.grey[600]!]),
+                            : [Colors.red[400]!, Colors.red[700]!],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              (_attendance == null
+                          color: (_attendance == null || _attendance!['clockOut'] != null
                                       ? Colors.blue
-                                      : (_attendance!['clockOut'] == null
-                                            ? Colors.red
-                                            : Colors.grey))
+                                      : Colors.red)
                                   .withOpacity(0.4),
                           blurRadius: 20,
                           offset: Offset(0, 8),
@@ -558,20 +551,16 @@ class _HomeScreenState extends State<HomeScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  _attendance == null
+                                  _attendance == null || _attendance!['clockOut'] != null
                                       ? Icons.fingerprint
-                                      : (_attendance!['clockOut'] == null
-                                            ? Icons.logout
-                                            : Icons.check_circle),
+                                      : Icons.logout,
                                   size: 60,
                                   color: Colors.white,
                                 ),
                                 Text(
-                                  _attendance == null
+                                  _attendance == null || _attendance!['clockOut'] != null
                                       ? 'CLOCK IN'
-                                      : (_attendance!['clockOut'] == null
-                                            ? 'CLOCK OUT'
-                                            : 'SUDAH ABSEN'),
+                                      : 'CLOCK OUT',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
