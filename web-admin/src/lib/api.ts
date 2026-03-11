@@ -3,15 +3,16 @@ import axios from 'axios';
 // Ini akan merujuk ke API Backend Node.js yang sudah kita buat sebelumnya
 // Helper to determine the backend URL
 const getBaseURL = () => {
-    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-    
-    // Fallback logic for production domains
+    // Force direct Railway URL in production to bypass broken api.aivola.id
     if (typeof window !== 'undefined') {
         const host = window.location.hostname;
         if (host.includes('aivola.id') || host.includes('vercel.app')) {
             return 'https://hris-absensi-clone-production.up.railway.app/api';
         }
     }
+    
+    // Allow local override if .env exists
+    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
     
     return 'http://127.0.0.1:5000/api'; // Local development fallback
 };
