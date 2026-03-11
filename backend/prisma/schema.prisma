@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // Harus menggunakan PostgreSQL untuk relasi Multi-Tenant yang stabil
-  url      = env("DATABASE_URL")
+  provider  = "postgresql" // Harus menggunakan PostgreSQL untuk relasi Multi-Tenant yang stabil
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // Model untuk Data Perusahaan (Tenant)
