@@ -55,6 +55,11 @@ export default function CompaniesPage() {
     const [contractEnd, setContractEnd] = useState('');
     const [employeeLimit, setEmployeeLimit] = useState('0');
 
+    // Admin Account States
+    const [adminName, setAdminName] = useState('');
+    const [adminEmail, setAdminEmail] = useState('');
+    const [adminPassword, setAdminPassword] = useState('');
+
     // Fetch daftar perusahaan saat komponen dimuat
     useEffect(() => {
         fetchCompanies();
@@ -85,7 +90,10 @@ export default function CompaniesPage() {
                 contractValue,
                 contractStart,
                 contractEnd,
-                employeeLimit
+                employeeLimit,
+                adminName,
+                adminEmail,
+                adminPassword
             });
 
             if (res.status === 200 || res.status === 201) {
@@ -101,15 +109,19 @@ export default function CompaniesPage() {
                 setContractStart('');
                 setContractEnd('');
                 setEmployeeLimit('0');
+                setAdminName('');
+                setAdminEmail('');
+                setAdminPassword('');
+                
                 // Tarik ulang data tabel
                 fetchCompanies();
-                alert('Berhasil mendaftarkan klien baru!');
+                alert('Berhasil mendaftarkan klien dan admin baru!');
             } else {
                 alert('Gagal mendaftar klien.');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            alert('Terjadi kesalahan jaringan.');
+            alert(error.response?.data?.error || 'Terjadi kesalahan jaringan.');
         } finally {
             setIsLoading(false);
         }
@@ -223,6 +235,43 @@ export default function CompaniesPage() {
                                     className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                                 <p className="mt-1 text-[10px] text-slate-400 italic">Membatasi jumlah karyawan yang bisa didaftarkan oleh tenant ini.</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 border-b border-slate-50 pb-4 bg-blue-50/50 -mx-6 px-6 pt-4 mb-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+                                Akun Administrator Pertama
+                            </h3>
+                            <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Nama Admin</label>
+                                <input
+                                    type="text"
+                                    value={adminName}
+                                    onChange={(e) => setAdminName(e.target.value)}
+                                    placeholder="Nama Lengkap Admin"
+                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Email Admin</label>
+                                <input
+                                    type="email"
+                                    value={adminEmail}
+                                    onChange={(e) => setAdminEmail(e.target.value)}
+                                    placeholder="hrd@perusahaan.com"
+                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Password Awal</label>
+                                <input
+                                    type="password"
+                                    value={adminPassword}
+                                    onChange={(e) => setAdminPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
                             </div>
                         </div>
 

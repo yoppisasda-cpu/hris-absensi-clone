@@ -442,29 +442,61 @@ app.post('/api/companies', async (req: Request, res: Response) => {
     const { 
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
-      employeeLimit 
+      employeeLimit,
+      adminEmail, adminPassword, adminName
     } = req.body;
 
-    // Casting tipe data memastikan angka desimal dari Frontend aman
-    const company = await prisma.company.create({
-      data: {
-        name,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        radius: radius ? parseInt(radius, 10) : 100,
-        picName,
-        picPhone,
-        contractType: contractType || 'LUMSUM',
-        contractValue: contractValue ? parseFloat(contractValue) : 0,
-        contractStart: contractStart ? new Date(contractStart) : null,
-        contractEnd: contractEnd ? new Date(contractEnd) : null,
-        employeeLimit: employeeLimit ? parseInt(employeeLimit, 10) : 0
+    // Gunakan Prisma Transaction agar jika salah satu gagal, semuanya dibatalkan
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Buat Perusahaan
+      const company = await tx.company.create({
+        data: {
+          name,
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
+          radius: radius ? parseInt(radius, 10) : 100,
+          picName,
+          picPhone,
+          contractType: contractType || 'LUMSUM',
+          contractValue: contractValue ? parseFloat(contractValue) : 0,
+          contractStart: contractStart ? new Date(contractStart) : null,
+          contractEnd: contractEnd ? new Date(contractEnd) : null,
+          employeeLimit: employeeLimit ? parseInt(employeeLimit, 10) : 0
+        }
+      });
+
+      let adminUser = null;
+
+      // 2. Buat Admin Pertama jika data dikirim
+      if (adminEmail && adminPassword) {
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+        adminUser = await tx.user.create({
+          data: {
+            companyId: company.id,
+            email: adminEmail.trim(),
+            password: hashedPassword,
+            name: adminName || picName || 'Admin ' + name,
+            role: 'ADMIN'
+          }
+        });
       }
+
+      return { company, adminUser };
     });
-    res.json({ message: 'Perusahaan berhasil didaftarkan di SaaS', company });
-  } catch (error) {
-    console.error('Error creating company:', error);
-    res.status(500).json({ error: 'Gagal mendaftar perusahaan' });
+
+    res.json({ 
+      message: 'Perusahaan ' + (result.adminUser ? 'dan Admin ' : '') + 'berhasil didaftarkan', 
+      company: result.company,
+      admin: result.adminUser ? { email: result.adminUser.email, name: result.adminUser.name } : null
+    });
+  } catch (error: any) {
+    console.error('Error creating company/admin:', error);
+    
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Email admin sudah terdaftar di sistem. Gunakan email lain.' });
+    }
+
+    res.status(500).json({ error: 'Gagal mendaftar perusahaan: ' + error.message });
   }
 });
 
