@@ -34,7 +34,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', diagnostic: 'v1.0.2-debug', time: new Date().toISOString() });
+  res.json({ status: 'ok', diagnostic: 'v1.0.3-final-test', time: new Date().toISOString() });
 });
 
 app.get('/api/setup-master', async (req: Request, res: Response) => {
@@ -359,10 +359,11 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('!!! LOGIN CRASH !!!', error);
     res.status(500).json({ 
-      error: 'Terjadi kesalahan pada server saat login (DIAGNOSTIC): ' + (error.message || 'Unknown Error'),
+      error: 'Terjadi kesalahan pada server saat login (DIAGNOSTIC v1.0.3): ' + (error.message || 'Unknown Error'),
       details: error.stack,
       env_db: !!process.env.DATABASE_URL,
-      env_direct: !!process.env.DIRECT_URL
+      env_direct: !!process.env.DIRECT_URL,
+      error_code: error.code || 'NO_CODE'
     });
   }
 });
