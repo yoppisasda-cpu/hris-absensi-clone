@@ -34,7 +34,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({ status: 'ok', diagnostic: 'v1.0.2-debug', time: new Date().toISOString() });
 });
 
 app.get('/api/setup-master', async (req: Request, res: Response) => {
@@ -357,10 +357,12 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error('Login Error:', error);
+    console.error('!!! LOGIN CRASH !!!', error);
     res.status(500).json({ 
-      error: 'Terjadi kesalahan pada server saat login: ' + (error.message || 'Unknown Error'),
-      details: error.stack 
+      error: 'Terjadi kesalahan pada server saat login (DIAGNOSTIC): ' + (error.message || 'Unknown Error'),
+      details: error.stack,
+      env_db: !!process.env.DATABASE_URL,
+      env_direct: !!process.env.DIRECT_URL
     });
   }
 });
@@ -510,6 +512,73 @@ app.get('/api/companies', async (req: Request, res: Response) => {
   }
 });
 
+// A2.1. Endpoint Menghapus Perusahaan (Super Admin Only)
+app.delete('/api/companies/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).userRole;
+    if (userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Hanya Super Admin yang dapat menghapus tenant' });
+    }
+
+    const companyId = parseInt(req.params.id as string);
+    
+    // Pastikan bukan menghapus Owner Company sendiri (Id 1 biasanya)
+    if (companyId === 1) {
+      return res.status(400).json({ error: 'Tidak dapat menghapus perusahaan sistem utama' });
+    }
+
+    await prisma.company.delete({
+      where: { id: companyId }
+    });
+
+    res.json({ message: 'Perusahaan berhasil dihapus secara permanen' });
+  } catch (error: any) {
+    console.error('Delete Company Error:', error);
+    res.status(500).json({ error: 'Gagal menghapus perusahaan: ' + error.message });
+  }
+});
+
+// A2.2. Endpoint Update Detail Perusahaan (Super Admin Only)
+app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).userRole;
+    const tenantIdFromAuth = (req as any).tenantId;
+    const companyId = parseInt(req.params.id as string);
+
+    // Izinkan jika dia Super Admin ATAU dia adalah Admin dari perusahaan itu sendiri
+    if (userRole !== 'SUPERADMIN' && tenantIdFromAuth !== companyId) {
+      return res.status(403).json({ error: 'Hanya Super Admin atau Admin terkait yang dapat mengedit data ini' });
+    }
+    const { 
+      name, latitude, longitude, radius,
+      picName, picPhone, contractType, contractValue, contractStart, contractEnd,
+      employeeLimit
+    } = req.body;
+
+    const updatedCompany = await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        name,
+        latitude: (latitude !== undefined && latitude !== null) ? parseFloat(latitude.toString()) : (latitude === null ? null : undefined),
+        longitude: (longitude !== undefined && longitude !== null) ? parseFloat(longitude.toString()) : (longitude === null ? null : undefined),
+        radius: (radius !== undefined && radius !== null) ? parseInt(radius.toString(), 10) : undefined,
+        picName,
+        picPhone,
+        contractType,
+        contractValue: (contractValue !== undefined && contractValue !== null) ? parseFloat(contractValue.toString()) : undefined,
+        contractStart: contractStart ? new Date(contractStart) : (contractStart === null ? null : undefined),
+        contractEnd: contractEnd ? new Date(contractEnd) : (contractEnd === null ? null : undefined),
+        employeeLimit: (employeeLimit !== undefined && employeeLimit !== null) ? parseInt(employeeLimit.toString(), 10) : undefined
+      }
+    });
+
+    res.json({ message: 'Data klien berhasil diperbarui', company: updatedCompany });
+  } catch (error: any) {
+    console.error('Update Company Error:', error);
+    res.status(500).json({ error: 'Gagal memperbarui data klien: ' + error.message });
+  }
+});
+
 // A3. Endpoint Mendapatkan Detail Perusahaan Sendiri (Tenant)
 app.get('/api/companies/my', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -645,6 +714,35 @@ app.delete('/api/branches/:id', tenantMiddleware, async (req: Request, res: Resp
     res.json({ message: 'Cabang berhasil dihapus' });
   } catch (error) {
     res.status(500).json({ error: 'Gagal menghapus cabang, pastikan tidak ada karyawan yang terhubung.' });
+  }
+});
+
+app.patch('/api/branches/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const branchId = parseInt(req.params.id as string);
+    const { name, latitude, longitude, radius } = req.body;
+
+    // Pastikan cabang milik tenant ini
+    // @ts-ignore
+    const branch = await prisma.branch.findFirst({ where: { id: branchId, companyId: tenantId } });
+    if (!branch) return res.status(404).json({ error: 'Cabang tidak ditemukan atau bukan milik perusahaan Anda' });
+
+    // @ts-ignore
+    const updatedBranch = await prisma.branch.update({
+      where: { id: branchId },
+      data: {
+        name,
+        latitude: (latitude !== undefined && latitude !== null) ? parseFloat(latitude.toString()) : (latitude === null ? null : undefined),
+        longitude: (longitude !== undefined && longitude !== null) ? parseFloat(longitude.toString()) : (longitude === null ? null : undefined),
+        radius: (radius !== undefined && radius !== null) ? parseInt(radius.toString(), 10) : undefined
+      }
+    });
+
+    res.json({ message: 'Data cabang berhasil diperbarui', branch: updatedBranch });
+  } catch (error) {
+    console.error('Update Branch Error:', error);
+    res.status(500).json({ error: 'Gagal memperbarui data cabang.' });
   }
 });
 
@@ -808,10 +906,51 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
       }
     });
 
-    res.json({ message: 'Profil karyawan diperbarui', user: updatedUser });
+    res.json({ message: 'Data karyawan berhasil diperbarui', user: updatedUser });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Gagal memperbarui karyawan.' });
+    res.status(500).json({ error: 'Gagal memperbarui data karyawan' });
+  }
+});
+
+// B1.6 Endpoint Hapus Karyawan (Permanen)
+app.delete('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+    const currentUserId = (req as any).userId;
+    const targetUserId = parseInt(req.params.id as string);
+
+    // 1. Prevent self-deletion
+    if (currentUserId === targetUserId) {
+      return res.status(400).json({ error: 'Anda tidak dapat menghapus akun Anda sendiri' });
+    }
+
+    // 2. Cek eksistensi
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+    }
+
+    // 3. Authorization Check
+    // SuperAdmin can delete anyone. Admin can only delete users in their own company.
+    if (userRole !== 'SUPERADMIN' && targetUser.companyId !== tenantId) {
+      return res.status(403).json({ error: 'Anda tidak memiliki akses untuk menghapus user ini' });
+    }
+
+    // 4. Delete
+    await prisma.user.delete({
+      where: { id: targetUserId }
+    });
+
+    res.json({ message: 'Karyawan berhasil dihapus secara permanen dari sistem' });
+
+  } catch (error: any) {
+    console.error('Delete User Error:', error);
+    res.status(500).json({ error: 'Gagal menghapus karyawan: ' + error.message });
   }
 });
 
