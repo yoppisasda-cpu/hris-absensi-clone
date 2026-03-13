@@ -188,6 +188,19 @@ export default function EmployeesPage() {
         }
     };
 
+    const handleDeleteUser = async (user: User) => {
+        if (!confirm(`Hapus PERMANEN karyawan "${user.name}"?\nSemua histori absensi dan payroll akan ikut terhapus.`)) return;
+        
+        try {
+            await api.delete(`/users/${user.id}`);
+            alert('Karyawan berhasil dihapus secara permanen.');
+            fetchUsers();
+        } catch (error: any) {
+            console.error(error);
+            alert(error.response?.data?.error || 'Gagal menghapus karyawan.');
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -430,6 +443,14 @@ export default function EmployeesPage() {
                                                         <UserCheck className="h-4 w-4" />
                                                     </button>
                                                 )}
+
+                                                <button
+                                                    onClick={() => handleDeleteUser(user)}
+                                                    className="p-1 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                    title="Hapus Permanen"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -478,7 +499,7 @@ export default function EmployeesPage() {
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSaveEmployee} className="p-6 space-y-4">
+                            <form onSubmit={handleSaveEmployee} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto custom-scrollbar">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>
                                     <input required type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. John Doe" />
@@ -609,13 +630,14 @@ export default function EmployeesPage() {
                                     </div>
                                 </div>
 
-                                    <div className="pt-4 flex gap-3 justify-end">
+                                <div className="sticky bottom-0 bg-white pt-4 pb-0 flex gap-3 justify-end border-t border-slate-50">
                                     <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Batal</button>
-                                    <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
+                                    <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 shadow-lg shadow-blue-500/20">
                                         <Save className="h-4 w-4" /> {isSaving ? 'Menyimpan...' : 'Simpan Profil'}
                                     </button>
                                 </div>
                             </form>
+
                         </div>
                     </div>
                 )

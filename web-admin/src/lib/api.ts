@@ -14,7 +14,7 @@ const getBaseURL = () => {
     // Allow local override if .env exists
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
     
-    return 'http://127.0.0.1:5000/api'; // Local development fallback
+    return 'http://127.0.0.1:5005/api'; // Local development fallback
 };
 
 const api = axios.create({

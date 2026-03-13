@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
-import { Building2, MapPin, Save, AlertTriangle } from 'lucide-react';
+import { Building2, MapPin, Save, AlertTriangle, Trash2, Globe, Edit2 } from 'lucide-react';
+import MapPicker from '@/components/maps/MapPicker';
 
 interface Company {
     id: number;
@@ -60,6 +61,9 @@ export default function CompaniesPage() {
     const [adminEmail, setAdminEmail] = useState('');
     const [adminPassword, setAdminPassword] = useState('');
 
+    const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
+    const [isMapOpen, setIsMapOpen] = useState(false);
+
     // Fetch daftar perusahaan saat komponen dimuat
     useEffect(() => {
         fetchCompanies();
@@ -74,12 +78,30 @@ export default function CompaniesPage() {
         }
     };
 
-    const handleCreateCompany = async (e: React.FormEvent) => {
+    const resetForm = () => {
+        setEditingCompanyId(null);
+        setName('');
+        setLatitude('');
+        setLongitude('');
+        setRadius('100');
+        setPicName('');
+        setPicPhone('');
+        setContractType('LUMSUM');
+        setContractValue('0');
+        setContractStart('');
+        setContractEnd('');
+        setEmployeeLimit('0');
+        setAdminName('');
+        setAdminEmail('');
+        setAdminPassword('');
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
         try {
-            const res = await api.post('/companies', {
+            const payload = {
                 name,
                 latitude,
                 longitude,
@@ -88,42 +110,66 @@ export default function CompaniesPage() {
                 picPhone,
                 contractType,
                 contractValue,
-                contractStart,
-                contractEnd,
+                contractStart: contractStart || null,
+                contractEnd: contractEnd || null,
                 employeeLimit,
-                adminName,
-                adminEmail,
-                adminPassword
-            });
+                ...(editingCompanyId ? {} : { adminName, adminEmail, adminPassword })
+            };
+
+            let res;
+            if (editingCompanyId) {
+                res = await api.patch(`/companies/${editingCompanyId}`, payload);
+            } else {
+                res = await api.post('/companies', payload);
+            }
 
             if (res.status === 200 || res.status === 201) {
-                // Reset form
-                setName('');
-                setLatitude('');
-                setLongitude('');
-                setRadius('100');
-                setPicName('');
-                setPicPhone('');
-                setContractType('LUMSUM');
-                setContractValue('0');
-                setContractStart('');
-                setContractEnd('');
-                setEmployeeLimit('0');
-                setAdminName('');
-                setAdminEmail('');
-                setAdminPassword('');
-                
-                // Tarik ulang data tabel
+                resetForm();
                 fetchCompanies();
-                alert('Berhasil mendaftarkan klien dan admin baru!');
+                alert(editingCompanyId ? 'Data klien berhasil diperbarui!' : 'Berhasil mendaftarkan klien dan admin baru!');
             } else {
-                alert('Gagal mendaftar klien.');
+                alert('Gagal memproses data klien.');
             }
         } catch (error: any) {
             console.error(error);
             alert(error.response?.data?.error || 'Terjadi kesalahan jaringan.');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleEditClick = (company: Company) => {
+        setEditingCompanyId(company.id);
+        setName(company.name);
+        setLatitude(company.latitude?.toString() || '');
+        setLongitude(company.longitude?.toString() || '');
+        setRadius(company.radius?.toString() || '100');
+        setPicName(company.picName || '');
+        setPicPhone(company.picPhone || '');
+        setContractType(company.contractType);
+        setContractValue(company.contractValue?.toString() || '0');
+        setContractStart(company.contractStart ? new Date(company.contractStart).toISOString().split('T')[0] : '');
+        setContractEnd(company.contractEnd ? new Date(company.contractEnd).toISOString().split('T')[0] : '');
+        setEmployeeLimit(company.employeeLimit?.toString() || '0');
+        // Kosongkan admin fields karena tidak diedit di sini
+        setAdminName('');
+        setAdminEmail('');
+        setAdminPassword('');
+
+        // Scroll ke form
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDeleteCompany = async (id: number, companyName: string) => {
+        if (!confirm(`Hapus PERMANEN tenant "${companyName}"?\nSemua data karyawan, absensi, dan payroll terkait akan ikut terhapus.`)) return;
+        
+        try {
+            await api.delete(`/companies/${id}`);
+            alert('Tenant berhasil dihapus.');
+            fetchCompanies();
+        } catch (error: any) {
+            console.error(error);
+            alert(error.response?.data?.error || 'Gagal menghapus tenant.');
         }
     };
 
@@ -139,10 +185,18 @@ export default function CompaniesPage() {
                 <div className="lg:col-span-1 border border-slate-200 bg-white p-6 shadow-sm rounded-xl h-fit">
                     <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
                         <Building2 className="h-5 w-5 text-blue-600" />
-                        <h2 className="text-lg font-semibold text-slate-800">Registrasi Tenant Baru</h2>
+                        <h2 className="text-lg font-semibold text-slate-800">
+                            {editingCompanyId ? 'Edit Data Klien' : 'Registrasi Tenant Baru'}
+                        </h2>
                     </div>
 
-                    <form onSubmit={handleCreateCompany} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {editingCompanyId && (
+                            <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg flex justify-between items-center mb-4">
+                                <div className="text-xs text-amber-700 font-medium italic">Sedang mengedit: ID {editingCompanyId}</div>
+                                <button type="button" onClick={resetForm} className="text-[10px] font-bold text-amber-800 hover:underline">Batal Edit</button>
+                            </div>
+                        )}
                         <div className="space-y-4 border-b border-slate-50 pb-4">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Informasi Dasar & PIC</h3>
                             <div>
@@ -238,48 +292,60 @@ export default function CompaniesPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-4 border-b border-slate-50 pb-4 bg-blue-50/50 -mx-6 px-6 pt-4 mb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">
-                                <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
-                                Akun Administrator Pertama
-                            </h3>
-                            <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Nama Admin</label>
-                                <input
-                                    type="text"
-                                    value={adminName}
-                                    onChange={(e) => setAdminName(e.target.value)}
-                                    placeholder="Nama Lengkap Admin"
-                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
+                        {!editingCompanyId && (
+                            <div className="space-y-4 border-b border-slate-50 pb-4 bg-blue-50/50 -mx-6 px-6 pt-4 mb-4">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+                                    Akun Administrator Pertama
+                                </h3>
+                                <div>
+                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Nama Admin</label>
+                                    <input
+                                        type="text"
+                                        value={adminName}
+                                        onChange={(e) => setAdminName(e.target.value)}
+                                        placeholder="Nama Lengkap Admin"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Email Admin</label>
+                                    <input
+                                        type="email"
+                                        value={adminEmail}
+                                        onChange={(e) => setAdminEmail(e.target.value)}
+                                        placeholder="hrd@perusahaan.com"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Password Awal</label>
+                                    <input
+                                        type="password"
+                                        value={adminPassword}
+                                        onChange={(e) => setAdminPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Email Admin</label>
-                                <input
-                                    type="email"
-                                    value={adminEmail}
-                                    onChange={(e) => setAdminEmail(e.target.value)}
-                                    placeholder="hrd@perusahaan.com"
-                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Password Awal</label>
-                                <input
-                                    type="password"
-                                    value={adminPassword}
-                                    onChange={(e) => setAdminPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                            </div>
-                        </div>
+                        )}
 
                         <div className="space-y-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 text-slate-400">Lokasi Kantor (Opsional)</h3>
+                            <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Lokasi Kantor (Opsional)</h3>
+                                <button 
+                                    type="button"
+                                    onClick={() => setIsMapOpen(true)}
+                                    className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-md transition-colors"
+                                >
+                                    <Globe className="h-3 w-3" /> Pilih di Peta
+                                </button>
+                            </div>
+                            
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-700 text-xs">Lat (Gmaps)</label>
+                                    <label className="mb-1 block text-[10px] font-medium text-slate-500 uppercase">Latitude</label>
                                     <input
                                         type="number"
                                         step="any"
@@ -290,7 +356,7 @@ export default function CompaniesPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-700 text-xs">Lng (Gmaps)</label>
+                                    <label className="mb-1 block text-[10px] font-medium text-slate-500 uppercase">Longitude</label>
                                     <input
                                         type="number"
                                         step="any"
@@ -316,10 +382,12 @@ export default function CompaniesPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-blue-700 disabled:bg-blue-300"
+                            className={`mt-6 flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold text-white transition-all disabled:bg-slate-300 ${
+                                editingCompanyId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
                         >
                             <Save className="h-4 w-4" />
-                            {isLoading ? 'Memproses...' : 'Daftarkan Klien'}
+                            {isLoading ? 'Memproses...' : (editingCompanyId ? 'Simpan Perubahan' : 'Daftarkan Klien')}
                         </button>
                     </form>
                 </div>
@@ -336,13 +404,14 @@ export default function CompaniesPage() {
                                     <th className="px-4 py-3 border-b text-center">Status Kontrak</th>
                                     <th className="px-4 py-3 border-b text-right">Nilai Kontrak</th>
                                     <th className="px-4 py-3 border-b text-center">Limit</th>
+                                    <th className="px-4 py-3 border-b text-right">Aksi</th>
                                     <th className="px-4 py-3 border-b">GPS / Radius</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {companies.length === 0 ? (
                                     <tr>
-                                        <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
+                                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                                             Sedang memuat data... atau belum ada data klien.
                                         </td>
                                     </tr>
@@ -385,6 +454,24 @@ export default function CompaniesPage() {
                                                 <div className="text-xs font-bold text-slate-800">{company.employeeLimit || '∞'}</div>
                                                 <div className="text-[10px] text-slate-400">User</div>
                                             </td>
+                                            <td className="px-4 py-4 border-b border-slate-100 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => handleEditClick(company)}
+                                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                        title="Edit Tenant"
+                                                    >
+                                                        <Edit2 className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteCompany(company.id, company.name)}
+                                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Hapus Tenant"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td className="px-4 py-4 border-b border-slate-100">
                                                 <div className="text-[10px] text-slate-500">Lat: {company.latitude ?? '-'}</div>
                                                 <div className="text-[10px] text-slate-500">Lng: {company.longitude ?? '-'}</div>
@@ -398,6 +485,16 @@ export default function CompaniesPage() {
                     </div>
                 </div>
             </div>
+            <MapPicker 
+                isOpen={isMapOpen} 
+                onClose={() => setIsMapOpen(false)} 
+                onSelect={(lat, lng) => {
+                    setLatitude(lat.toString());
+                    setLongitude(lng.toString());
+                }}
+                initialLat={parseFloat(latitude) || undefined}
+                initialLng={parseFloat(longitude) || undefined}
+            />
         </DashboardLayout>
     );
 }
