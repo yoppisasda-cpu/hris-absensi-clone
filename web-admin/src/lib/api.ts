@@ -7,7 +7,7 @@ const getBaseURL = () => {
     if (typeof window !== 'undefined') {
         const host = window.location.hostname;
         if (host.includes('aivola.id') || host.includes('vercel.app')) {
-            return 'https://hris-absensi-clone-production.up.railway.app/api';
+            return 'https://api.aivola.id/api';
         }
     }
     
