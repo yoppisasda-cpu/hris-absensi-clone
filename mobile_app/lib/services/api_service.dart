@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   // Ganti localhost dengan IP lokal komputer Anda jika dio run di real-device/emulator
   // Emulator Android = 10.0.2.2 || Real Device = IP LAN (192.168.x.x)
-  static const String baseUrl = 'https://hris-absensi-clone-production.up.railway.app/api';
+  static const String baseUrl = 'https://api.aivola.id/api';
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   ApiService() {
