@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs';
 import { uploadToSupabase } from './supabase_storage';
 import dotenv from 'dotenv';
+import { initCleanupCron, runCleanup } from './cron_jobs';
 
 dotenv.config();
 
@@ -1066,7 +1067,9 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
         const fullPath = path.join(__dirname, photoUrl);
         finalPhotoUrl = await uploadToSupabase(fullPath, 'attendance');
       } catch (uploadError) {
-        console.error('Failed to upload to R2, keeping local path:', uploadError);
+        console.error('Failed to upload to Supabase, falling back to absolute local URL:', uploadError);
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        finalPhotoUrl = `${baseUrl}${photoUrl}`;
       }
     }
 
@@ -1084,19 +1087,27 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
     // --- AI MOOD ANALYSIS (Phase 36) ---
     if (photoUrl) {
         const fullPath = path.join(__dirname, photoUrl);
+        console.log(`[Mood AI] Analyzing photo at: ${fullPath}`);
         if (fs.existsSync(fullPath)) {
-            const { analyzeMood } = require('./moodAI');
-            const moodResult = await analyzeMood(fullPath);
-            await (prisma.attendance as any).update({
-                where: { id: attendance.id },
-                data: {
-                    mood: moodResult.mood,
-                    moodScore: moodResult.score
-                }
-            });
-            // Update response object for mobile
-            (attendance as any).mood = moodResult.mood;
-            (attendance as any).moodScore = moodResult.score;
+            try {
+                const { analyzeMood } = require('./moodAI');
+                const moodResult = await analyzeMood(fullPath);
+                console.log(`[Mood AI] Result for attendance ${attendance.id}:`, moodResult);
+                await (prisma.attendance as any).update({
+                    where: { id: attendance.id },
+                    data: {
+                        mood: moodResult.mood,
+                        moodScore: moodResult.score
+                    }
+                });
+                // Update response object for mobile
+                (attendance as any).mood = moodResult.mood;
+                (attendance as any).moodScore = moodResult.score;
+            } catch (moodErr) {
+                console.error('[Mood AI] Error during analysis:', moodErr);
+            }
+        } else {
+            console.warn(`[Mood AI] Photo file not found for analysis: ${fullPath}`);
         }
         // Cleanup after Supabase upload and AI processing
         cleanupLocalFile(fullPath);
@@ -1185,7 +1196,9 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         const fullPath = path.join(__dirname, photoUrl);
         finalPhotoUrl = await uploadToSupabase(fullPath, 'attendance');
       } catch (uploadError) {
-        console.error('Failed to upload to Supabase, keeping local path:', uploadError);
+        console.error('Failed to upload to Supabase, falling back to absolute local URL:', uploadError);
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        finalPhotoUrl = `${baseUrl}${photoUrl}`;
       }
     }
 
@@ -1198,6 +1211,32 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         clockOutPhotoUrl: finalPhotoUrl
       }
     });
+
+    // --- AI MOOD ANALYSIS (Phase 36) - Clock Out ---
+    if (photoUrl) {
+        const fullPath = path.join(__dirname, photoUrl);
+        if (fs.existsSync(fullPath)) {
+            try {
+                const { analyzeMood } = require('./moodAI');
+                const moodResult = await analyzeMood(fullPath);
+                console.log(`[Mood AI - ClockOut] Result for attendance ${attendance.id}:`, moodResult);
+                // Kita simpan mood clock-out jika ingin mendata mood akhir hari
+                // Namun di database kita hanya punya satu kolom mood (biasanya clock-in yang paling krusial)
+                // Jika ingin menyimpan keduanya, butuh update schema.
+                // Untuk sekarang kita hanya update jika data mood masih kosong (misal gagal saat clock-in)
+                await (prisma.attendance as any).update({
+                    where: { id: attendance.id },
+                    data: {
+                        mood: moodResult.mood,
+                        moodScore: moodResult.score
+                    }
+                });
+            } catch (moodErr) {
+                console.error('[Mood AI - ClockOut] Error:', moodErr);
+            }
+        }
+        cleanupLocalFile(fullPath);
+    }
 
     res.json({ message: 'Berhasil Clock-Out', attendance: updatedAttendance });
   } catch (error) {
@@ -3914,7 +3953,7 @@ app.post('/api/admin/billing/generate', tenantMiddleware, async (req: Request, r
       }
     }
 
-    res.json({ 
+    res.json({
       message: `Proses generate invoice selesai.`,
       details: results
     });
@@ -3973,6 +4012,63 @@ app.patch('/api/admin/billing/:id/pay', tenantMiddleware, async (req: Request, r
   }
 });
 
+// --- SUPER ADMIN SETTINGS (PHOTO RETENTION) ---
+app.get('/api/admin/settings', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    if ((req as any).userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Akses terbatas untuk Super Admin' });
+    }
+
+    const settingsArr = await prisma.globalSetting.findMany();
+    // Convert to object for easier frontend use
+    const settingsObj = settingsArr.reduce((acc, curr) => {
+      acc[curr.key] = curr.value;
+      return acc;
+    }, {} as Record<string, string>);
+
+    res.json(settingsObj);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal mengambil pengaturan global' });
+  }
+});
+
+app.patch('/api/admin/settings', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    if ((req as any).userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Akses terbatas untuk Super Admin' });
+    }
+
+    const updates = req.body; // Expecting { key: value, ... }
+
+    for (const [key, value] of Object.entries(updates)) {
+      await prisma.globalSetting.upsert({
+        where: { key },
+        update: { value: String(value) },
+        create: { key, value: String(value) }
+      });
+    }
+
+    res.json({ message: 'Pengaturan berhasil diperbarui' });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal memperbarui pengaturan' });
+  }
+});
+
+// Manual trigger for testing cleanup
+app.post('/api/admin/cleanup-photos', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    if ((req as any).userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Akses terbatas untuk Super Admin' });
+    }
+
+    console.log('[MANUAL] Triggering Photo Cleanup...');
+    await runCleanup();
+    res.json({ message: 'Proses pembersihan foto selesai dijalankan.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menjalankan pembersihan foto' });
+  }
+});
+
 // --- FASE 41: CONSOLIDATED REPORTING (SUPERADMIN) ---
 
 app.get('/api/admin/reports/consolidated', tenantMiddleware, async (req: Request, res: Response) => {
@@ -3984,8 +4080,8 @@ app.get('/api/admin/reports/consolidated', tenantMiddleware, async (req: Request
 
     // 1. Basic Stats
     const totalTenants = await prisma.company.count();
-    const totalEmployees = await prisma.user.count({ 
-      where: { role: { not: 'SUPERADMIN' } } 
+    const totalEmployees = await prisma.user.count({
+      where: { role: { not: 'SUPERADMIN' } }
     });
 
     // 2. Financial Stats (Revenue from Invoices)
@@ -4048,8 +4144,8 @@ app.get('/api/admin/reports/consolidated', tenantMiddleware, async (req: Request
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('!!! GLOBAL SERVER ERROR !!!');
   console.error(err);
-  res.status(500).json({ 
-    error: 'Internal Server Error (Crash)', 
+  res.status(500).json({
+    error: 'Internal Server Error (Crash)',
     message: err.message,
     path: req.path
   });
@@ -4058,4 +4154,5 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 app.listen(PORT, () => {
   console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
   console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);
+  initCleanupCron(); // Start the background cleanup job
 });

@@ -69,6 +69,10 @@ export default function Sidebar() {
                             <TrendingUp className="h-5 w-5" />
                             Laporan Global (SaaS)
                         </Link>
+                        <Link href="/dashboard/owner-settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-orange-600/10 text-orange-400 hover:bg-slate-800 transition-colors">
+                            <Settings className="h-5 w-5" />
+                            Owner Settings (Data)
+                        </Link>
                     </>
                 )}
 

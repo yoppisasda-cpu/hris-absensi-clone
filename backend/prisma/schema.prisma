@@ -479,6 +479,14 @@ model Invoice {
   @@unique([companyId, month, year])
 }
 
+model GlobalSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum OvertimeStatus {
   PENDING
   APPROVED
