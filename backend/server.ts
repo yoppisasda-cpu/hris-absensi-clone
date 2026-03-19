@@ -14,6 +14,7 @@ import { compareFaces } from './faceAI';
 import { getAIChatResponse } from './chatAI';
 
 dotenv.config();
+console.log('🚀 [BOOT] Aivola Backend v1.0.5-Live-Debug starting...');
 
 // Helper for cleaning up local files after Supabase upload (Phase Cloud)
 const cleanupLocalFile = (filePath: string | null) => {
@@ -37,7 +38,12 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', diagnostic: 'v1.0.3-final-test', time: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    version: 'v1.0.5-live-debug',
+    env: process.env.NODE_ENV,
+    time: new Date().toISOString() 
+  });
 });
 
 app.get('/api/setup-master', async (req: Request, res: Response) => {
