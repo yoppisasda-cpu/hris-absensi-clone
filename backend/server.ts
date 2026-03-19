@@ -1179,7 +1179,7 @@ app.patch('/api/users/:id/face-reference', tenantMiddleware, uploadFaceReference
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
-    const targetUserId = parseInt(req.params.id);
+    const targetUserId = parseInt(req.params.id as string);
 
     // Keamanan: Hanya Admin/Superadmin yang bisa mendaftarkan wajah (mencegah fraud mandiri)
     if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN') {
@@ -4348,7 +4348,7 @@ app.post('/api/chat/message', async (req: Request, res: Response) => {
     });
     
     // 3. Get AI Response
-    const aiResponseContent = await getAIChatResponse(content, history.map(h => ({ role: h.sender, content: h.content })));
+    const aiResponseContent = await getAIChatResponse(content, history.map((h: any) => ({ role: h.sender, content: h.content })));
     
     // 4. Save AI Response
     const aiMsg = await prisma.chatMessage.create({
@@ -4389,7 +4389,7 @@ app.get('/api/chat/admin/sessions', tenantMiddleware, async (req: Request, res: 
 app.get('/api/chat/admin/sessions/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const session = await prisma.chatSession.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' }
