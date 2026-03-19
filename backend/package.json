@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch server.ts",
-    "build": "echo BUILDING_V1_0_3_CLEAN && rm -rf dist && npx prisma generate && tsc",
+    "build": "rm -rf dist && tsc",
     "start": "node dist/server.js",
     "serve": "tsx server.ts"
   },
@@ -35,7 +35,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
-    "@types/node": "^25.3.3",
+    "@types/node": "^18.18.0",
     "@types/node-cron": "^3.0.11",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
