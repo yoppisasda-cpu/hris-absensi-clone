@@ -1,4 +1,4 @@
-# 1. Base image (v1.0.1-forced-update)
+# 1. Base image (v1.0.6-FORCE-CACHE-BREAK)
 FROM node:18-alpine
 
 # Install openssl for Prisma (diperlukan di Alpine)
