@@ -40,7 +40,10 @@ export default function Sidebar() {
             <div className="flex h-16 items-center justify-center border-b border-slate-700 mt-4 pb-4" style={{ display: 'flex', height: '4rem', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #334155', marginTop: '1rem', paddingBottom: '1rem' }}>
                 <div className="flex items-center gap-2" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <img src="/logo.png" alt="aivola Logo" className="h-8 w-8 rounded-lg object-contain bg-white p-1" style={{ height: '2rem', width: '2rem', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'white', padding: '0.25rem' }} />
-                    <span className="text-xl font-bold tracking-tight text-slate-100 font-primary" style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f1f5f9' }}>aivola <span style={{ color: '#3b82f6' }}>Admin</span></span>
+                    <div className="flex flex-col">
+                        <span className="text-xl font-bold tracking-tight text-slate-100 font-primary" style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f1f5f9' }}>aivola <span style={{ color: '#3b82f6' }}>Admin</span></span>
+                        <span className="text-[10px] text-slate-500 font-mono">Build v1.0.6-Final-Live</span>
+                    </div>
                 </div>
             </div>
 
