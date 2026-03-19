@@ -14,7 +14,8 @@ import { compareFaces } from './faceAI';
 import { getAIChatResponse } from './chatAI';
 
 dotenv.config();
-console.log('🚀 [BOOT] Aivola Backend v1.0.5-Live-Debug starting...');
+console.log('🚀 [BOOT] Aivola Backend v1.0.6-Final-Live starting...');
+const VERSION = 'v1.0.6-final-live';
 
 // Helper for cleaning up local files after Supabase upload (Phase Cloud)
 const cleanupLocalFile = (filePath: string | null) => {
