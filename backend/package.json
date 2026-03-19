@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch server.ts",
-    "build": "rm -rf dist && tsc",
+    "build": "npx prisma generate && rm -rf dist && tsc",
     "start": "node dist/server.js",
     "serve": "tsx server.ts"
   },
