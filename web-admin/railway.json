@@ -5,7 +5,7 @@
     "buildCommand": "npm install && npm run build && ls -la out"
   },
   "deploy": {
-    "startCommand": "npx serve -s out -l $PORT",
+    "startCommand": "npx serve -s out -l 3000",
     "restartPolicyType": "ON_FAILURE"
   }
 }
