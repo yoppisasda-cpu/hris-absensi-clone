@@ -19,6 +19,7 @@ interface Company {
     contractStart: string | null;
     contractEnd: string | null;
     employeeLimit: number;
+    photoRetentionDays?: number;
 }
 
 export default function CompaniesPage() {
@@ -55,6 +56,7 @@ export default function CompaniesPage() {
     const [contractStart, setContractStart] = useState('');
     const [contractEnd, setContractEnd] = useState('');
     const [employeeLimit, setEmployeeLimit] = useState('0');
+    const [photoRetentionDays, setPhotoRetentionDays] = useState('30');
 
     // Admin Account States
     const [adminName, setAdminName] = useState('');
@@ -91,6 +93,7 @@ export default function CompaniesPage() {
         setContractStart('');
         setContractEnd('');
         setEmployeeLimit('0');
+        setPhotoRetentionDays('30');
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
@@ -113,6 +116,7 @@ export default function CompaniesPage() {
                 contractStart: contractStart || null,
                 contractEnd: contractEnd || null,
                 employeeLimit,
+                photoRetentionDays,
                 ...(editingCompanyId ? {} : { adminName, adminEmail, adminPassword })
             };
 
@@ -151,6 +155,7 @@ export default function CompaniesPage() {
         setContractStart(company.contractStart ? new Date(company.contractStart).toISOString().split('T')[0] : '');
         setContractEnd(company.contractEnd ? new Date(company.contractEnd).toISOString().split('T')[0] : '');
         setEmployeeLimit(company.employeeLimit?.toString() || '0');
+        setPhotoRetentionDays(company.photoRetentionDays?.toString() || '30');
         // Kosongkan admin fields karena tidak diedit di sini
         setAdminName('');
         setAdminEmail('');
@@ -289,6 +294,21 @@ export default function CompaniesPage() {
                                     className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                                 <p className="mt-1 text-[10px] text-slate-400 italic">Membatasi jumlah karyawan yang bisa didaftarkan oleh tenant ini.</p>
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-slate-700">Retensi Foto (Hari)</label>
+                                <div className="relative">
+                                    <input
+                                        required
+                                        type="number"
+                                        value={photoRetentionDays}
+                                        onChange={(e) => setPhotoRetentionDays(e.target.value)}
+                                        placeholder="30"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                    <span className="absolute right-3 top-2 text-xs text-slate-400 font-medium h-full flex items-center">hari</span>
+                                </div>
+                                <p className="mt-1 text-[10px] text-slate-400 italic">Foto akan otomatis dihapus setelah jumlah hari ini.</p>
                             </div>
                         </div>
 

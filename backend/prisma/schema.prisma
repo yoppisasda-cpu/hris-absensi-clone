@@ -28,6 +28,7 @@ model Company {
   picName                String?
   picPhone               String?
   employeeLimit          Int                  @default(0)
+  photoRetentionDays     Int                  @default(30)
   announcements          Announcement[]
   assets                 Asset[]
   attendances            Attendance[]
@@ -93,6 +94,7 @@ model User {
   reportToId              Int?
   isActive                Boolean             @default(true)
   resignDate              DateTime?
+  faceReferenceUrl        String?
   assets                  Asset[]
   attendances             Attendance[]
   bonuses                 Bonus[]
@@ -114,6 +116,7 @@ model User {
   company                 Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   reportTo                User?               @relation("ReportingLine", fields: [reportToId], references: [id])
   subordinates            User[]              @relation("ReportingLine")
+  chatSessions            ChatSession[]
   shift                   Shift?              @relation(fields: [shiftId], references: [id])
 }
 
@@ -160,6 +163,8 @@ model Attendance {
   clockOutLat      Float?
   clockOutLng      Float?
   clockOutPhotoUrl String?
+  faceSimilarityScore Float?
+  isFaceVerified     Boolean          @default(false)
   company          Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -470,6 +475,7 @@ model Invoice {
   contractType  ContractType
   contractValue Float
   employeeLimit Int           @default(0)
+  photoRetentionDays Int      @default(30)
   dueDate       DateTime
   paidAt        DateTime?
   createdAt     DateTime      @default(now())
@@ -549,4 +555,30 @@ enum InvoiceStatus {
   UNPAID
   PAID
   CANCELLED
+}
+
+model ChatSession {
+  id          String        @id @default(uuid())
+  visitorName String?
+  email       String?
+  userId      Int?          // If a logged in user is chatting
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  messages    ChatMessage[]
+  user        User?         @relation(fields: [userId], references: [id])
+}
+
+model ChatMessage {
+  id        Int          @id @default(autoincrement())
+  sessionId String
+  sender    ChatSender
+  content   String
+  createdAt DateTime     @default(now())
+  session   ChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+enum ChatSender {
+  USER
+  AI
+  ADMIN
 }

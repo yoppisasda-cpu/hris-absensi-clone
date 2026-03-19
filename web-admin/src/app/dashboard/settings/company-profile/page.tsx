@@ -15,6 +15,7 @@ interface Company {
     absenceDeductionType?: string;
     absenceDeductionRate?: number;
     sickLeaveDeductionRate?: number;
+    photoRetentionDays?: number;
 }
 
 export default function CompanyProfilePage() {
@@ -26,7 +27,8 @@ export default function CompanyProfilePage() {
         name: '',
         latitude: '',
         longitude: '',
-        radius: ''
+        radius: '',
+        photoRetentionDays: '30'
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -45,7 +47,8 @@ export default function CompanyProfilePage() {
                 name: response.data.name || '',
                 latitude: response.data.latitude?.toString() || '',
                 longitude: response.data.longitude?.toString() || '',
-                radius: response.data.radius?.toString() || '100'
+                radius: response.data.radius?.toString() || '100',
+                photoRetentionDays: response.data.photoRetentionDays?.toString() || '30'
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -75,7 +78,8 @@ export default function CompanyProfilePage() {
                 name: formData.name,
                 latitude: formData.latitude ? parseFloat(formData.latitude) : null,
                 longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-                radius: formData.radius ? parseInt(formData.radius, 10) : 100
+                radius: formData.radius ? parseInt(formData.radius, 10) : 100,
+                photoRetentionDays: formData.photoRetentionDays ? parseInt(formData.photoRetentionDays, 10) : 30
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -166,6 +170,24 @@ export default function CompanyProfilePage() {
                                     className="w-full rounded-lg border border-slate-300 py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                                     placeholder="Nama PT / Instansi"
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Retensi Foto (Hari)</label>
+                                    <div className="relative">
+                                        <input
+                                            required
+                                            type="number"
+                                            value={formData.photoRetentionDays}
+                                            onChange={e => setFormData({ ...formData, photoRetentionDays: e.target.value })}
+                                            className="w-full rounded-lg border border-slate-300 py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                            placeholder="30"
+                                        />
+                                        <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-medium">hari</span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 mt-1.5">* Foto absensi akan otomatis dihapus setelah jumlah hari ini.</p>
+                                </div>
                             </div>
 
                             <div className="pt-4 border-t border-slate-100">

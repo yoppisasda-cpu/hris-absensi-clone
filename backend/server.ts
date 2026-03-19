@@ -10,6 +10,8 @@ import fs from 'fs';
 import { uploadToSupabase } from './supabase_storage';
 import dotenv from 'dotenv';
 import { initCleanupCron, runCleanup } from './cron_jobs';
+import { compareFaces } from './faceAI';
+import { getAIChatResponse } from './chatAI';
 
 dotenv.config();
 
@@ -171,6 +173,20 @@ const assetStorage = multer.diskStorage({
   }
 });
 const uploadAsset = multer({ storage: assetStorage });
+
+// --- CONFIG MULTER UNTUK FOTO REFERENSI WAJAH ---
+const faceReferenceStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = 'uploads/face_references';
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'face-ref-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const uploadFaceReference = multer({ storage: faceReferenceStorage });
 
 // --- 1. MIDDLEWARE MULTI-TENANT & AUTH (CRITICAL) ---
 // Middleware ini mengekstrak profil Karyawan dari token JWT.
@@ -446,7 +462,7 @@ app.post('/api/companies', async (req: Request, res: Response) => {
     const { 
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
-      employeeLimit,
+      employeeLimit, photoRetentionDays,
       adminEmail, adminPassword, adminName
     } = req.body;
 
@@ -459,13 +475,15 @@ app.post('/api/companies', async (req: Request, res: Response) => {
           latitude: latitude ? parseFloat(latitude) : null,
           longitude: longitude ? parseFloat(longitude) : null,
           radius: radius ? parseInt(radius, 10) : 100,
+          // @ts-ignore
           picName,
           picPhone,
           contractType: contractType || 'LUMSUM',
           contractValue: contractValue ? parseFloat(contractValue) : 0,
           contractStart: contractStart ? new Date(contractStart) : null,
           contractEnd: contractEnd ? new Date(contractEnd) : null,
-          employeeLimit: employeeLimit ? parseInt(employeeLimit, 10) : 0
+          employeeLimit: employeeLimit ? parseInt(employeeLimit, 10) : 0,
+          photoRetentionDays: photoRetentionDays ? parseInt(photoRetentionDays, 10) : 30
         }
       });
 
@@ -554,7 +572,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
     const { 
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
-      employeeLimit
+      employeeLimit, photoRetentionDays
     } = req.body;
 
     const updatedCompany = await prisma.company.update({
@@ -570,7 +588,8 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         contractValue: (contractValue !== undefined && contractValue !== null) ? parseFloat(contractValue.toString()) : undefined,
         contractStart: contractStart ? new Date(contractStart) : (contractStart === null ? null : undefined),
         contractEnd: contractEnd ? new Date(contractEnd) : (contractEnd === null ? null : undefined),
-        employeeLimit: (employeeLimit !== undefined && employeeLimit !== null) ? parseInt(employeeLimit.toString(), 10) : undefined
+        employeeLimit: (employeeLimit !== undefined && employeeLimit !== null) ? parseInt(employeeLimit.toString(), 10) : undefined,
+        photoRetentionDays: (photoRetentionDays !== undefined && photoRetentionDays !== null) ? parseInt(photoRetentionDays.toString(), 10) : undefined
       }
     });
 
@@ -620,7 +639,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
     const { 
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
-      employeeLimit
+      employeeLimit, photoRetentionDays
     } = req.body;
 
     const updatedCompany = await prisma.company.update({
@@ -636,7 +655,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         contractValue: contractValue ? parseFloat(contractValue.toString()) : undefined,
         contractStart: contractStart ? new Date(contractStart) : undefined,
         contractEnd: contractEnd ? new Date(contractEnd) : undefined,
-        employeeLimit: employeeLimit ? parseInt(employeeLimit.toString(), 10) : undefined
+        employeeLimit: employeeLimit ? parseInt(employeeLimit.toString(), 10) : undefined,
+        photoRetentionDays: photoRetentionDays ? parseInt(photoRetentionDays.toString(), 10) : undefined
       }
     });
 
@@ -1037,6 +1057,37 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
     // @ts-ignore
     if (!user || !user.company) return res.status(404).json({ error: 'Data karyawan atau perusahaan tidak ditemukan' });
 
+    // --- FACE VERIFICATION (Phase 50/52) ---
+    let faceSimilarityScore = null;
+    let isFaceVerified = false;
+
+    // @ts-ignore
+    if (!user.faceReferenceUrl) {
+      return res.status(400).json({ error: 'Verifikasi Wajah Gagal: Anda belum mendaftarkan Master Photo (Referensi Wajah). Silakan hubungi HRD.' });
+    }
+
+    if (req.file) {
+      try {
+        const capturePath = path.join(__dirname, photoUrl!);
+        // @ts-ignore
+        const refUrl = user.faceReferenceUrl;
+        
+        const faceResult = await compareFaces(refUrl, capturePath);
+        faceSimilarityScore = faceResult.score;
+        isFaceVerified = faceResult.verified;
+        console.log(`[Face AI] Clock-In Verification: ${isFaceVerified} (Score: ${faceSimilarityScore})`);
+
+        if (!isFaceVerified) {
+          return res.status(400).json({ error: `Verifikasi Wajah Gagal: Foto selfie tidak cocok dengan data referensi (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%). Pastikan wajah terlihat jelas.` });
+        }
+      } catch (faceErr) {
+        console.error('[Face AI] Error during Clock-In verification:', faceErr);
+        return res.status(500).json({ error: 'Terjadi kesalahan pada sistem verifikasi wajah AI.' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Verifikasi Wajah Wajib: Foto selfie tidak ditemukan.' });
+    }
+
     // 2. Tentukan Titik Koordinat Acuan (GPS Reference Point)
     // Jika karyawan terdaftar di Cabang, gunakan GPS Cabang.
     // Jika tidak (staff pusat), gunakan GPS global Perusahaan.
@@ -1080,7 +1131,11 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
         lat: parseFloat(lat),
         lng: parseFloat(lng),
         photoUrl: finalPhotoUrl,
-        status: 'PRESENT'
+        status: 'PRESENT',
+        // @ts-ignore
+        faceSimilarityScore,
+        // @ts-ignore
+        isFaceVerified
       }
     });
 
@@ -1116,6 +1171,57 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
     res.json({ message: 'Berhasil Clock-In', attendance });
   } catch (error) {
     res.status(500).json({ error: 'Gagal melakukan absensi' });
+  }
+});
+
+// C1. Register Face Reference (Admin/HR Only)
+app.patch('/api/users/:id/face-reference', tenantMiddleware, uploadFaceReference.single('photo'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+    const targetUserId = parseInt(req.params.id);
+
+    // Keamanan: Hanya Admin/Superadmin yang bisa mendaftarkan wajah (mencegah fraud mandiri)
+    if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Hanya Admin/HR yang dapat mendaftarkan foto referensi wajah.' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'File foto wajib dilampirkan.' });
+    }
+
+    // Pastikan user milik tenant yang sama (kecuali superadmin)
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user || (userRole !== 'SUPERADMIN' && user.companyId !== tenantId)) {
+      return res.status(404).json({ error: 'Karyawan tidak ditemukan atau akses ditolak.' });
+    }
+
+    const localPath = `/uploads/face_references/${req.file.filename}`;
+    const fullPath = path.join(__dirname, localPath);
+
+    // Upload ke Supabase
+    let finalUrl = localPath;
+    try {
+      finalUrl = await uploadToSupabase(fullPath, 'face_references');
+      cleanupLocalFile(fullPath);
+    } catch (uploadError) {
+      console.error('Supabase upload failed for face reference:', uploadError);
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      finalUrl = `${baseUrl}${localPath}`;
+    }
+
+    // Simpan ke User
+    await prisma.user.update({
+      where: { id: targetUserId },
+      // @ts-ignore
+      data: { faceReferenceUrl: finalUrl }
+    });
+
+    res.json({ message: 'Foto referensi wajah berhasil didaftarkan.', faceReferenceUrl: finalUrl });
+
+  } catch (error) {
+    console.error('Face Reference Registration Error:', error);
+    res.status(500).json({ error: 'Gagal mendaftarkan foto referensi wajah.' });
   }
 });
 
@@ -1168,6 +1274,36 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
       return res.status(404).json({ error: 'Data absensi aktif hari ini tidak ditemukan.' });
     }
 
+    // --- FACE VERIFICATION (Phase 50/52) - Clock Out ---
+    let faceSimilarityScore = null;
+    let isFaceVerified = false;
+
+    // @ts-ignore
+    if (!attendance.user.faceReferenceUrl) {
+      return res.status(400).json({ error: 'Verifikasi Wajah Gagal: Anda belum memiliki Master Photo. Hubungi HRD.' });
+    }
+
+    if (req.file) {
+      try {
+        const capturePath = path.join(__dirname, photoUrl!);
+        // @ts-ignore
+        const refUrl = attendance.user.faceReferenceUrl;
+        const faceResult = await compareFaces(refUrl, capturePath);
+        faceSimilarityScore = faceResult.score;
+        isFaceVerified = faceResult.verified;
+        console.log(`[Face AI] Clock-Out Verification: ${isFaceVerified} (Score: ${faceSimilarityScore})`);
+
+        if (!isFaceVerified) {
+          return res.status(400).json({ error: `Verifikasi Wajah Gagal: Foto tidak cocok (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%).` });
+        }
+      } catch (faceErr) {
+        console.error('[Face AI] Error during Clock-Out verification:', faceErr);
+        return res.status(500).json({ error: 'Gagal memverifikasi wajah saat Clock-Out.' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Foto selfie wajib dilampirkan untuk Clock-Out.' });
+    }
+
     const user = attendance.user;
     // @ts-ignore
     let refLat = user.branch?.latitude || user.company?.latitude;
@@ -1208,7 +1344,11 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         clockOut: new Date(),
         clockOutLat: parseFloat(lat),
         clockOutLng: parseFloat(lng),
-        clockOutPhotoUrl: finalPhotoUrl
+        clockOutPhotoUrl: finalPhotoUrl,
+        // @ts-ignore
+        faceSimilarityScore: faceSimilarityScore || (attendance as any).faceSimilarityScore,
+        // @ts-ignore
+        isFaceVerified: isFaceVerified || (attendance as any).isFaceVerified
       }
     });
 
@@ -3440,6 +3580,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
         contractStart: true,
         contractEnd: true,
         employeeLimit: true,
+        photoRetentionDays: true,
         contractType: true
       }
     });
@@ -3942,6 +4083,7 @@ app.post('/api/admin/billing/generate', tenantMiddleware, async (req: Request, r
             contractType: company.contractType,
             contractValue: company.contractValue,
             employeeLimit: company.employeeLimit,
+            photoRetentionDays: company.photoRetentionDays,
             dueDate
           }
         });
@@ -4149,6 +4291,117 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     message: err.message,
     path: req.path
   });
+});
+
+// ==========================================
+// C1. CRM LIVE CHAT ENDPOINTS
+// ==========================================
+
+// C1.1. Create/Retrieve Chat Session
+app.post('/api/chat/session', async (req: Request, res: Response) => {
+  try {
+    const { visitorName, email, userId } = req.body;
+    
+    const session = await prisma.chatSession.create({
+      data: {
+        visitorName,
+        email,
+        userId: userId ? parseInt(userId) : undefined,
+        messages: {
+            create: [
+                {
+                    sender: 'AI',
+                    content: "Halo! Saya adalah Asisten AI Aivola. Ada yang bisa saya bantu terkait sistem HRIS kami?"
+                }
+            ]
+        }
+      },
+      include: { messages: true }
+    });
+    
+    res.json(session);
+  } catch (error: any) {
+    console.error('Create Chat Session Error:', error);
+    res.status(500).json({ error: 'Gagal membuat sesi chat' });
+  }
+});
+
+// C1.2. Send Message and Get AI Response
+app.post('/api/chat/message', async (req: Request, res: Response) => {
+  try {
+    const { sessionId, content } = req.body;
+    
+    // 1. Save User Message
+    const userMsg = await prisma.chatMessage.create({
+      data: {
+        sessionId,
+        sender: 'USER',
+        content
+      }
+    });
+    
+    // 2. Get History for context
+    const history = await prisma.chatMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
+      take: 10
+    });
+    
+    // 3. Get AI Response
+    const aiResponseContent = await getAIChatResponse(content, history.map(h => ({ role: h.sender, content: h.content })));
+    
+    // 4. Save AI Response
+    const aiMsg = await prisma.chatMessage.create({
+      data: {
+        sessionId,
+        sender: 'AI',
+        content: aiResponseContent
+      }
+    });
+    
+    res.json({ userMessage: userMsg, aiResponse: aiMsg });
+  } catch (error: any) {
+    console.error('Send Chat Message Error:', error);
+    res.status(500).json({ error: 'Gagal mengirim pesan' });
+  }
+});
+
+// C1.3. Get All Sessions (Admin Monitoring)
+app.get('/api/chat/admin/sessions', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const sessions = await prisma.chatSession.findMany({
+      include: {
+        messages: {
+           orderBy: { createdAt: 'desc' },
+           take: 1
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+    
+    res.json(sessions);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil sesi chat' });
+  }
+});
+
+// C1.4. Get Session Detail
+app.get('/api/chat/admin/sessions/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const session = await prisma.chatSession.findUnique({
+      where: { id: req.params.id },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' }
+        }
+      }
+    });
+    
+    if (!session) return res.status(404).json({ error: 'Sesi tidak ditemukan' });
+    res.json(session);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil detail sesi' });
+  }
 });
 
 app.listen(PORT, () => {

@@ -98,6 +98,11 @@ class _HomeScreenState extends State<HomeScreen> {
         desiredAccuracy: LocationAccuracy.best,
       );
 
+      // --- ANTI FAKEMAP (Phase 51) ---
+      if (position.isMocked) {
+        throw Exception('Anti-Fakemap: Terdeteksi penggunaan GPS Palsu! Silakan gunakan lokasi asli.');
+      }
+
       // 3. Cek & Minta Izin Kamera
       var statusCam = await Permission.camera.status;
       if (!statusCam.isGranted) {
@@ -183,6 +188,11 @@ class _HomeScreenState extends State<HomeScreen> {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
       );
+
+      // --- ANTI FAKEMAP (Phase 51) ---
+      if (position.isMocked) {
+        throw Exception('Anti-Fakemap: Terdeteksi penggunaan GPS Palsu! Silakan gunakan lokasi asli.');
+      }
 
       // 3. Cek & Minta Izin Kamera
       var statusCam = await Permission.camera.status;

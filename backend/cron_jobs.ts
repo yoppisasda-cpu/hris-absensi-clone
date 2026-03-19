@@ -18,62 +18,67 @@ export const initCleanupCron = () => {
 
 export const runCleanup = async () => {
     try {
-        // 1. Get Retention Period from Settings
-        const setting = await prisma.globalSetting.findUnique({
-            where: { key: 'photo_retention_days' }
+        console.log('[CRON] Starting Per-Company Photo Retention Cleanup...');
+        
+        // 1. Ambil semua perusahaan
+        const companies = await prisma.company.findMany({
+            select: { id: true, name: true, photoRetentionDays: true }
         });
 
-        const retentionDays = setting ? parseInt(setting.value) : 30; // Default 30 days
-        if (isNaN(retentionDays) || retentionDays < 0) {
-            console.log('[CRON] Invalid retention days setting. Skipping.');
-            return;
-        }
+        for (const company of companies) {
+            const retentionDays = company.photoRetentionDays || 30; // Default 30 hari
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+            console.log(`[CRON] Company: ${company.name} (ID: ${company.id}) - Retention: ${retentionDays} days (Before: ${cutoffDate.toISOString()})`);
 
-        console.log(`[CRON] Deleting photos older than ${retentionDays} days (before ${cutoffDate.toISOString()})`);
-
-        // 2. Cleanup Attendance Photos
-        const oldAttendances = await prisma.attendance.findMany({
-            where: {
-                OR: [
-                    { clockIn: { lt: cutoffDate }, photoUrl: { not: null } },
-                    { clockOut: { lt: cutoffDate }, clockOutPhotoUrl: { not: null } }
-                ]
-            },
-            select: { id: true, photoUrl: true, clockOutPhotoUrl: true }
-        });
-
-        for (const record of oldAttendances) {
-            if (record.photoUrl) await deleteFromSupabase(record.photoUrl, 'attendance');
-            if (record.clockOutPhotoUrl) await deleteFromSupabase(record.clockOutPhotoUrl, 'attendance');
-            
-            await prisma.attendance.update({
-                where: { id: record.id },
-                data: { photoUrl: null, clockOutPhotoUrl: null }
+            // 2. Cleanup Attendance Photos untuk Perusahaan ini
+            const oldAttendances = await prisma.attendance.findMany({
+                where: {
+                    companyId: company.id,
+                    OR: [
+                        { clockIn: { lt: cutoffDate }, photoUrl: { not: null } },
+                        { clockOut: { lt: cutoffDate }, clockOutPhotoUrl: { not: null } }
+                    ]
+                },
+                select: { id: true, photoUrl: true, clockOutPhotoUrl: true }
             });
-        }
 
-        // 3. Cleanup Reimbursement Receipts
-        const oldReimbursements = await prisma.reimbursement.findMany({
-            where: {
-                createdAt: { lt: cutoffDate },
-                receiptUrl: { not: null }
-            },
-            select: { id: true, receiptUrl: true }
-        });
+            for (const record of oldAttendances) {
+                if (record.photoUrl) await deleteFromSupabase(record.photoUrl, 'attendance');
+                if (record.clockOutPhotoUrl) await deleteFromSupabase(record.clockOutPhotoUrl, 'attendance');
+                
+                await prisma.attendance.update({
+                    where: { id: record.id },
+                    data: { photoUrl: null, clockOutPhotoUrl: null }
+                });
+            }
 
-        for (const record of oldReimbursements) {
-            if (record.receiptUrl) await deleteFromSupabase(record.receiptUrl, 'reimbursements');
-            
-            await prisma.reimbursement.update({
-                where: { id: record.id },
-                data: { receiptUrl: null }
+            // 3. Cleanup Reimbursement Receipts untuk Perusahaan ini
+            const oldReimbursements = await prisma.reimbursement.findMany({
+                where: {
+                    companyId: company.id,
+                    createdAt: { lt: cutoffDate },
+                    receiptUrl: { not: null }
+                },
+                select: { id: true, receiptUrl: true }
             });
+
+            for (const record of oldReimbursements) {
+                if (record.receiptUrl) await deleteFromSupabase(record.receiptUrl, 'reimbursements');
+                
+                await prisma.reimbursement.update({
+                    where: { id: record.id },
+                    data: { receiptUrl: null }
+                });
+            }
+
+            if (oldAttendances.length > 0 || oldReimbursements.length > 0) {
+                console.log(`[CRON] ${company.name}: Cleaned up ${oldAttendances.length} attendances and ${oldReimbursements.length} reimbursements.`);
+            }
         }
 
-        console.log(`[CRON] Cleanup finished. Processed ${oldAttendances.length} attendance records and ${oldReimbursements.length} reimbursements.`);
+        console.log('[CRON] Per-company cleanup finished successfully.');
     } catch (error) {
         console.error('[CRON] Cleanup Error:', error);
     }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 
 const menuItems = [
@@ -30,7 +30,7 @@ export default function Sidebar() {
         }
     }, [userRole]);
     return (
-        <div className="flex h-screen w-64 flex-col bg-slate-900 text-white shadow-xl transition-all" style={{ display: 'flex', height: '100vh', width: '16rem', flexDirection: 'column', backgroundColor: '#0f172a', color: 'white' }}>
+        <div className="flex h-screen w-64 flex-col bg-slate-900 text-white shadow-xl transition-all overflow-y-auto" style={{ display: 'flex', height: '100vh', width: '16rem', flexDirection: 'column', backgroundColor: '#0f172a', color: 'white', overflowY: 'auto' }}>
             <style jsx>{`
                 .nav-link { display: flex; items-center: center; gap: 0.75rem; border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; transition: all 0.2s; color: #cbd5e1; text-decoration: none; }
                 .nav-link:hover { background-color: #1e293b; color: white; }
@@ -135,6 +135,10 @@ export default function Sidebar() {
                 <Link href="/dashboard/vents" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                     <Heart className="h-5 w-5 text-pink-500" />
                     Pulse of Company
+                </Link>
+                <Link href="/dashboard/crm" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                    <MessageSquare className="h-5 w-5 text-blue-400" />
+                    CRM Live Chat
                 </Link>
                 <Link href="/dashboard/learning" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                     <GraduationCap className="h-5 w-5 text-indigo-500" />

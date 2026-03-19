@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2 } from 'lucide-react';
+import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2, Camera } from 'lucide-react';
 import EmployeeDocumentsModal from '@/components/dashboard/EmployeeDocumentsModal';
 import EmployeeAssetsModal from '@/components/dashboard/EmployeeAssetsModal';
 
@@ -39,6 +39,7 @@ interface User {
     reportToId?: number;
     isActive?: boolean;
     resignDate?: string;
+    faceReferenceUrl?: string;
 }
 
 export default function EmployeesPage() {
@@ -65,6 +66,13 @@ export default function EmployeesPage() {
 
     const [isAssetsModalOpen, setIsAssetsModalOpen] = useState(false);
     const [selectedUserForAssets, setSelectedUserForAssets] = useState({ id: 0, name: '' });
+
+    // State untuk Modal Face Reference
+    const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
+    const [selectedUserForFace, setSelectedUserForFace] = useState<{id: number, name: string, currentPhoto?: string}>({ id: 0, name: '' });
+    const [faceFile, setFaceFile] = useState<File | null>(null);
+    const [facePreview, setFacePreview] = useState<string | null>(null);
+    const [isUploadingFace, setIsUploadingFace] = useState(false);
 
     const [availableShifts, setAvailableShifts] = useState<Shift[]>([]);
     const [availableBranches, setAvailableBranches] = useState<Branch[]>([]);
@@ -134,6 +142,30 @@ export default function EmployeesPage() {
         } finally {
             setIsLoading(false);
             setIsSaving(false);
+        }
+    };
+
+    const handleFaceUpload = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!faceFile) return;
+
+        setIsUploadingFace(true);
+        const formData = new FormData();
+        formData.append('photo', faceFile);
+
+        try {
+            await api.patch(`/users/${selectedUserForFace.id}/face-reference`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            alert('Foto referensi wajah berhasil diperbarui!');
+            setIsFaceModalOpen(false);
+            setFaceFile(null);
+            setFacePreview(null);
+            fetchUsers();
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Gagal mengupload foto referensi.');
+        } finally {
+            setIsUploadingFace(false);
         }
     };
 
@@ -445,6 +477,21 @@ export default function EmployeesPage() {
                                                 )}
 
                                                 <button
+                                                    onClick={() => {
+                                                        setSelectedUserForFace({ 
+                                                            id: user.id, 
+                                                            name: user.name, 
+                                                            currentPhoto: user.faceReferenceUrl 
+                                                        });
+                                                        setIsFaceModalOpen(true);
+                                                    }}
+                                                    className={`p-1 px-2 rounded transition-colors ${user.faceReferenceUrl ? 'text-green-600 hover:bg-green-50' : 'text-slate-400 hover:bg-slate-100'}`}
+                                                    title="Foto Referensi Wajah (AI)"
+                                                >
+                                                    <Camera className="h-4 w-4" />
+                                                </button>
+
+                                                <button
                                                     onClick={() => handleDeleteUser(user)}
                                                     className="p-1 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                                                     title="Hapus Permanen"
@@ -656,6 +703,73 @@ export default function EmployeesPage() {
                 isOpen={isAssetsModalOpen}
                 onClose={() => setIsAssetsModalOpen(false)}
             />
+
+            {/* Modal Face Reference Registration */}
+            {isFaceModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between border-b px-6 py-4 border-slate-100">
+                            <h3 className="font-bold text-slate-800">Registrasi Wajah AI</h3>
+                            <button onClick={() => setIsFaceModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleFaceUpload} className="p-8">
+                            <p className="text-sm text-slate-500 mb-6 text-center">
+                                Daftarkan foto wajah resmi <strong>{selectedUserForFace.name}</strong> sebagai referensi verifikasi absensi.
+                            </p>
+
+                            <div className="flex flex-col items-center gap-6 mb-8">
+                                <div className="relative h-48 w-48 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden group transition-all hover:border-blue-400">
+                                    {facePreview ? (
+                                        <img src={facePreview} alt="Preview" className="h-full w-full object-cover" />
+                                    ) : selectedUserForFace.currentPhoto ? (
+                                        <img src={selectedUserForFace.currentPhoto} alt="Current" className="h-full w-full object-cover" />
+                                    ) : (
+                                        <div className="flex flex-col items-center text-slate-400">
+                                            <Camera className="h-10 w-10 mb-2 opacity-20" />
+                                            <span className="text-xs">Pilih Foto Jelas</span>
+                                        </div>
+                                    )}
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        capture="user"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                setFaceFile(file);
+                                                setFacePreview(URL.createObjectURL(file));
+                                            }
+                                        }}
+                                        className="absolute inset-0 opacity-0 cursor-pointer" 
+                                    />
+                                </div>
+                                <p className="text-[10px] text-slate-400 italic text-center px-4">
+                                    Pastikan wajah terlihat jelas, tanpa masker/kacamata hitam, dan pencahayaan cukup.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsFaceModalOpen(false)} 
+                                    className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                                >
+                                    Batal
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={isUploadingFace || !faceFile} 
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+                                >
+                                    <Save className="h-4 w-4" /> {isUploadingFace ? 'Mengirim...' : 'Simpan Wajah'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }

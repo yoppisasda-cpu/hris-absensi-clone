@@ -2,6 +2,7 @@ import { useState } from 'react'
 import logoImg from './assets/logo.png'
 import heroImg from './assets/hero.png'
 import demoVideo from './assets/demo.webp'
+import { ChatWidget } from './components/ChatWidget'
 import './App.css'
 
 function App() {
@@ -91,7 +92,7 @@ function App() {
       </main>
 
       {isVideoOpen && <VideoModal onClose={() => setIsVideoOpen(false)} />}
-
+      <ChatWidget />
       <Footer />
     </div>
   )

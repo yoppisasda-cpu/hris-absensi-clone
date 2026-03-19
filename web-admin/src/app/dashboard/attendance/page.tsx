@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { FileSpreadsheet, Download, Calendar, User, Clock, Search, Smile, Meh, Frown, AlertCircle, TrendingUp } from 'lucide-react';
+import { FileSpreadsheet, Download, Calendar, User, Clock, Search, Smile, Meh, Frown, AlertCircle, TrendingUp, ShieldCheck, ShieldAlert, Shield } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface Attendance {
@@ -22,6 +22,8 @@ interface Attendance {
     clockOutPhotoUrl: string | null;
     mood: string | null;
     moodScore: number | null;
+    faceSimilarityScore: number | null;
+    isFaceVerified: boolean;
 }
 
 export default function AttendancePage() {
@@ -171,6 +173,7 @@ export default function AttendancePage() {
                                     <th className="px-6 py-4 text-center">Clock-In</th>
                                     <th className="px-6 py-4 text-center">Clock-Out</th>
                                     <th className="px-6 py-4 text-center">Mood</th>
+                                    <th className="px-6 py-4 text-center">Verifikasi Wajah</th>
                                     <th className="px-6 py-4 text-center">Status</th>
                                 </tr>
                             </thead>
@@ -256,6 +259,26 @@ export default function AttendancePage() {
                                             {att.mood === 'Lelah' && <span className="flex items-center justify-center gap-1 text-orange-600"><Frown className="h-5 w-5" /> <span className="text-xs font-medium">Lelah</span></span>}
                                             {att.mood === 'Stres' && <span className="flex items-center justify-center gap-1 text-red-600"><AlertCircle className="h-5 w-5" /> <span className="text-xs font-medium">Stres</span></span>}
                                             {!att.mood && <span className="text-slate-300">-</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {att.faceSimilarityScore !== null ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {att.isFaceVerified ? (
+                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">
+                                                            <ShieldCheck className="h-3 w-3" /> VERIFIED
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-100">
+                                                            <ShieldAlert className="h-3 w-3" /> MISMATCH
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] text-slate-400 font-mono">Score: {(att.faceSimilarityScore * 100).toFixed(0)}%</span>
+                                                </div>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full text-[10px] font-medium border border-slate-100">
+                                                    <Shield className="h-3 w-3 opacity-30" /> No Reference
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${att.clockOut ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>

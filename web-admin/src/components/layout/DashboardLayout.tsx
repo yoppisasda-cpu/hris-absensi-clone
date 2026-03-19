@@ -20,7 +20,7 @@ export default function DashboardLayout({
     }, [router]);
 
     return (
-        <div className="flex h-screen bg-slate-50" style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc' }}>
+        <div className="flex h-screen bg-slate-50 overflow-hidden" style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden' }}>
             {/* Sidebar Kiri */}
             <Sidebar />
 
