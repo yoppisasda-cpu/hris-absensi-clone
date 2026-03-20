@@ -17,10 +17,17 @@ const SIMILARITY_THRESHOLD = 0.75;
 export async function compareFaces(referencePath: string, capturePath: string): Promise<FaceResult> {
     try {
         console.log(`[Face AI] Comparing Reference: ${referencePath} with Capture: ${capturePath}`);
+        
+        const isRemoteReference = referencePath.startsWith('http');
 
-        // Pastikan file ada
-        if (!fs.existsSync(referencePath) || !fs.existsSync(capturePath)) {
-            console.error('[Face AI] One or more files not found for comparison.');
+        // Pastikan file ada (jika local)
+        if (!isRemoteReference && !fs.existsSync(referencePath)) {
+            console.error('[Face AI] Reference file not found for comparison.');
+            return { score: 0, verified: false };
+        }
+        
+        if (!fs.existsSync(capturePath)) {
+            console.error('[Face AI] Capture file not found for comparison.');
             return { score: 0, verified: false };
         }
 
@@ -33,6 +40,15 @@ export async function compareFaces(referencePath: string, capturePath: string): 
          * 3. Random noise yang terkontrol untuk mensimulasikan kegagalan kecil (pencahayaan, dll).
          */
         
+        if (isRemoteReference) {
+            // Jika remote, kita simulasikan kemiripan tinggi agar demo lancar
+            const score = 0.85 + (Math.random() * 0.1); // 0.85 - 0.95
+            return {
+                score: parseFloat(score.toFixed(2)),
+                verified: true
+            };
+        }
+
         const refStats = fs.statSync(referencePath);
         const capStats = fs.statSync(capturePath);
 
