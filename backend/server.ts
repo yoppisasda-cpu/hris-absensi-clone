@@ -643,34 +643,60 @@ app.post('/api/companies/my/api-key', tenantMiddleware, async (req: Request, res
 app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+
+    // --- STRICT ROLE CHECK ---
+    if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN') {
+      console.warn(`[AUTH] Unauthorized Company Update Attempt by User: ${(req as any).userId}, Role: ${userRole}`);
+      return res.status(403).json({ error: 'Akses Ditolak: Hanya Admin yang dapat merubah profil perusahaan' });
+    }
+
     const { 
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, photoRetentionDays
     } = req.body;
 
+    console.log(`[DEBUG] Updating Company Profile for Tenant: ${tenantId}`, {
+      body: req.body
+    });
+
+    // Helper untuk parse angka agar aman dari NaN dan mendukung nilai 0
+    const parseNum = (val: any) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      const num = parseFloat(val.toString());
+      return isNaN(num) ? undefined : num;
+    };
+
+    const parseIntNum = (val: any) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      const num = parseInt(val.toString(), 10);
+      return isNaN(num) ? undefined : num;
+    };
+
     const updatedCompany = await prisma.company.update({
       where: { id: tenantId },
       data: {
         name,
-        latitude: latitude ? parseFloat(latitude.toString()) : undefined,
-        longitude: longitude ? parseFloat(longitude.toString()) : undefined,
-        radius: radius ? parseInt(radius.toString(), 10) : undefined,
+        latitude: parseNum(latitude),
+        longitude: parseNum(longitude),
+        radius: parseIntNum(radius),
         picName,
         picPhone,
         contractType,
-        contractValue: contractValue ? parseFloat(contractValue.toString()) : undefined,
+        contractValue: parseNum(contractValue),
         contractStart: contractStart ? new Date(contractStart) : undefined,
         contractEnd: contractEnd ? new Date(contractEnd) : undefined,
-        employeeLimit: employeeLimit ? parseInt(employeeLimit.toString(), 10) : undefined,
-        photoRetentionDays: photoRetentionDays ? parseInt(photoRetentionDays.toString(), 10) : undefined
+        employeeLimit: parseIntNum(employeeLimit),
+        photoRetentionDays: parseIntNum(photoRetentionDays)
       }
     });
 
+    console.log(`[SUCCESS] Company Profile Updated for Tenant: ${tenantId}`);
     res.json({ message: 'Profil perusahaan berhasil diperbarui', company: updatedCompany });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Gagal memperbarui data perusahaan' });
+    console.error('[ERROR] Gagal memperbarui profil perusahaan:', error);
+    res.status(500).json({ error: 'Gagal memperbarui data perusahaan di database' });
   }
 });
 
