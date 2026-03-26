@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { Toaster } from 'react-hot-toast';
 
 import { LanguageProvider } from '@/lib/LanguageContext';
 
@@ -18,8 +19,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <LanguageProvider>
+          <Toaster position="top-right" />
           {children}
         </LanguageProvider>
       </body>

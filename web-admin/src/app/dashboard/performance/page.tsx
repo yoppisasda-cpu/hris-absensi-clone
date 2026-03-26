@@ -13,6 +13,7 @@ interface Indicator {
     target: number;
     weight: number;
     isSystem?: boolean;
+    systemType?: string | null;
 }
 
 interface Employee {
@@ -38,7 +39,8 @@ export default function PerformancePage() {
         name: '',
         description: '',
         target: 100,
-        weight: 1
+        weight: 1,
+        systemType: ''
     });
 
     useEffect(() => {
@@ -64,8 +66,13 @@ export default function PerformancePage() {
     const handleCreateIndicator = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await api.post('/kpi/indicators', newIndicator);
-            setNewIndicator({ name: '', description: '', target: 100, weight: 1 });
+            const payload = {
+                ...newIndicator,
+                isSystem: newIndicator.systemType === 'ATTENDANCE' || newIndicator.systemType === 'PUNCTUALITY',
+                systemType: newIndicator.systemType || null
+            };
+            await api.post('/kpi/indicators', payload);
+            setNewIndicator({ name: '', description: '', target: 100, weight: 1, systemType: '' });
             setIsFormOpen(false);
             fetchData();
         } catch (err) {
@@ -89,13 +96,19 @@ export default function PerformancePage() {
             name: ind.name,
             description: ind.description || '',
             target: ind.target,
-            weight: ind.weight
+            weight: ind.weight,
+            systemType: ind.systemType || ''
         });
     };
 
     const handleUpdateIndicator = async (id: number) => {
         try {
-            await api.put(`/kpi/indicators/${id}`, editIndicator);
+            const payload = {
+                ...editIndicator,
+                isSystem: editIndicator.systemType === 'ATTENDANCE' || editIndicator.systemType === 'PUNCTUALITY',
+                systemType: editIndicator.systemType || null
+            };
+            await api.put(`/kpi/indicators/${id}`, payload);
             setEditingId(null);
             fetchData();
         } catch (err) {
@@ -171,7 +184,7 @@ export default function PerformancePage() {
                             </div>
                             <form onSubmit={handleCreateIndicator} className="p-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="md:col-span-2">
+                                    <div className="md:col-span-1">
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Nama Indikator</label>
                                         <input
                                             type="text"
@@ -179,8 +192,21 @@ export default function PerformancePage() {
                                             value={newIndicator.name}
                                             onChange={e => setNewIndicator({ ...newIndicator, name: e.target.value })}
                                             className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                            placeholder="Contoh: Produktivitas Harian, Kepatuhan Prosedur"
+                                            placeholder="Contoh: Produktivitas Harian"
                                         />
+                                    </div>
+                                    <div className="md:col-span-1">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Sumber Data (Otomasi)</label>
+                                        <select
+                                            value={newIndicator.systemType}
+                                            onChange={e => setNewIndicator({ ...newIndicator, systemType: e.target.value })}
+                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        >
+                                            <option value="">Manual (Input Sendiri)</option>
+                                            <option value="ATTENDANCE">Kehadiran (Sistem)</option>
+                                            <option value="PUNCTUALITY">Ketepatan Waktu (Sistem)</option>
+                                            <option value="LEARNING">Target Belajar (Module Learning)</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Target Nilai</label>
@@ -236,6 +262,19 @@ export default function PerformancePage() {
                                             />
                                         </div>
                                         <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Sumber Data</label>
+                                            <select 
+                                                className="w-full text-[10px] font-bold border border-slate-100 rounded px-2 py-1 focus:border-blue-500 outline-none"
+                                                value={editIndicator.systemType || ''}
+                                                onChange={e => setEditIndicator({...editIndicator, systemType: e.target.value})}
+                                            >
+                                                <option value="">Manual (Input Sendiri)</option>
+                                                <option value="ATTENDANCE">Kehadiran (Sistem)</option>
+                                                <option value="PUNCTUALITY">Ketepatan Waktu (Sistem)</option>
+                                                <option value="LEARNING">Target Belajar (Module Learning)</option>
+                                            </select>
+                                        </div>
+                                        <div>
                                             <label className="text-[10px] font-bold text-slate-400 uppercase">Deskripsi</label>
                                             <textarea 
                                                 className="w-full text-xs text-slate-500 border border-slate-100 rounded p-2 focus:border-blue-500 outline-none"
@@ -275,8 +314,12 @@ export default function PerformancePage() {
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex flex-col">
                                                 <h3 className="font-bold text-slate-900 leading-tight">{ind.name}</h3>
-                                                {ind.isSystem && (
-                                                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-0.5">Otomatis Sistem</span>
+                                                {ind.systemType && (
+                                                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-0.5">
+                                                        {ind.systemType === 'ATTENDANCE' ? 'Otomatis Kehadiran' : 
+                                                         ind.systemType === 'PUNCTUALITY' ? 'Otomatis Ketepatan Waktu' : 
+                                                         ind.systemType === 'LEARNING' ? 'Target Belajar' : 'Otomatis Sistem'}
+                                                    </span>
                                                 )}
                                             </div>
                                             <div className="flex gap-2">

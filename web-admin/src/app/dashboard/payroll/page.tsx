@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { Wallet, Calculator, CheckCircle, Clock, User, AlertCircle, Download, FileText, Search } from 'lucide-react';
+import { Wallet, Calculator, CheckCircle, Clock, User, AlertCircle, Download, FileText, Search, Banknote, Plus, X, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
@@ -27,6 +27,8 @@ interface PayrollRecord {
     loanDeduction: number;
     bpjsKesehatanDeduction: number;
     bpjsKetenagakerjaanDeduction: number;
+    pph21Deduction: number;
+    bpjsCompanyContribution: number;
     sickLeaveDeduction: number;
     reimbursementPay: number;
     bonusPay: number;
@@ -47,13 +49,34 @@ export default function PayrollPage() {
     const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
-    const fetchPayrolls = async () => {
-        setIsLoading(true);
+    // SaaS Module State
+    const [isFinanceOnly, setIsFinanceOnly] = useState(false);
+    const [employees, setEmployees] = useState<{ id: number, name: string }[]>([]);
+    
+    // Manual Modal State
+    const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+    const [manualForm, setManualForm] = useState({
+        userId: '',
+        basicSalary: '',
+        allowance: '',
+        deductions: '',
+        bonusPay: ''
+    });
+
+    const fetchInitialData = async () => {
         try {
-            const response = await api.get(`/payroll?month=${selectedMonth}&year=${selectedYear}`);
-            setPayrolls(response.data);
+            const [payrollRes, companyRes, userRes] = await Promise.all([
+                api.get(`/payroll?month=${selectedMonth}&year=${selectedYear}`),
+                api.get('/companies/my'),
+                api.get('/users?limit=1000') // Ambil daftar karyawan untuk dropdown manual
+            ]);
+            
+            setPayrolls(payrollRes.data);
+            setIsFinanceOnly(companyRes.data.modules === 'FINANCE');
+            setEmployees(userRes.data);
             setError('');
         } catch (err: any) {
+            console.error("Fetch Data Error:", err);
             setError('Gagal memuat data penggajian.');
         } finally {
             setIsLoading(false);
@@ -61,19 +84,44 @@ export default function PayrollPage() {
     };
 
     useEffect(() => {
-        fetchPayrolls();
+        fetchInitialData();
     }, [selectedMonth, selectedYear]);
 
     const handleGenerate = async () => {
+        if (isFinanceOnly) {
+            setIsManualModalOpen(true);
+            return;
+        }
+
         if (!confirm(`Hitung ulang gaji untuk Periode ${selectedMonth}/${selectedYear}?`)) return;
 
         setIsGenerating(true);
         try {
             await api.post('/payroll/generate', { month: selectedMonth, year: selectedYear });
             alert('Kalkulasi Gaji Berhasil!');
-            fetchPayrolls();
+            fetchInitialData();
         } catch (err: any) {
             alert('Gagal generate payroll: ' + (err.response?.data?.error || 'Kesalahan Server'));
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleManualSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsGenerating(true);
+        try {
+            await api.post('/payroll/manual', {
+                ...manualForm,
+                month: selectedMonth,
+                year: selectedYear
+            });
+            alert('Payroll Manual Berhasil Disimpan!');
+            setIsManualModalOpen(false);
+            setManualForm({ userId: '', basicSalary: '', allowance: '', deductions: '', bonusPay: '' });
+            fetchInitialData();
+        } catch (err: any) {
+            alert('Gagal simpan payroll manual: ' + (err.response?.data?.error || 'Kesalahan Server'));
         } finally {
             setIsGenerating(false);
         }
@@ -97,7 +145,9 @@ export default function PayrollPage() {
             'Potongan Sakit': p.sickLeaveDeduction,
             'Potongan Kasbon': p.loanDeduction,
             'BPJS Kesehatan (1%)': p.bpjsKesehatanDeduction,
-            'BPJS Ketenagakerjaan (3%)': p.bpjsKetenagakerjaanDeduction,
+            'BPJS Ketenagakerjaan (Employee)': p.bpjsKetenagakerjaanDeduction,
+            'PPh 21 (Pajak)': p.pph21Deduction,
+            'BPJS Tanggung Perusahaan': p.bpjsCompanyContribution,
             'Klaim Reimbursement': p.reimbursementPay,
             'Bonus & THR': p.bonusPay,
             'Gaji Bersih (THP)': p.netSalary,
@@ -169,7 +219,10 @@ export default function PayrollPage() {
             tableBody.push(['Potongan BPJS Kesehatan (1%)', `- ${formatCurrency(p.bpjsKesehatanDeduction)}`]);
         }
         if (p.bpjsKetenagakerjaanDeduction > 0) {
-            tableBody.push(['Potongan BPJS Ketenagakerjaan (3%)', `- ${formatCurrency(p.bpjsKetenagakerjaanDeduction)}`]);
+            tableBody.push(['Potongan BPJS Ketenagakerjaan', `- ${formatCurrency(p.bpjsKetenagakerjaanDeduction)}`]);
+        }
+        if (p.pph21Deduction > 0) {
+            tableBody.push(['Potongan PPh 21 (Pajak)', `- ${formatCurrency(p.pph21Deduction)}`]);
         }
 
         tableBody.push(
@@ -251,15 +304,25 @@ export default function PayrollPage() {
                     <button
                         onClick={handleGenerate}
                         disabled={isGenerating}
-                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-all disabled:opacity-50"
                     >
                         {isGenerating ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                         ) : (
-                            <Calculator className="h-4 w-4" />
+                            isFinanceOnly ? <Plus className="h-4 w-4" /> : <Calculator className="h-4 w-4" />
                         )}
-                        Hitung Gaji
+                        {isFinanceOnly ? 'Input Gaji Manual' : 'Hitung Gaji'}
                     </button>
+                </div>
+            </div>
+
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <Banknote className="h-6 w-6" />
+                </div>
+                <div>
+                    <h3 className="text-sm font-bold text-emerald-900">Terintegrasi dengan Keuangan</h3>
+                    <p className="text-xs text-emerald-700">Setiap gaji yang Anda tandai sebagai <b>"Bayar"</b> akan otomatis tercatat sebagai Pengeluaran (Expense) di Modul Finance.</p>
                 </div>
             </div>
 
@@ -379,12 +442,21 @@ export default function PayrollPage() {
                                                 {p.loanDeduction > 0 && (
                                                     <span className="text-orange-600 font-medium">- {formatCurrency(p.loanDeduction)} (Pinjaman)</span>
                                                 )}
-                                                {p.deductions === 0 && p.loanDeduction === 0 && (
+                                                {p.bpjsKesehatanDeduction > 0 && (
+                                                    <span className="text-red-500 text-xs">BPJS Kes (1%): - {formatCurrency(p.bpjsKesehatanDeduction)}</span>
+                                                )}
+                                                {p.bpjsKetenagakerjaanDeduction > 0 && (
+                                                    <span className="text-red-500 text-xs">BPJS Ket: - {formatCurrency(p.bpjsKetenagakerjaanDeduction)}</span>
+                                                )}
+                                                {p.pph21Deduction > 0 && (
+                                                    <span className="text-blue-600 font-bold text-xs underline decoration-blue-200">PPh 21: - {formatCurrency(p.pph21Deduction)}</span>
+                                                )}
+                                                {p.loanDeduction === 0 && p.deductions === 0 && p.pph21Deduction === 0 && (
                                                     <span className="text-slate-400">Rp 0</span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-bold text-blue-600 bg-blue-50/30">
+                                        <td className="px-6 py-4 font-bold text-emerald-600 bg-emerald-50/30">
                                             {formatCurrency(p.netSalary)}
                                         </td>
                                         <td className="px-6 py-4">
@@ -402,16 +474,16 @@ export default function PayrollPage() {
                                                 >
                                                     <FileText className="h-4 w-4" />
                                                 </button>
-                                                {p.status === 'DRAFT' ? (
-                                                    <button
-                                                        onClick={() => handlePay(p.id)}
-                                                        className="inline-flex items-center gap-1 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded transition-all"
-                                                    >
-                                                        Bayar
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-xs text-slate-400 font-medium">Selesai</span>
-                                                )}
+                                                 {p.status === 'DRAFT' ? (
+                                                     <button
+                                                         onClick={() => handlePay(p.id)}
+                                                         className="inline-flex items-center gap-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded transition-all shadow-sm"
+                                                     >
+                                                         Bayar
+                                                     </button>
+                                                 ) : (
+                                                     <span className="text-xs text-slate-400 font-medium">Selesai</span>
+                                                 )}
                                             </div>
                                         </td>
                                     </tr>
@@ -436,6 +508,101 @@ export default function PayrollPage() {
                     </ul>
                 </div>
             </div>
+            {/* MODAL INPUT MANUAL (Khusus Finance-Only) */}
+            {isManualModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-900">Input Gaji Manual</h2>
+                                <p className="text-xs text-slate-500">Periode {selectedMonth} / {selectedYear}</p>
+                            </div>
+                            <button onClick={() => setIsManualModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                                <X className="h-5 w-5 text-slate-500" />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleManualSubmit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Pilih Karyawan</label>
+                                <select 
+                                    required
+                                    value={manualForm.userId}
+                                    onChange={(e) => setManualForm({...manualForm, userId: e.target.value})}
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                >
+                                    <option value="">-- Pilih --</option>
+                                    {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                                </select>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Gaji Pokok</label>
+                                    <input 
+                                        type="number"
+                                        required
+                                        value={manualForm.basicSalary}
+                                        onChange={(e) => setManualForm({...manualForm, basicSalary: e.target.value})}
+                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Tunjangan</label>
+                                    <input 
+                                        type="number"
+                                        value={manualForm.allowance}
+                                        onChange={(e) => setManualForm({...manualForm, allowance: e.target.value})}
+                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Bonus / THR</label>
+                                    <input 
+                                        type="number"
+                                        value={manualForm.bonusPay}
+                                        onChange={(e) => setManualForm({...manualForm, bonusPay: e.target.value})}
+                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Total Potongan</label>
+                                    <input 
+                                        type="number"
+                                        value={manualForm.deductions}
+                                        onChange={(e) => setManualForm({...manualForm, deductions: e.target.value})}
+                                        className="w-full rounded-lg border border-red-200 px-3 py-2 text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-100 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsManualModalOpen(false)}
+                                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isGenerating}
+                                    className="flex-2 px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isGenerating ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : 'Simpan Payroll'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }

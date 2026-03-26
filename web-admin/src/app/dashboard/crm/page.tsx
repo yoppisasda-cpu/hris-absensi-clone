@@ -39,7 +39,7 @@ export default function CRMPage() {
 
   const fetchSessions = async () => {
     try {
-      const res = await api.get('/api/chat/admin/sessions');
+      const res = await api.get('/chat/admin/sessions');
       setSessions(res.data);
       setLoading(false);
     } catch (err) {
@@ -49,7 +49,7 @@ export default function CRMPage() {
 
   const fetchSessionDetail = async (id: string) => {
     try {
-      const res = await api.get(`/api/chat/admin/sessions/${id}`);
+      const res = await api.get(`/chat/admin/sessions/${id}`);
       setSelectedSession(res.data);
     } catch (err) {
       console.error('Fetch session detail error:', err);

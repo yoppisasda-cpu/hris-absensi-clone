@@ -17,10 +17,17 @@ interface Indicator {
     systemType?: string | null;
 }
 
+interface LearningObjective {
+    id: number;
+    title: string;
+    progress: number;
+}
+
 interface ScoreRecord {
     indicatorId: number;
     score: number;
     comment: string;
+    learningObjectiveId?: number | null;
 }
 
 interface Employee {
@@ -38,6 +45,7 @@ function ScoreContent() {
 
     const [indicators, setIndicators] = useState<Indicator[]>([]);
     const [scores, setScores] = useState<Record<number, ScoreRecord>>({});
+    const [objectives, setObjectives] = useState<LearningObjective[]>([]);
     const [employee, setEmployee] = useState<Employee | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -65,9 +73,12 @@ function ScoreContent() {
                 scoreMap[s.indicatorId] = {
                     indicatorId: s.indicatorId,
                     score: s.score,
-                    comment: s.comment || ''
+                    comment: s.comment || '',
+                    learningObjectiveId: s.learningObjectiveId
                 };
             });
+
+            setObjectives(autoRes.data.objectives || []);
 
             autoRes.data.scores.forEach((as: any) => {
                 const existing = scoreMap[as.indicatorId];
@@ -117,6 +128,18 @@ function ScoreContent() {
         }));
     };
 
+    const handleLinkObjective = (indicatorId: number, objectiveId: number | null) => {
+        const obj = objectives.find(o => o.id === objectiveId);
+        setScores(prev => ({
+            ...prev,
+            [indicatorId]: {
+                ...(prev[indicatorId] || { indicatorId, comment: '', score: 0 }),
+                learningObjectiveId: objectiveId,
+                score: obj ? obj.progress : (prev[indicatorId]?.score || 0)
+            }
+        }));
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         try {
@@ -126,6 +149,7 @@ function ScoreContent() {
                     indicatorId: s.indicatorId,
                     score: s.score,
                     comment: s.comment,
+                    learningObjectiveId: s.learningObjectiveId,
                     month,
                     year
                 })
@@ -230,20 +254,43 @@ function ScoreContent() {
                                             min="0"
                                             max="150"
                                             step="1"
-                                            disabled={ind.isSystem}
+                                            disabled={ind.isSystem || !!scores[ind.id]?.learningObjectiveId}
                                             value={scores[ind.id]?.score || 0}
                                             onChange={e => handleScoreChange(ind.id, parseInt(e.target.value))}
-                                            className={`w-full h-2 bg-slate-100 rounded-lg appearance-none ${ind.isSystem ? 'cursor-not-allowed grayscale opacity-50' : 'cursor-pointer accent-blue-600'}`}
+                                            className={`w-full h-2 bg-slate-100 rounded-lg appearance-none ${ind.isSystem || !!scores[ind.id]?.learningObjectiveId ? 'cursor-not-allowed grayscale opacity-50' : 'cursor-pointer accent-blue-600'}`}
                                         />
                                         <div className="flex justify-between text-[10px] text-slate-300 mt-1 px-1">
                                             <span>Mulai</span>
-                                            {ind.isSystem ? (
-                                                <span className="text-blue-500 font-bold uppercase">Objektif (Sistem)</span>
+                                            {ind.systemType === 'ATTENDANCE' || ind.systemType === 'PUNCTUALITY' || (ind.systemType === 'LEARNING' && !!scores[ind.id]?.learningObjectiveId) ? (
+                                                <span className="text-blue-500 font-bold uppercase">
+                                                    Automasi {ind.systemType === 'LEARNING' ? 'Objektif' : 'Sistem'}
+                                                </span>
                                             ) : (
                                                 <span>Target ({ind.target})</span>
                                             )}
                                             <span>Over</span>
                                         </div>
+                                        
+                                        {ind.systemType === 'LEARNING' && (
+                                            <div className="mt-4 pt-4 border-t border-slate-50">
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Automasi Target Belajar</label>
+                                                <select 
+                                                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-blue-500"
+                                                    value={scores[ind.id]?.learningObjectiveId || ''}
+                                                    onChange={(e) => handleLinkObjective(ind.id, e.target.value ? parseInt(e.target.value) : null)}
+                                                >
+                                                    <option value="">-- Pilih Target Belajar Karyawan --</option>
+                                                    {objectives.map(obj => (
+                                                        <option key={obj.id} value={obj.id}>{obj.title} ({obj.progress}%)</option>
+                                                    ))}
+                                                </select>
+                                                {scores[ind.id]?.learningObjectiveId && (
+                                                    <p className="text-[9px] text-blue-500 font-medium mt-1 italic">
+                                                        *Skor disinkronkan otomatis dari progress target belajar.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="md:col-span-7">
                                         <div className="relative">

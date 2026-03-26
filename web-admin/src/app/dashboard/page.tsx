@@ -2,13 +2,19 @@
 
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout"
-import { Users, UserCheck, Clock, FileWarning, TrendingUp, AlertTriangle, ShieldCheck } from "lucide-react"
+import { Users, UserCheck, Clock, FileWarning, TrendingUp, AlertTriangle, ShieldCheck, BarChart3, Coins, PieChart, ArrowUpRight, ArrowDownRight, Wallet as WalletIcon, Briefcase, Box } from "lucide-react"
 import api from "@/lib/api";
+import { useRouter } from 'next/navigation';
 import AttendanceChart from "@/components/dashboard/AttendanceChart";
+import FinanceVisualChart from "@/components/dashboard/FinanceVisualChart";
+import InventoryVisualStats from "@/components/dashboard/InventoryVisualStats";
+import AIInsights from "@/components/dashboard/AIInsights";
 
 export default function DashboardPage() {
+    const router = useRouter();
     const [adminName, setAdminName] = useState('Admin');
     const [companyName, setCompanyName] = useState('Perusahaan Anda');
+    const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | 'INVENTORY' | null>(null);
     const [stats, setStats] = useState([
         { title: "Total Karyawan", value: "0", icon: <Users className="h-6 w-6 text-blue-500" />, trend: "..." },
         { title: "Hadir Hari Ini", value: "0", icon: <UserCheck className="h-6 w-6 text-green-500" />, trend: "..." },
@@ -19,9 +25,21 @@ export default function DashboardPage() {
     const [trends, setTrends] = useState<any[]>([]);
     const [contractAlerts, setContractAlerts] = useState<any[]>([]);
     const [companyContract, setCompanyContract] = useState<any>(null);
+    const [visualFinance, setVisualFinance] = useState<any[]>([]);
+    const [visualInventory, setVisualInventory] = useState<any>(null);
+    const [summaryStats, setSummaryStats] = useState<any>(null);
+    const [aiInsights, setAiInsights] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // 0. Check for Active Module
+        const mod = localStorage.getItem('activeModule') as any;
+        if (!mod) {
+            router.push('/dashboard/select-module');
+            return;
+        }
+        setActiveModule(mod);
+
         // 1. Ambil Profil Admin dari LocalStorage
         const storedName = localStorage.getItem('userName');
         if (storedName) setAdminName(storedName);
@@ -30,13 +48,20 @@ export default function DashboardPage() {
         const fetchDashboardData = async () => {
             try {
                 setLoading(true);
-                const [statsRes, activityRes, trendsRes, contractRes] = await Promise.all([
+                const [statsRes, activityRes, trendsRes, contractRes, finRes, invRes, aiRes] = await Promise.all([
                     api.get('/stats/summary'),
                     api.get('/attendance'),
                     api.get('/stats/trends'),
-                    api.get('/stats/contract-alerts')
+                    api.get('/stats/contract-alerts'),
+                    api.get('/stats/visual-finance'),
+                    api.get('/stats/visual-inventory'),
+                    api.get('/stats/ai-insights')
                 ]);
+                setAiInsights(aiRes.data);
                 setContractAlerts(contractRes.data);
+                setVisualFinance(finRes.data);
+                setVisualInventory(invRes.data);
+                setSummaryStats(statsRes.data);
 
                 const s = statsRes.data;
                 setTrends(trendsRes.data);
@@ -58,7 +83,153 @@ export default function DashboardPage() {
         };
 
         fetchDashboardData();
-    }, []);
+    }, [router]);
+
+    if (!activeModule) return null;
+
+    if (activeModule === 'FINANCE') {
+        return (
+            <DashboardLayout>
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-slate-900">Dashboard Keuangan & Stok 👋</h1>
+                    <p className="mt-1 text-sm text-slate-500">Ringkasan kondisi finansial dan inventori <span className="font-semibold">{companyName}</span> saat ini.</p>
+                </div>
+                
+                {/* AI INSIGHTS SECTION */}
+                <div className="mb-8">
+                    <AIInsights insights={aiInsights} loading={loading} />
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">Total Saldo Kas & Bank</p>
+                                <p className="mt-2 text-2xl font-black text-slate-900 leading-tight">
+                                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.totalBalance || 0)}
+                                </p>
+                            </div>
+                            <div className="rounded-lg bg-blue-50 p-3"><WalletIcon className="h-6 w-6 text-blue-600" /></div>
+                        </div>
+                        <div className="mt-4 flex items-center text-xs text-blue-600 font-bold">
+                            Akun Keuangan Aktif
+                        </div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">Laba Bersih (Bulan Ini)</p>
+                                <p className={`mt-2 text-2xl font-black leading-tight ${(summaryStats?.monthlyProfit || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.monthlyProfit || 0)}
+                                </p>
+                            </div>
+                            <div className="rounded-lg bg-emerald-50 p-3"><TrendingUp className="h-6 w-6 text-emerald-600" /></div>
+                        </div>
+                        <div className="mt-4 flex items-center text-xs text-emerald-600 font-bold">
+                             { (summaryStats?.monthlyProfit || 0) >= 0 ? 'Surplus (Profit)' : 'Defisit (Loss)' }
+                        </div>
+                    </div>
+                    
+                    {/* HUTANG CARD */}
+                    <div 
+                        onClick={() => router.push('/dashboard/finance/payables')}
+                        className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm cursor-pointer hover:border-red-500 transition-all group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-slate-500 group-hover:text-red-500 transition-colors">Total Hutang (Payables)</p>
+                                <p className="mt-2 text-2xl font-black text-red-600 leading-tight">
+                                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.totalPayable || 0)}
+                                </p>
+                            </div>
+                            <div className="rounded-lg bg-red-50 p-3 group-hover:bg-red-600 group-hover:text-white transition-all"><Coins className="h-6 w-6 text-red-600 group-hover:text-white" /></div>
+                        </div>
+                        <div className="mt-4 flex items-center text-xs text-red-500 font-bold">
+                            Klik untuk Detail Hutang
+                        </div>
+                    </div>
+
+                    {/* PIUTANG CARD */}
+                    <div 
+                        onClick={() => router.push('/dashboard/finance/receivables')}
+                        className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm cursor-pointer hover:border-blue-500 transition-all group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-slate-500 group-hover:text-blue-500 transition-colors">Total Piutang (Receivables)</p>
+                                <p className="mt-2 text-2xl font-black text-blue-600 leading-tight">
+                                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.totalReceivable || 0)}
+                                </p>
+                            </div>
+                            <div className="rounded-lg bg-blue-50 p-3 group-hover:bg-blue-600 group-hover:text-white transition-all"><BarChart3 className="h-6 w-6 text-blue-600 group-hover:text-white" /></div>
+                        </div>
+                        <div className="mt-4 flex items-center text-xs text-blue-600 font-bold">
+                            Klik untuk Detail Piutang
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">Nilai Inventori (Asset)</p>
+                                <p className="mt-2 text-2xl font-black text-orange-600 leading-tight">
+                                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.inventoryValue || 0)}
+                                </p>
+                            </div>
+                            <div className="rounded-lg bg-orange-50 p-3"><Box className="h-6 w-6 text-orange-600" /></div>
+                        </div>
+                        <div className="mt-4 flex items-center text-xs text-orange-500 font-medium">
+                            Asset Lancar Barang
+                        </div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">Kesehatan Stok</p>
+                                <p className="mt-2 text-2xl font-black text-slate-900 leading-tight">
+                                    {visualInventory?.health?.find((h:any) => h.name === 'Menipis')?.value || 0}
+                                </p>
+                            </div>
+                            <div className="rounded-lg bg-amber-50 p-3"><AlertTriangle className="h-6 w-6 text-amber-600" /></div>
+                        </div>
+                        <div className="mt-4 flex items-center text-xs text-slate-400">
+                            Produk Perlu Restock
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                             <BarChart3 className="h-5 w-5 text-blue-500" /> Arus Kas Bulanan (Revenue vs Expense)
+                        </h3>
+                        {loading ? (
+                            <div className="h-64 flex items-center justify-center animate-pulse bg-slate-50 rounded-lg">
+                                <p className="text-slate-400 text-sm">Memuat grafik...</p>
+                            </div>
+                        ) : (
+                            <FinanceVisualChart data={visualFinance} />
+                        )}
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                             <Box className="h-5 w-5 text-orange-500" /> Kesehatan & Performa Stok
+                        </h3>
+                        {loading ? (
+                            <div className="h-64 flex items-center justify-center animate-pulse bg-slate-50 rounded-lg">
+                                <p className="text-slate-400 text-sm">Memuat analitik...</p>
+                            </div>
+                        ) : (
+                            <InventoryVisualStats data={visualInventory} />
+                        )}
+                        <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                             <button onClick={() => router.push('/dashboard/inventory/products')} className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">Manajemen Produk Lengkap</button>
+                        </div>
+                    </div>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     return (
         <DashboardLayout>
@@ -94,6 +265,11 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 )}
+            </div>
+
+            {/* AI INSIGHTS SECTION */}
+            <div className="mb-8">
+                <AIInsights insights={aiInsights} loading={loading} />
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -259,5 +435,5 @@ export default function DashboardPage() {
                 )}
             </div>
         </DashboardLayout>
-    )
+    );
 }

@@ -303,6 +303,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
         border: Border.all(color: Colors.grey[100]!),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -321,13 +322,61 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                   ],
                 ),
               ),
-              if (!isDone)
+              if (!isDone && obj['materialId'] == null)
                 IconButton(
                   icon: Icon(Icons.add_circle_outline, color: Colors.indigo),
                   onPressed: () => _updateProgress(obj['id'], progress),
                 )
             ],
           ),
+          if (obj['materialId'] != null) ...[
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.indigo[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.indigo[100]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.book, size: 16, color: Colors.indigo),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Terhubung ke SOP: ${obj['material']?['title'] ?? 'Materi'}',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.indigo[700]),
+                    ),
+                  ),
+                  if (!isDone) 
+                    TextButton(
+                      onPressed: () {
+                        // Cari exam ID yang sesuai dengan materialId ini
+                        final exam = _exams.firstWhere(
+                          (e) => e['materialId'] == obj['materialId'],
+                          orElse: () => null,
+                        );
+                        if (exam != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => ExamScreen(examId: exam['id']))
+                          ).then((_) => _loadData());
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Ujian untuk SOP ini belum tersedia.')),
+                          );
+                        }
+                      },
+                      child: Text('Buka SOP / Ujian', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: Colors.indigo,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
           SizedBox(height: 12),
           Row(
             children: [

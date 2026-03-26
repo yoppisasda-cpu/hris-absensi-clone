@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { FileText, Download, CreditCard, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import api from "@/lib/api";
@@ -9,7 +10,14 @@ export default function BillingPage() {
     const [invoices, setInvoices] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const router = useRouter();
+
     useEffect(() => {
+        const role = localStorage.getItem("userRole");
+        if (role && role !== "OWNER" && role !== "SUPERADMIN") {
+            router.push("/dashboard");
+            return;
+        }
         fetchInvoices();
     }, []);
 

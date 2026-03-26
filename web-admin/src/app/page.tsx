@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { Building2, Lock, Mail, ArrowRight, UserCircle } from 'lucide-react';
+import { Building2, Lock, Mail, ArrowRight, UserCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -20,6 +21,13 @@ export default function LoginPage() {
       const res = await api.post('/auth/login', { email, password });
 
       const { token, user } = res.data;
+      
+      // Batasi Akses Web Admin hanya untuk Admin / SuperAdmin
+      if (user.role === 'EMPLOYEE') {
+        alert('Akses Web Admin Ditolak: Hanya Admin yang dapat masuk ke panel ini.');
+        setIsLoading(false);
+        return;
+      }
 
       // Mengamankan Token Bearer JWT dan Identitas Profil (Role) ke Browser LocalStorage
       localStorage.setItem('jwt_token', token);
@@ -93,13 +101,20 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-lg border border-slate-300 py-3 pl-11 pr-4 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow"
+                  className="w-full rounded-lg border border-slate-300 py-3 pl-11 pr-12 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 

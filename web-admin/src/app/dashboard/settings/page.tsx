@@ -171,7 +171,10 @@ export default function SettingsPage() {
                                                     <BellRing className="h-5 w-5" />
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-slate-800">Notifikasi Email</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-bold text-slate-800">Notifikasi Email</p>
+                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">Soon</span>
+                                                    </div>
                                                     <p className="text-xs text-slate-500">Terima update status pengajuan (Cuti, Reimbursement, dll) via email.</p>
                                                 </div>
                                             </div>

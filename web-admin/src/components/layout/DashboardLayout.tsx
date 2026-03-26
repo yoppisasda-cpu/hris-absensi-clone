@@ -14,7 +14,9 @@ export default function DashboardLayout({
 
     useEffect(() => {
         const token = localStorage.getItem('jwt_token');
-        if (!token) {
+        const role = localStorage.getItem('userRole');
+
+        if (!token || role === 'EMPLOYEE') {
             router.push('/');
         }
     }, [router]);

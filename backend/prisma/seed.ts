@@ -28,7 +28,8 @@ async function main() {
             name: 'PT. Maju Jaya',
             latitude: -6.175392, // Tugu Monas
             longitude: 106.827153,
-            radius: 100 // meter
+            radius: 100, // meter
+            modules: 'BOTH'
         },
         update: {
             name: 'PT. Maju Jaya'
@@ -43,7 +44,8 @@ async function main() {
             name: 'PT. Mundur Terus',
             latitude: -6.194911, // Bundaran HI
             longitude: 106.823055,
-            radius: 50 // meter
+            radius: 50, // meter
+            modules: 'BOTH'
         },
         update: {
             name: 'PT. Mundur Terus'
@@ -85,8 +87,9 @@ async function main() {
     });
 
     // 2. Buat Karyawan untuk PT Maju (Tenant 1) dengan Shift
-    await prisma.user.create({
-        data: {
+    await prisma.user.upsert({
+        where: { email: 'budi@ptmaju.com' },
+        create: {
             companyId: ptMaju.id,
             shiftId: shiftPagi.id,
             name: 'Budi Santoso',
@@ -94,6 +97,125 @@ async function main() {
             password: hashedPassword,
             role: 'ADMIN',
         },
+        update: {
+            role: 'ADMIN',
+            password: hashedPassword
+        }
+    });
+
+    // 4. Buat Perusahaan Khusus User Yoppi (Owner Tenant)
+    const ptRki = await prisma.company.upsert({
+        where: { id: 4 },
+        create: {
+            id: 4,
+            name: 'PT. RAJO KOPI INDONESIA',
+            latitude: -6.208763,
+            longitude: 106.845599,
+            radius: 500,
+            contractType: 'LUMSUM',
+            contractValue: 5000000,
+            contractStart: new Date(),
+            contractEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+            employeeLimit: 100,
+            photoRetentionDays: 30,
+            modules: 'BOTH'
+        },
+        update: {
+            name: 'PT. RAJO KOPI INDONESIA'
+        }
+    });
+
+    console.log(`Dibuat Tenant Utama: ${ptRki.name} (ID: ${ptRki.id})`);
+
+    // --- SEED FINANCE DATA ---
+    const cashAccount = await prisma.financialAccount.upsert({
+        where: { id: 1 },
+        create: {
+            id: 1,
+            companyId: ptRki.id,
+            name: 'Kas Utama (Tunai)',
+            type: 'CASH',
+            balance: 5000000
+        },
+        update: {}
+    });
+
+    const bankAccount = await prisma.financialAccount.upsert({
+        where: { id: 2 },
+        create: {
+            id: 2,
+            companyId: ptRki.id,
+            name: 'Bank BCA (Operasional)',
+            type: 'BANK',
+            balance: 25000000
+        },
+        update: {}
+    });
+
+    const salesCategory = await prisma.incomeCategory.upsert({
+        where: { id: 1 },
+        create: {
+            id: 1,
+            companyId: ptRki.id,
+            name: 'Penjualan Produk'
+        },
+        update: {}
+    });
+
+    const serviceCategory = await prisma.incomeCategory.upsert({
+        where: { id: 2 },
+        create: {
+            id: 2,
+            companyId: ptRki.id,
+            name: 'Pendapatan Jasa'
+        },
+        update: {}
+    });
+
+    console.log('Seed Finance Data selesai!');
+
+    // --- SEED EXPENSE CATEGORIES ---
+    const expenseCategories = [
+        'Gaji & Upah',
+        'Sewa Kantor',
+        'Listrik & Air',
+        'Internet & Telepon',
+        'Perlengkapan Kantor',
+        'Perjalanan Dinas',
+        'Pemasaran & Iklan',
+        'Biaya Operasional Lainnya'
+    ];
+
+    for (const catName of expenseCategories) {
+        await prisma.expenseCategory.upsert({
+            where: { id: expenseCategories.indexOf(catName) + 1 },
+            create: {
+                id: expenseCategories.indexOf(catName) + 1,
+                companyId: ptRki.id,
+                name: catName
+            },
+            update: {}
+        });
+    }
+
+    console.log('Seed Expense Categories selesai!');
+
+    // 0.2 Buat OWNER (Tenant Owner)
+    await prisma.user.upsert({
+        where: { email: 'yoppi@rki.com' },
+        create: {
+            companyId: ptRki.id,
+            name: 'YOPPI',
+            email: 'yoppi@rki.com',
+            password: hashedPassword,
+            role: 'ADMIN',
+            jobTitle: 'HR Director'
+        },
+        update: {
+            role: 'ADMIN',
+            password: hashedPassword,
+            companyId: ptRki.id
+        }
     });
 
     console.log('Seeding selesai!');

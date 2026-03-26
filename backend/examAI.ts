@@ -3,59 +3,116 @@
  * Generates multiple-choice questions from text content (SOP)
  */
 
-export async function generateQuestions(content: string) {
-    // In a real scenario, this would use an LLM API.
-    // Here we simulate it by splitting content into sentences and creating simple questions.
+export async function generateQuestions(content: string, count: number = 5) {
+    // Enhanced Simulation of an LLM API (Phase 39 Optimization)
+    // We break the SOP into logical units and generate diverse questions.
     
-    const lines = content.split('\n').filter(l => l.trim().length > 10);
+    const lines = content.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 15); // Take significant lines
+
     const questions: { question: string, options: string[], correctAnswer: string }[] = [];
+    const usedSentences = new Set<number>();
 
-    // Simple heuristic: If a line describes a rule or a step, turn it into a question.
-    for (const line of lines) {
-        if (questions.length >= 5) break;
-
-        const cleanLine = line.trim();
-        
-        // Simulating question generation from a statement
-        let question = "";
-        let correctAnswer = "";
-        let distractors: string[] = [];
-
-        if (cleanLine.toLowerCase().includes("suhu") || cleanLine.toLowerCase().includes("temperature")) {
-            question = `Berapa parameter yang disebutkan terkait "${cleanLine.substring(0, 20)}..."?`;
-            correctAnswer = cleanLine.match(/\d+/)?.[0] || "Sesuai SOP";
-            distractors = ["50", "100", "0", "99"];
-        } else if (cleanLine.toLowerCase().includes("bersih") || cleanLine.toLowerCase().includes("clean")) {
-            question = `Berdasarkan SOP, apa yang harus dilakukan terkait kebersihan di bagian: "${cleanLine.substring(0, 30)}..."?`;
-            correctAnswer = "Dibersihkan secara berkala";
-            distractors = ["Dibiarkan saja", "Menunggu instruksi", "Seminggu sekali", "Hanya saat kotor"];
-        } else {
-            question = `Apa poin utama dari pernyataan berikut: "${cleanLine.substring(0, 40)}..."?`;
-            correctAnswer = "Langkah wajib sesuai SOP";
-            distractors = ["Opsional saja", "Saran manajer", "Tidak penting", "Hanya untuk tamu"];
+    // Diverse Question Templates
+    const templates = [
+        {
+            regex: /(wajib|harus|perlu)\s+([\w\s]+?)(?=\s+untuk|\s+agar|\s+biar|\.|$)/i,
+            gen: (match: string[]) => ({
+                question: `Berdasarkan SOP, apa tindakan yang ${match[1].toLowerCase()} dilakukan terkait "${match[2].trim()}"?`,
+                correct: `Melakukan ${match[2].trim()} sesuai prosedur`,
+                distractors: ["Dilakukan jika ada waktu luang", "Bisa dilewati jika sudah ahli", "Tergantung instruksi lisan", "Hanya dilakukan saat shift malam"]
+            })
+        },
+        {
+            regex: /(memastikan|mengecek|memeriksa)\s+([\w\s]+?)\s+sudah\s+([\w\s]+?)(?=\.|$)/i,
+            gen: (match: string[]) => ({
+                question: `Apa parameter verifikasi untuk "${match[2].trim()}" sebelum memulai pekerjaan?`,
+                correct: `Memastikan statusnya sudah "${match[3].trim()}"`,
+                distractors: [`Memastikan sudah "${match[3].trim()} sedikit"`, "Tidak perlu dicek jika buru-buru", "Cukup dilihat dari jauh", "Menunggu rekan kerja mengecek"]
+            })
+        },
+        {
+            regex: /([\w\s]+?)\s+(agar|supaya|untuk)\s+([\w\s]+?)(?=\.|$)/i,
+            gen: (match: string[]) => ({
+                question: `Mengapa langkah "${match[1].trim()}" sangat krusial dilakukan?`,
+                correct: `Agar ${match[3].trim()}`,
+                distractors: ["Hanya sebagai formalitas", "Supaya terlihat sibuk", "Agar menghemat waktu", "Karena sudah menjadi kebiasaan saja"]
+            })
+        },
+        {
+            regex: /^(\d+[\.\)]|\-)\s*([\w\s]+?)(?=\.|$)/i,
+            gen: (match: string[]) => ({
+                question: `Langkah detail apa yang disebutkan dalam poin prosedur: "${match[2].substring(0, 30)}..."?`,
+                correct: match[2].trim(),
+                distractors: ["Langkah opsional tambahan", "Saran dari divisi lain", "Prosedur lama yang sudah diganti", "Hanya berlaku untuk manager"]
+            })
         }
+    ];
 
-        if (question) {
-            const options = [correctAnswer, ...distractors].sort(() => 0.5 - Math.random()).slice(0, 4);
-            // Ensure correct answer is in options
-            if (!options.includes(correctAnswer)) options[0] = correctAnswer;
-            
+    // Try to match lines with templates
+    for (let i = 0; i < lines.length && questions.length < count; i++) {
+        const line = lines[i];
+        for (const template of templates) {
+            const match = line.match(template.regex);
+            if (match && !usedSentences.has(i)) {
+                const qData = template.gen(match);
+                
+                // Shuffle options
+                const options = [qData.correct, ...qData.distractors]
+                    .sort(() => Math.random() - 0.5)
+                    .slice(0, 4);
+                
+                // Ensure correct answer is there
+                if (!options.includes(qData.correct)) options[0] = qData.correct;
+
+                questions.push({
+                    question: qData.question,
+                    options: options.sort(() => Math.random() - 0.5),
+                    correctAnswer: qData.correct
+                });
+
+                usedSentences.add(i);
+                break;
+            }
+        }
+    }
+
+    // Fallback if not enough questions found through templates
+    if (questions.length < count) {
+        const fallbacks = [
+            {
+                question: "Apa tujuan utama dari implementasi SOP ini di tempat kerja?",
+                correct: "Konsistensi kualitas dan standar operasional",
+                distractors: ["Memperlama proses kerja", "Menambah beban administrasi", "Sekadar dokumen pajangan", "Mengurangi interaksi antar staf"]
+            },
+            {
+                question: "Bagaimana sikap yang benar jika menemukan kondisi yang tidak sesuai dengan SOP ini?",
+                correct: "Melapor ke atasan dan mengikuti prosedur darurat",
+                distractors: ["Mengabaikannya", "Mencoba memperbaikinya tanpa ijin", "Menyalahkan rekan kerja", "Mendiamkannya saja"]
+            }
+        ];
+
+        for (const f of fallbacks) {
+            if (questions.length >= count) break;
+            const options = [f.correct, ...f.distractors].sort(() => Math.random() - 0.5);
             questions.push({
-                question,
-                options: options.sort(() => 0.5 - Math.random()),
-                correctAnswer
+                question: f.question,
+                options,
+                correctAnswer: f.correct
             });
         }
     }
 
-    // Fallback if no specific patterns found
-    if (questions.length === 0) {
+    // Last resort generic questions
+    while (questions.length < count && lines.length > 0) {
+        const randomLine = lines[Math.floor(Math.random() * lines.length)];
         questions.push({
-            question: "Apa tujuan utama dari dokumen ini?",
-            options: ["Standar Operasional", "Hiburan", "Cerita Pendek", "Berita"],
-            correctAnswer: "Standar Operasional"
+            question: `Terkait poin "${randomLine.substring(0, 40)}...", apa yang paling ditekankan?`,
+            options: ["Kepatuhan pada standar", "Kecepatan kerja", "Biaya terendah", "Kenyamanan pribadi"].sort(() => Math.random() - 0.5),
+            correctAnswer: "Kepatuhan pada standar"
         });
     }
 
-    return questions;
+    return questions.slice(0, count);
 }

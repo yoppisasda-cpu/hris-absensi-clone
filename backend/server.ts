@@ -95,6 +95,145 @@ app.get('/api/setup-master', async (req: Request, res: Response) => {
   }
 });
 
+app.get('/api/setup-sales', async (req: Request, res: Response) => {
+  try {
+    console.log('--- Sales Module Setup Triggered ---');
+    
+    // 1. Create Sale Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Sale" (
+        "id" SERIAL PRIMARY KEY,
+        "companyId" INTEGER NOT NULL,
+        "invoiceNumber" TEXT UNIQUE NOT NULL,
+        "customerId" INTEGER,
+        "date" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "totalAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "status" TEXT NOT NULL DEFAULT 'PAID',
+        "accountId" INTEGER,
+        "notes" TEXT,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // 2. Create SaleItem Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SaleItem" (
+        "id" SERIAL PRIMARY KEY,
+        "saleId" INTEGER NOT NULL REFERENCES "Sale"("id") ON DELETE CASCADE,
+        "productId" INTEGER NOT NULL,
+        "quantity" DOUBLE PRECISION NOT NULL,
+        "price" DOUBLE PRECISION NOT NULL,
+        "total" DOUBLE PRECISION NOT NULL
+      )
+    `);
+
+    // 3. Create ProductRecipe Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ProductRecipe" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER NOT NULL,
+        "materialId" INTEGER NOT NULL,
+        "quantity" DOUBLE PRECISION NOT NULL,
+        "updatedAt" TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // 4. Create SaleReturn Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SaleReturn" (
+        "id" SERIAL PRIMARY KEY,
+        "companyId" INTEGER NOT NULL,
+        "saleId" INTEGER NOT NULL REFERENCES "Sale"("id") ON DELETE CASCADE,
+        "returnNumber" TEXT UNIQUE NOT NULL,
+        "date" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "totalRefundAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "notes" TEXT,
+        "accountId" INTEGER,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // 5. Create SaleReturnItem Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SaleReturnItem" (
+        "id" SERIAL PRIMARY KEY,
+        "returnId" INTEGER NOT NULL REFERENCES "SaleReturn"("id") ON DELETE CASCADE,
+        "productId" INTEGER NOT NULL,
+        "quantity" DOUBLE PRECISION NOT NULL,
+        "price" DOUBLE PRECISION NOT NULL,
+        "total" DOUBLE PRECISION NOT NULL
+      )
+    `);
+
+    console.log('--- Sales Module Tables Created Successfully ---');
+    res.json({ message: 'Tabel Sale, SaleItem, ProductRecipe, SaleReturn, dan SaleReturnItem berhasil disiapkan' });
+  } catch (error: any) {
+    console.error('Setup Sales Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/setup-customers', async (req: Request, res: Response) => {
+  try {
+    console.log('--- Customer Module Setup Triggered ---');
+    
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Customer" (
+        "id" SERIAL PRIMARY KEY,
+        "companyId" INTEGER NOT NULL,
+        "name" TEXT NOT NULL,
+        "phone" TEXT,
+        "email" TEXT,
+        "address" TEXT,
+        "points" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "totalSpent" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    console.log('--- Customer Table Created Successfully ---');
+    res.json({ message: 'Tabel Customer berhasil disiapkan' });
+  } catch (error: any) {
+    console.error('Setup Customers Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/setup-suppliers', async (req: Request, res: Response) => {
+  try {
+    console.log('--- Supplier Module Setup Triggered ---');
+    
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Supplier" (
+        "id" SERIAL PRIMARY KEY,
+        "companyId" INTEGER NOT NULL,
+        "name" TEXT NOT NULL,
+        "contactPerson" TEXT,
+        "phone" TEXT,
+        "email" TEXT,
+        "address" TEXT,
+        "category" TEXT,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Ensure StockTransaction has supplierId
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "StockTransaction" ADD COLUMN IF NOT EXISTS "supplierId" INTEGER
+    `);
+
+    console.log('--- Supplier Table Created & StockTransaction Updated ---');
+    res.json({ message: 'Tabel Supplier berhasil disiapkan dan StockTransaction diperbarui' });
+  } catch (error: any) {
+    console.error('Setup Suppliers Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/debug-db', (req, res) => {
   res.json({ url: process.env.DATABASE_URL });
 });
@@ -181,6 +320,20 @@ const assetStorage = multer.diskStorage({
 });
 const uploadAsset = multer({ storage: assetStorage });
 
+// --- CONFIG MULTER UNTUK LOGO PERUSAHAAN (Phase 19) ---
+const logoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = 'uploads/logos';
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'logo-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const uploadLogo = multer({ storage: logoStorage });
+
 // --- CONFIG MULTER UNTUK FOTO REFERENSI WAJAH ---
 const faceReferenceStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -266,6 +419,37 @@ function deg2rad(deg: number) {
   return deg * (Math.PI / 180);
 }
 
+// --- FUNGSI HELPER SAAS (FRAUD DETECTION) ---
+function calculateFraudScore(params: {
+    faceScore: number | null,
+    isDeviceMatch: boolean,
+    isBorderlineLocation: boolean,
+    userHasRegisteredDevice: boolean
+}): { score: number, isSuspicious: boolean } {
+    let score = 0;
+
+    // 1. Face Score Analysis (Weight: 40%)
+    if (params.faceScore !== null) {
+        if (params.faceScore < 0.8) score += 30; // Very borderline
+        else if (params.faceScore < 0.9) score += 10;
+    }
+
+    // 2. Device Fingerprint Analysis (Weight: 50%)
+    if (params.userHasRegisteredDevice && !params.isDeviceMatch) {
+        score += 50; // High risk - someone else's phone?
+    }
+
+    // 3. Location Borderline (Weight: 10%)
+    if (params.isBorderlineLocation) {
+        score += 15;
+    }
+
+    return {
+        score,
+        isSuspicious: score >= 60
+    };
+}
+
 // --- FUNGSI HELPER SAAS (CONTRACT ENFORCEMENT) ---
 /**
  * Level 0: Aktif
@@ -294,6 +478,31 @@ async function getTenantExpiryLevel(companyId: number): Promise<number> {
   return 3;
 }
 
+// --- FUNGSI HELPER CLOSING PERIODE ---
+async function isPeriodClosed(companyId: number, dateValue: any) {
+  if (!dateValue) return false;
+  try {
+    const date = new Date(dateValue);
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+
+    const closing = await prisma.periodClosing.findUnique({
+      where: {
+        companyId_month_year: {
+          companyId: companyId,
+          month: month,
+          year: year
+        }
+      }
+    });
+
+    return !!closing;
+  } catch (err) {
+    console.error('[Closing Checker] Error:', err);
+    return false;
+  }
+}
+
 // --- FUNGSI HELPER NOTIFIKASI (FASE 7) ---
 async function sendNotification(companyId: number, userId: number, title: string, message: string) {
   try {
@@ -313,6 +522,24 @@ async function sendNotification(companyId: number, userId: number, title: string
     return notif;
   } catch (error) {
     console.error('Gagal mengirim notifikasi:', error);
+  }
+}
+
+async function notifyAdmins(companyId: number, title: string, message: string) {
+  try {
+    const admins = await prisma.user.findMany({
+      where: {
+        companyId,
+        role: { in: ['ADMIN', 'OWNER'] },
+        isActive: true
+      }
+    });
+
+    for (const admin of admins) {
+      await sendNotification(companyId, admin.id, title, message);
+    }
+  } catch (error) {
+    console.error('Gagal mengirim notifikasi ke Admin:', error);
   }
 }
 
@@ -566,6 +793,68 @@ app.delete('/api/companies/:id', tenantMiddleware, async (req: Request, res: Res
 });
 
 // A2.2. Endpoint Update Detail Perusahaan (Super Admin Only)
+app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+
+    // --- STRICT ROLE CHECK ---
+    if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN') {
+      console.warn(`[AUTH] Unauthorized Company Update Attempt by User: ${(req as any).userId}, Role: ${userRole}`);
+      return res.status(403).json({ error: 'Akses Ditolak: Hanya Admin yang dapat merubah profil perusahaan' });
+    }
+
+    const { 
+      name, latitude, longitude, radius,
+      picName, picPhone, address, contractType, contractValue, contractStart, contractEnd,
+      employeeLimit, photoRetentionDays, modules
+    } = req.body;
+
+    console.log(`[DEBUG] Updating Company Profile for Tenant: ${tenantId}`, {
+      body: req.body
+    });
+
+    // Helper untuk parse angka agar aman dari NaN dan mendukung nilai 0
+    const parseNum = (val: any) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      const num = parseFloat(val.toString());
+      return isNaN(num) ? undefined : num;
+    };
+
+    const parseIntNum = (val: any) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      const num = parseInt(val.toString(), 10);
+      return isNaN(num) ? undefined : num;
+    };
+
+    const updatedCompany = await prisma.company.update({
+      where: { id: tenantId },
+      data: {
+        name,
+        latitude: parseNum(latitude),
+        longitude: parseNum(longitude),
+        radius: parseIntNum(radius),
+        picName,
+        picPhone,
+        address,
+        contractType,
+        contractValue: parseNum(contractValue),
+        contractStart: contractStart ? new Date(contractStart) : undefined,
+        contractEnd: contractEnd ? new Date(contractEnd) : undefined,
+        employeeLimit: parseIntNum(employeeLimit),
+        photoRetentionDays: parseIntNum(photoRetentionDays),
+        modules: modules
+      }
+    });
+
+    console.log(`[SUCCESS] Company Profile Updated for Tenant: ${tenantId}`);
+    res.json({ message: 'Profil perusahaan berhasil diperbarui', company: updatedCompany });
+  } catch (error) {
+    console.error('[ERROR] Gagal memperbarui profil perusahaan:', error);
+    res.status(500).json({ error: 'Gagal memperbarui data perusahaan di database' });
+  }
+});
+
 app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const userRole = (req as any).userRole;
@@ -614,7 +903,8 @@ app.get('/api/companies/my', tenantMiddleware, async (req: Request, res: Respons
     const company = await prisma.company.findUnique({
       where: { id: tenantId }
     });
-    res.json(company);
+    const expiryLevel = await getTenantExpiryLevel(tenantId);
+    res.json({ ...company, expiryLevel });
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil data perusahaan' });
   }
@@ -639,72 +929,50 @@ app.post('/api/companies/my/api-key', tenantMiddleware, async (req: Request, res
     res.status(500).json({ error: 'Gagal membuat API Key baru' });
   }
 });
-// A4. Endpoint Update Detail Perusahaan (Tenant)
-app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Response) => {
+
+// A3.2. Endpoint Upload Logo Perusahaan (Phase 19)
+app.patch('/api/companies/my/logo', tenantMiddleware, uploadLogo.single('logo'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
 
-    // --- STRICT ROLE CHECK ---
     if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN') {
-      console.warn(`[AUTH] Unauthorized Company Update Attempt by User: ${(req as any).userId}, Role: ${userRole}`);
-      return res.status(403).json({ error: 'Akses Ditolak: Hanya Admin yang dapat merubah profil perusahaan' });
+      return res.status(403).json({ error: 'Akses Ditolak' });
     }
 
-    const { 
-      name, latitude, longitude, radius,
-      picName, picPhone, contractType, contractValue, contractStart, contractEnd,
-      employeeLimit, photoRetentionDays
-    } = req.body;
+    if (!req.file) {
+      return res.status(400).json({ error: 'Tidak ada file yang diupload' });
+    }
 
-    console.log(`[DEBUG] Updating Company Profile for Tenant: ${tenantId}`, {
-      body: req.body
-    });
+    // Upload ke Cloud Storage (Supabase)
+    const logoUrl = await uploadToSupabase(req.file.path, 'logos');
 
-    // Helper untuk parse angka agar aman dari NaN dan mendukung nilai 0
-    const parseNum = (val: any) => {
-      if (val === null || val === undefined || val === '') return undefined;
-      const num = parseFloat(val.toString());
-      return isNaN(num) ? undefined : num;
-    };
-
-    const parseIntNum = (val: any) => {
-      if (val === null || val === undefined || val === '') return undefined;
-      const num = parseInt(val.toString(), 10);
-      return isNaN(num) ? undefined : num;
-    };
-
+    // Update URL di Database
     const updatedCompany = await prisma.company.update({
       where: { id: tenantId },
-      data: {
-        name,
-        latitude: parseNum(latitude),
-        longitude: parseNum(longitude),
-        radius: parseIntNum(radius),
-        picName,
-        picPhone,
-        contractType,
-        contractValue: parseNum(contractValue),
-        contractStart: contractStart ? new Date(contractStart) : undefined,
-        contractEnd: contractEnd ? new Date(contractEnd) : undefined,
-        employeeLimit: parseIntNum(employeeLimit),
-        photoRetentionDays: parseIntNum(photoRetentionDays)
-      }
+      data: { logoUrl }
     });
 
-    console.log(`[SUCCESS] Company Profile Updated for Tenant: ${tenantId}`);
-    res.json({ message: 'Profil perusahaan berhasil diperbarui', company: updatedCompany });
+    // Cleanup local file
+    cleanupLocalFile(req.file.path);
+
+    res.json({ message: 'Logo berhasil diperbarui', logoUrl: updatedCompany.logoUrl });
   } catch (error) {
-    console.error('[ERROR] Gagal memperbarui profil perusahaan:', error);
-    res.status(500).json({ error: 'Gagal memperbarui data perusahaan di database' });
+    console.error('Logo Upload Error:', error);
+    res.status(500).json({ error: 'Gagal mengupload logo' });
   }
 });
+
+
 
 // A4.1. Endpoint Update Aturan Gaji (Payroll Settings) Phase 20
 app.patch('/api/companies/my/payroll-settings', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const { lateDeductionRate, absenceDeductionType, absenceDeductionRate, sickLeaveDeductionRate } = req.body;
+    const { 
+      lateDeductionRate, absenceDeductionType, absenceDeductionRate, 
+      sickLeaveDeductionRate, workDaysPerMonth, lateGracePeriod 
+    } = req.body;
 
     const updatedCompany = await prisma.company.update({
       where: { id: tenantId },
@@ -713,6 +981,8 @@ app.patch('/api/companies/my/payroll-settings', tenantMiddleware, async (req: Re
         absenceDeductionType: absenceDeductionType, // 'PRO_RATA' | 'FIXED_AMOUNT'
         absenceDeductionRate: isNaN(parseFloat(absenceDeductionRate)) ? undefined : parseFloat(absenceDeductionRate),
         sickLeaveDeductionRate: isNaN(parseFloat(sickLeaveDeductionRate)) ? undefined : parseFloat(sickLeaveDeductionRate),
+        workDaysPerMonth: isNaN(parseInt(workDaysPerMonth)) ? undefined : parseInt(workDaysPerMonth),
+        lateGracePeriod: isNaN(parseInt(lateGracePeriod)) ? undefined : parseInt(lateGracePeriod),
       }
     });
 
@@ -1071,7 +1341,7 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
   try {
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
-    const { lat, lng } = req.body;
+    const { lat, lng, deviceId } = req.body;
 
     // photoUrl diambil dari multer jika ada
     const photoUrl = req.file ? `/uploads/attendance/${req.file.filename}` : null;
@@ -1144,6 +1414,29 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
       }
     }
 
+    // --- AI FRAUD DETECTION (Phase 28) ---
+    // @ts-ignore
+    const isDeviceMatch = user.lastDeviceId ? (user.lastDeviceId === deviceId) : true;
+    const isBorderlineLocation = (refLat && refLng && refRadius) ? (getDistanceFromLatLonInM(lat, lng, refLat, refLng) > (refRadius * 0.8)) : false;
+    
+    const fraudResult = calculateFraudScore({
+        faceScore: faceSimilarityScore,
+        isDeviceMatch,
+        isBorderlineLocation,
+        // @ts-ignore
+        userHasRegisteredDevice: !!user.lastDeviceId
+    });
+
+    // Update User's lastDeviceId jika belum ada dan absen ini bersih
+    // @ts-ignore
+    if (!user.lastDeviceId && deviceId && !fraudResult.isSuspicious) {
+        await prisma.user.update({
+            where: { id: userId },
+            // @ts-ignore
+            data: { lastDeviceId: deviceId }
+        });
+    }
+
     // 3. Simpan data aman ke tabel absen
     let finalPhotoUrl = photoUrl;
     if (photoUrl) {
@@ -1168,7 +1461,13 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
         // @ts-ignore
         faceSimilarityScore,
         // @ts-ignore
-        isFaceVerified
+        isFaceVerified,
+        // @ts-ignore
+        fraudScore: fraudResult.score,
+        // @ts-ignore
+        isSuspicious: fraudResult.isSuspicious,
+        // @ts-ignore
+        deviceId: deviceId || null
       }
     });
 
@@ -1198,10 +1497,17 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
             console.warn(`[Mood AI] Photo file not found for analysis: ${fullPath}`);
         }
         // Cleanup after Supabase upload and AI processing
-        cleanupLocalFile(fullPath);
+        // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
+        if (finalPhotoUrl && !finalPhotoUrl.includes(req.get('host') || 'localhost')) {
+            cleanupLocalFile(fullPath);
+        }
     }
 
-    res.json({ message: 'Berhasil Clock-In', attendance });
+    // TRIGGER NOTIFIKASI KE ADMIN
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    await notifyAdmins(tenantId, 'Clock-In Baru', `${targetUser?.name || 'Seorang karyawan'} melakukan clock-in.`);
+
+    res.json({ message: 'Absent Berhasil (Clock In)', attendance });
   } catch (error) {
     res.status(500).json({ error: 'Gagal melakukan absensi' });
   }
@@ -1236,7 +1542,10 @@ app.patch('/api/users/:id/face-reference', tenantMiddleware, uploadFaceReference
     let finalUrl = localPath;
     try {
       finalUrl = await uploadToSupabase(fullPath, 'face_references');
-      cleanupLocalFile(fullPath);
+      // Only cleanup if successfully uploaded to Supabase
+      if (finalUrl && !finalUrl.includes(req.get('host') || 'localhost')) {
+          cleanupLocalFile(fullPath);
+      }
     } catch (uploadError) {
       console.error('Supabase upload failed for face reference:', uploadError);
       const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -1280,7 +1589,7 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
   try {
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
-    const { lat, lng } = req.body;
+    const { lat, lng, deviceId } = req.body;
 
     const photoUrl = req.file ? `/uploads/attendance/${req.file.filename}` : null;
 
@@ -1358,6 +1667,29 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
       }
     }
 
+    // --- AI FRAUD DETECTION (Phase 28) - Clock Out ---
+    // @ts-ignore
+    const isDeviceMatch = user.lastDeviceId ? (user.lastDeviceId === deviceId) : true;
+    const isBorderlineLocation = (refLat && refLng && refRadius) ? (getDistanceFromLatLonInM(lat, lng, refLat, refLng) > (refRadius * 0.8)) : false;
+
+    const fraudResult = calculateFraudScore({
+        faceScore: faceSimilarityScore,
+        isDeviceMatch,
+        isBorderlineLocation,
+        // @ts-ignore
+        userHasRegisteredDevice: !!user.lastDeviceId
+    });
+
+    // Update User's lastDeviceId jika belum ada dan absen ini bersih
+    // @ts-ignore
+    if (!user.lastDeviceId && deviceId && !fraudResult.isSuspicious) {
+        await prisma.user.update({
+            where: { id: userId },
+            // @ts-ignore
+            data: { lastDeviceId: deviceId }
+        });
+    }
+
     // Simpan foto ke Supabase jika ada
     let finalPhotoUrl = photoUrl;
     if (photoUrl) {
@@ -1381,7 +1713,13 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         // @ts-ignore
         faceSimilarityScore: faceSimilarityScore || (attendance as any).faceSimilarityScore,
         // @ts-ignore
-        isFaceVerified: isFaceVerified || (attendance as any).isFaceVerified
+        isFaceVerified: isFaceVerified || (attendance as any).isFaceVerified,
+        // @ts-ignore
+        fraudScore: fraudResult.score,
+        // @ts-ignore
+        isSuspicious: fraudResult.isSuspicious,
+        // @ts-ignore
+        deviceId: deviceId || (attendance as any).deviceId
       }
     });
 
@@ -1408,7 +1746,10 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
                 console.error('[Mood AI - ClockOut] Error:', moodErr);
             }
         }
-        cleanupLocalFile(fullPath);
+        // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
+        if (finalPhotoUrl && !finalPhotoUrl.includes(req.get('host') || 'localhost')) {
+            cleanupLocalFile(fullPath);
+        }
     }
 
     res.json({ message: 'Berhasil Clock-Out', attendance: updatedAttendance });
@@ -1599,6 +1940,10 @@ app.post('/api/leaves', tenantMiddleware, async (req: Request, res: Response) =>
         approverId: requester?.reportToId
       }
     });
+
+    // TRIGGER NOTIFIKASI KE ADMIN
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    await notifyAdmins(tenantId, 'Pengajuan Cuti Baru', `${targetUser?.name || 'Seorang karyawan'} mengajukan cuti baru.`);
 
     res.json({ message: 'Pengajuan cuti berhasil dikirim', leaveRequest });
   } catch (error) {
@@ -1868,7 +2213,7 @@ app.get('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Respo
 app.post('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const { name, description, target, weight } = req.body;
+    const { name, description, target, weight, isSystem, systemType } = req.body;
     console.log(`[KPI] Create Indicator: Tenant=${tenantId}, Body=`, req.body);
 
     if (!name) return res.status(400).json({ error: 'Nama indikator wajib diisi' });
@@ -1879,7 +2224,9 @@ app.post('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Resp
         name,
         description,
         target: target ? parseFloat(target) : 100,
-        weight: weight ? parseFloat(weight) : 1
+        weight: weight ? parseFloat(weight) : 1,
+        isSystem: isSystem || false,
+        systemType: systemType || null
       }
     });
 
@@ -1895,7 +2242,7 @@ app.put('/api/kpi/indicators/:id', tenantMiddleware, async (req: Request, res: R
   try {
     const tenantId = (req as any).tenantId;
     const id = req.params.id;
-    const { name, description, target, weight } = req.body;
+    const { name, description, target, weight, isSystem, systemType } = req.body;
 
     if (typeof id !== 'string') return res.status(400).json({ error: 'ID tidak valid' });
 
@@ -1908,7 +2255,9 @@ app.put('/api/kpi/indicators/:id', tenantMiddleware, async (req: Request, res: R
         name,
         description,
         target: target ? parseFloat(target) : undefined,
-        weight: weight ? parseFloat(weight) : undefined
+        weight: weight ? parseFloat(weight) : undefined,
+        isSystem: isSystem === true,
+        systemType: systemType || null
       }
     });
 
@@ -1972,6 +2321,11 @@ app.get('/api/kpi/auto-score/:userId', tenantMiddleware, async (req: Request, re
     const lateCount = attendances.filter(a => a.status === 'LATE').length;
     const totalPresence = presentCount + lateCount;
 
+    // Ambil Learning Objectives untuk integrasi KPI
+    const objectives = await prisma.learningObjective.findMany({
+      where: { userId }
+    });
+
     const scores = systemIndicators.map(ind => {
       let score = 0;
       if (ind.systemType === 'ATTENDANCE') {
@@ -1986,7 +2340,14 @@ app.get('/api/kpi/auto-score/:userId', tenantMiddleware, async (req: Request, re
       };
     });
 
-    res.json({ scores });
+    res.json({ 
+      scores,
+      objectives: objectives.map(obj => ({
+        id: obj.id,
+        title: obj.title,
+        progress: obj.progress
+      }))
+    });
 
   } catch (error) {
     console.error('Error auto-scoring:', error);
@@ -2040,7 +2401,7 @@ app.get('/api/kpi/scores/:userId', tenantMiddleware, async (req: Request, res: R
 app.post('/api/kpi/scores', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const { userId, indicatorId, score, comment, month, year } = req.body;
+    const { userId, indicatorId, score, comment, month, year, learningObjectiveId } = req.body;
 
     if (!userId || !indicatorId || score === undefined || !month || !year) {
       return res.status(400).json({ error: 'Data penilaian tidak lengkap' });
@@ -2057,7 +2418,8 @@ app.post('/api/kpi/scores', tenantMiddleware, async (req: Request, res: Response
       },
       update: {
         score: parseFloat(score),
-        comment
+        comment,
+        learningObjectiveId: learningObjectiveId ? parseInt(learningObjectiveId) : null
       },
       create: {
         companyId: tenantId,
@@ -2066,7 +2428,8 @@ app.post('/api/kpi/scores', tenantMiddleware, async (req: Request, res: Response
         score: parseFloat(score),
         comment,
         month: parseInt(month),
-        year: parseInt(year)
+        year: parseInt(year),
+        learningObjectiveId: learningObjectiveId ? parseInt(learningObjectiveId) : null
       }
     });
 
@@ -2173,6 +2536,103 @@ app.get('/api/kpi/my-performance', tenantMiddleware, async (req: Request, res: R
   }
 });
 
+// --- PAYROLL CALCULATION HELPERS (POINT 6) ---
+
+/**
+ * Menghitung BPJS Karyawan & Perusahaan
+ */
+function calculateBPJS(baseSalary: number, allowance: number, config: { kesehatan: boolean, ketenagakerjaan: boolean }) {
+  const salary = baseSalary + allowance;
+  const capKesehatan = 12000000;
+  const capJP = 10000000; // Asumsi cap JP sekitar 10jt
+
+  let kesehatanEmp = 0;
+  let kesehatanComp = 0;
+  let jkk = 0;
+  let jkm = 0;
+  let jhtEmp = 0;
+  let jhtComp = 0;
+  let jpEmp = 0;
+  let jpComp = 0;
+
+  if (config.kesehatan) {
+    const basisKesehatan = Math.min(salary, capKesehatan);
+    kesehatanEmp = basisKesehatan * 0.01;
+    kesehatanComp = basisKesehatan * 0.04;
+  }
+
+  if (config.ketenagakerjaan) {
+    jkk = salary * 0.0024; // Grade standar
+    jkm = salary * 0.003;
+    jhtEmp = salary * 0.02;
+    jhtComp = salary * 0.037;
+    
+    const basisJP = Math.min(salary, capJP);
+    jpEmp = basisJP * 0.01;
+    jpComp = basisJP * 0.02;
+  }
+
+  return {
+    employeeDeduction: kesehatanEmp + jhtEmp + jpEmp,
+    companyContribution: kesehatanComp + jkk + jkm + jhtComp + jpComp,
+    breakdown: { kesehatanEmp, kesehatanComp, jkk, jkm, jhtEmp, jhtComp, jpEmp, jpComp }
+  };
+}
+
+/**
+ * Menghitung PPh 21 (Metode Progresif Bulanan Disederhanakan)
+ */
+function calculatePPh21(grossIncome: number, jhtjpEmp: number, taxStatus: string) {
+  // 1. Biaya Jabatan (5%, max 500k/bulan)
+  const biayaJabatan = Math.min(grossIncome * 0.05, 500000);
+  
+  // 2. Net Income Bulanan
+  const netIncomeMonth = grossIncome - biayaJabatan - jhtjpEmp;
+  
+  // 3. Setahunkan
+  const netIncomeYear = netIncomeMonth * 12;
+  
+  // 4. PTKP (Asumsi standar 2024)
+  let ptkp = 54000000; // TK/0
+  if (taxStatus === 'K/0') ptkp = 58500000;
+  else if (taxStatus === 'K/1') ptkp = 63000000;
+  else if (taxStatus === 'K/2') ptkp = 67500000;
+  else if (taxStatus === 'K/3') ptkp = 72000000;
+  
+  // 5. PKP (Penghasilan Kena Pajak)
+  const pkp = Math.max(0, netIncomeYear - ptkp);
+  
+  // 6. Tarif Progresif
+  let taxYear = 0;
+  let remainingPkp = pkp;
+
+  // Lapis 1: 5% (0 - 60jt)
+  const lapis1 = Math.min(remainingPkp, 60000000);
+  taxYear += lapis1 * 0.05;
+  remainingPkp -= lapis1;
+
+  // Lapis 2: 15% (60jt - 250jt)
+  if (remainingPkp > 0) {
+    const lapis2 = Math.min(remainingPkp, 190000000);
+    taxYear += lapis2 * 0.15;
+    remainingPkp -= lapis2;
+  }
+
+  // Lapis 3: 25% (250jt - 500jt)
+  if (remainingPkp > 0) {
+    const lapis3 = Math.min(remainingPkp, 250000000);
+    taxYear += lapis3 * 0.25;
+    remainingPkp -= lapis3;
+  }
+
+  // Lapis 4: 30% (> 500jt)
+  if (remainingPkp > 0) {
+    taxYear += remainingPkp * 0.30;
+  }
+
+  return Math.round(taxYear / 12);
+}
+
 // F. Endpoint Manajemen Penggajian (Fase 12)
 // F1. HRD men-generate daftar gaji bulanan masal
 app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Response) => {
@@ -2182,6 +2642,12 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
     const year = parseInt(req.body.year as string);
 
     if (isNaN(month) || isNaN(year)) return res.status(400).json({ error: 'Bulan dan Tahun wajib diisi dengan angka.' });
+
+    // --- CHECK CLOSING ---
+    const dateCheck = new Date(year, month - 1, 1);
+    if (await isPeriodClosed(tenantId, dateCheck)) {
+       return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat men-generate gaji pada periode ini.' });
+    }
 
     const userRole = (req as any).userRole;
 
@@ -2200,7 +2666,11 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
     const sickLeaveDeductionRate = company?.sickLeaveDeductionRate || 0;
 
     // === Logika Pro-rated ===
-    // Hitung total hari kerja (Senin-Jumat) dalam bulan ini
+    // Parameter perusahaan: Hari Kerja Per Bulan & Grace Period
+    const stdWorkDays = company?.workDaysPerMonth || 0;
+    const lateGracePeriod = company?.lateGracePeriod || 0;
+
+    // Hitung total hari kerja (Senin-Jumat) dalam bulan ini secara dinamis sebagai fallback
     let totalWeekdays = 0;
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       if (d.getDay() !== 0 && d.getDay() !== 6) totalWeekdays++;
@@ -2218,7 +2688,8 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
       if (day !== 0 && day !== 6) holidayWeekdays++;
     });
 
-    const activeWorkingDays = Math.max(1, totalWeekdays - holidayWeekdays);
+    // Gunakan stdWorkDays jika diset (>0), jika tidak gunakan hitungan dinamis
+    const activeWorkingDays = stdWorkDays > 0 ? stdWorkDays : Math.max(1, totalWeekdays - holidayWeekdays);
 
     const results = [];
 
@@ -2228,10 +2699,51 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
         where: { userId: user.id, companyId: tenantId, clockIn: { gte: startDate, lte: endDate } }
       });
 
-      // 3. Hitung jumlah keterlambatan (LATE)
-      const lateCount = await prisma.attendance.count({
-        where: { userId: user.id, companyId: tenantId, status: 'LATE', clockIn: { gte: startDate, lte: endDate } }
-      });
+      // 3. Hitung jumlah keterlambatan (LATE) dengan Grace Period
+      let lateCount = 0;
+      if (lateGracePeriod > 0) {
+        // Jika ada grace period, kita filter manual data absen LATE
+        const lateAttendances = await prisma.attendance.findMany({
+          where: { 
+            userId: user.id, 
+            companyId: tenantId, 
+            status: 'LATE', 
+            clockIn: { gte: startDate, lte: endDate } 
+          },
+          include: { 
+            // @ts-ignore
+            shift: true 
+          }
+        });
+
+        for (const att of lateAttendances) {
+          // @ts-ignore
+          if (att.shift && att.shift.startTime) {
+            // @ts-ignore
+            const shiftStart = att.shift.startTime; // Format "HH:mm"
+            const [sh, sm] = shiftStart.split(':').map(Number);
+            
+            const actualIn = new Date(att.clockIn);
+            const scheduledIn = new Date(att.clockIn);
+            scheduledIn.setHours(sh, sm, 0, 0);
+
+            const diffMinutes = (actualIn.getTime() - scheduledIn.getTime()) / (1000 * 60);
+            
+            // Hanya anggap telat jika melebihi grace period
+            if (diffMinutes > lateGracePeriod) {
+              lateCount++;
+            }
+          } else {
+            // Jika tidak ada data shift, tetap anggap telat sesuai status DB
+            lateCount++;
+          }
+        }
+      } else {
+        // Jika tidak ada grace period, gunakan count biasa dari status
+        lateCount = await prisma.attendance.count({
+          where: { userId: user.id, companyId: tenantId, status: 'LATE', clockIn: { gte: startDate, lte: endDate } }
+        });
+      }
 
       // 4. Hitung jumlah hari cuti yang disetujui (jatuh di weekday & bukan hari libur)
       const approvedLeaves = await prisma.leaveRequest.findMany({
@@ -2303,13 +2815,7 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
       });
       const loanDeduction = activeLoan ? Math.min(activeLoan.monthlyDeduction, activeLoan.remainingAmount) : 0;
 
-      // 4. Hitung BPJS (Fase 21)
-      let bpjsKesehatan = 0;
-      let bpjsKetenagakerjaan = 0;
-      if (user.bpjsKesehatan) bpjsKesehatan = user.basicSalary * 0.01;
-      if (user.bpjsKetenagakerjaan) bpjsKetenagakerjaan = user.basicSalary * 0.03;
-
-      // 5. Hitung Bonus/THR (Fase 31)
+      // 4.1. Hitung Bonus/THR (Fase 31) - Untuk Gross PPh 21
       const bonuses = await prisma.bonus.findMany({
         where: {
           companyId: tenantId,
@@ -2318,12 +2824,30 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
           year: year
         }
       });
-      const bonusPay = bonuses.reduce((sum, b) => sum + b.amount, 0);
+      const bonusPayTotal = bonuses.reduce((sum, b) => sum + b.amount, 0);
+
+      // 4.2. Hitung BPJS (Point 6: Auto-Calculator)
+      const bpjs = calculateBPJS(user.basicSalary, user.allowance || 0, {
+        kesehatan: user.bpjsKesehatan,
+        ketenagakerjaan: user.bpjsKetenagakerjaan
+      });
+
+      // 4.3. Hitung PPh 21 (Point 6: Tax Recovery)
+      // Gross Income untuk PPh 21 = Gaji Pokok + Tunjangan + Lembur + Bonus + BPJS Tanggung Perusahaan (Kesehatan + JKK + JKM)
+      const grossForTax = (user.basicSalary + (user.allowance || 0) + overtimePay + bonusPayTotal) 
+                        + bpjs.breakdown.kesehatanComp + bpjs.breakdown.jkk + bpjs.breakdown.jkm;
+      
+      // Pengurang PPh 21 = JHT (Employee) + JP (Employee)
+      const deductionForTax = bpjs.breakdown.jhtEmp + bpjs.breakdown.jpEmp;
+      
+      const pph21 = calculatePPh21(grossForTax, deductionForTax, (user as any).taxStatus || 'TK-0');
 
       // 6. Final Calculation
-      // Gaji Bersih = (Potensi Gaji Penuh + Lembur + Reimburse + Bonus) - (Potongan Absen/Telat + Kasbon + BPJS + Potongan Sakit)
-      const netSalary = (user.basicSalary + user.allowance + overtimePay + reimbursementPay + bonusPay)
-        - totalDeductions - loanDeduction - bpjsKesehatan - bpjsKetenagakerjaan - sickLeaveDeduction;
+      // Gaji Bersih = (Pendapatan Kotor) - (Potongan Absensi + Pinjaman + BPJS Karyawan + PPh 21 + Potongan Sakit)
+      const totalEarnings = (user.basicSalary + (user.allowance || 0) + overtimePay + reimbursementPay + bonusPayTotal);
+      const totalDeductionsAll = totalDeductions + loanDeduction + bpjs.employeeDeduction + pph21 + sickLeaveDeduction;
+      
+      const netSalary = totalEarnings - totalDeductionsAll;
 
       // Simpan Draft Payroll
       const payroll = await prisma.payroll.upsert({
@@ -2337,14 +2861,16 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
           lateCount,
           deductions: totalDeductions,
           loanDeduction: loanDeduction,
-          bpjsKesehatanDeduction: bpjsKesehatan,
-          bpjsKetenagakerjaanDeduction: bpjsKetenagakerjaan,
+          bpjsKesehatanDeduction: bpjs.breakdown.kesehatanEmp,
+          bpjsKetenagakerjaanDeduction: bpjs.breakdown.jhtEmp + bpjs.breakdown.jpEmp,
+          pph21Deduction: pph21,
+          bpjsCompanyContribution: bpjs.companyContribution,
           sickLeaveCount: sickLeaveCount,
           sickLeaveDeduction: sickLeaveDeduction,
           overtimeHours: overtimeHours,
           overtimePay: overtimePay,
           reimbursementPay: reimbursementPay,
-          bonusPay: bonusPay,
+          bonusPay: bonusPayTotal,
           netSalary,
           status: 'DRAFT'
         },
@@ -2359,14 +2885,16 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
           lateCount,
           deductions: totalDeductions,
           loanDeduction: loanDeduction,
-          bpjsKesehatanDeduction: bpjsKesehatan,
-          bpjsKetenagakerjaanDeduction: bpjsKetenagakerjaan,
+          bpjsKesehatanDeduction: bpjs.breakdown.kesehatanEmp,
+          bpjsKetenagakerjaanDeduction: bpjs.breakdown.jhtEmp + bpjs.breakdown.jpEmp,
+          pph21Deduction: pph21,
+          bpjsCompanyContribution: bpjs.companyContribution,
           sickLeaveCount: sickLeaveCount,
           sickLeaveDeduction: sickLeaveDeduction,
           overtimeHours: overtimeHours,
           overtimePay: overtimePay,
           reimbursementPay: reimbursementPay,
-          bonusPay: bonusPay,
+          bonusPay: bonusPayTotal,
           netSalary,
           status: 'DRAFT'
         }
@@ -2438,6 +2966,48 @@ app.patch('/api/payroll/:id', tenantMiddleware, async (req: Request, res: Respon
 
     res.json({ message: 'Gaji berhasil dibayarkan.', updatedPayroll });
 
+    // --- SINKRONISASI KE FINANCE (AUTO-CREATE EXPENSE) ---
+    try {
+      // 1. Cari atau buat kategori "GAJI / PAYROLL"
+      let category = await prisma.expenseCategory.findFirst({
+        where: { name: 'GAJI / PAYROLL', companyId: tenantId }
+      });
+
+      if (!category) {
+        category = await prisma.expenseCategory.create({
+          data: {
+            name: 'GAJI / PAYROLL',
+            companyId: tenantId,
+            type: 'OPERATIONAL'
+          }
+        });
+      }
+
+      // 2. Ambil Akun Kas Utama (Default yang pertama ditemukan jika tidak ada pilihan)
+      const defaultAccount = await (prisma as any).financialAccount.findFirst({
+        where: { companyId: tenantId }
+      });
+
+      // 3. Create Expense Record
+      const userName = await prisma.user.findUnique({ where: { id: updatedPayroll.userId }, select: { name: true } });
+      await prisma.expense.create({
+        data: {
+          companyId: tenantId,
+          categoryId: category.id,
+          amount: updatedPayroll.netSalary,
+          date: new Date(),
+          description: `Pembayaran Gaji Karyawan: ${userName?.name || 'User ID ' + updatedPayroll.userId} (Periode ${updatedPayroll.month}/${updatedPayroll.year})`,
+          status: 'PAID',
+          accountId: defaultAccount?.id || null
+        }
+      });
+
+      console.log(`[Finance Sync] Created Expense for Payroll ID ${updatedPayroll.id}`);
+    } catch (financeErr) {
+      console.error('[Finance Sync Error] Gagal mencatat pengeluaran gaji:', financeErr);
+      // Kita tidak return error di sini agar proses utama (update payroll) dianggap sukses
+    }
+
     // TRIGGER NOTIFIKASI
     if (status === 'PAID') {
       await sendNotification(
@@ -2452,7 +3022,66 @@ app.patch('/api/payroll/:id', tenantMiddleware, async (req: Request, res: Respon
   }
 });
 
-// F4. Karyawan menarik riwayat gaji masing-masing (Mobile)
+// F4. Manual Payroll Entry (For Finance-only modules)
+app.post('/api/payroll/manual', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { userId, month, year, basicSalary, allowance, deductions, bonusPay, status } = req.body;
+
+    if (!userId || !month || !year) return res.status(400).json({ error: 'User ID, Bulan, dan Tahun wajib diisi.' });
+
+    // --- CHECK CLOSING ---
+    const dateCheck = new Date(year, month - 1, 1);
+    if (await isPeriodClosed(tenantId, dateCheck)) {
+       return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat mencatat gaji manual pada periode ini.' });
+    }
+
+    const netSalary = (Number(basicSalary) || 0) + (Number(allowance) || 0) + (Number(bonusPay) || 0) - (Number(deductions) || 0);
+
+    const payroll = await prisma.payroll.upsert({
+      where: {
+        userId_month_year: {
+          userId: Number(userId),
+          month: Number(month),
+          year: Number(year)
+        }
+      },
+      update: {
+        basicSalary: Number(basicSalary) || 0,
+        allowance: Number(allowance) || 0,
+        deductions: Number(deductions) || 0,
+        bonusPay: Number(bonusPay) || 0,
+        netSalary: netSalary,
+        status: status || 'DRAFT'
+      },
+      create: {
+        companyId: tenantId,
+        userId: Number(userId),
+        month: Number(month),
+        year: Number(year),
+        basicSalary: Number(basicSalary) || 0,
+        allowance: Number(allowance) || 0,
+        deductions: Number(deductions) || 0,
+        bonusPay: Number(bonusPay) || 0,
+        netSalary: netSalary,
+        status: status || 'DRAFT',
+        attendanceCount: 0,
+        lateCount: 0,
+        overtimeHours: 0,
+        overtimePay: 0,
+        loanDeduction: 0,
+        reimbursementPay: 0
+      }
+    });
+
+    res.json(payroll);
+  } catch (error) {
+    console.error('Manual Payroll Error:', error);
+    res.status(500).json({ error: 'Gagal menyimpan data payroll manual.' });
+  }
+});
+
+// F5. Karyawan menarik riwayat gaji masing-masing (Mobile)
 app.get('/api/my-payroll', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
@@ -2593,7 +3222,10 @@ app.post('/api/reimbursements/scan', tenantMiddleware, upload.single('receipt'),
     const ocrResult = await performOCR(fullLocalPath);
     
     // Cleanup after Supabase upload and OCR processing
-    cleanupLocalFile(fullLocalPath);
+    // Only cleanup if the upload to Supabase was successful (i.e., receiptUrl changed from local path)
+    if (receiptUrl && !receiptUrl.includes(req.get('host') || 'localhost')) {
+      cleanupLocalFile(fullLocalPath);
+    }
 
     res.json({
       ...ocrResult,
@@ -2667,7 +3299,11 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
     // Cleanup local file after Supabase upload and AI processing
     cleanupLocalFile(fullPath);
 
-    res.status(201).json(reimbursement);
+    // TRIGGER NOTIFIKASI KE ADMIN
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    await notifyAdmins(tenantId, 'Pengajuan Reimbursement', `${targetUser?.name || 'Seorang karyawan'} mengajukan reimbursement sebesar Rp ${amount.toLocaleString('id-ID')}.`);
+
+    res.json({ message: 'Reimbursement berhasil diajukan', reimbursement });
   } catch (error) {
     console.error('Error reimbursement:', error);
     res.status(500).json({ error: 'Gagal mengajukan klaim reimbursement.' });
@@ -2929,8 +3565,10 @@ app.get('/api/learning/objectives', tenantMiddleware, async (req: Request, res: 
     const userRole = (req as any).userRole;
     const objectives = await (prisma as any).learningObjective.findMany({
       where: userRole === 'SUPERADMIN' ? { userId: userId } : { companyId: tenantId, userId: userId },
+      include: { material: true },
       orderBy: { createdAt: 'desc' }
     });
+    console.log(`[LMS DEBUG] User ${userId} fetched ${objectives.length} objectives. First has materialId: ${objectives[0]?.materialId}`);
     res.json(objectives);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil data pembelajaran.' });
@@ -2954,6 +3592,7 @@ app.post('/api/learning/objectives', tenantMiddleware, async (req: Request, res:
       data: {
         companyId: tenantId,
         userId: finalUserId,
+        materialId: req.body.materialId ? parseInt(req.body.materialId) : null,
         title,
         description,
         category,
@@ -3028,7 +3667,10 @@ app.get('/api/admin/learning/all', tenantMiddleware, async (req: Request, res: R
     const userRole = (req as any).userRole;
     const data = await (prisma as any).learningObjective.findMany({
       where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
-      include: { user: { select: { name: true, jobTitle: true } } },
+      include: { 
+        user: { select: { name: true, jobTitle: true } },
+        material: { select: { title: true } }
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json(data);
@@ -3037,13 +3679,210 @@ app.get('/api/admin/learning/all', tenantMiddleware, async (req: Request, res: R
   }
 });
 
+// 7. Admin: Lihat semua Library SOP & Exam
+app.get('/api/admin/learning/materials', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+
+    const materials = await (prisma as any).learningMaterial.findMany({
+      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      include: {
+        exams: {
+          include: {
+            questions: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Parse JSON options in questions
+    const formatted = materials.map((m: any) => ({
+      ...m,
+      exams: m.exams.map((ex: any) => ({
+        ...ex,
+        questions: ex.questions.map((q: any) => ({
+          ...q,
+          options: JSON.parse(q.options)
+        }))
+      }))
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching materials library:', error);
+    res.status(500).json({ error: 'Gagal mengambil daftar library SOP.' });
+  }
+});
+
+// 11. Admin: Delete Exam Result
+app.delete('/api/admin/learning/exams/results/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+    const id = parseInt(req.params.id as string);
+
+    const attempt = await (prisma as any).examAttempt.findFirst({
+      where: userRole === 'SUPERADMIN' ? { id } : { id, companyId: tenantId }
+    });
+
+    if (!attempt) return res.status(404).json({ error: 'Hasil ujian tidak ditemukan.' });
+
+    await (prisma as any).examAttempt.delete({
+      where: { id }
+    });
+
+    res.json({ message: 'Hasil ujian berhasil dihapus.' });
+  } catch (error) {
+    console.error('Error deleting exam result:', error);
+    res.status(500).json({ error: 'Gagal menghapus hasil ujian.' });
+  }
+});
+
+// 8. Admin: Hapus Material SOP
+app.delete('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userRole = (req as any).userRole;
+    const id = parseInt(req.params.id as string);
+
+    console.log(`[DEBUG] Attempting to delete material ID: ${id} for tenant: ${tenantId} (Role: ${userRole})`);
+
+    // Cari material
+    const material = await (prisma as any).learningMaterial.findFirst({
+      where: userRole === 'SUPERADMIN' ? { id } : { id, companyId: tenantId }
+    });
+
+    if (!material) {
+        console.warn(`[DEBUG] Material with ID ${id} not found for tenant ${tenantId}`);
+        return res.status(404).json({ error: 'Materi tidak ditemukan.' });
+    }
+
+    console.log(`[DEBUG] Found material: "${material.title}". Identifying associated exams...`);
+
+    // Hapus material (Exam dan Questions akan ikut terhapus jika di-handle Prisma atau manual)
+    const exams = await (prisma as any).exam.findMany({
+      where: { materialId: id },
+      select: { id: true }
+    });
+    const examIds = exams.map((e: any) => e.id);
+
+    console.log(`[DEBUG] Found ${examIds.length} exams to delete: ${examIds.join(', ')}`);
+
+    if (examIds.length > 0) {
+        try {
+            console.log(`[DEBUG] Deleting ExamAttempts for exam IDs...`);
+            await (prisma as any).examAttempt.deleteMany({
+                where: { examId: { in: examIds } }
+            });
+            
+            console.log(`[DEBUG] Deleting ExamQuestions for exam IDs...`);
+            await (prisma as any).examQuestion.deleteMany({
+                where: { examId: { in: examIds } }
+            });
+            
+            console.log(`[DEBUG] Deleting Exams...`);
+            await (prisma as any).exam.deleteMany({
+                where: { id: { in: examIds } }
+            });
+        } catch (subErr) {
+            console.error(`[DEBUG] Error during sub-data deletion:`, subErr);
+            // Continue anyway to try deleting the material
+        }
+    }
+
+    console.log(`[DEBUG] Finally deleting LearningMaterial ID: ${id}`);
+    await (prisma as any).learningMaterial.delete({
+      where: { id }
+    });
+
+    console.log(`[DEBUG] Deletion successful for material ID: ${id}`);
+    res.json({ message: 'Materi dan ujian terkait berhasil dihapus.' });
+  } catch (error) {
+    console.error('Error deleting material:', error);
+    res.status(500).json({ error: 'Gagal menghapus materi. Silakan cek koneksi database.' });
+  }
+});
+
+// 9. Admin: Edit Material SOP
+app.put('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+    const id = parseInt(req.params.id as string);
+    const { title, content, category, targetDivision, targetJobTitle, regenerateQuestions, questionCount, minScore } = req.body;
+
+    const material = await (prisma as any).learningMaterial.findFirst({
+      where: userRole === 'SUPERADMIN' ? { id } : { id, companyId: tenantId }
+    });
+
+    if (!material) return res.status(404).json({ error: 'Materi tidak ditemukan.' });
+
+    // Update material
+    const updatedMaterial = await (prisma as any).learningMaterial.update({
+      where: { id },
+      data: {
+        title,
+        content,
+        category,
+        targetDivision,
+        targetJobTitle
+      }
+    });
+
+    // Update minScore of existing exams if present
+    if (minScore !== undefined) {
+      await (prisma as any).exam.updateMany({
+        where: { materialId: id },
+        data: { minScore: parseFloat(minScore) }
+      });
+    }
+
+    // Jika re-generate questions
+    if (regenerateQuestions) {
+        // Hapus ujian lama
+        await (prisma as any).exam.deleteMany({
+            where: { materialId: id }
+        });
+
+        // Generate baru
+        const { generateQuestions } = require('./examAI');
+        const questionsData = await generateQuestions(content, questionCount || 5);
+
+        await (prisma as any).exam.create({
+            data: {
+                companyId: material.companyId,
+                materialId: id,
+                title: `Test Pemahaman: ${title}`,
+                description: `Ujian otomatis untuk memverifikasi pemahaman Anda tentang ${title}.`,
+                targetDivision: targetDivision || null,
+                targetJobTitle: targetJobTitle || null,
+                questions: {
+                    create: questionsData.map((q: any) => ({
+                        question: q.question,
+                        options: JSON.stringify(q.options),
+                        correctAnswer: q.correctAnswer
+                    }))
+                }
+            }
+        });
+    }
+
+    res.json(updatedMaterial);
+  } catch (error) {
+    console.error('Error updating material:', error);
+    res.status(500).json({ error: 'Gagal memperbarui materi.' });
+  }
+});
+
 // --- FASE 39: AI-GENERATED EXAM SYSTEM (OTOMASI TES SOP) ---
 
 // 1. Admin: Upload SOP & Generate Exam
 app.post('/api/learning/materials', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { title, content, category, targetDivision, targetJobTitle } = req.body;
     const tenantId = (req as any).tenantId;
+    const { title, content, category, targetDivision, targetJobTitle, questionCount, minScore } = req.body;
 
     // Simpan Material SOP
     const material = await (prisma as any).learningMaterial.create({
@@ -3059,7 +3898,7 @@ app.post('/api/learning/materials', tenantMiddleware, async (req: Request, res: 
 
     // AI generate questions
     const { generateQuestions } = require('./examAI');
-    const questionsData = await generateQuestions(content);
+    const questionsData = await generateQuestions(content, questionCount || 5);
 
     // Create Exam based on material
     const exam = await (prisma as any).exam.create({
@@ -3070,6 +3909,7 @@ app.post('/api/learning/materials', tenantMiddleware, async (req: Request, res: 
         description: `Ujian otomatis untuk memverifikasi pemahaman Anda tentang ${title}.`,
         targetDivision: targetDivision || null,
         targetJobTitle: targetJobTitle || null,
+        minScore: minScore ? parseFloat(minScore) : 70,
         questions: {
           create: questionsData.map((q: any) => ({
             question: q.question,
@@ -3101,10 +3941,19 @@ app.get('/api/learning/exams', tenantMiddleware, async (req: Request, res: Respo
       select: { division: true, jobTitle: true }
     });
 
+    // Ambil materialId dari objective yang ditugaskan ke user ini
+    const userObjectives = await (prisma as any).learningObjective.findMany({
+      where: { userId, materialId: { not: null } },
+      select: { materialId: true }
+    });
+    const assignedMaterialIds = userObjectives.map((o: any) => o.materialId).filter(Boolean);
+
     const exams = await (prisma as any).exam.findMany({
       where: { 
-        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        companyId: tenantId,
         OR: [
+          // Match material yang ditugaskan
+          { materialId: { in: assignedMaterialIds } },
           // Match all (no target)
           { AND: [{ targetDivision: null }, { targetJobTitle: null }] },
           // Match division
@@ -3116,6 +3965,7 @@ app.get('/api/learning/exams', tenantMiddleware, async (req: Request, res: Respo
       include: { material: { select: { title: true, category: true } } },
       orderBy: { createdAt: 'desc' }
     });
+    console.log(`[LMS DEBUG] User ${userId} fetched ${exams.length} exams. Assigned Material IDs: ${JSON.stringify(assignedMaterialIds)}`);
     res.json(exams);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil daftar ujian.' });
@@ -3200,6 +4050,22 @@ app.post('/api/learning/exams/:id/submit', tenantMiddleware, async (req: Request
         comments: `Menyelesaikan ujian dengan skor ${score.toFixed(1)}%`
       }
     });
+
+    // Auto-complete objectives linked to this material
+    const passingScore = exam.minScore ?? 70;
+    if (score >= passingScore && exam.materialId) {
+      await (prisma as any).learningObjective.updateMany({
+        where: {
+          userId: userId,
+          materialId: exam.materialId,
+          status: { not: 'COMPLETED' }
+        },
+        data: {
+          status: 'COMPLETED',
+          progress: 100
+        }
+      });
+    }
 
     res.json({ attempt, score });
   } catch (error) {
@@ -3605,7 +4471,42 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
       }
     });
 
-    // 5. Nama Perusahaan & Detail Kontrak
+    // 5. Finance Summary (New)
+    const financialAccounts = await prisma.financialAccount.aggregate({
+      _sum: { balance: true },
+      where: { companyId: tenantId }
+    });
+    const totalBalance = Number(financialAccounts._sum.balance || 0);
+
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const incomesMonth = await prisma.income.aggregate({
+      _sum: { amount: true },
+      where: { companyId: tenantId, date: { gte: firstDayOfMonth } }
+    });
+    const expensesMonth = await prisma.expense.aggregate({
+      _sum: { amount: true },
+      where: { companyId: tenantId, date: { gte: firstDayOfMonth } }
+    });
+    const monthlyProfit = Number(incomesMonth._sum.amount || 0) - Number(expensesMonth._sum.amount || 0);
+
+    // 5.1 Hutang (Pending Expenses)
+    const payableRes: any[] = await prisma.$queryRawUnsafe(`
+      SELECT SUM(amount) as value FROM "Expense" WHERE "companyId" = $1 AND "status"::text = 'PENDING'
+    `, tenantId);
+    const totalPayable = Number(payableRes[0]?.value || 0);
+
+    // 5.2 Piutang (Unpaid Sales)
+    const receivableRes: any[] = await prisma.$queryRawUnsafe(`
+      SELECT SUM("totalAmount") as value FROM "Sale" WHERE "companyId" = $1 AND "status" = 'UNPAID'
+    `, tenantId);
+    const totalReceivable = Number(receivableRes[0]?.value || 0);
+
+    const inventoryRes: any[] = await prisma.$queryRawUnsafe(`
+      SELECT SUM(stock * price) as value FROM "Product" WHERE "companyId" = $1
+    `, tenantId);
+    const inventoryValue = Number(inventoryRes[0]?.value || 0);
+
+    // 6. Nama Perusahaan & Detail Kontrak
     const company = await prisma.company.findUnique({
       where: { id: tenantId },
       select: { 
@@ -3623,6 +4524,11 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
       presentCount,
       lateCount,
       leaveCount,
+      totalBalance,
+      monthlyProfit,
+      totalPayable,
+      totalReceivable,
+      inventoryValue,
       companyName: company?.name || 'Perusahaan Anda',
       companyContract: company
     });
@@ -3664,6 +4570,190 @@ app.get('/api/stats/contract-alerts', tenantMiddleware, async (req: Request, res
     res.json(expiringSoon);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil data pengingat kontrak.' });
+  }
+});
+
+app.get('/api/stats/ai-insights', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    
+    // Fetch Company to check purchasedInsights
+    const company = await prisma.company.findUnique({
+      where: { id: tenantId },
+      select: { purchasedInsights: true }
+    });
+    const purchased = company?.purchasedInsights || [];
+    
+    const insights: any[] = [];
+
+    const today = new Date();
+    const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    // 1. Finance Insight (Revenue Trend)
+    const incomeThisMonth = await prisma.income.aggregate({
+      _sum: { amount: true },
+      where: { companyId: tenantId, date: { gte: firstDayThisMonth } }
+    });
+    const incomeLastMonth = await prisma.income.aggregate({
+      _sum: { amount: true },
+      where: { companyId: tenantId, date: { gte: firstDayLastMonth, lte: lastDayLastMonth } }
+    });
+
+    const valThis = Number(incomeThisMonth._sum.amount || 0);
+    const valLast = Number(incomeLastMonth._sum.amount || 0);
+
+    if (valLast > 0) {
+      const diff = ((valThis - valLast) / valLast) * 100;
+      if (diff > 0) {
+        insights.push({ 
+            type: 'success', 
+            message: `Revenue Naik ${diff.toFixed(1)}%`, 
+            detail: `Performa finansial bulan ini menunjukkan tren positif dibanding periode sebelumnya.` 
+        });
+      } else if (diff < -5) {
+        insights.push({ 
+            type: 'warning', 
+            message: `Revenue Turun ${Math.abs(diff).toFixed(1)}%`, 
+            detail: `Terdeteksi penurunan pemasukan. Periksa kembali efisiensi operasional atau target penjualan.` 
+        });
+      }
+    } else if (valThis > 0) {
+        insights.push({ type: 'info', message: 'Awal Pertumbuhan', detail: 'Sistem mencatat pemasukan pertama untuk perusahaan Anda di platform ini.' });
+    }
+
+    // 2. Attendance Insight (Daily Discipline)
+    const todayStart = new Date();
+    todayStart.setHours(0,0,0,0);
+    const lateToday = await prisma.attendance.count({
+      where: { companyId: tenantId, status: 'LATE', clockIn: { gte: todayStart } }
+    });
+    
+    if (lateToday > 0) {
+      insights.push({ 
+          type: 'warning', 
+          message: `${lateToday} Orang Terlambat`, 
+          detail: `Hari ini terpantau ada ${lateToday} staf yang datang tidak sesuai jam masuk. Perlu pengawasan lebih.` 
+      });
+    } else {
+        const totalPresentToday = await prisma.attendance.count({
+            where: { companyId: tenantId, clockIn: { gte: todayStart } }
+        });
+        if (totalPresentToday > 0) {
+            insights.push({ 
+                type: 'success', 
+                message: 'Kedisiplinan Sempurna', 
+                detail: 'Seluruh tim yang hadir hari ini datang tepat waktu. Budaya kerja yang sangat baik!' 
+            });
+        }
+    }
+
+    // 3. Stock Insight (Inventory Health)
+    const lowStockItems = await prisma.product.findMany({
+        where: { companyId: tenantId, stock: { lte: 5 } },
+        take: 1
+    });
+    const lowStockCount = await prisma.product.count({
+        where: { companyId: tenantId, stock: { lte: 5 } }
+    });
+
+    if (lowStockCount > 0) {
+        insights.push({ 
+            type: 'danger', 
+            message: `${lowStockCount} Stok Kritis`, 
+            detail: `Item '${lowStockItems[0]?.name}' dan ${lowStockCount - 1} lainnya hampir habis. Segera restock!` 
+        });
+    }
+
+    // 4. Contract Insight (HR Risk)
+    const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const expiringSoon = await prisma.user.count({
+        where: { 
+            companyId: tenantId, 
+            contractEndDate: { 
+                gte: today, 
+                lte: thirtyDaysLater
+            } 
+        }
+    });
+
+    if (expiringSoon > 0) {
+        insights.push({
+            type: 'warning',
+            message: `${expiringSoon} Kontrak Akan Berakhir`,
+            detail: `Terdapat ${expiringSoon} karyawan yang kontraknya berakhir dalam 30 hari ke depan. Siapkan review!`
+        });
+    }
+
+    // --- PREMIUM INSIGHTS STORE (POINT 5) ---
+
+    // 5. Premium: Profitability Analysis
+    if (purchased.includes('PREMIUM_PROFIT')) {
+        insights.push({
+            type: 'success',
+            isPremium: true,
+            id: 'PREMIUM_PROFIT',
+            message: 'AI: Optimalisasi Margin',
+            detail: 'Berdasarkan korelasi HPP dan Penjualan, Anda bisa menghemat 12% biaya dengan beralih ke Vendor Bahan Baku alternatif.'
+        });
+    } else {
+        insights.push({
+            type: 'info',
+            isPremium: true,
+            isLocked: true,
+            id: 'PREMIUM_PROFIT',
+            message: 'Profit Optimizer (Locked)',
+            detail: 'Buka insight premium ini untuk melihat rekomendasi penghematan biaya produksi.'
+        });
+    }
+
+    // 6. Premium: Retention Risk
+    if (purchased.includes('PREMIUM_RETENTION')) {
+        insights.push({
+            type: 'warning',
+            isPremium: true,
+            id: 'PREMIUM_RETENTION',
+            message: 'AI: Deteksi Burnout',
+            detail: 'Terdeteksi peningkatan pola keterlambatan dan cuti di departemen Operasional. Risiko pengunduran diri meningkat 15%.'
+        });
+    } else {
+        insights.push({
+            type: 'info',
+            isPremium: true,
+            isLocked: true,
+            id: 'PREMIUM_RETENTION',
+            message: 'Retention Predictor (Locked)',
+            detail: 'Prediksi risiko kehilangan bakat terbaik Anda dengan AI analisis perilaku.'
+        });
+    }
+
+    // 7. Premium: Smart Stock Forecasting
+    if (purchased.includes('PREMIUM_STOCK')) {
+        insights.push({
+            type: 'danger',
+            isPremium: true,
+            id: 'PREMIUM_STOCK',
+            message: 'AI: Prediksi Stok Habis',
+            detail: 'Berdasarkan kecepatan penjualan 7 hari terakhir, 5 item utama Anda akan habis dalam 48 jam ke depan.'
+        });
+    } else {
+        insights.push({
+            type: 'info',
+            isPremium: true,
+            isLocked: true,
+            id: 'PREMIUM_STOCK',
+            message: 'Stock Forecaster (Locked)',
+            detail: 'Gunakan AI untuk memprediksi kapan stok barang akan habis agar tidak kehilangan potensi penjualan.'
+        });
+    }
+
+    res.json(insights);
+  } catch (error) {
+    console.error('[AI Insight Error]:', error);
+    res.status(500).json({ error: 'Gagal menganalisis data.' });
   }
 });
 
@@ -3810,6 +4900,175 @@ app.delete('/api/assets/:id', tenantMiddleware, async (req: Request, res: Respon
     res.status(500).json({ error: 'Gagal menghapus aset.' });
   }
 });
+// --- ANALYTICS & VISUAL DASHBOARD ---
+
+app.get('/api/stats/visual-finance', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const history: any[] = [];
+    
+    // Get last 30 days
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const startOfDay = new Date(date.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+
+      // Calculate Revenue (from Sale table)
+      const sales: any[] = await prisma.$queryRawUnsafe(`
+        SELECT SUM("totalAmount") as total FROM "Sale" 
+        WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
+      `, tenantId, startOfDay, endOfDay);
+      const revenue = Number(sales[0]?.total || 0);
+
+      // Calculate Expenses (from Expense table)
+      const expenses = await prisma.expense.aggregate({
+        _sum: { amount: true },
+        where: {
+          companyId: tenantId,
+          date: { gte: startOfDay, lte: endOfDay }
+        }
+      });
+      const expense = Number(expenses._sum.amount || 0);
+
+      history.push({
+        date: date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+        revenue,
+        expense
+      });
+    }
+
+    res.json(history);
+  } catch (error: any) {
+    console.error("Visual Finance Error:", error);
+    res.status(500).json({ error: 'Gagal mengambil data visual keuangan' });
+  }
+});
+
+// --- CLOSING LAPORAN ENDPOINTS ---
+// 1. Ambil riwayat penutupan buku
+app.get('/api/finance/closing', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const closings = await prisma.periodClosing.findMany({
+      where: { companyId: tenantId },
+      orderBy: [{ year: 'desc' }, { month: 'desc' }]
+    });
+    res.json(closings);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal mengambil data penutupan buku' });
+  }
+});
+
+// 2. Lakukan penutupan buku (Closing)
+app.post('/api/finance/closing', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId;
+    const { month, year } = req.body;
+
+    if (!month || !year) {
+      return res.status(400).json({ error: 'Bulan dan Tahun wajib diisi' });
+    }
+
+    // 1. Hitung Total Income di periode ini
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const incomeSum = await prisma.income.aggregate({
+      _sum: { amount: true },
+      where: { companyId: tenantId, date: { gte: startDate, lte: endDate } }
+    });
+
+    const salesSum: any[] = await prisma.$queryRawUnsafe(`
+      SELECT SUM("totalAmount") as total FROM "Sale" 
+      WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
+    `, tenantId, startDate, endDate);
+
+    const totalIncome = (incomeSum._sum.amount || 0) + Number(salesSum[0]?.total || 0);
+
+    // 2. Hitung Total Expense di periode ini
+    const expenseSum = await prisma.expense.aggregate({
+      _sum: { amount: true },
+      where: { companyId: tenantId, date: { gte: startDate, lte: endDate } }
+    });
+
+    const payrollSum = await prisma.payroll.aggregate({
+      _sum: { netSalary: true },
+      where: { companyId: tenantId, month, year, status: 'PAID' }
+    });
+
+    const totalExpense = (expenseSum._sum.amount || 0) + (payrollSum._sum.netSalary || 0);
+    const netProfit = totalIncome - totalExpense;
+
+    // 3. Simpan data closing
+    const closing = await prisma.periodClosing.upsert({
+      where: {
+        companyId_month_year: { companyId: tenantId, month, year }
+      },
+      update: {
+        totalIncome,
+        totalExpense,
+        netProfit,
+        closedAt: new Date(),
+        closedBy: userId
+      },
+      create: {
+        companyId: tenantId,
+        month,
+        year,
+        totalIncome,
+        totalExpense,
+        netProfit,
+        closedBy: userId
+      }
+    });
+
+    res.json({ message: `Buku periode ${month}/${year} berhasil ditutup`, closing });
+  } catch (error: any) {
+    console.error('Closing Error:', error);
+    res.status(500).json({ error: 'Gagal melakukan penutupan buku: ' + error.message });
+  }
+});
+
+app.get('/api/stats/visual-inventory', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+
+    // 1. Stock Health Stats
+    const totalOut = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock <= 0`, tenantId) as any;
+    const totalLow = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock > 0 AND stock <= "minStock"`, tenantId) as any;
+    const totalHealthy = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock > "minStock"`, tenantId) as any;
+
+    // 2. Top 5 Products
+    const topProducts = await prisma.$queryRawUnsafe(`
+      SELECT p.name, SUM(si.quantity) as sold
+      FROM "SaleItem" si
+      JOIN "Product" p ON si."productId" = p.id
+      JOIN "Sale" s ON si."saleId" = s.id
+      WHERE s."companyId" = $1
+      GROUP BY p.name
+      ORDER BY sold DESC
+      LIMIT 5
+    `, tenantId) as any[];
+
+    res.json({
+      health: [
+        { name: 'Aman', value: Number(totalHealthy[0]?.count || 0), color: '#10b981' },
+        { name: 'Menipis', value: Number(totalLow[0]?.count || 0), color: '#f59e0b' },
+        { name: 'Habis', value: Number(totalOut[0]?.count || 0), color: '#ef4444' }
+      ],
+      topProducts: topProducts.map(p => ({
+        name: p.name,
+        sold: Number(p.sold)
+      }))
+    });
+  } catch (error: any) {
+    console.error("Visual Inventory Error:", error);
+    res.status(500).json({ error: 'Gagal mengambil data visual inventori' });
+  }
+});
+
 app.get('/api/stats/trends', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
@@ -4434,6 +5693,2067 @@ app.get('/api/chat/admin/sessions/:id', tenantMiddleware, async (req: Request, r
     res.json(session);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil detail sesi' });
+  }
+});
+
+// --- FINANCE MODULE ENDPOINTS ---
+
+// F1.1. Get Accounts
+app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const accounts = await prisma.financialAccount.findMany({
+      where: { companyId: (req as any).tenantId },
+      orderBy: { name: 'asc' }
+    });
+    res.json(accounts);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil daftar akun keuangan' });
+  }
+});
+
+// F1.2. Create Account
+app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { name, type, balance } = req.body;
+    const account = await prisma.financialAccount.create({
+      data: {
+        companyId: (req as any).tenantId,
+        name,
+        type,
+        balance: parseFloat(balance) || 0
+      }
+    });
+    res.status(201).json(account);
+  } catch (error: any) {
+    console.error('[Account Creation Error]:', error);
+    res.status(500).json({ error: 'Gagal membuat akun keuangan: ' + error.message });
+  }
+});
+
+// F1.3. Update Account
+app.patch('/api/finance/accounts/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, type } = req.body;
+    const tenantId = (req as any).tenantId;
+
+    const account = await prisma.financialAccount.update({
+      where: { id: parseInt(id as string), companyId: tenantId },
+      data: { name, type }
+    });
+    res.json(account);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal memperbarui akun keuangan' });
+  }
+});
+
+// F1.4. Delete Account
+app.delete('/api/finance/accounts/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const tenantId = (req as any).tenantId;
+
+    // Check if account has transactions (Income or Expense)
+    const incomeCount = await prisma.income.count({ where: { accountId: parseInt(id as string) } });
+    const expenseCount = await prisma.expense.count({ where: { accountId: parseInt(id as string) } });
+    
+    // Also check Sales if accountId is linked there
+    const salesCount = await prisma.sale.count({ where: { accountId: parseInt(id as string) } });
+
+    if (incomeCount > 0 || expenseCount > 0 || salesCount > 0) {
+      return res.status(400).json({ 
+        error: 'Akun tidak bisa dihapus karena sudah memiliki riwayat transaksi. Silakan hapus transaksi terkait terlebih dahulu.' 
+      });
+    }
+
+    await prisma.financialAccount.delete({
+      where: { id: parseInt(id as string), companyId: tenantId }
+    });
+    res.json({ message: 'Akun berhasil dihapus' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menghapus akun keuangan' });
+  }
+});
+
+// F2.1. Get Income Categories
+app.get('/api/finance/income-categories', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const categories = await prisma.incomeCategory.findMany({
+      where: { companyId: (req as any).tenantId },
+      orderBy: { name: 'asc' }
+    });
+    res.json(categories);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil kategori pemasukan' });
+  }
+});
+
+// F2.2. Create Income Category
+app.post('/api/finance/income-categories', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { name } = req.body;
+    const category = await prisma.incomeCategory.create({
+      data: {
+        companyId: (req as any).tenantId,
+        name
+      }
+    });
+    res.status(201).json(category);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal membuat kategori pemasukan' });
+  }
+});
+
+// F3.1. Get Incomes
+app.get('/api/finance/income', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const incomes = await prisma.income.findMany({
+      where: { companyId: tenantId },
+      include: {
+        account: true,
+        category: true
+      },
+      orderBy: { date: 'desc' }
+    });
+    res.json(incomes);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data pemasukan' });
+  }
+});
+
+// F3.2. Record Income
+app.post('/api/finance/income', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { accountId, categoryId, amount, date, description, receivedFrom } = req.body;
+    const tenantId = Number((req as any).tenantId);
+
+    // --- CHECK CLOSING ---
+    if (await isPeriodClosed(tenantId, date || new Date())) {
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat menambah transaksi pada tanggal ini.' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const income = await tx.income.create({
+        data: {
+          companyId: tenantId,
+          accountId: parseInt(accountId),
+          categoryId: parseInt(categoryId),
+          amount: parseFloat(amount),
+          date: date ? new Date(date) : new Date(),
+          description,
+          receivedFrom
+        }
+      });
+
+      await tx.financialAccount.update({
+        where: { id: parseInt(accountId) },
+        data: {
+          balance: { increment: parseFloat(amount) }
+        }
+      });
+
+      return income;
+    });
+
+    res.status(201).json(result);
+  } catch (error: any) {
+    console.error("DEBUG INCOME CREATE ERROR:", error);
+    fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] INCOME CREATE ERROR: ${error.message}\n${error.stack}\n`);
+    res.status(500).json({ error: 'Gagal mencatat pemasukan: ' + error.message });
+  }
+});
+
+// F3.3. Update Income
+app.patch('/api/finance/income/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { accountId, categoryId, amount, date, description, receivedFrom } = req.body;
+    const tenantId = Number((req as any).tenantId);
+
+    const oldIncome = await prisma.income.findFirst({
+      where: { id: parseInt(id as string), companyId: tenantId }
+    });
+
+    if (!oldIncome) return res.status(404).json({ error: 'Data tidak ditemukan' });
+
+    if (await isPeriodClosed(tenantId, oldIncome.date) || await isPeriodClosed(tenantId, date ? new Date(date) : oldIncome.date)) {
+      return res.status(403).json({ error: 'Periode sudah ditutup' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.financialAccount.update({
+        where: { id: oldIncome.accountId },
+        data: { balance: { decrement: oldIncome.amount } }
+      });
+
+      const updated = await tx.income.update({
+        where: { id: parseInt(id as string) },
+        data: {
+          accountId: accountId ? parseInt(accountId) : undefined,
+          categoryId: categoryId ? parseInt(categoryId) : undefined,
+          amount: amount ? parseFloat(amount) : undefined,
+          date: date ? new Date(date) : undefined,
+          description,
+          receivedFrom
+        }
+      });
+
+      await tx.financialAccount.update({
+        where: { id: updated.accountId },
+        data: { balance: { increment: updated.amount } }
+      });
+
+      return updated;
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal update pemasukan' });
+  }
+});
+
+// F3.4. Delete Income
+app.delete('/api/finance/income/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const tenantId = Number((req as any).tenantId);
+    const income = await prisma.income.findFirst({ where: { id: parseInt(id as string), companyId: tenantId } });
+    if (!income) return res.status(404).json({ error: 'Data tidak ditemukan' });
+    if (await isPeriodClosed(tenantId, income.date)) return res.status(403).json({ error: 'Periode sudah ditutup' });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.financialAccount.update({ where: { id: income.accountId }, data: { balance: { decrement: income.amount } } });
+      await tx.income.delete({ where: { id: parseInt(id as string) } });
+    });
+    res.json({ message: 'Berhasil dihapus' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal hapus pemasukan' });
+  }
+});
+
+// F4.1. Get Expense Categories
+app.get('/api/finance/expense-categories', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const categories = await prisma.expenseCategory.findMany({
+      where: { companyId: (req as any).tenantId },
+      orderBy: { name: 'asc' }
+    });
+    res.json(categories);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil kategori pengeluaran' });
+  }
+});
+
+// F4.2. Create Expense Category
+app.post('/api/finance/expense-categories', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { name, type } = req.body;
+    const tenantId = Number((req as any).tenantId);
+    
+    console.log(`[DEBUG] Creating category: ${name}, type: ${type}, tenantId: ${tenantId}`);
+
+    // Use raw SQL to bypass Prisma model sync issues on Windows
+    const result = await prisma.$queryRawUnsafe<any[]>(
+      `INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt") 
+       VALUES ($1, $2, $3::"ExpenseType", NOW()) 
+       RETURNING "id", "companyId", "name", "type", "createdAt", "updatedAt"`,
+      tenantId, name, type || 'OPERATIONAL'
+    );
+    const category = result[0];
+    res.status(201).json(category);
+  } catch (error: any) {
+    console.error("DEBUG CAT CREATE ERROR:", error);
+    fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] CAT CREATE ERROR: ${error.message}\n${error.stack}\n`);
+    res.status(500).json({ error: 'Gagal membuat kategori: ' + error.message });
+  }
+});
+
+// F5.1. Get Expenses
+app.get('/api/finance/expense', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const expenses = await prisma.expense.findMany({
+      where: { companyId: (req as any).tenantId },
+      include: {
+        account: true,
+        category: true,
+        supplier: true
+      },
+      orderBy: { date: 'desc' }
+    });
+    res.json(expenses);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data pengeluaran' });
+  }
+});
+
+// F5.2. Record Expense
+app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { accountId, categoryId, amount, date, description, paidTo, status, dueDate, productId, quantity } = req.body;
+    const tenantId = Number((req as any).tenantId);
+
+    // --- CHECK CLOSING ---
+    if (await isPeriodClosed(tenantId, date || new Date())) {
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat menambah transaksi pada tanggal ini.' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      let finalCategoryId = categoryId ? parseInt(categoryId) : null;
+      const prodIdNum = productId ? parseInt(productId.toString()) : null;
+      const qtyNum = quantity ? parseFloat(quantity.toString()) : 0;
+
+      console.log("DEBUG EXPENSE CREATE RAW:", { productId, quantity, amount });
+      console.log("DEBUG EXPENSE CREATE PARSED:", { prodIdNum, qtyNum, amount });
+
+      // 1. Handle Inventory Link (Bahan Baku)
+      if (prodIdNum && qtyNum > 0) {
+          console.log("DEBUG BAHAN BAKU MODE ACTIVE");
+        // Find or create the "Belanja Bahan Baku" category
+        let category: any = await tx.expenseCategory.findFirst({
+          where: { companyId: tenantId, name: 'Belanja Bahan Baku (Inventori)' }
+        });
+
+        if (!category) {
+          const catResult: any[] = await tx.$queryRawUnsafe(`
+            INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
+            VALUES ($1, 'Belanja Bahan Baku (Inventori)', 'COGS', NOW())
+            RETURNING id
+          `, tenantId);
+          category = { id: catResult[0].id };
+        }
+        finalCategoryId = category.id;
+
+        // Calculate unit cost and update Product Stock & Cost Price
+        const unitCost = qtyNum > 0 ? parseFloat(amount) / qtyNum : 0;
+        
+        await tx.$executeRawUnsafe(
+          'UPDATE "Product" SET "stock" = "stock" + $1, "costPrice" = $2, "updatedAt" = NOW() WHERE "id" = $3 AND "companyId" = $4',
+          qtyNum, unitCost, prodIdNum, tenantId
+        );
+
+        // Record Stock Transaction
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+          VALUES ($1, 'IN', $2, $3, NOW())
+        `, prodIdNum, qtyNum, description || 'Pembelian via Finance');
+      }
+
+      if (!finalCategoryId) throw new Error('Kategori pengeluaran diperlukan');
+
+      // 2. Create Expense
+      const dateVal = date ? new Date(date) : new Date();
+      const dueDateVal = dueDate ? new Date(dueDate) : null;
+      
+      const insertRes = await tx.$queryRawUnsafe<any[]>(
+        `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "amount", "date", "dueDate", "status", "description", "paidTo", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::"ExpenseStatus", $9, $10, NOW())
+         RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "amount", "date", "dueDate", "status", "description", "paidTo"`,
+        tenantId, 
+        accountId ? parseInt(accountId) : null,
+        finalCategoryId,
+        req.body.supplierId ? parseInt(req.body.supplierId) : null,
+        parseFloat(amount),
+        dateVal,
+        dueDateVal,
+        status || 'PAID',
+        description,
+        paidTo
+      );
+      
+      const expense = insertRes[0];
+
+      // 3. Update account balance (ONLY if status is PAID and accountId is provided)
+      if (status !== 'PENDING' && accountId) {
+        await tx.financialAccount.update({
+          where: { id: parseInt(accountId) },
+          data: {
+            balance: { decrement: parseFloat(amount) }
+          }
+        });
+      }
+
+      return expense;
+    });
+
+    res.status(201).json(result);
+  } catch (error: any) {
+    console.error("DEBUG EXPENSE CREATE ERROR:", error);
+    fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] EXPENSE CREATE ERROR: ${error.message}\n${error.stack}\n`);
+  }
+});
+
+// F5.2. Update Expense
+app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { accountId, categoryId, supplierId, amount, date, dueDate, status, description, paidTo } = req.body;
+    const tenantId = Number((req as any).tenantId);
+
+    // 1. Safety Check: Period Closing
+    const expense = await prisma.expense.findFirst({
+        where: { id: parseInt(id as string), companyId: tenantId }
+    });
+
+    if (!expense) return res.status(404).json({ error: 'Pengeluaran tidak ditemukan' });
+
+    const isClosed = await prisma.periodClosing.findFirst({
+        where: { 
+            companyId: tenantId, 
+            month: new Date(expense.date).getMonth() + 1,
+            year: new Date(expense.date).getFullYear(),
+            status: 'CLOSED'
+        }
+    });
+
+    if (isClosed) return res.status(403).json({ error: 'Periode transaksi sudah ditutup. Data tidak dapat diubah.' });
+
+    const result = await prisma.$transaction(async (tx) => {
+        // 2. Revert Old Balance (ONLY if status was not PENDING and had accountId)
+        if (expense.status !== 'PENDING' && expense.accountId) {
+            await tx.$executeRawUnsafe(
+                'UPDATE "FinancialAccount" SET "balance" = "balance" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
+                expense.amount, expense.accountId, tenantId
+            );
+        }
+
+        // 3. Update Expense
+        const upRes = await tx.$queryRawUnsafe<any[]>(
+            `UPDATE "Expense" SET 
+                "accountId" = $1, "categoryId" = $2, "supplierId" = $3, "amount" = $4, 
+                "date" = $5, "dueDate" = $6, "status" = $7::"ExpenseStatus", 
+                "description" = $8, "paidTo" = $9, "updatedAt" = NOW() 
+             WHERE "id" = $10 AND "companyId" = $11
+             RETURNING *`,
+            accountId || expense.accountId, categoryId || expense.categoryId, supplierId || expense.supplierId, 
+            amount || expense.amount, date ? new Date(date) : expense.date, 
+            dueDate ? new Date(dueDate) : expense.dueDate, status || expense.status, 
+            description || expense.description, paidTo || expense.paidTo, 
+            parseInt(id as string), tenantId
+        );
+
+        // 4. Apply New Balance (ONLY if new status is not PENDING and has accountId)
+        const finalStatus = status || expense.status;
+        const finalAccountId = accountId || expense.accountId;
+        const finalAmount = amount || expense.amount;
+
+        if (finalStatus !== 'PENDING' && finalAccountId) {
+            await tx.$executeRawUnsafe(
+                'UPDATE "FinancialAccount" SET "balance" = "balance" - $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
+                finalAmount, finalAccountId, tenantId
+            );
+        }
+
+        return upRes[0];
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Gagal memperbarui pengeluaran:", error);
+    res.status(500).json({ error: 'Gagal memperbarui pengeluaran: ' + error.message });
+  }
+});
+
+// F5.2b. Delete Expense
+app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const tenantId = Number((req as any).tenantId);
+
+    const expense = await prisma.expense.findFirst({
+        where: { id: parseInt(id as string), companyId: tenantId }
+    });
+
+    if (!expense) return res.status(404).json({ error: 'Pengeluaran tidak ditemukan' });
+
+    // Period Check
+    const isClosed = await prisma.periodClosing.findFirst({
+        where: { 
+            companyId: tenantId, 
+            month: new Date(expense.date).getMonth() + 1,
+            year: new Date(expense.date).getFullYear(),
+            status: 'CLOSED'
+        }
+    });
+
+    if (isClosed) return res.status(403).json({ error: 'Periode transaksi sudah ditutup. Data tidak dapat dihapus.' });
+
+    await prisma.$transaction(async (tx) => {
+        // Revert Balance (Add back if was PAID)
+        if (expense.status !== 'PENDING' && expense.accountId) {
+            await tx.$executeRawUnsafe(
+                'UPDATE "FinancialAccount" SET "balance" = "balance" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
+                expense.amount, expense.accountId, tenantId
+            );
+        }
+
+        // Delete record
+        await tx.expense.delete({ where: { id: parseInt(id as string) } });
+    });
+
+    res.json({ message: 'Pengeluaran berhasil dihapus' });
+  } catch (error: any) {
+    console.error("Gagal menghapus pengeluaran:", error);
+    res.status(500).json({ error: 'Gagal menghapus pengeluaran: ' + error.message });
+  }
+});
+
+// F5.3. Pay Pending Expense
+app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const expenseId = parseInt(req.params.id as string);
+    const { accountId } = req.body; // New: pick account at payment time
+    const tenantId = Number((req as any).tenantId);
+
+    if (!accountId) return res.status(400).json({ error: 'Pilih akun pembayaran' });
+
+    const result = await prisma.$transaction(async (tx) => {
+      const expense = await tx.expense.findUnique({
+        where: { id: expenseId, companyId: tenantId }
+      });
+
+      if (!expense) throw new Error('Pengeluaran tidak ditemukan');
+      if (expense.status === 'PAID') throw new Error('Pengeluaran sudah lunas');
+
+      // --- CHECK CLOSING ---
+      if (await isPeriodClosed(tenantId, expense.date)) {
+        throw new Error('Periode buku sudah ditutup. Tidak dapat mengubah transaksi pada tanggal ini.');
+      }
+
+      const res = await tx.$queryRawUnsafe<any[]>(
+        `UPDATE "Expense" SET "status" = 'PAID'::"ExpenseStatus", "accountId" = $1, "updatedAt" = NOW()
+         WHERE "id" = $2 AND "companyId" = $3
+         RETURNING "id", "status", "accountId"`,
+        parseInt(accountId), expenseId, tenantId
+      );
+      const updatedExpense = res[0];
+
+      // Decrement account balance now
+      await tx.financialAccount.update({
+        where: { id: parseInt(accountId) },
+        data: {
+          balance: { decrement: expense.amount }
+        }
+      });
+
+      return updatedExpense;
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("DEBUG EXPENSE PAY ERROR:", error);
+    fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] EXPENSE PAY ERROR: ${error.message}\n${error.stack}\n`);
+    res.status(500).json({ error: 'Gagal melunasi pengeluaran: ' + error.message });
+  }
+});
+
+// F5.4. Update Expense
+app.put('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const expenseId = parseInt(req.params.id as string);
+    const tenantId = Number((req as any).tenantId);
+    const { accountId, categoryId, amount, date, dueDate, status, description, paidTo } = req.body;
+
+    // --- CHECK CLOSING ---
+    if (await isPeriodClosed(tenantId, date ? new Date(date) : new Date())) {
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat memperbarui transaksi pada tanggal ini.' });
+    }
+
+      const result = await prisma.$transaction(async (tx) => {
+        const prodIdNum = req.body.productId ? parseInt(req.body.productId.toString()) : null;
+        const qtyNum = req.body.quantity ? parseFloat(req.body.quantity.toString()) : 0;
+        
+        console.log("DEBUG EXPENSE UPDATE PARSED:", { prodIdNum, qtyNum, amount: req.body.amount });
+
+        // 1. Get old expense
+      const oldExpense = await tx.expense.findUnique({
+        where: { id: expenseId, companyId: tenantId }
+      });
+      if (!oldExpense) throw new Error('Pengeluaran tidak ditemukan');
+
+      const newAmount = parseFloat(amount);
+      const newAccountId = accountId ? parseInt(accountId) : null;
+
+      // 2. Adjust Balance if PAID
+      if (oldExpense.status === 'PAID' && status === 'PAID') {
+        if (oldExpense.accountId === newAccountId) {
+            const diff = newAmount - oldExpense.amount;
+            if (diff !== 0 && newAccountId) {
+                await tx.financialAccount.update({
+                    where: { id: newAccountId },
+                    data: { balance: { decrement: diff } }
+                });
+            }
+        } else {
+            if (oldExpense.accountId) {
+                await tx.financialAccount.update({
+                    where: { id: oldExpense.accountId },
+                    data: { balance: { increment: oldExpense.amount } }
+                });
+            }
+            if (newAccountId) {
+                await tx.financialAccount.update({
+                    where: { id: newAccountId },
+                    data: { balance: { decrement: newAmount } }
+                });
+            }
+        }
+      } else if (oldExpense.status === 'PENDING' && status === 'PAID') {
+        if (newAccountId) {
+            await tx.financialAccount.update({
+                where: { id: newAccountId },
+                data: { balance: { decrement: newAmount } }
+            });
+        }
+      } else if (oldExpense.status === 'PAID' && status === 'PENDING') {
+        if (oldExpense.accountId) {
+            await tx.financialAccount.update({
+                where: { id: oldExpense.accountId },
+                data: { balance: { increment: oldExpense.amount } }
+            });
+        }
+      }
+
+      // 4. Update Product Cost Price (if BAHAN_BAKU mode/data provided)
+      if (prodIdNum && qtyNum > 0) {
+          const unitCost = newAmount / qtyNum;
+          console.log("DEBUG SYNC COST PRICE:", { prodIdNum, unitCost });
+          const updateRes = await tx.$executeRawUnsafe(
+            'UPDATE "Product" SET "costPrice" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
+            unitCost, prodIdNum, tenantId
+          );
+          console.log("DEBUG UPDATE RES:", updateRes);
+      }
+
+      // 3. Update record
+      await tx.$executeRawUnsafe(
+        `UPDATE "Expense" SET 
+            "accountId" = $1, 
+            "categoryId" = $2, 
+            "supplierId" = $3,
+            "amount" = $4, 
+            "date" = $5, 
+            "dueDate" = $6, 
+            "status" = $7::"ExpenseStatus", 
+            "description" = $8, 
+            "paidTo" = $9, 
+            "updatedAt" = NOW()
+         WHERE "id" = $10 AND "companyId" = $11`,
+        newAccountId, 
+        parseInt(categoryId), 
+        req.body.supplierId ? parseInt(req.body.supplierId) : null,
+        newAmount, 
+        new Date(date), 
+        dueDate ? new Date(dueDate) : null,
+        status,
+        description,
+        paidTo,
+        expenseId,
+        tenantId
+      );
+
+      return { id: expenseId, status, amount: newAmount };
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("PUT EXPENSE ERROR:", error);
+    res.status(500).json({ error: 'Gagal memperbarui pengeluaran: ' + error.message });
+  }
+});
+
+// F5.5. Delete Expense
+app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const expenseId = parseInt(req.params.id as string);
+    const tenantId = Number((req as any).tenantId);
+
+    await prisma.$transaction(async (tx) => {
+      const expense = await tx.expense.findUnique({
+        where: { id: expenseId, companyId: tenantId }
+      });
+      if (!expense) throw new Error('Pengeluaran tidak ditemukan');
+
+      // --- CHECK CLOSING ---
+      if (await isPeriodClosed(tenantId, expense.date)) {
+        throw new Error('Periode buku sudah ditutup. Tidak dapat menghapus transaksi pada tanggal ini.');
+      }
+
+      if (expense.status === 'PAID' && expense.accountId) {
+        await tx.financialAccount.update({
+          where: { id: expense.accountId },
+          data: { balance: { increment: expense.amount } }
+        });
+      }
+
+      await tx.expense.delete({
+        where: { id: expenseId }
+      });
+    });
+
+    res.json({ message: 'Pengeluaran berhasil dihapus' });
+  } catch (error: any) {
+    console.error("DELETE EXPENSE ERROR:", error);
+    res.status(500).json({ error: 'Gagal menghapus pengeluaran: ' + error.message });
+  }
+});
+
+// F6.1. Profit & Loss Report
+app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    // 1. Fetch Incomes
+    const incomes = await prisma.income.findMany({
+      where: {
+        companyId: tenantId,
+        date: { gte: startDate, lte: endDate }
+      },
+      include: { category: true }
+    });
+
+    // 2. Fetch Expenses
+    const expenses = await prisma.expense.findMany({
+      where: {
+        companyId: tenantId,
+        date: { gte: startDate, lte: endDate }
+      },
+      include: { category: true }
+    });
+
+    // 3. Aggregate Data
+    const revenueByCategory: Record<string, number> = {};
+    let totalRevenue = 0;
+    incomes.forEach(inc => {
+      const catName = inc.category?.name || 'Uncategorized';
+      revenueByCategory[catName] = (revenueByCategory[catName] || 0) + inc.amount;
+      totalRevenue += inc.amount;
+    });
+
+    const cogsByCategory: Record<string, number> = {};
+    const opexByCategory: Record<string, number> = {};
+    let totalOpEx = 0;
+    let manualCOGS = 0;
+
+    expenses.forEach(exp => {
+      const catName = exp.category?.name || 'Uncategorized';
+      const isCOGS = exp.category?.type === 'COGS';
+      
+      if (isCOGS) {
+        cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
+        manualCOGS += exp.amount;
+      } else {
+        opexByCategory[catName] = (opexByCategory[catName] || 0) + exp.amount;
+        totalOpEx += exp.amount;
+      }
+    });
+
+    // 4. Calculate Detailed COGS based on Sales (Standard Costing)
+    // We use queryRawUnsafe for Sale/SaleItem as they are not in the main Prisma model yet
+    const sales: any[] = await prisma.$queryRawUnsafe(`
+      SELECT * FROM "Sale" 
+      WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
+    `, tenantId, startDate, endDate);
+
+    let calculatedCogsFromSales = 0;
+    for (const s of sales) {
+      const items: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "SaleItem" WHERE "saleId" = $1`, s.id);
+      for (const item of items) {
+        // Get recipe for this product
+        const recipes: any[] = await prisma.$queryRawUnsafe(`
+          SELECT pr.*, p."costPrice" 
+          FROM "ProductRecipe" pr
+          JOIN "Product" p ON pr."materialId" = p.id
+          WHERE pr."productId" = $1
+        `, item.productId);
+
+        if (recipes.length > 0) {
+          const recipeCost = recipes.reduce((sum, r) => sum + (parseFloat(r.quantity) * (r.costPrice || 0)), 0);
+          calculatedCogsFromSales += item.quantity * recipeCost;
+        } else {
+          // If no recipe, use product's own costPrice (Retail)
+          const products: any[] = await prisma.$queryRawUnsafe(`SELECT "costPrice" FROM "Product" WHERE id = $1`, item.productId);
+          const costPrice = products[0]?.costPrice || 0;
+          calculatedCogsFromSales += item.quantity * costPrice;
+        }
+      }
+    }
+
+    const totalCOGS = calculatedCogsFromSales + manualCOGS;
+    const grossProfit = totalRevenue - totalCOGS;
+    const netProfit = grossProfit - totalOpEx;
+
+    res.json({
+      period: { month, year },
+      revenue: {
+        categories: revenueByCategory,
+        total: totalRevenue
+      },
+      cogs: {
+        categories: { ...cogsByCategory, "HPP Terjual (Calc)": calculatedCogsFromSales },
+        total: totalCOGS,
+        detail: "HPP dihitung otomatis berdasarkan resep dan volume penjualan"
+      },
+      grossProfit,
+      opex: {
+        categories: opexByCategory,
+        total: totalOpEx
+      },
+      netProfit
+    });
+
+  } catch (error: any) {
+    console.error("DEBUG PnL REPORT ERROR:", error);
+    res.status(500).json({ error: 'Gagal menghasilkan laporan Laba Rugi: ' + error.message });
+  }
+});
+
+// F6.2. Balance Sheet Report (Neraca)
+app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+
+    // 1. Assets: Get all Financial Accounts and their current balances
+    const accounts = await prisma.financialAccount.findMany({
+      where: { companyId: tenantId }
+    });
+
+    let totalAssets = 0;
+    accounts.forEach(acc => {
+      totalAssets += acc.balance;
+    });
+
+    // 2. Liabilities: Get all Pending Expenses (Hutang)
+    const pendingExpenses = await prisma.expense.findMany({
+      where: {
+        companyId: tenantId,
+        status: 'PENDING'
+      }
+    });
+
+    let totalLiabilities = 0;
+    pendingExpenses.forEach(exp => {
+      totalLiabilities += exp.amount;
+    });
+
+    // 3. Equity: Assets - Liabilities
+    const totalEquity = totalAssets - totalLiabilities;
+
+    res.json({
+      assets: {
+        accounts: accounts,
+        total: totalAssets
+      },
+      liabilities: {
+        total: totalLiabilities,
+        // Optional: group by category or vendor? 
+        // For now just total is enough for a standard balance sheet
+      },
+      equity: {
+        total: totalEquity
+      }
+    });
+
+  } catch (error: any) {
+    console.error("DEBUG BALANCE SHEET REPORT ERROR:", error);
+    res.status(500).json({ error: 'Gagal menghasilkan laporan Neraca: ' + error.message });
+  }
+});
+
+// F6.3. Cash Flow Report (Arus Kas)
+app.get('/api/finance/reports/cash-flow', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    // 1. Calculate Inflow (Actual Income in period)
+    const inflows = await prisma.income.findMany({
+      where: {
+        companyId: tenantId,
+        date: { gte: startDate, lte: endDate }
+      },
+      include: { category: true }
+    });
+
+    const inflowByCategory: Record<string, number> = {};
+    let totalInflow = 0;
+    inflows.forEach(inc => {
+      const catName = inc.category?.name || 'Uncategorized';
+      inflowByCategory[catName] = (inflowByCategory[catName] || 0) + inc.amount;
+      totalInflow += inc.amount;
+    });
+
+    // 2. Calculate Outflow (PAID Expenses in period)
+    const outflows = await prisma.expense.findMany({
+      where: {
+        companyId: tenantId,
+        status: 'PAID',
+        date: { gte: startDate, lte: endDate }
+      },
+      include: { category: true }
+    });
+
+    const outflowByCategory: Record<string, number> = {};
+    let totalOutflow = 0;
+    outflows.forEach(exp => {
+      const catName = exp.category?.name || 'Uncategorized';
+      outflowByCategory[catName] = (outflowByCategory[catName] || 0) + exp.amount;
+      totalOutflow += exp.amount;
+    });
+
+    // 3. Calculate Balances (Approximate starting balance)
+    // Formula: Current Balance - (Sum of all Incomes since then) + (Sum of all Paid Expenses since then)
+    const allAccounts = await prisma.financialAccount.findMany({
+      where: { companyId: tenantId }
+    });
+    const currentTotalBalance = allAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+
+    // Get all movements from AFTER endDate up to NOW
+    const futureIncomes = await prisma.income.aggregate({
+      where: { companyId: tenantId, date: { gt: endDate } },
+      _sum: { amount: true }
+    });
+    const futureOutflows = await prisma.expense.aggregate({
+      where: { companyId: tenantId, status: 'PAID', date: { gt: endDate } },
+      _sum: { amount: true }
+    });
+
+    const balanceAtEndPeriod = currentTotalBalance - (futureIncomes._sum.amount || 0) + (futureOutflows._sum.amount || 0);
+    const startingBalance = balanceAtEndPeriod - totalInflow + totalOutflow;
+
+    res.json({
+      period: { month, year },
+      startingBalance,
+      inflow: {
+        categories: inflowByCategory,
+        total: totalInflow
+      },
+      outflow: {
+        categories: outflowByCategory,
+        total: totalOutflow
+      },
+      netCashFlow: totalInflow - totalOutflow,
+      endingBalance: balanceAtEndPeriod
+    });
+
+  } catch (error: any) {
+    console.error("DEBUG CASH FLOW REPORT ERROR:", error);
+    res.status(500).json({ error: 'Gagal menghasilkan laporan Arus Kas: ' + error.message });
+  }
+});
+
+// F6.4. General Journal (Jurnal Umum)
+app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+
+    // 1. Fetch Incomes
+    const incomes = await prisma.income.findMany({
+      where: { companyId: tenantId },
+      include: { account: true, category: true },
+      orderBy: { date: 'desc' }
+    });
+
+    // 2. Fetch Expenses
+    const expenses = await prisma.expense.findMany({
+      where: { companyId: tenantId },
+      include: { account: true, category: true },
+      orderBy: { date: 'desc' }
+    });
+
+    const journalEntries: any[] = [];
+
+    // Map Incomes to Journal Lines
+    incomes.forEach(inc => {
+      const entryId = `INC-${inc.id.toString().padStart(6, '0')}`;
+      // Debit: Asset Account
+      journalEntries.push({
+        id: `${entryId}-D`,
+        date: inc.date,
+        ref: entryId,
+        description: inc.description || `Penerimaan: ${inc.receivedFrom || 'Tanpa Nama'}`,
+        accountName: inc.account.name,
+        debit: inc.amount,
+        credit: 0
+      });
+      // Credit: Income Category
+      journalEntries.push({
+        id: `${entryId}-C`,
+        date: inc.date,
+        ref: entryId,
+        description: '', // Leave empty for multi-line view
+        accountName: inc.category.name,
+        debit: 0,
+        credit: inc.amount
+      });
+    });
+
+    // Map Expenses to Journal Lines
+    expenses.forEach(exp => {
+      const entryId = `EXP-${exp.id.toString().padStart(6, '0')}`;
+      
+      // Debit: Expense Category
+      journalEntries.push({
+        id: `${entryId}-D`,
+        date: exp.date,
+        ref: entryId,
+        description: exp.description || `Pengeluaran: ${exp.paidTo || 'Tanpa Nama'}`,
+        accountName: exp.category.name,
+        debit: exp.amount,
+        credit: 0
+      });
+
+      // Credit: Asset Account (if PAID) or Accounts Payable (if PENDING)
+      if (exp.status === 'PAID') {
+        journalEntries.push({
+          id: `${entryId}-C`,
+          date: exp.date,
+          ref: entryId,
+          description: '',
+          accountName: exp.account?.name || 'Kas/Bank',
+          debit: 0,
+          credit: exp.amount
+        });
+      } else {
+        journalEntries.push({
+          id: `${entryId}-C`,
+          date: exp.date,
+          ref: entryId,
+          description: '',
+          accountName: 'Hutang Usaha (Accounts Payable)',
+          debit: 0,
+          credit: exp.amount
+        });
+      }
+    });
+
+    // Sort all entries by date descending, then by ref descending
+    journalEntries.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return b.ref.localeCompare(a.ref);
+    });
+
+    res.json(journalEntries);
+
+  } catch (error: any) {
+    console.error("DEBUG JOURNAL ERROR:", error);
+    res.status(500).json({ error: 'Gagal mengambil data Jurnal: ' + error.message });
+  }
+});
+
+// F6.5. Margin & Profitability Report
+app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+
+    // 1. Get SaleItems joining with Sale to filter by date and company
+    const saleItems: any[] = await prisma.$queryRawUnsafe(`
+      SELECT si.*, s.date, p.name as "productName", p.sku, p."costPrice" as "currentCostPrice"
+      FROM "SaleItem" si
+      JOIN "Sale" s ON si."saleId" = s.id
+      JOIN "Product" p ON si."productId" = p.id
+      WHERE s."companyId" = $1 AND s.date >= $2 AND s.date <= $3
+    `, tenantId, startDate, endDate);
+
+    // 2. Fetch all recipes for these products to calculate BOM cost
+    const productIds = Array.from(new Set(saleItems.map(si => si.productId)));
+    const recipes: any[] = await prisma.$queryRawUnsafe(`
+      SELECT pr.*, p."costPrice" as "materialCost"
+      FROM "ProductRecipe" pr
+      JOIN "Product" p ON pr."materialId" = p.id
+      WHERE pr."productId" = ANY($1)
+    `, productIds);
+
+    // 3. Process data
+    const productStats: Record<number, any> = {};
+    const trendStats: Record<string, any> = {};
+
+    for (const item of saleItems) {
+      const pid = item.productId;
+      if (!productStats[pid]) {
+        productStats[pid] = {
+          productId: pid,
+          name: item.productName,
+          sku: item.sku,
+          qtySold: 0,
+          revenue: 0,
+          cogs: 0,
+          profit: 0
+        };
+      }
+
+      // Calculate COGS
+      const itemRecipes = recipes.filter(r => r.productId === pid);
+      let calculatedUnitCost = 0;
+      if (itemRecipes.length > 0) {
+        calculatedUnitCost = itemRecipes.reduce((sum, r) => sum + (parseFloat(r.quantity) * (r.materialCost || 0)), 0);
+      } else {
+        calculatedUnitCost = item.currentCostPrice || 0;
+      }
+
+      const itemCogs = item.quantity * calculatedUnitCost;
+      const itemRevenue = item.total;
+      const itemProfit = itemRevenue - itemCogs;
+      
+      productStats[pid].qtySold += item.quantity;
+      productStats[pid].revenue += itemRevenue;
+      productStats[pid].cogs += itemCogs;
+      productStats[pid].profit += itemProfit;
+
+      // Trend data
+      const dateKey = new Date(item.date).toISOString().split('T')[0];
+      if (!trendStats[dateKey]) {
+        trendStats[dateKey] = { date: dateKey, profit: 0, revenue: 0 };
+      }
+      trendStats[dateKey].profit += itemProfit;
+      trendStats[dateKey].revenue += itemRevenue;
+    }
+
+    const productArray = Object.values(productStats).map((p: any) => ({
+      ...p,
+      marginPercentage: p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0
+    })).sort((a, b) => b.profit - a.profit);
+
+    const trendArray = Object.values(trendStats).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      products: productArray,
+      trend: trendArray,
+      summary: {
+        totalRevenue: productArray.reduce((sum, p) => sum + p.revenue, 0),
+        totalProfit: productArray.reduce((sum, p) => sum + p.profit, 0),
+        avgMargin: productArray.length > 0 ? (productArray.reduce((sum, p) => sum + p.marginPercentage, 0) / productArray.length) : 0
+      }
+    });
+  } catch (error: any) {
+    console.error("PROFITABILITY REPORT ERROR:", error);
+    res.status(500).json({ error: 'Gagal menghasilkan analisis margin: ' + error.message });
+  }
+});
+
+// F16.1. Get Payables Report (Hutang)
+app.get('/api/finance/reports/payable', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    
+    const payables = await prisma.$queryRawUnsafe(`
+      SELECT e.*, s."name" as "supplierName", ec."name" as "categoryName"
+      FROM "Expense" e
+      LEFT JOIN "Supplier" s ON e."supplierId" = s.id
+      JOIN "ExpenseCategory" ec ON e."categoryId" = ec.id
+      WHERE e."companyId" = $1 AND e."status" = 'PENDING'
+      ORDER BY e."dueDate" ASC NULLS LAST, e."date" ASC
+    `, tenantId);
+
+    res.json(payables);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil laporan hutang: ' + error.message });
+  }
+});
+
+// F16.2. Get Receivables Report (Piutang)
+app.get('/api/finance/reports/receivable', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    
+    const receivables = await prisma.$queryRawUnsafe(`
+      SELECT s.*, c."name" as "customerName"
+      FROM "Sale" s
+      LEFT JOIN "Customer" c ON s."customerId" = c.id
+      WHERE s."companyId" = $1 AND s."status" = 'UNPAID'
+      ORDER BY s."date" ASC
+    `, tenantId);
+
+    res.json(receivables);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil laporan piutang: ' + error.message });
+  }
+});
+
+// --- MODUL INVENTORI ---
+
+// I1. List Products
+// I1. List Products (Updated with Warehouse Stock)
+app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const products = await prisma.product.findMany({
+      where: { companyId: tenantId },
+      include: {
+        WarehouseStock: {
+          include: { warehouse: true }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(products);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data produk: ' + error.message });
+  }
+});
+
+// I2. Create Product (Updated with Unit & simplified)
+app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId } = req.body;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create Product
+      const productResult: any[] = await tx.$queryRawUnsafe(`
+        INSERT INTO "Product" ("companyId", "name", "sku", "description", "price", "costPrice", "stock", "minStock", "unit", "updatedAt") 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+        RETURNING id
+      `, tenantId, name, sku, description, price || 0, costPrice || 0, stock || 0, minStock || 0, unit || 'Pcs');
+      
+      const productId = productResult[0].id;
+
+      // 2. Initial Stock Transaction & Warehouse Stock
+      const wId = warehouseId ? parseInt(warehouseId) : null;
+
+      if (stock > 0 && wId && !isNaN(wId)) {
+        // Record Transaction
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "warehouseId")
+          VALUES ($1, 'IN', $2, $3, NOW(), $4)
+        `, productId, stock, 'Stok awal registrasi', wId);
+
+        // Create Warehouse Stock
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "WarehouseStock" ("productId", "warehouseId", "quantity", "updatedAt")
+          VALUES ($1, $2, $3, NOW())
+          ON CONFLICT ("productId", "warehouseId") DO UPDATE SET "quantity" = "WarehouseStock"."quantity" + $3, "updatedAt" = NOW()
+        `, productId, wId, stock);
+      } else if (stock > 0) {
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+          VALUES ($1, 'IN', $2, $3, NOW())
+        `, productId, stock, 'Stok awal registrasi');
+      }
+
+      // 3. Optional Expense Sync
+      if (recordExpense && stock > 0 && accountId && costPrice > 0) {
+        const totalCost = stock * costPrice;
+        
+        // Find or create "Belanja Stok" category
+        let category: any = await tx.expenseCategory.findFirst({
+          where: { companyId: tenantId, name: 'Belanja Stok (Inventori)' }
+        });
+
+        if (!category) {
+          const catResult: any[] = await tx.$queryRawUnsafe(`
+            INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
+            VALUES ($1, 'Belanja Stok (Inventori)', 'OPERATIONAL', NOW())
+            RETURNING id
+          `, tenantId);
+          category = { id: catResult[0].id };
+        }
+
+        // Create Expense
+        await tx.expense.create({
+          data: {
+            companyId: tenantId,
+            accountId: parseInt(accountId),
+            categoryId: category.id,
+            amount: totalCost,
+            date: new Date(),
+            description: `Pembelian stok awal: ${name} (${stock} unit)`,
+            paidTo: 'Supplier'
+          }
+        });
+
+        // Update Account Balance
+        await tx.financialAccount.update({
+          where: { id: parseInt(accountId) },
+          data: { balance: { decrement: totalCost } }
+        });
+      }
+
+      return productId;
+    });
+
+    res.status(201).json({ message: 'Produk berhasil ditambahkan', productId: result });
+  } catch (error: any) {
+    fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] PRODUCT CREATE ERROR: \n${error.stack || error.message}\n`);
+    console.error('Product Create Error:', error);
+    res.status(500).json({ error: 'Gagal menambah produk: ' + error.message });
+  }
+});
+
+// I3. Update Product
+app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id as string);
+    const { name, sku, description, price, costPrice, minStock, unit } = req.body;
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Product" 
+      SET "name" = $1, "sku" = $2, "description" = $3, "price" = $4, "costPrice" = $5, "minStock" = $6, "unit" = $7, "updatedAt" = NOW()
+      WHERE id = $8 AND "companyId" = $9
+    `, name, sku, description, price || 0, costPrice || 0, minStock || 0, unit || 'Pcs', id, tenantId);
+
+    res.json({ message: 'Produk berhasil diperbarui' });
+  } catch (error: any) {
+    console.error('Product Update Error:', error);
+    res.status(500).json({ error: 'Gagal memperbarui produk: ' + error.message });
+  }
+});
+
+// I4. Get Product Recipe (BOM)
+app.get('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const productId = parseInt(req.params.id as string);
+    const recipes = await prisma.$queryRawUnsafe(`
+      SELECT pr.*, p.name as material_name, p.unit as material_unit
+      FROM "ProductRecipe" pr
+      JOIN "Product" p ON pr."materialId" = p.id
+      WHERE pr."productId" = $1
+    `, productId);
+    res.json(recipes);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil resep: ' + error.message });
+  }
+});
+
+// I5. Set Product Recipe (BOM)
+app.post('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const productId = parseInt(req.params.id as string);
+    const { items } = req.body; // Array of { materialId, quantity }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete existing recipe
+      await tx.$executeRawUnsafe(`DELETE FROM "ProductRecipe" WHERE "productId" = $1`, productId);
+      
+      // 2. Insert new recipe items
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          await tx.$executeRawUnsafe(`
+            INSERT INTO "ProductRecipe" ("productId", "materialId", "quantity", "updatedAt")
+            VALUES ($1, $2, $3, NOW())
+          `, productId, parseInt(item.materialId), parseFloat(item.quantity));
+        }
+      }
+    });
+
+    res.json({ message: 'Resep berhasil diperbarui' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menyimpan resep: ' + error.message });
+  }
+});
+
+// I3. Stock Adjustment (Updated with Categorized Expense Sync)
+app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { productId, type, quantity, reference, recordExpense, accountId, expenseType, supplierId, warehouseId } = req.body;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Get current product data
+      const products: any[] = await tx.$queryRawUnsafe(`SELECT * FROM "Product" WHERE id = $1 AND "companyId" = $2`, productId, tenantId);
+      if (products.length === 0) throw new Error('Produk tidak ditemukan');
+      const product = products[0];
+
+      // 2. Calculate new stock
+      let newStock = product.stock;
+      if (type === 'IN') newStock += quantity;
+      else if (type === 'OUT') newStock -= quantity;
+      else if (type === 'ADJUST') newStock = quantity;
+
+      // 3. Update Product (Total Stock)
+      await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = $1, "updatedAt" = NOW() WHERE id = $2`, newStock, productId);
+
+      // 4. Update Warehouse Stock (New Task)
+      if (warehouseId) {
+        const wId = parseInt(warehouseId);
+        // Get existing warehouse stock
+        const wStocks: any[] = await tx.$queryRawUnsafe(`SELECT quantity FROM "WarehouseStock" WHERE "productId" = $1 AND "warehouseId" = $2`, productId, wId);
+        let oldWQty = wStocks.length > 0 ? wStocks[0].quantity : 0;
+        let newWQty = oldWQty;
+        
+        if (type === 'IN') newWQty += quantity;
+        else if (type === 'OUT') newWQty -= quantity;
+        else if (type === 'ADJUST') newWQty = quantity;
+
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "WarehouseStock" ("productId", "warehouseId", "quantity", "updatedAt")
+          VALUES ($1, $2, $3, NOW())
+          ON CONFLICT ("productId", "warehouseId") DO UPDATE SET "quantity" = $3, "updatedAt" = NOW()
+        `, productId, wId, newWQty);
+      }
+
+      // 5. Record Transaction
+      await tx.$executeRawUnsafe(`
+        INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "supplierId", "warehouseId")
+        VALUES ($1, $2, $3, $4, NOW(), $5, $6)`,
+        productId, type, quantity, reference, supplierId ? parseInt(supplierId) : null, warehouseId ? parseInt(warehouseId) : null
+      );
+
+      // 5. Optional Expense Sync (Only for IN)
+      if (recordExpense && type === 'IN' && accountId && quantity > 0 && product.costPrice > 0) {
+        const totalCost = quantity * product.costPrice;
+        
+        // Determine Category Name & Type
+        const isCOGS = expenseType === 'COGS';
+        const catName = isCOGS ? 'Belanja Bahan Baku (Inventori)' : 'Biaya Operasional (Inventori)';
+        const catType = isCOGS ? 'COGS' : 'OPERATIONAL';
+
+        let category: any = await tx.expenseCategory.findFirst({
+          where: { companyId: tenantId, name: catName }
+        });
+
+        if (!category) {
+          const catResult: any[] = await tx.$queryRawUnsafe(`
+            INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
+            VALUES ($1, $2, $3::"ExpenseType", NOW())
+            RETURNING id
+          `, tenantId, catName, catType);
+          category = { id: catResult[0].id };
+        }
+
+        let paidTo = reference || 'Supplier';
+        if (supplierId) {
+          const suppliers: any[] = await tx.$queryRawUnsafe(`SELECT name FROM "Supplier" WHERE id = $1`, parseInt(supplierId));
+          if (suppliers.length > 0) paidTo = suppliers[0].name;
+        }
+
+        await tx.expense.create({
+          data: {
+            companyId: tenantId,
+            accountId: parseInt(accountId),
+            categoryId: category.id,
+            amount: totalCost,
+            date: new Date(),
+            description: `Belanja stok: ${product.name} (${quantity} unit)`,
+            paidTo: paidTo
+          }
+        });
+
+        await tx.financialAccount.update({
+          where: { id: parseInt(accountId) },
+          data: { balance: { decrement: totalCost } }
+        });
+      }
+
+      return newStock;
+    });
+
+    res.json({ message: 'Stok berhasil diperbarui', newStock: result });
+  } catch (error: any) {
+    fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] STOCK ADJUST ERROR: \n${error.stack || error.message}\n`);
+    console.error('Stock Adjust Error:', error);
+    res.status(500).json({ error: 'Gagal menyesuaikan stok: ' + error.message });
+  }
+});
+
+// Get all stock transactions for the tenant
+app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) => {
+  try {
+    const tenantId = Number(req.tenantId);
+    const transactions = await prisma.$queryRawUnsafe(`
+      SELECT st.*, p.name as product_name, p.sku as product_sku
+      FROM "StockTransaction" st
+      JOIN "Product" p ON st."productId" = p.id
+      WHERE p."companyId" = $1
+      ORDER BY st."createdAt" DESC
+    `, tenantId);
+    res.json(transactions);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data transaksi: ' + error.message });
+  }
+});
+
+// --- MODUL GUDANG (WAREHOUSE) ---
+
+// W1. List Warehouses
+app.get('/api/inventory/warehouses', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const warehouses = await prisma.$queryRawUnsafe(
+      `SELECT * FROM "Warehouse" WHERE "companyId" = $1 ORDER BY "name" ASC`,
+      tenantId
+    );
+    res.json(warehouses);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data gudang: ' + error.message });
+  }
+});
+
+// W2. Create Warehouse
+app.post('/api/inventory/warehouses', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { name, location, isMain } = req.body;
+    
+    // If isMain is true, unset other main warehouses for this company
+    if (isMain) {
+      await prisma.$executeRawUnsafe(`UPDATE "Warehouse" SET "isMain" = FALSE WHERE "companyId" = $1`, tenantId);
+    }
+    
+    const result: any[] = await prisma.$queryRawUnsafe(`
+      INSERT INTO "Warehouse" ("companyId", "name", "location", "isMain", "updatedAt")
+      VALUES ($1, $2, $3, $4, NOW())
+      RETURNING id
+    `, tenantId, name, location, isMain || false);
+    
+    res.status(201).json({ message: 'Gudang berhasil ditambahkan', warehouseId: result[0].id });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menambah gudang: ' + error.message });
+  }
+});
+
+// W3. Update Warehouse
+app.patch('/api/inventory/warehouses/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const warehouseId = parseInt(req.params.id as string);
+    const { name, location, isMain } = req.body;
+    
+    if (isMain) {
+      await prisma.$executeRawUnsafe(`UPDATE "Warehouse" SET "isMain" = FALSE WHERE "companyId" = $1`, tenantId);
+    }
+    
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Warehouse" 
+      SET "name" = $1, "location" = $2, "isMain" = $3, "updatedAt" = NOW()
+      WHERE id = $4 AND "companyId" = $5
+    `, name, location, isMain, warehouseId, tenantId);
+    
+    res.json({ message: 'Gudang berhasil diperbarui' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal memperbarui gudang: ' + error.message });
+  }
+});
+
+// W4. Delete Warehouse
+app.delete('/api/inventory/warehouses/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const warehouseId = parseInt(req.params.id as string);
+    
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM "Warehouse" WHERE id = $1 AND "companyId" = $2
+    `, warehouseId, tenantId);
+    
+    res.json({ message: 'Gudang berhasil dihapus' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menghapus gudang: ' + error.message });
+  }
+});
+
+// --- MODUL PELANGGAN & MEMBER ---
+
+// C1. List Customers
+app.get('/api/customers', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const customers = await prisma.$queryRawUnsafe(`
+      SELECT * FROM "Customer" WHERE "companyId" = $1 ORDER BY "name" ASC
+    `, tenantId);
+    res.json(customers);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data pelanggan: ' + error.message });
+  }
+});
+
+// C2. Create Customer
+app.post('/api/customers', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { name, phone, email, address } = req.body;
+
+    if (!name) return res.status(400).json({ error: 'Nama pelanggan wajib diisi' });
+
+    const result: any[] = await prisma.$queryRawUnsafe(`
+      INSERT INTO "Customer" ("companyId", "name", "phone", "email", "address", "updatedAt")
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      RETURNING id
+    `, tenantId, name, phone, email, address);
+
+    res.status(201).json({ id: result[0].id, message: 'Pelanggan berhasil ditambahkan' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menambah pelanggan: ' + error.message });
+  }
+});
+
+// C3. Update Customer
+app.patch('/api/customers/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id as string);
+    const { name, phone, email, address } = req.body;
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Customer" 
+      SET "name" = $1, "phone" = $2, "email" = $3, "address" = $4, "updatedAt" = NOW()
+      WHERE "id" = $5 AND "companyId" = $6
+    `, name, phone, email, address, id, tenantId);
+
+    res.json({ message: 'Data pelanggan berhasil diperbarui' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal memperbarui pelanggan: ' + error.message });
+  }
+});
+
+// C4. Delete Customer
+app.delete('/api/customers/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id as string);
+
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM "Customer" WHERE "id" = $1 AND "companyId" = $2
+    `, id, tenantId);
+
+    res.json({ message: 'Pelanggan berhasil dihapus' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menghapus pelanggan: ' + error.message });
+  }
+});
+
+// C5. Get Customer Sales History
+app.get('/api/customers/:id/sales', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const customerId = parseInt(req.params.id as string);
+
+    const sales = await prisma.$queryRawUnsafe(`
+      SELECT * FROM "Sale" 
+      WHERE "companyId" = $1 AND "customerId" = $2 
+      ORDER BY "date" DESC
+    `, tenantId, customerId);
+
+    res.json(sales);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil riwayat transaksi: ' + error.message });
+  }
+});
+
+// --- MODUL SUPPLIER & PEMASOK ---
+
+// SP1. List Suppliers
+app.get('/api/suppliers', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const suppliers = await prisma.$queryRawUnsafe(`
+      SELECT * FROM "Supplier" WHERE "companyId" = $1 ORDER BY "name" ASC
+    `, tenantId);
+    res.json(suppliers);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data supplier: ' + error.message });
+  }
+});
+
+// SP2. Create Supplier
+app.post('/api/suppliers', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { name, contactPerson, phone, email, address, category } = req.body;
+
+    if (!name) return res.status(400).json({ error: 'Nama supplier wajib diisi' });
+
+    const result: any[] = await prisma.$queryRawUnsafe(`
+      INSERT INTO "Supplier" ("companyId", "name", "contactPerson", "phone", "email", "address", "category", "updatedAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      RETURNING id
+    `, tenantId, name, contactPerson, phone, email, address, category);
+
+    res.status(201).json({ id: result[0].id, message: 'Supplier berhasil ditambahkan' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menambah supplier: ' + error.message });
+  }
+});
+
+// SP3. Update Supplier
+app.patch('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id as string);
+    const { name, contactPerson, phone, email, address, category } = req.body;
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Supplier" 
+      SET "name" = $1, "contactPerson" = $2, "phone" = $3, "email" = $4, "address" = $5, "category" = $6, "updatedAt" = NOW()
+      WHERE "id" = $7 AND "companyId" = $8
+    `, name, contactPerson, phone, email, address, category, id, tenantId);
+
+    res.json({ message: 'Data supplier berhasil diperbarui' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal memperbarui supplier: ' + error.message });
+  }
+});
+
+// SP4. Delete Supplier
+app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id as string);
+
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM "Supplier" WHERE "id" = $1 AND "companyId" = $2
+    `, id, tenantId);
+
+    res.json({ message: 'Supplier berhasil dihapus' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menghapus supplier: ' + error.message });
+  }
+});
+
+// --- MODUL PENJUALAN & INVOICING ---
+
+// S1. Record Sale
+app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { items, accountId, customerId, status, notes, date } = req.body;
+
+    // --- CHECK CLOSING ---
+    if (await isPeriodClosed(tenantId, date || new Date())) {
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat mencatat penjualan pada tanggal ini.' });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Minimal harus ada 1 barang' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Generate Invoice Number: SLS/2026/03/ID4-XXXX
+      const dateVal = date ? new Date(date) : new Date();
+      const y = dateVal.getFullYear();
+      const m = (dateVal.getMonth() + 1).toString().padStart(2, '0');
+      const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const invoiceNumber = `SLS/${y}/${m}/ID${tenantId}-${randomStr}`;
+
+      // 2. Calculate Total
+      let totalAmount = 0;
+      for (const item of items) {
+        totalAmount += parseFloat(item.quantity) * parseFloat(item.price);
+      }
+
+      // 3. Create Sale Record
+      const saleResult: any[] = await tx.$queryRawUnsafe(`
+        INSERT INTO "Sale" ("companyId", "invoiceNumber", "customerId", "date", "totalAmount", "status", "accountId", "notes", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        RETURNING id
+      `, tenantId, invoiceNumber, customerId ? parseInt(customerId) : null, dateVal, totalAmount, status || 'PAID', accountId ? parseInt(accountId) : null, notes);
+      
+      const saleId = saleResult[0].id;
+
+      // 4. Create Sale Items & Update Inventory
+      for (const item of items) {
+        const productId = parseInt(item.productId);
+        const quantity = parseFloat(item.quantity);
+        const price = parseFloat(item.price);
+        const total = quantity * price;
+
+        // Insert Sale Item
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "SaleItem" ("saleId", "productId", "quantity", "price", "total")
+          VALUES ($1, $2, $3, $4, $5)
+        `, saleId, productId, quantity, price, total);
+
+        // --- NEW BOM LOGIC ---
+        // Check if product has a recipe (BOM)
+        const recipes: any[] = await tx.$queryRawUnsafe(`
+          SELECT * FROM "ProductRecipe" WHERE "productId" = $1
+        `, productId);
+
+        if (recipes.length > 0) {
+          // Decrement Materials instead of Product
+          for (const recipe of recipes) {
+            const materialId = recipe.materialId;
+            const recipeQty = parseFloat(recipe.quantity);
+            const totalMaterialNeeded = recipeQty * quantity;
+
+            await tx.$executeRawUnsafe(`
+              UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2
+            `, totalMaterialNeeded, materialId);
+
+            await tx.$executeRawUnsafe(`
+              INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+              VALUES ($1, 'OUT', $2, $3, NOW())
+            `, materialId, totalMaterialNeeded, `Penjualan (BOM) Inv ${invoiceNumber}`);
+          }
+        } else {
+          // Original logic for Retail (Decrement Product itself)
+          await tx.$executeRawUnsafe(`
+            UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3
+          `, quantity, productId, tenantId);
+
+          await tx.$executeRawUnsafe(`
+            INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+            VALUES ($1, 'OUT', $2, $3, NOW())
+          `, productId, quantity, `Penjualan Invoice ${invoiceNumber}`);
+        }
+      }
+
+      // 5. Finance Integration (Income)
+      if (status === 'PAID' && accountId) {
+        // Find or create "Penjualan Produk" category
+        let category: any = await tx.incomeCategory.findFirst({
+          where: { companyId: tenantId, name: 'Penjualan Produk' }
+        });
+
+        if (!category) {
+          const catResult: any[] = await tx.$queryRawUnsafe(`
+            INSERT INTO "IncomeCategory" ("companyId", "name", "updatedAt")
+            VALUES ($1, 'Penjualan Produk', NOW())
+            RETURNING id
+          `, tenantId);
+          category = { id: catResult[0].id };
+        }
+
+        // Create Income
+        await tx.income.create({
+          data: {
+            companyId: tenantId,
+            accountId: parseInt(accountId),
+            categoryId: category.id,
+            amount: totalAmount,
+            date: dateVal,
+            description: `Penjualan Invoice ${invoiceNumber}`,
+            receivedFrom: 'Customer'
+          }
+        });
+
+        // Update Account Balance (Increment)
+        await tx.financialAccount.update({
+          where: { id: parseInt(accountId) },
+          data: { balance: { increment: totalAmount } }
+        });
+      }
+
+      return { saleId, invoiceNumber, totalAmount };
+    });
+
+    res.status(201).json(result);
+  } catch (error: any) {
+    console.error("DEBUG SALE CREATE ERROR:", error);
+    res.status(500).json({ error: 'Gagal mencatat penjualan: ' + error.message });
+  }
+});
+
+// S2. List Sales
+app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const sales = await prisma.$queryRawUnsafe(`
+      SELECT s.*, c.name as "customerName"
+      FROM "Sale" s
+      LEFT JOIN "Customer" c ON s."customerId" = c.id
+      WHERE s."companyId" = $1 
+      ORDER BY s."date" DESC
+    `, tenantId);
+    res.json(sales);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data penjualan: ' + error.message });
+  }
+});
+
+// S3. Get Sale Detail
+app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const saleId = parseInt(req.params.id as string);
+
+    const sales: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Sale" WHERE id = $1 AND "companyId" = $2`, saleId, tenantId);
+    if (sales.length === 0) return res.status(404).json({ error: 'Penjualan tidak ditemukan' });
+
+    const items = await prisma.$queryRawUnsafe(`
+      SELECT si.*, p.name as product_name, p.sku as product_sku, p.unit as product_unit
+      FROM "SaleItem" si
+      JOIN "Product" p ON si."productId" = p.id
+      WHERE si."saleId" = $1
+    `, saleId);
+
+    const company: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Company" WHERE id = $1`, tenantId);
+
+    res.json({ ...sales[0], items, company: company[0] });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil detail penjualan: ' + error.message });
+  }
+});
+
+// S4. Process Sale Return
+app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const saleId = parseInt(req.params.id as string);
+    const { items, accountId, notes, date } = req.body; // items: [{ productId, quantity }]
+    const dateVal = date ? new Date(date) : new Date();
+
+    // --- CHECK CLOSING ---
+    if (await isPeriodClosed(tenantId, dateVal)) {
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat mencatat retur pada tanggal ini.' });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Minimal harus ada 1 barang yang diretur' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Get Original Sale & Existing Returns
+      const sales: any[] = await tx.$queryRawUnsafe(`SELECT * FROM "Sale" WHERE id = $1 AND "companyId" = $2`, saleId, tenantId);
+      if (sales.length === 0) throw new Error('Penjualan tidak ditemukan');
+      const originalSale = sales[0];
+
+      const originalItems: any[] = await tx.$queryRawUnsafe(`SELECT * FROM "SaleItem" WHERE "saleId" = $1`, saleId);
+      const existingReturns: any[] = await tx.$queryRawUnsafe(`
+        SELECT sri."productId", SUM(sri.quantity) as "totalReturned"
+        FROM "SaleReturnItem" sri
+        JOIN "SaleReturn" sr ON sri."returnId" = sr.id
+        WHERE sr."saleId" = $1
+        GROUP BY sri."productId"
+      `, saleId);
+
+      // 2. Validate quantities
+      const returnItemsData: any[] = [];
+      let totalRefundAmount = 0;
+
+      for (const item of items) {
+        const productId = parseInt(item.productId);
+        const returnQty = parseFloat(item.quantity);
+        
+        const origItem = originalItems.find(oi => oi.productId === productId);
+        if (!origItem) throw new Error(`Produk ID ${productId} tidak ada dalam transaksi original`);
+
+        const alreadyReturned = existingReturns.find(er => er.productId === productId)?.totalReturned || 0;
+        if (returnQty > (origItem.quantity - alreadyReturned)) {
+          throw new Error(`Jumlah retur untuk produk ${productId} melebihi sisa barang yang bisa diretur`);
+        }
+
+        const itemTotal = returnQty * parseFloat(origItem.price);
+        totalRefundAmount += itemTotal;
+        returnItemsData.push({ productId, quantity: returnQty, price: origItem.price, total: itemTotal });
+      }
+
+      // 3. Create Return Record
+      const returnNumber = `RET/${dateVal.getFullYear()}/${(dateVal.getMonth()+1).toString().padStart(2,'0')}/ID${tenantId}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
+      
+      const returnResult: any[] = await tx.$queryRawUnsafe(`
+        INSERT INTO "SaleReturn" ("companyId", "saleId", "returnNumber", "date", "totalRefundAmount", "notes", "accountId", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        RETURNING id
+      `, tenantId, saleId, returnNumber, dateVal, totalRefundAmount, notes, accountId ? parseInt(accountId) : null);
+      
+      const returnId = returnResult[0].id;
+
+      // 4. Process Items (Restore Stock & Create Return Items)
+      for (const item of returnItemsData) {
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "SaleReturnItem" ("returnId", "productId", "quantity", "price", "total")
+          VALUES ($1, $2, $3, $4, $5)
+        `, returnId, item.productId, item.quantity, item.price, item.total);
+
+        // Check BOM
+        const recipes: any[] = await tx.$queryRawUnsafe(`SELECT * FROM "ProductRecipe" WHERE "productId" = $1`, item.productId);
+        if (recipes.length > 0) {
+          for (const recipe of recipes) {
+            const materialQty = parseFloat(recipe.quantity) * item.quantity;
+            await tx.$executeRawUnsafe(`UPDATE "Product" SET stock = stock + $1 WHERE id = $2`, materialQty, recipe.materialId);
+            await tx.$executeRawUnsafe(`
+              INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+              VALUES ($1, 'RETURN', $2, $3, NOW())
+            `, recipe.materialId, materialQty, `Retur (BOM) ${returnNumber} dari ${originalSale.invoiceNumber}`);
+          }
+        } else {
+          await tx.$executeRawUnsafe(`UPDATE "Product" SET stock = stock + $1 WHERE id = $2`, item.quantity, item.productId);
+          await tx.$executeRawUnsafe(`
+            INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+            VALUES ($1, 'RETURN', $2, $3, NOW())
+          `, item.productId, item.quantity, `Retur ${returnNumber} dari ${originalSale.invoiceNumber}`);
+        }
+      }
+
+      // 5. Finance Reconciliation (If Refund)
+      if (accountId && totalRefundAmount > 0) {
+        // Create Expense (Refund)
+        const refundCategoryName = 'Refund Penjualan';
+        let category: any = await tx.expenseCategory.findFirst({
+          where: { companyId: tenantId, name: refundCategoryName }
+        });
+
+        if (!category) {
+          const catResult: any[] = await tx.$queryRawUnsafe(`
+            INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
+            VALUES ($1, $2, 'OPERATIONAL', NOW())
+            RETURNING id
+          `, tenantId, refundCategoryName);
+          category = { id: catResult[0].id };
+        }
+
+        await tx.expense.create({
+          data: {
+            companyId: tenantId,
+            accountId: parseInt(accountId),
+            categoryId: category.id,
+            amount: totalRefundAmount,
+            date: dateVal,
+            description: `Refund Penjualan ${originalSale.invoiceNumber} (Retur ${returnNumber})`,
+            status: 'PAID'
+          }
+        });
+
+        // Decrement Account Balance
+        await tx.financialAccount.update({
+          where: { id: parseInt(accountId) },
+          data: { balance: { decrement: totalRefundAmount } }
+        });
+      }
+
+      // 6. Update Sale Status
+      const totalReturnedSoFar = (existingReturns.reduce((sum, r) => sum + r.totalReturned, 0)) + returnItemsData.reduce((sum, i) => sum + i.quantity, 0);
+      const totalSoldItems = originalItems.reduce((sum, i) => sum + i.quantity, 0);
+
+      let newStatus = originalSale.status;
+      if (totalReturnedSoFar >= totalSoldItems) {
+        newStatus = 'RETURNED';
+      } else if (totalReturnedSoFar > 0) {
+        newStatus = 'PARTIALLY_RETURNED';
+      }
+
+      await tx.$executeRawUnsafe(`UPDATE "Sale" SET "status" = $1, "updatedAt" = NOW() WHERE id = $2`, newStatus, saleId);
+
+      return { returnId, returnNumber, refundAmount: totalRefundAmount, newStatus };
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("RETURN ERROR:", error);
+    res.status(500).json({ error: 'Gagal memproses retur: ' + error.message });
+  }
+});
+
+// S5. Get Sale Returns
+app.get('/api/sales/:id/returns', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const saleId = parseInt(req.params.id as string);
+    const returns = await prisma.$queryRawUnsafe(`
+      SELECT sr.*, json_agg(sri.*) as items
+      FROM "SaleReturn" sr
+      LEFT JOIN "SaleReturnItem" sri ON sr.id = sri."returnId"
+      WHERE sr."saleId" = $1 AND sr."companyId" = $2
+      GROUP BY sr.id
+      ORDER BY sr.date DESC
+    `, saleId, tenantId);
+    res.json(returns);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil riwayat retur: ' + error.message });
   }
 });
 

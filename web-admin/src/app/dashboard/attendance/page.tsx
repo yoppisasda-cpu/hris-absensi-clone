@@ -24,6 +24,9 @@ interface Attendance {
     moodScore: number | null;
     faceSimilarityScore: number | null;
     isFaceVerified: boolean;
+    fraudScore: number | null;
+    isSuspicious: boolean;
+    deviceId: string | null;
 }
 
 export default function AttendancePage() {
@@ -64,7 +67,9 @@ export default function AttendancePage() {
             'In Lng': att.lng || '-',
             'Out Lat': att.clockOutLat || '-',
             'Out Lng': att.clockOutLng || '-',
-            'Mood': att.mood || '-'
+            'Mood': att.mood || '-',
+            'Fraud Score': att.fraudScore || 0,
+            'Suspicious': att.isSuspicious ? 'YES' : 'NO'
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -174,6 +179,7 @@ export default function AttendancePage() {
                                     <th className="px-6 py-4 text-center">Clock-Out</th>
                                     <th className="px-6 py-4 text-center">Mood</th>
                                     <th className="px-6 py-4 text-center">Verifikasi Wajah</th>
+                                    <th className="px-6 py-4 text-center">Tingkat Risiko</th>
                                     <th className="px-6 py-4 text-center">Status</th>
                                 </tr>
                             </thead>
@@ -278,6 +284,28 @@ export default function AttendancePage() {
                                                 <span className="inline-flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full text-[10px] font-medium border border-slate-100">
                                                     <Shield className="h-3 w-3 opacity-30" /> No Reference
                                                 </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {att.fraudScore !== null ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {att.isSuspicious ? (
+                                                        <span className="inline-flex items-center gap-1 text-red-700 bg-red-100 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-200 animate-pulse">
+                                                            <ShieldAlert className="h-3 w-3" /> 🚨 TINGGI
+                                                        </span>
+                                                    ) : att.fraudScore > 30 ? (
+                                                        <span className="inline-flex items-center gap-1 text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-orange-100">
+                                                            <Shield className="h-3 w-3" /> SEDANG
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">
+                                                            <ShieldCheck className="h-3 w-3" /> RENDAH
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] text-slate-400 font-mono">ID: {att.deviceId?.substring(0, 8) || 'N/A'}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-300">-</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
