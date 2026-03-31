@@ -165,8 +165,8 @@ export default function AdminBillingPage() {
                                             <p className="text-xs text-slate-400 whitespace-nowrap">Due: {new Date(inv.dueDate).toLocaleDateString('id-ID')}</p>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${inv.contractType === 'LUMSUM' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                {inv.contractType}
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${inv.contractType === 'BULANAN' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                {inv.contractType === 'BULANAN' ? 'Bulanan' : 'Tahunan'}
                                             </span>
                                             <p className="text-xs text-slate-500 mt-1">Val: {formatCurrency(inv.contractValue)} / {inv.employeeLimit} pax</p>
                                         </td>

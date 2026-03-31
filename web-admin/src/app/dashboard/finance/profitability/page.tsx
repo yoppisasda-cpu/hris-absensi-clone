@@ -18,6 +18,8 @@ interface ProductStat {
   productId: number;
   name: string;
   sku: string;
+  categoryId?: number;
+  categoryName?: string;
   qtySold: number;
   revenue: number;
   cogs: number;
@@ -39,8 +41,11 @@ interface Summary {
 
 export default function ProfitabilityPage() {
   const [data, setData] = useState<{ products: ProductStat[], trend: TrendStat[], summary: Summary } | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [dateRange, setDateRange] = useState({
     startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd')
@@ -49,10 +54,12 @@ export default function ProfitabilityPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/reports/profitability', {
-        params: dateRange
-      });
-      setData(res.data);
+      const [reportRes, catRes] = await Promise.all([
+        api.get('/reports/profitability', { params: dateRange }),
+        api.get('/pos/categories')
+      ]);
+      setData(reportRes.data);
+      setCategories(catRes.data);
       setError(null);
     } catch (err: any) {
       console.error("Fetch profitability error:", err);
@@ -83,6 +90,13 @@ export default function ProfitabilityPage() {
   );
 
   const topProducts = data?.products.slice(0, 5) || [];
+
+  const filteredProducts = data?.products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = selectedCategory === 'all' || p.categoryId === Number(selectedCategory);
+    return matchesSearch && matchesCategory;
+  }) || [];
 
   return (
     <DashboardLayout>
@@ -120,7 +134,7 @@ export default function ProfitabilityPage() {
           </div>
         </div>
 
-        {/* Summary Cards */}
+        {/* ... (Summary Cards and Charts stay the same) ... */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4 transition-all hover:shadow-md cursor-default group">
             <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -153,7 +167,6 @@ export default function ProfitabilityPage() {
           </div>
         </div>
 
-        {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Profit Trend Chart */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -199,7 +212,6 @@ export default function ProfitabilityPage() {
             </div>
           </div>
 
-          {/* Top Products Chart */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
             <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
               <Package className="h-5 w-5 text-orange-500" />
@@ -236,16 +248,44 @@ export default function ProfitabilityPage() {
 
         {/* Main Data Table */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="px-6 py-5 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             <div>
-              <h3 className="font-black text-slate-900 tracking-tight">Rincian Performa Produk</h3>
-              <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Data Real-time dari Modul Sales & Inventory</p>
+              <h3 className="font-black text-slate-900 tracking-tight uppercase text-sm">Rincian Performa Produk</h3>
+              <p className="text-[10px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold">Data Real-time dari Modul Sales & Inventory</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full uppercase tracking-widest">
+            
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              {/* Search Field */}
+              <div className="relative w-full sm:w-64 group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                <input 
+                  type="text"
+                  placeholder="Cari Produk / SKU..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              {/* Category Filter */}
+              <div className="relative w-full sm:w-48">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <select 
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer transition-all text-slate-600 font-medium"
+                >
+                  <option value="all">Semua Kategori</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-2 rounded-lg uppercase tracking-widest whitespace-nowrap">
                 <Info className="h-3 w-3" />
-                HPP dihitung otomatis berdasarkan Resep/BOM
-              </span>
+                HPP Berdasarkan Resep/BOM
+              </div>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -253,7 +293,7 @@ export default function ProfitabilityPage() {
               <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-[0.2em] font-black border-b border-slate-100">
                 <tr>
                   <th className="px-6 py-4">Nama Produk</th>
-                  <th className="px-6 py-4">Terjual</th>
+                  <th className="px-6 py-4 text-center">Terjual</th>
                   <th className="px-6 py-4 text-right">Omzet</th>
                   <th className="px-6 py-4 text-right">Total HPP</th>
                   <th className="px-6 py-4 text-right">Profit Kotor</th>
@@ -261,16 +301,19 @@ export default function ProfitabilityPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {data?.products.map((p) => (
+                {filteredProducts.map((p) => (
                   <tr key={p.productId} className="hover:bg-slate-50/80 transition-all group">
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-black text-slate-800 text-sm group-hover:text-blue-600 transition-colors uppercase tracking-tight">{p.name}</span>
-                        <span className="text-[10px] font-mono text-slate-400 font-bold tracking-widest">{p.sku}</span>
+                        <span className="font-black text-slate-800 text-sm group-hover:text-blue-600 transition-colors uppercase tracking-tight line-clamp-1">{p.name}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] font-mono text-slate-400 font-bold tracking-widest">{p.sku}</span>
+                          <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">{p.categoryName}</span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-600">
+                      <div className="flex items-center justify-center gap-1.5 font-bold text-slate-600">
                         <Package className="h-3 w-3 opacity-50" />
                         {p.qtySold}
                       </div>
@@ -293,14 +336,14 @@ export default function ProfitabilityPage() {
                     </td>
                   </tr>
                 ))}
-                {data?.products.length === 0 && (
+                {filteredProducts.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-24 text-center">
                       <div className="flex flex-col items-center gap-4">
                         <div className="p-4 bg-slate-50 rounded-full">
                           <Search className="h-8 w-8 text-slate-300" />
                         </div>
-                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Tidak ada data penjualan dalam periode ini.</p>
+                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Tidak ada produk yang cocok dengan filter.</p>
                       </div>
                     </td>
                   </tr>

@@ -112,7 +112,7 @@ async function main() {
             latitude: -6.208763,
             longitude: 106.845599,
             radius: 500,
-            contractType: 'LUMSUM',
+            contractType: 'BULANAN',
             contractValue: 5000000,
             contractStart: new Date(),
             contractEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
@@ -217,6 +217,58 @@ async function main() {
             companyId: ptRki.id
         }
     });
+
+    // --- SEED POS DATA (PT RKI) ---
+    const coffeeCategory = await prisma.productCategory.upsert({
+        where: { id: 1 },
+        create: {
+            id: 1,
+            companyId: ptRki.id,
+            name: 'Coffee Series'
+        },
+        update: {}
+    });
+
+    const snackCategory = await prisma.productCategory.upsert({
+        where: { id: 2 },
+        create: {
+            id: 2,
+            companyId: ptRki.id,
+            name: 'Snacks'
+        },
+        update: {}
+    });
+
+    const products = [
+        { name: 'Espresso Single', price: 15000, categoryId: coffeeCategory.id, stock: 100, unit: 'Cup' },
+        { name: 'Cafe Latte', price: 28000, categoryId: coffeeCategory.id, stock: 50, unit: 'Cup' },
+        { name: 'Cappuccino', price: 28000, categoryId: coffeeCategory.id, stock: 50, unit: 'Cup' },
+        { name: 'Americano', price: 22000, categoryId: coffeeCategory.id, stock: 80, unit: 'Cup' },
+        { name: 'Croissant Butter', price: 25000, categoryId: snackCategory.id, stock: 20, unit: 'Pcs' },
+        { name: 'Brownies Choco', price: 18000, categoryId: snackCategory.id, stock: 30, unit: 'Pcs' },
+    ];
+
+    for (const p of products) {
+        await prisma.product.upsert({
+            where: { id: products.indexOf(p) + 1 },
+            create: {
+                id: products.indexOf(p) + 1,
+                companyId: ptRki.id,
+                name: p.name,
+                price: p.price,
+                categoryId: p.categoryId,
+                stock: p.stock,
+                unit: p.unit,
+                updatedAt: new Date()
+            },
+            update: {
+                price: p.price,
+                stock: p.stock
+            }
+        });
+    }
+
+    console.log('Seed POS Data selesai!');
 
     console.log('Seeding selesai!');
 }

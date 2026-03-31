@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import 'printer_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -218,15 +219,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
 
-                    SizedBox(height: 16),
-                    Text(
-                      'Keamanan',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    ListTile(
+                      leading: Icon(
+                        Icons.print_outlined,
+                        color: Colors.blue[800],
                       ),
+                      title: Text('Pengaturan Printer'),
+                      subtitle: Text('Kelola printer thermal Bluetooth'),
+                      trailing: Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PrinterSettingsScreen(),
+                          ),
+                        );
+                      },
                     ),
-                    SizedBox(height: 16),
                     ListTile(
                       leading: Icon(
                         Icons.lock_outline,

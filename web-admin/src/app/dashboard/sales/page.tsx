@@ -42,8 +42,9 @@ export default function SalesPage() {
     }, [sales]);
 
     const filteredSales = sales.filter(sale => 
-        sale.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.notes?.toLowerCase().includes(searchTerm.toLowerCase())
+        (sale.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sale.notes?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        !sale.invoiceNumber?.startsWith('POS-')
     );
 
     const handleViewInvoice = (id: number) => {

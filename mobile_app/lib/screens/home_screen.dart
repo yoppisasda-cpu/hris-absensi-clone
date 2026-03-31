@@ -16,6 +16,7 @@ import 'calendar_screen.dart';
 import 'kpi_screen.dart';
 import 'vent_screen.dart';
 import 'learning_center_screen.dart';
+import 'pos_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -434,6 +435,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 shrinkWrap: true,
                 physics: NeverScrollableScrollPhysics(),
                 children: [
+                  if (auth.userRole == 'ADMIN' || auth.userRole == 'OWNER' || auth.userRole == 'CASHIER' || auth.userRole == 'SUPERADMIN')
+                    _buildMenuCard(
+                      context,
+                      title: 'POS Kasir',
+                      icon: Icons.point_of_sale,
+                      color: Colors.deepOrange,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => POSScreen()),
+                      ),
+                    ),
                   _buildMenuCard(
                     context,
                     title: 'Slip Gaji',

@@ -7,12 +7,14 @@ class AuthProvider with ChangeNotifier {
   String? _companyId;
   String? _userName;
   int? _userId;
+  String? _userRole;
   String _language = 'id';
 
   bool get isAuthenticated => _isAuthenticated;
   String? get companyId => _companyId;
   String? get userName => _userName;
   int? get userId => _userId;
+  String? get userRole => _userRole;
   String get language => _language;
 
   Future<void> login(String email, String password) async {
@@ -28,10 +30,12 @@ class AuthProvider with ChangeNotifier {
     await prefs.setString('companyId', user['companyId'].toString());
     await prefs.setInt('userId', user['id']);
     await prefs.setString('userName', user['name']);
+    await prefs.setString('userRole', user['role']);
 
     _companyId = user['companyId'].toString();
     _userId = user['id'];
     _userName = user['name'];
+    _userRole = user['role'];
     _language = user['language'] ?? 'id';
 
     await prefs.setString('language', _language);
@@ -46,6 +50,7 @@ class AuthProvider with ChangeNotifier {
     _companyId = prefs.getString('companyId');
     _userId = prefs.getInt('userId');
     _userName = prefs.getString('userName');
+    _userRole = prefs.getString('userRole');
     _language = prefs.getString('language') ?? 'id';
 
     // Autentikasi ditentukan dari ketersediaan JWT
@@ -75,6 +80,7 @@ class AuthProvider with ChangeNotifier {
     _companyId = null;
     _userId = null;
     _userName = null;
+    _userRole = null;
     notifyListeners();
   }
 }

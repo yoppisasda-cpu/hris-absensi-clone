@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { Building2, Lock, Mail, ArrowRight, UserCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, ArrowRight, UserCircle, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,35 +11,40 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isHardBlocked, setIsHardBlocked] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setIsHardBlocked(false);
+    setErrorMsg('');
 
     try {
-      // Mengirim POST Login ke Backend Validasi Database Express Node.js
       const res = await api.post('/auth/login', { email, password });
-
       const { token, user } = res.data;
       
-      // Batasi Akses Web Admin hanya untuk Admin / SuperAdmin
       if (user.role === 'EMPLOYEE') {
-        alert('Akses Web Admin Ditolak: Hanya Admin yang dapat masuk ke panel ini.');
+        setErrorMsg('Akses Web Admin Ditolak: Hanya Admin yang dapat masuk ke panel ini.');
         setIsLoading(false);
         return;
       }
 
-      // Mengamankan Token Bearer JWT dan Identitas Profil (Role) ke Browser LocalStorage
       localStorage.setItem('jwt_token', token);
       localStorage.setItem('companyId', user.companyId.toString());
       localStorage.setItem('userName', user.name);
-      localStorage.setItem('userRole', user.role); // mis. 'ADMIN'
-
-      // Redirect ke Dashboard Admin Utama
+      localStorage.setItem('userRole', user.role);
       router.push('/dashboard');
-    } catch (error) {
-      const err = error as { response?: { data?: { error?: string } } };
-      alert(err.response?.data?.error || 'Email atau Kata Sandi Salah atau Server Sedang Mati!');
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const msg = error?.response?.data?.error || 'Email atau Kata Sandi salah.';
+      
+      // Hard Block: Contract expired > 30 days
+      if (status === 403 && msg.toLowerCase().includes('dibekukan')) {
+        setIsHardBlocked(true);
+      } else {
+        setErrorMsg(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -118,15 +123,53 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-400"
-            >
-              {isLoading ? 'Memproses...' : 'Masuk ke Dashboard'}
-              {!isLoading && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />}
-            </button>
+            {/* Error Message */}
+            {errorMsg && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Hard Block Banner */}
+            {isHardBlocked && (
+              <div className="rounded-xl border border-red-300 bg-red-50 p-5 text-center space-y-3">
+                <div className="flex justify-center">
+                  <div className="rounded-full bg-red-100 p-3">
+                    <AlertTriangle className="h-6 w-6 text-red-600" />
+                  </div>
+                </div>
+                <p className="font-bold text-red-800">Langganan Anda Telah Berakhir</p>
+                <p className="text-xs text-red-600 leading-relaxed">
+                  Akses akun Anda dibekukan karena periode berlangganan telah berlalu lebih dari 30 hari. Perpanjang sekarang untuk memulihkan akses.
+                </p>
+                <a
+                  href="http://localhost:5173/#renewal"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700 transition-all"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Perpanjang Langganan Sekarang
+                </a>
+              </div>
+            )}
+
+            {!isHardBlocked && (
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="group flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-400"
+              >
+                {isLoading ? 'Memproses...' : 'Masuk ke Dashboard'}
+                {!isLoading && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />}
+              </button>
+            )}
           </form>
+
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Belum punya akun?{' '}
+            <a href="http://localhost:3000/register" className="font-semibold text-blue-600 hover:text-blue-500">
+              Coba Gratis 14 Hari
+            </a>
+          </p>
         </div>
       </div>
 

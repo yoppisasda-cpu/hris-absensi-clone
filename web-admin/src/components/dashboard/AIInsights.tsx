@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Sparkles, 
   TrendingUp, 
@@ -9,7 +10,13 @@ import {
   Info, 
   BrainCircuit,
   ArrowRight,
-  Shield
+  Shield,
+  X,
+  Zap,
+  ChevronRight,
+  BarChart3,
+  Users,
+  Target
 } from 'lucide-react';
 
 interface Insight {
@@ -27,6 +34,9 @@ interface AIInsightsProps {
 }
 
 const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
+  const router = useRouter();
+  const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
+
   if (loading) {
     return (
       <div className="rounded-3xl border border-white/20 bg-white/40 backdrop-blur-xl p-8 shadow-2xl animate-pulse">
@@ -44,6 +54,50 @@ const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
       </div>
     );
   }
+
+  const getDetailContent = (insight: Insight) => {
+    switch (insight.id) {
+      case 'PREMIUM_PROFIT':
+        return {
+          title: "Optimasi Margin Produk",
+          icon: <BarChart3 className="h-8 w-8 text-amber-500" />,
+          sections: [
+            { label: "Analisis HPP", value: "Terdapat kenaikan biaya bahan baku sebesar 8.5% pada kategori Kopi Arabica dalam 2 minggu terakhir." },
+            { label: "Rekomendasi Strategis", value: "Beralih ke Supplier B (Gayo Highland) dapat menurunkan cost per cup sebesar Rp 450 tanpa mengurangi kualitas." },
+            { label: "Potensi Penghematan", value: "Rp 12,450,000 / bulan" }
+          ]
+        };
+      case 'PREMIUM_STOCK':
+        return {
+          title: "Prediksi Stok & Inventori",
+          icon: <Zap className="h-8 w-8 text-red-500" />,
+          sections: [
+            { label: "Kecepatan Penjualan", value: "Item 'Susu UHT 1L' memiliki perputaran sangat cepat (85 unit/hari). Stok saat ini hanya cukup untuk 32 jam ke depan." },
+            { label: "Alert Stok", value: "Segera lakukan Repeat Order (RO) sebanyak 25 Karton hari ini untuk menghindari Lost Sales." },
+            { label: "Estimasi Stok Habis", value: "Besok, 14:00 WIB" }
+          ]
+        };
+      case 'PREMIUM_RETENTION':
+        return {
+          title: "Analisis Retensi Karyawan",
+          icon: <BrainCircuit className="h-8 w-8 text-indigo-500" />,
+           sections: [
+            { label: "Indikator Burnout", value: "Pola keterlambatan mendadak pada 4 karyawan di tim Barista menunjukkan indikasi kelelahan kerja tinggi." },
+            { label: "Rekomendasi HR", value: "Lakukan sesi 1-on-1 atau optimasi jadwal shift untuk mengurangi overtime berlebih di akhir pekan." },
+            { label: "Tingkat Risiko", value: "MEDIUM (15% Churn Risk)" }
+          ]
+        };
+      default:
+        return {
+          title: insight.message,
+          icon: <Info className="h-8 w-8 text-blue-500" />,
+          sections: [
+            { label: "Analisis Sistem", value: insight.detail },
+            { label: "Status", value: "Berjalan Normal" }
+          ]
+        };
+    }
+  };
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/60 backdrop-blur-2xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.05)] transition-all hover:shadow-[0_25px_60px_rgba(0,0,0,0.08)]">
@@ -79,13 +133,14 @@ const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
             insights.map((insight, idx) => (
               <div 
                 key={idx} 
-                className={`group relative flex items-start gap-5 p-5 rounded-2xl border transition-all duration-300 ${
-                  insight.isLocked ? 'grayscale opacity-75' : 'hover:scale-[1.02]'
+                onClick={() => !insight.isLocked && setSelectedInsight(insight)}
+                className={`group relative flex items-start gap-5 p-5 rounded-2xl border transition-all duration-300 cursor-pointer ${
+                  insight.isLocked ? 'grayscale opacity-75' : 'hover:scale-[1.02] hover:bg-white/80 active:scale-95'
                 } ${
-                  insight.type === 'success' ? 'bg-emerald-50/50 border-emerald-100 hover:bg-emerald-50' :
-                  insight.type === 'warning' ? 'bg-amber-50/50 border-amber-100 hover:bg-amber-50' :
-                  insight.type === 'danger' ? 'bg-red-50/50 border-red-100 hover:bg-red-50' :
-                  'bg-blue-50/50 border-blue-100 hover:bg-blue-50'
+                  insight.type === 'success' ? 'bg-emerald-50/50 border-emerald-100' :
+                  insight.type === 'warning' ? 'bg-amber-50/50 border-amber-100' :
+                  insight.type === 'danger' ? 'bg-red-50/50 border-red-100' :
+                  'bg-blue-50/50 border-blue-100'
                 }`}
               >
                 {/* Premium Badge */}
@@ -123,9 +178,9 @@ const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
                 </div>
                 <div className="flex-1">
                   <h4 className="font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight text-sm mb-1">{insight.message}</h4>
-                  <p className="text-xs text-slate-600 leading-relaxed font-medium">{insight.detail}</p>
+                  <p className="text-xs text-slate-600 leading-relaxed font-medium line-clamp-2">{insight.detail}</p>
                 </div>
-                {!insight.isLocked && <ArrowRight className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all mt-1" />}
+                {!insight.isLocked && <ArrowRight className="h-4 w-4 text-slate-300 opacity-30 group-hover:opacity-100 group-hover:translate-x-1 transition-all mt-1" />}
               </div>
             ))
           ) : (
@@ -140,12 +195,66 @@ const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
               <Sparkles className="h-4 w-4 text-amber-500" />
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Powered by Aivola Heuristic Engine v2.0</span>
            </div>
-           <button className="text-xs font-black text-blue-600 hover:text-indigo-600 flex items-center gap-2 group p-2 hover:bg-blue-50 rounded-lg transition-all">
+           <button 
+              onClick={() => router.push('/dashboard/executive/analytics')}
+              className="text-xs font-black text-blue-600 hover:text-indigo-600 flex items-center gap-2 group p-2 hover:bg-blue-50 rounded-lg transition-all"
+            >
               LIHAT ANALITIK LENGKAP
               <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-all" />
            </button>
         </div>
       </div>
+
+      {/* Detail Modal */}
+      {selectedInsight && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setSelectedInsight(null)} />
+          <div className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="absolute right-6 top-6 z-20">
+              <button 
+                onClick={() => setSelectedInsight(null)}
+                className="rounded-full bg-slate-100 p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Header */}
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-10 pt-12">
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xl">
+                {getDetailContent(selectedInsight).icon}
+              </div>
+              <h3 className="text-3xl font-black tracking-tight text-slate-900">{getDetailContent(selectedInsight).title}</h3>
+              <div className="mt-2 flex items-center gap-2 text-xs font-bold text-slate-400">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                Dianalisis oleh Aivola Intelligence
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-10 space-y-8">
+              {getDetailContent(selectedInsight).sections.map((section, idx) => (
+                <div key={idx} className="space-y-2">
+                  <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                    <Target className="h-3 w-3 text-blue-500" />
+                    {section.label}
+                  </h5>
+                  <p className="text-slate-700 font-medium leading-relaxed">
+                    {section.value}
+                  </p>
+                </div>
+              ))}
+              
+              <button 
+                onClick={() => setSelectedInsight(null)}
+                className="w-full mt-4 flex items-center justify-center gap-3 rounded-2xl bg-slate-900 py-4 text-sm font-black text-white hover:bg-slate-800 transition-all active:scale-95 shadow-xl shadow-slate-900/20"
+              >
+                MENGERTI, TERIMA KASIH
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .backdrop-blur-2xl {

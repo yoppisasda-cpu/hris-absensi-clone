@@ -20,7 +20,8 @@ function App() {
           <a href="#solutions">Solusi</a>
           <a href="#pricing">Harga</a>
           <a href="#about">Tentang</a>
-          <a href="https://admin.aivola.id" className="btn-login">Login Admin</a>
+          <a href="#renewal" style={{ color: '#f59e0b', fontWeight: '700' }}>🔄 Perpanjang</a>
+          <a href="http://localhost:3000" className="btn-login">Login Admin</a>
         </div>
       </nav>
 
@@ -37,7 +38,7 @@ function App() {
               Didesain untuk membantu bisnis Anda tumbuh lebih cepat.
             </p>
             <div className="cta-group">
-              <button className="btn-primary">Coba Gratis 14 Hari</button>
+              <a href="http://localhost:3000/register" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Coba Gratis 14 Hari</a>
               <button className="btn-secondary" onClick={() => setIsVideoOpen(true)}>Lihat Demo</button>
             </div>
           </div>
@@ -89,6 +90,7 @@ function App() {
         </section>
         
         <PricingSection />
+        <RenewalSection />
       </main>
 
       {isVideoOpen && <VideoModal onClose={() => setIsVideoOpen(false)} />}
@@ -268,70 +270,271 @@ function AboutSection() {
 }
 
 function PricingSection() {
-  const plans = [
+  const [isYearly, setIsYearly] = useState(true);
+
+  const corePrice = isYearly ? 'Rp 7.000' : 'Rp 9.000';
+  const corePeriod = '/karyawan/bulan';
+  const yearlyNote = isYearly ? '(Dibayar tahunan)' : '(Dibayar bulanan)';
+
+  const featureCategories = [
     {
-      name: 'Starter',
-      price: 'Rp 25.000',
-      period: '/karyawan/bulan',
-      desc: 'Cocok untuk UKM yang baru mulai mendigitalkan HR.',
-      features: ['Absensi GPS & Selfie', 'Manajemen Cuti & Izin', 'Database Karyawan', 'Slip Gaji Digital'],
-      btnText: 'Mulai Sekarang',
-      highlight: false
+      title: 'Kehadiran & Jadwal',
+      icon: '🕐',
+      color: '#3b82f6',
+      items: ['Absensi Wajah & GPS', 'Manajemen Cuti & Izin', 'Manajemen Shift', 'Lembur dengan Approval']
     },
     {
-      name: 'Professional',
-      price: 'Rp 45.000',
-      period: '/karyawan/bulan',
-      desc: 'Solusi lengkap untuk perusahaan yang sedang berkembang.',
-      features: ['Semua Fitur Starter', 'Hitung Payroll & Pajak', 'Manajemen Shift & Lembur', 'KPI & Performance Appraisal', 'Prioritas Support'],
-      btnText: 'Paling Populer',
-      highlight: true
+      title: 'Penggajian & Keuangan',
+      icon: '💰',
+      color: '#10b981',
+      items: ['Hitung Payroll Otomatis', 'Slip Gaji Digital', 'Bonus & THR', 'Reimbursement', 'Pinjaman Karyawan']
     },
     {
-      name: 'Enterprise',
-      price: 'Custom',
-      period: '',
-      desc: 'Fitur kustom dan integrasi mendalam untuk korporasi besar.',
-      features: ['Semua Fitur Professional', 'White-label Mobile App', 'Dedicated Account Manager', 'Integrasi API Kustom', 'SLA 99.9%'],
-      btnText: 'Hubungi Sales',
-      highlight: false
+      title: 'Data & Aset SDM',
+      icon: '👥',
+      color: '#8b5cf6',
+      items: ['Database Karyawan Aman', 'Kelola Aset Perusahaan', 'Hari Libur & Kalender']
+    },
+    {
+      title: 'Organisasi',
+      icon: '🏢',
+      color: '#f59e0b',
+      items: ['Multi Cabang', 'Pengumuman Perusahaan']
+    },
+    {
+      title: 'Engagement',
+      icon: '💬',
+      color: '#ec4899',
+      items: ['Pulse of Company']
     }
+  ];
+
+  const hrAddons = [
+    { name: 'KPI Management', price: 'Rp 1.500', icon: '📊', desc: 'Pantau performa tim dengan KPI terukur & dashboard real-time.', color: '#3b82f6' },
+    { name: 'Learning & Development', price: 'Rp 2.000', icon: '🎓', desc: 'Pusat pelatihan, modul belajar mandiri & sertifikasi internal.', color: '#8b5cf6' },
+    { name: 'Performance Bundle', price: 'Rp 3.000', icon: '🚀', desc: 'KPI + Learning & Development dalam satu paket hemat.', highlight: true, color: '#ec4899' }
   ];
 
   return (
     <section id="pricing" className="pricing-section">
+      <div className="pricing-glow-orb pricing-glow-1"></div>
+      <div className="pricing-glow-orb pricing-glow-2"></div>
+
       <div className="section-header">
-        <div className="hero-badge">Daftar Harga</div>
-        <h2>Pilih Paket yang Sesuai untuk Anda</h2>
-        <p>Investasi cerdas untuk efisiensi dan transparansi operasional tim Anda.</p>
+        <div className="hero-badge">💎 Daftar Harga HR</div>
+        <h2>Satu Paket. Semua Fitur HR.</h2>
+        <p>Tidak ada biaya tersembunyi. Tidak ada fitur terkunci. Semua sudah termasuk.</p>
       </div>
 
-      <div className="pricing-grid">
-        {plans.map((plan, i) => (
-          <div key={i} className={`pricing-card ${plan.highlight ? 'highlighted' : ''}`}>
-            {plan.highlight && <div className="card-badge">Terpopuler</div>}
-            <h3>{plan.name}</h3>
-            <div className="price-box">
-              <span className="price">{plan.price}</span>
-              <span className="period">{plan.period}</span>
-            </div>
-            <p className="plan-desc">{plan.desc}</p>
-            <ul className="plan-features">
-              {plan.features.map((f, j) => (
-                <li key={j}><span className="check">✓</span> {f}</li>
-              ))}
-            </ul>
-            <button className={`btn-plan ${plan.highlight ? 'btn-primary' : 'btn-secondary'}`}>
-              {plan.btnText}
-            </button>
+      <div className="pricing-toggle-wrapper">
+        <span className={!isYearly ? 'active' : ''}>Bulanan</span>
+        <button 
+          className={`pricing-toggle ${isYearly ? 'yearly' : 'monthly'}`}
+          onClick={() => setIsYearly(!isYearly)}
+          aria-label="Toggle billing period"
+        >
+          <div className="toggle-ball"></div>
+        </button>
+        <span className={isYearly ? 'active' : ''}>Tahunan <span className="save-badge">Hemat ~22%</span></span>
+      </div>
+
+      <div className="single-pricing-container">
+        <div className="pricing-card main-hr-card">
+          <div className="hr-card-glow"></div>
+          <div className="card-badge">✨ All-in-One</div>
+          <h3>Aivola HR Core</h3>
+          <div className="price-box">
+            <span className="price">{corePrice}</span>
+            <span className="period">{corePeriod}</span>
           </div>
-        ))}
+          <p className="plan-desc">{yearlyNote}</p>
+
+          <div className="feature-categories">
+            {featureCategories.map((cat, i) => (
+              <div key={i} className="feature-category">
+                <div className="category-header">
+                  <span className="category-icon" style={{ background: `${cat.color}20`, color: cat.color }}>{cat.icon}</span>
+                  <h4 style={{ color: cat.color }}>{cat.title}</h4>
+                </div>
+                <ul className="category-features">
+                  {cat.items.map((item, j) => (
+                    <li key={j}><span className="check-icon" style={{ color: cat.color }}>✓</span>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="total-features-count">
+            <span>15+ fitur</span> dalam satu paket sederhana
+          </div>
+          
+            <a href="http://localhost:3000/register" className="btn-plan btn-primary btn-glow" style={{ textDecoration: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <span>🚀</span> Mulai 14 Hari Gratis
+            </a>
+          <p className="no-cc">Tanpa kartu kredit. Batalkan kapan saja.</p>
+        </div>
+      </div>
+
+      <div className="addons-container">
+        <div className="section-header">
+          <div className="hero-badge">⚡ Power-ups</div>
+          <h2>Tambah Kemampuan Tim Anda</h2>
+          <p>Add-on per karyawan untuk fitur spesialis.</p>
+        </div>
+        <div className="addons-grid">
+          {hrAddons.map((addon, i) => (
+            <div key={i} className={`addon-card ${addon.highlight ? 'highlight' : ''}`}>
+              {addon.highlight && <div className="addon-badge">Best Value</div>}
+              <div className="addon-icon" style={{ background: `${addon.color}15`, color: addon.color }}>{addon.icon}</div>
+              <h4>{addon.name}</h4>
+              <div className="addon-price">{addon.price}<span>/karyawan/bln</span></div>
+              <p>{addon.desc}</p>
+              {addon.highlight && <div className="addon-savings">Hemat Rp 500 vs terpisah</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <div className="promo-banner">
+        <div className="promo-content">
+          <div className="promo-icon-wrapper">
+            <span className="early-bird-icon">🎁</span>
+          </div>
+          <div className="promo-text">
+            <strong>Promo Early Adopter!</strong>
+            <p>Dapatkan tambahan storage 10GB dan sesi konsultasi HR gratis untuk pendaftaran paket tahunan minggu ini!</p>
+          </div>
+          <button className="btn-promo">Klaim Promo</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RenewalSection() {
+  const WA_NUMBER = '6287882716935';
+  const plans = [
+    {
+      name: 'Bulanan',
+      price: 'Rp 9.000',
+      unit: '/karyawan/bulan',
+      desc: 'Fleksibel, bayar bulan ke bulan.',
+      color: '#2563eb',
+      waText: 'Halo Admin Aivola, saya ingin perpanjang/berlangganan Paket HR Bulanan @Rp 9.000/karyawan.',
+    },
+    {
+      name: 'Tahunan',
+      price: 'Rp 7.000',
+      unit: '/karyawan/bulan',
+      desc: 'Hemat Rp 2.000/karyawan vs bulanan. Tagih sekali setahun.',
+      color: '#059669',
+      badge: 'BEST VALUE',
+      waText: 'Halo Admin Aivola, saya ingin perpanjang/berlangganan Paket HR Tahunan @Rp 7.000/karyawan.',
+    },
+  ];
+
+  return (
+    <section id="renewal" style={{
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+      padding: '80px 0',
+    }}>
+      <div className="container" style={{ maxWidth: '900px', margin: '0 auto', padding: '0 24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '8px',
+            background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)',
+            borderRadius: '100px', padding: '6px 20px', marginBottom: '16px',
+            color: '#fbbf24', fontSize: '13px', fontWeight: '700',
+          }}>
+            🔄 Perpanjang / Upgrade Langganan
+          </div>
+          <h2 style={{ color: 'white', fontSize: '36px', fontWeight: '800', margin: '0 0 12px' }}>
+            Pulihkan Akses Akun Anda
+          </h2>
+          <p style={{ color: '#94a3b8', fontSize: '16px', maxWidth: '540px', margin: '0 auto', lineHeight: '1.6' }}>
+            Jika langganan Anda habis, pilih paket di bawah dan hubungi kami via WhatsApp.
+            Tim kami akan reaktivasi akun Anda dalam hitungan menit.
+          </p>
+        </div>
+
+        {/* Renewal Plans */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '48px' }}>
+          {plans.map((plan) => (
+            <div key={plan.name} style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: `2px solid ${plan.badge ? '#f59e0b' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: '20px',
+              padding: '32px',
+              position: 'relative',
+              backdropFilter: 'blur(10px)',
+            }}>
+              {plan.badge && (
+                <div style={{
+                  position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)',
+                  background: '#f59e0b', color: 'white', fontSize: '11px', fontWeight: '800',
+                  padding: '4px 16px', borderRadius: '100px', whiteSpace: 'nowrap',
+                }}>
+                  {plan.badge}
+                </div>
+              )}
+              <h3 style={{ color: 'white', fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>
+                Paket {plan.name}
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '8px' }}>
+                <span style={{ color: 'white', fontSize: '40px', fontWeight: '900' }}>{plan.price}</span>
+                <span style={{ color: '#94a3b8', fontSize: '13px' }}>{plan.unit}</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '28px' }}>{plan.desc}</p>
+              <a
+                href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(plan.waText)}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  width: '100%', background: plan.badge ? '#f59e0b' : plan.color,
+                  color: 'white', borderRadius: '12px', padding: '14px', fontWeight: '700', fontSize: '14px',
+                  textDecoration: 'none', transition: 'opacity 0.2s',
+                  boxSizing: 'border-box',
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.opacity = '0.85')}
+                onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+              >
+                💬 Perpanjang via WhatsApp
+              </a>
+            </div>
+          ))}
+        </div>
+
+        {/* Process Steps */}
+        <div style={{
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '20px', padding: '32px',
+        }}>
+          <h3 style={{ color: 'white', fontWeight: '700', textAlign: 'center', marginBottom: '28px', fontSize: '18px' }}>
+            Cara Perpanjang — 3 Langkah Mudah
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+            {[
+              { step: '1', icon: '💬', title: 'Chat WhatsApp', desc: 'Klik tombol di atas, pilih paket, dan kirim pesan ke tim kami.' },
+              { step: '2', icon: '💳', title: 'Proses Pembayaran', desc: 'Kami kirimkan invoice dan instruksi transfer yang jelas.' },
+              { step: '3', icon: '✅', title: 'Akses Pulih', desc: 'Konfirmasi pembayaran → akun Anda aktif kembali dalam menit.' },
+            ].map((s) => (
+              <div key={s.step} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>{s.icon}</div>
+                <p style={{ color: 'white', fontWeight: '700', marginBottom: '6px', fontSize: '15px' }}>{s.title}</p>
+                <p style={{ color: '#64748b', fontSize: '13px', lineHeight: '1.5' }}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
 function Footer() {
+
   return (
     <footer className="footer">
       <div className="container footer-grid">

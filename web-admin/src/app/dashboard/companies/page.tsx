@@ -14,12 +14,13 @@ interface Company {
     radius: number | null;
     picName: string | null;
     picPhone: string | null;
-    contractType: 'LUMSUM' | 'SATUAN';
+    contractType: 'BULANAN' | 'TAHUNAN';
     contractValue: number;
     contractStart: string | null;
     contractEnd: string | null;
     employeeLimit: number;
     photoRetentionDays?: number;
+    purchasedInsights?: string[];
 }
 
 export default function CompaniesPage() {
@@ -51,12 +52,16 @@ export default function CompaniesPage() {
     // contract states
     const [picName, setPicName] = useState('');
     const [picPhone, setPicPhone] = useState('');
-    const [contractType, setContractType] = useState('LUMSUM');
+    const [contractType, setContractType] = useState('BULANAN');
     const [contractValue, setContractValue] = useState('0');
     const [contractStart, setContractStart] = useState('');
     const [contractEnd, setContractEnd] = useState('');
     const [employeeLimit, setEmployeeLimit] = useState('0');
     const [photoRetentionDays, setPhotoRetentionDays] = useState('30');
+
+    // Add-on states
+    const [addonKpi, setAddonKpi] = useState(false);
+    const [addonLearning, setAddonLearning] = useState(false);
 
     // Admin Account States
     const [adminName, setAdminName] = useState('');
@@ -88,12 +93,14 @@ export default function CompaniesPage() {
         setRadius('100');
         setPicName('');
         setPicPhone('');
-        setContractType('LUMSUM');
+        setContractType('BULANAN');
         setContractValue('0');
         setContractStart('');
         setContractEnd('');
         setEmployeeLimit('0');
         setPhotoRetentionDays('30');
+        setAddonKpi(false);
+        setAddonLearning(false);
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
@@ -104,6 +111,16 @@ export default function CompaniesPage() {
         setIsLoading(true);
 
         try {
+            const buildInsights = () => {
+                const insights: string[] = [];
+                if (addonKpi && addonLearning) { insights.push('KPI_LEARNING'); }
+                else {
+                    if (addonKpi) insights.push('KPI');
+                    if (addonLearning) insights.push('LEARNING');
+                }
+                return insights;
+            };
+
             const payload = {
                 name,
                 latitude,
@@ -117,6 +134,7 @@ export default function CompaniesPage() {
                 contractEnd: contractEnd || null,
                 employeeLimit,
                 photoRetentionDays,
+                purchasedInsights: buildInsights(),
                 ...(editingCompanyId ? {} : { adminName, adminEmail, adminPassword })
             };
 
@@ -156,12 +174,14 @@ export default function CompaniesPage() {
         setContractEnd(company.contractEnd ? new Date(company.contractEnd).toISOString().split('T')[0] : '');
         setEmployeeLimit(company.employeeLimit?.toString() || '0');
         setPhotoRetentionDays(company.photoRetentionDays?.toString() || '30');
-        // Kosongkan admin fields karena tidak diedit di sini
+        // Set add-on checkboxes
+        const insights = company.purchasedInsights || [];
+        setAddonKpi(insights.includes('KPI') || insights.includes('KPI_LEARNING'));
+        setAddonLearning(insights.includes('LEARNING') || insights.includes('KPI_LEARNING'));
+        // Kosongkan admin fields
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
-
-        // Scroll ke form
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -250,8 +270,8 @@ export default function CompaniesPage() {
                                         onChange={(e) => setContractType(e.target.value)}
                                         className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     >
-                                        <option value="LUMSUM">Lumsum</option>
-                                        <option value="SATUAN">Satuan</option>
+                                        <option value="BULANAN">Bulanan</option>
+                                        <option value="TAHUNAN">Tahunan</option>
                                     </select>
                                 </div>
                                 <div>
@@ -310,6 +330,47 @@ export default function CompaniesPage() {
                                 </div>
                                 <p className="mt-1 text-[10px] text-slate-400 italic">Foto akan otomatis dihapus setelah jumlah hari ini.</p>
                             </div>
+                        </div>
+
+                        {/* === ADD-ON: KPI & LEARNING === */}
+                        <div className="space-y-3 border-b border-slate-50 pb-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Add-On Aktif</h3>
+                            <p className="text-[10px] text-slate-400 italic">Centang fitur tambahan yang sudah dibeli klien.</p>
+                            <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-all">
+                                <input
+                                    type="checkbox"
+                                    checked={addonKpi}
+                                    onChange={(e) => setAddonKpi(e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded accent-indigo-600"
+                                />
+                                <div>
+                                    <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                                        🎯 KPI & Penilaian Kinerja
+                                        <span className="text-[9px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded">Rp 1.500/karyawan</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 mt-0.5">Fitur pembuatan KPI, penilaian, dan laporan performa.</div>
+                                </div>
+                            </label>
+                            <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-sky-50 hover:border-sky-300 transition-all">
+                                <input
+                                    type="checkbox"
+                                    checked={addonLearning}
+                                    onChange={(e) => setAddonLearning(e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded accent-sky-600"
+                                />
+                                <div>
+                                    <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                                        📚 Learning & Development
+                                        <span className="text-[9px] bg-sky-100 text-sky-700 font-bold px-1.5 py-0.5 rounded">Rp 2.000/karyawan</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 mt-0.5">Modul pelatihan, ujian online, dan tracking kompetensi.</div>
+                                </div>
+                            </label>
+                            {addonKpi && addonLearning && (
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                    🚀 Bundle aktif — ditagih Rp 3.000/karyawan (hemat Rp 500)
+                                </div>
+                            )}
                         </div>
 
                         {!editingCompanyId && (
@@ -424,6 +485,7 @@ export default function CompaniesPage() {
                                     <th className="px-4 py-3 border-b text-center">Status Kontrak</th>
                                     <th className="px-4 py-3 border-b text-right">Nilai Kontrak</th>
                                     <th className="px-4 py-3 border-b text-center">Limit</th>
+                                    <th className="px-4 py-3 border-b text-center">Add-On</th>
                                     <th className="px-4 py-3 border-b text-right">Aksi</th>
                                     <th className="px-4 py-3 border-b">GPS / Radius</th>
                                 </tr>
@@ -448,9 +510,9 @@ export default function CompaniesPage() {
                                             </td>
                                             <td className="px-4 py-4 border-b border-slate-100 text-center">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                                    company.contractType === 'LUMSUM' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
+                                                    company.contractType === 'BULANAN' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
                                                 }`}>
-                                                    {company.contractType}
+                                                    {company.contractType === 'BULANAN' ? 'Bulanan' : 'Tahunan'}
                                                 </span>
                                                 <div className="text-[10px] text-slate-400 mt-1 italic flex flex-col gap-1 items-center">
                                                     <span>
@@ -473,6 +535,29 @@ export default function CompaniesPage() {
                                             <td className="px-4 py-4 border-b border-slate-100 text-center">
                                                 <div className="text-xs font-bold text-slate-800">{company.employeeLimit || '∞'}</div>
                                                 <div className="text-[10px] text-slate-400">User</div>
+                                            </td>
+                                            <td className="px-4 py-4 border-b border-slate-100 text-center">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {(() => {
+                                                        const insights = company.purchasedInsights || [];
+                                                        const hasKpi = insights.includes('KPI') || insights.includes('KPI_LEARNING');
+                                                        const hasLearning = insights.includes('LEARNING') || insights.includes('KPI_LEARNING');
+                                                        return (
+                                                            <>
+                                                                {hasKpi ? (
+                                                                    <span className="text-[9px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">🎯 KPI</span>
+                                                                ) : (
+                                                                    <span className="text-[9px] text-slate-300 px-2 py-0.5 rounded-full border border-dashed border-slate-200">🎯 KPI</span>
+                                                                )}
+                                                                {hasLearning ? (
+                                                                    <span className="text-[9px] font-bold bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">📚 Learning</span>
+                                                                ) : (
+                                                                    <span className="text-[9px] text-slate-300 px-2 py-0.5 rounded-full border border-dashed border-slate-200">📚 Learning</span>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-4 border-b border-slate-100 text-right">
                                                 <div className="flex items-center justify-end gap-1">

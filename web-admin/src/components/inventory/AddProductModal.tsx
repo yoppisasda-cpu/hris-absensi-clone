@@ -9,43 +9,68 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     const [formData, setFormData] = useState({
         name: "",
         sku: "",
+        categoryId: "",
         unit: "Pcs",
         description: "",
         minStock: 5,
         price: 0,
         costPrice: 0,
         warehouseId: "",
-        stock: 0
+        stock: 0,
+        showInPos: true,
+        type: "FINISHED_GOOD",
+        trackStock: true,
+        priceGofood: 0,
+        priceGrabfood: 0,
+        priceShopeefood: 0
     });
     const [warehouses, setWarehouses] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
     const [hasRecipe, setHasRecipe] = useState(false);
     const [recipeItems, setRecipeItems] = useState<any[]>([]);
     const [productList, setProductList] = useState<any[]>([]);
+    const [customizations, setCustomizations] = useState<any[]>([]);
+    const [selectedCustomizations, setSelectedCustomizations] = useState<number[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             fetchProducts();
             fetchWarehouses();
+            fetchCategories();
+            fetchCustomizations();
             if (product) {
                 setFormData({
                     name: product.name || "",
                     sku: product.sku || "",
+                    categoryId: product.categoryId?.toString() || "",
                     unit: product.unit || "Pcs",
                     description: product.description || "",
                     minStock: product.minStock || 0,
                     price: product.price || 0,
                     costPrice: product.costPrice || 0,
                     warehouseId: "",
-                    stock: product.stock || 0
+                    stock: product.stock || 0,
+                    showInPos: product.showInPos !== undefined ? product.showInPos : true,
+                    type: product.type || "FINISHED_GOOD",
+                    trackStock: product.trackStock !== undefined ? product.trackStock : true,
+                    priceGofood: product.priceGofood || 0,
+                    priceGrabfood: product.priceGrabfood || 0,
+                    priceShopeefood: product.priceShopeefood || 0
                 });
                 fetchRecipe(product.id);
+                if (product.customizations) {
+                    setSelectedCustomizations(product.customizations.map((c: any) => c.groupId));
+                } else {
+                    setSelectedCustomizations([]);
+                }
             } else {
                 setFormData({
-                    name: "", sku: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: "", stock: 0
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
+                setSelectedCustomizations([]);
             }
         }
     }, [isOpen, product]);
@@ -62,6 +87,24 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             }
         } catch (error) {
             console.error("Gagal mengambil resep", error);
+        }
+    };
+
+    const fetchCategories = async () => {
+        try {
+            const res = await api.get('/pos/categories');
+            setCategories(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil kategori", error);
+        }
+    };
+
+    const fetchCustomizations = async () => {
+        try {
+            const res = await api.get('/pos/customizations');
+            setCustomizations(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil add-ons", error);
         }
     };
 
@@ -117,11 +160,14 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 await api.post(`/inventory/products/${productId}/recipe`, { items: recipeItems });
             }
 
+            await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
+
             setFormData({
-                name: "", sku: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0
             });
             setHasRecipe(false);
             setRecipeItems([]);
+            setSelectedCustomizations([]);
             onSuccess();
             onClose();
             toast.success(product ? "Produk diperbarui" : "Produk ditambahkan");
@@ -205,36 +251,189 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     <option value="Gram">Gram</option>
                                     <option value="Liter">Liter</option>
                                     <option value="Pack">Pack</option>
+                                    <option value="ml">ml</option>
                                 </select>
                             </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Tipe Produk</label>
+                                <select
+                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-orange-500 focus:bg-white focus:outline-none transition-all appearance-none cursor-pointer text-blue-600 italic"
+                                    value={formData.type}
+                                    onChange={(e) => {
+                                        const newType = e.target.value;
+                                        const updates: any = { type: newType };
+                                        if (newType === 'RAW_MATERIAL') {
+                                            updates.showInPos = false;
+                                            updates.price = 0;
+                                        }
+                                        setFormData({ ...formData, ...updates });
+                                    }}
+                                >
+                                    <option value="FINISHED_GOOD">Produk Jadi / Menu</option>
+                                    <option value="WIP">Setengah Jadi (WIP)</option>
+                                    <option value="RAW_MATERIAL">Bahan Baku</option>
+                                </select>
+                            </div>
+                            <div className="flex items-end pb-1 border-b border-slate-100 sm:border-none">
+                                <label className={`flex items-center gap-3 cursor-pointer group w-full py-2 ${formData.type === 'RAW_MATERIAL' ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    <div className="relative">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only peer"
+                                            checked={formData.showInPos}
+                                            disabled={formData.type === 'RAW_MATERIAL'}
+                                            onChange={(e) => setFormData({ ...formData, showInPos: e.target.checked })}
+                                        />
+                                        <div className="w-10 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest group-hover:text-orange-600 transition-colors">Tampilkan di POS</span>
+                                </label>
+                            </div>
+                            <div className="flex items-end pb-1 border-b border-slate-100 sm:border-none">
+                                <label className="flex items-center gap-3 cursor-pointer group w-full py-2">
+                                    <div className="relative">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only peer"
+                                            checked={formData.trackStock}
+                                            onChange={(e) => setFormData({ ...formData, trackStock: e.target.checked })}
+                                        />
+                                        <div className="w-10 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest group-hover:text-blue-600 transition-colors">Cek Stok di POS</span>
+                                </label>
+                            </div>
+                            {formData.showInPos && formData.type !== 'RAW_MATERIAL' && (
+                                <div className="col-span-2 mt-4 bg-orange-50/50 p-4 rounded-xl border border-orange-100">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Tersedia Kustomisasi (Add-ons)</h4>
+                                        <a href="/dashboard/pos/customizations" target="_blank" className="text-[10px] font-black uppercase text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-1">
+                                            + Tambah Baru
+                                        </a>
+                                    </div>
+                                    {customizations.length > 0 ? (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                            {customizations.map(c => (
+                                                <label key={c.id} className="flex items-center gap-2 cursor-pointer bg-white border border-slate-200 p-2 rounded-lg hover:border-orange-300">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500"
+                                                        checked={selectedCustomizations.includes(c.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setSelectedCustomizations([...selectedCustomizations, c.id]);
+                                                            else setSelectedCustomizations(selectedCustomizations.filter(id => id !== c.id));
+                                                        }}
+                                                    />
+                                                    <span className="text-xs font-bold text-slate-700">{c.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 bg-white rounded-lg border border-dashed border-orange-200 text-center">
+                                            <p className="text-[11px] font-bold text-slate-400 italic mb-1">Belum ada Add-ons yang tersimpan.</p>
+                                            <a href="/dashboard/pos/customizations" target="_blank" className="text-[10px] font-black uppercase text-orange-600 hover:underline">
+                                                ➔ Buat Add-ons Baru di sini
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {formData.type !== 'RAW_MATERIAL' && (
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Kategori POS</label>
+                                    <select
+                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-orange-500 focus:bg-white focus:outline-none transition-all appearance-none cursor-pointer text-orange-600"
+                                        value={formData.categoryId}
+                                        onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                                    >
+                                        <option value="">-- Tanpa Kategori --</option>
+                                        {categories.map((c) => (
+                                            <option key={c.id} value={c.id.toString()}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Harga Jual (Rp)</label>
-                                <input
-                                    type="number"
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-orange-500 focus:bg-white focus:outline-none transition-all text-blue-600"
-                                    value={isNaN(formData.price) ? "" : formData.price}
-                                    onChange={(e) => {
-                                        const val = parseFloat(e.target.value);
-                                        setFormData({ ...formData, price: isNaN(val) ? 0 : val });
-                                    }}
-                                />
-                            </div>
+                            {formData.type !== 'RAW_MATERIAL' ? (
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Harga Jual (Rp)</label>
+                                    <input
+                                        type="number"
+                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-orange-500 focus:bg-white focus:outline-none transition-all text-blue-600"
+                                        value={formData.price || ""}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setFormData({ ...formData, price: val === "" ? 0 : parseFloat(val) });
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="invisible"></div>
+                            )}
                             <div>
                                 <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Stok Aman (Alert)</label>
                                 <input
                                     type="number"
                                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-orange-500 focus:bg-white focus:outline-none transition-all text-red-600"
-                                    value={isNaN(formData.minStock) ? "" : formData.minStock}
+                                    value={formData.minStock || ""}
                                     onChange={(e) => {
-                                        const val = parseFloat(e.target.value);
-                                        setFormData({ ...formData, minStock: isNaN(val) ? 0 : val });
+                                        const val = e.target.value;
+                                        setFormData({ ...formData, minStock: val === "" ? 0 : parseFloat(val) });
                                     }}
                                 />
                             </div>
                         </div>
+
+                        {/* Marketplace Prices Section */}
+                        {formData.showInPos && formData.type !== 'RAW_MATERIAL' && (
+                            <div className="bg-blue-50 -mx-8 px-8 py-6 border-y border-blue-100 italic">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Tag className="h-5 w-5 text-blue-600" />
+                                    <h3 className="text-sm font-black uppercase text-slate-700 tracking-tight">Harga Marketplace (Online)</h3>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">GoFood (Rp)</label>
+                                        <input
+                                            type="number"
+                                            className="w-full rounded-xl border border-slate-200 bg-white py-3 px-4 text-sm font-bold focus:border-blue-500 focus:outline-none transition-all text-blue-600"
+                                            value={formData.priceGofood || ""}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, priceGofood: val === "" ? 0 : parseFloat(val) });
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">GrabFood (Rp)</label>
+                                        <input
+                                            type="number"
+                                            className="w-full rounded-xl border border-slate-200 bg-white py-3 px-4 text-sm font-bold focus:border-blue-500 focus:outline-none transition-all text-blue-600"
+                                            value={formData.priceGrabfood || ""}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, priceGrabfood: val === "" ? 0 : parseFloat(val) });
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">ShopeeFood (Rp)</label>
+                                        <input
+                                            type="number"
+                                            className="w-full rounded-xl border border-slate-200 bg-white py-3 px-4 text-sm font-bold focus:border-blue-500 focus:outline-none transition-all text-blue-600"
+                                            value={formData.priceShopeefood || ""}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, priceShopeefood: val === "" ? 0 : parseFloat(val) });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <p className="mt-3 text-[9px] text-blue-400 font-bold uppercase tracking-tight">* Kosongkan atau isi 0 jika ingin menggunakan harga dasar (Walk-in).</p>
+                            </div>
+                        )}
 
                         {/* Section 2: Initial Stock (Only for NEW Product) */}
                         {!product && (
@@ -264,7 +463,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                             type="number"
                                             className="w-full rounded-xl border border-slate-200 bg-white py-3 px-4 text-sm font-bold focus:border-orange-500 focus:outline-none transition-all"
                                             value={formData.stock || ""}
-                                            onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) || 0 })}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, stock: val === "" ? 0 : parseFloat(val) || 0 });
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -276,7 +478,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <ChefHat className="h-5 w-5 text-indigo-600" />
-                                    <h3 className="text-sm font-black uppercase text-slate-700 tracking-tight">Bill of Materials (Resep Baut)</h3>
+                                    <h3 className="text-sm font-black uppercase text-slate-700 tracking-tight">Bill of Materials</h3>
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input 

@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   // Ganti localhost dengan IP lokal komputer Anda jika dio run di real-device/emulator
   // Emulator Android = 10.0.2.2 || Real Device = IP LAN (192.168.x.x)
-  static const String baseUrl = 'http://10.0.2.2:5000/api';
+  static const String baseUrl = 'http://localhost:5000/api';
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   ApiService() {
@@ -560,6 +560,177 @@ class ApiService {
       return response.data as Map<String, dynamic>;
     } catch (e) {
       throw Exception('Gagal mengirim jawaban ujian.');
+    }
+  }
+
+  // --- FASE POS: POINT OF SALE (KASIR) ---
+
+  // Tarik daftar produk untuk POS
+  Future<List<dynamic>> getPosProducts() async {
+    try {
+      final response = await _dio.get('/pos/products');
+      return response.data as List<dynamic>;
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar produk POS.');
+    }
+  }
+
+  // Ambil daftar kategori produk untuk POS
+  Future<List<dynamic>> getPosCategories() async {
+    try {
+      final response = await _dio.get('/pos/categories');
+      return response.data as List<dynamic>;
+    } catch (e) {
+      throw Exception('Gagal mengambil kategori produk.');
+    }
+  }
+
+  // Cari pelanggan berdasarkan nama/hp (Autocomplete)
+  Future<List<dynamic>> searchCustomers(String query) async {
+    try {
+      final response = await _dio.get('/pos/customers', queryParameters: {'q': query});
+      return response.data as List<dynamic>;
+    } catch (e) {
+      print('Error searching customers: $e');
+      return [];
+    }
+  }
+
+  // Tarik daftar akun keuangan (untuk metode pembayaran)
+  Future<List<dynamic>> getFinancialAccounts() async {
+    try {
+      final response = await _dio.get('/finance/accounts');
+      return response.data as List<dynamic>;
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar akun keuangan.');
+    }
+  }
+
+  // Proses transaksi checkout POS
+  Future<Map<String, dynamic>> checkoutPos({
+    required List<Map<String, dynamic>> items,
+    required int accountId,
+    required double totalAmount,
+    int? customerId,
+    String? customerName,
+    String? customerPhone,
+    String? notes,
+    String saleType = 'WALK_IN',
+    double serviceFee = 0,
+    double markupPercentage = 0,
+  }) async {
+    try {
+      final response = await _dio.post('/pos/checkout', data: {
+        'items': items,
+        'accountId': accountId,
+        'totalAmount': totalAmount,
+        'customerId': customerId,
+        'customerName': customerName,
+        'customerPhone': customerPhone,
+        'notes': notes,
+        'saleType': saleType,
+        'serviceFee': serviceFee,
+        'markupPercentage': markupPercentage,
+      });
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data['error'] != null) {
+        throw Exception(e.response?.data['error']);
+      }
+      throw Exception('Gagal memproses checkout kasir.');
+    } catch (e) {
+      throw Exception('Terjadi kesalahan saat checkout.');
+    }
+  }
+
+  // Tarik riwayat pesanan (Semua penjualan di cabang)
+  Future<List<dynamic>> getPosOrders() async {
+    try {
+      final response = await _dio.get('/sales');
+      return response.data as List<dynamic>;
+    } catch (e) {
+      throw Exception('Gagal mengambil riwayat pesanan.');
+    }
+  }
+
+  // Tarik detail pesanan spesifik
+  Future<Map<String, dynamic>> getSaleDetail(int id) async {
+    try {
+      final response = await _dio.get('/sales/$id');
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Gagal mengambil detail pesanan.');
+    }
+  }
+
+  // Proses Refund/Retur Pesanan
+  Future<Map<String, dynamic>> returnSale(int saleId, List<dynamic> items, int accountId) async {
+    try {
+      final response = await _dio.post('/sales/$saleId/return', data: {
+        'items': items,
+        'accountId': accountId,
+        'notes': 'Refund POS',
+      });
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data['error'] != null) {
+        throw Exception(e.response?.data['error']);
+      }
+      throw Exception('Gagal memproses refund.');
+    } catch (e) {
+      throw Exception('Terjadi kesalahan saat refund.');
+    }
+  }
+
+  // POS - Simpan Bill Tertunda
+  Future<void> holdPosBill(String label, List<dynamic> items, String saleType) async {
+    try {
+      await _dio.post('/pos/hold', data: {
+        'label': label,
+        'items': items,
+        'saleType': saleType,
+      });
+    } catch (e) {
+      throw Exception('Gagal menyimpan bill sementara.');
+    }
+  }
+
+  // POS - Tarik Daftar Bill Tertunda
+  Future<List<dynamic>> getPendingPosBills() async {
+    try {
+      final response = await _dio.get('/pos/pending');
+      return response.data as List<dynamic>;
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar bill tertunda.');
+    }
+  }
+
+  // POS - Hapus Bill Tertunda
+  Future<void> deletePendingPosBill(int id) async {
+    try {
+      await _dio.delete('/pos/pending/$id');
+    } catch (e) {
+      throw Exception('Gagal menghapus bill tertunda.');
+    }
+  }
+
+  // POS - Ambil Ringkasan Closing
+  Future<Map<String, dynamic>> getPosClosingSummary() async {
+    try {
+      final response = await _dio.get('/pos/closing-summary');
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Gagal mengambil ringkasan closing: $e');
+    }
+  }
+
+  // POS - Simpan Closing Kasir
+  Future<Map<String, dynamic>> submitPosClosing(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.post('/pos/closing', data: data);
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Gagal melakukan closing kasir: $e');
     }
   }
 }

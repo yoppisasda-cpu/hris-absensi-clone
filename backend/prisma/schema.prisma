@@ -23,19 +23,19 @@ model Company {
   sickLeaveDeductionRate Float                @default(0)
   contractEnd            DateTime?
   contractStart          DateTime?
-  contractType           ContractType         @default(LUMSUM)
+  contractType           ContractType         @default(BULANAN)
   contractValue          Float                @default(0)
   picName                String?
   picPhone               String?
   employeeLimit          Int                  @default(0)
   photoRetentionDays     Int                  @default(30)
-  workDaysPerMonth       Int                  @default(25)
-  lateGracePeriod        Int                  @default(0)
   modules                AppModule            @default(ABSENSI)
-  purchasedInsights      String[]             @default([])
-  crmEnabled             Boolean              @default(true)
   address                String?
   logoUrl                String?
+  lateGracePeriod        Int                  @default(0)
+  workDaysPerMonth       Int                  @default(25)
+  purchasedInsights      String[]             @default([])
+  crmEnabled             Boolean              @default(true)
   announcements          Announcement[]
   assets                 Asset[]
   attendances            Attendance[]
@@ -58,29 +58,35 @@ model Company {
   learningMaterials      LearningMaterial[]
   learningObjectives     LearningObjective[]
   leaveRequests          LeaveRequest[]
+  transfers              Transfer[]
   loans                  Loan[]
   notifications          Notification[]
   overtimeRequests       OvertimeRequest[]
   payrolls               Payroll[]
+  periodClosings         PeriodClosing[]
   Product                Product[]
+  productCategories      ProductCategory[]
   reimbursements         Reimbursement[]
   shifts                 Shift[]
+  posClosings            PosClosing[]
   users                  User[]
-  periodClosings         PeriodClosing[]
   warehouses             Warehouse[]
+  customizationGroups    CustomizationGroup[]
 }
 
 model FinancialAccount {
-  id        Int       @id @default(autoincrement())
-  companyId Int
-  name      String
-  type      String
-  balance   Float     @default(0)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  expenses  Expense[]
-  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  incomes   Income[]
+  id            Int            @id @default(autoincrement())
+  companyId     Int
+  name          String
+  type          String
+  balance       Float          @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  expenses      Expense[]
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  incomes       Income[]
+  fromTransfers Transfer[]     @relation("FromAccount")
+  toTransfers   Transfer[]     @relation("ToAccount")
 }
 
 model IncomeCategory {
@@ -91,6 +97,8 @@ model IncomeCategory {
   updatedAt DateTime @updatedAt
   incomes   Income[]
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
 }
 
 model Income {
@@ -120,6 +128,8 @@ model ExpenseCategory {
   type      ExpenseType @default(OPERATIONAL)
   expenses  Expense[]
   company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
 }
 
 model Expense {
@@ -136,8 +146,11 @@ model Expense {
   dueDate     DateTime?
   status      ExpenseStatus     @default(PAID)
   supplierId  Int?
+  productId   Int?
+  quantity    Float?            @default(0)
   account     FinancialAccount? @relation(fields: [accountId], references: [id])
   category    ExpenseCategory   @relation(fields: [categoryId], references: [id])
+  product     Product?          @relation(fields: [productId], references: [id])
   company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   supplier    Supplier?         @relation(fields: [supplierId], references: [id], onUpdate: NoAction)
 
@@ -159,16 +172,18 @@ model Supplier {
 }
 
 model Branch {
-  id        Int      @id @default(autoincrement())
-  companyId Int
-  name      String
-  latitude  Float?
-  longitude Float?
-  radius    Int?     @default(100)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  users     User[]
+  id         Int         @id @default(autoincrement())
+  companyId  Int
+  name       String
+  latitude   Float?
+  longitude  Float?
+  radius     Int?        @default(100)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users      User[]
+  warehouses Warehouse[]
+  sales      Sale[]
 }
 
 model User {
@@ -193,13 +208,13 @@ model User {
   bpjsKesehatan           Boolean             @default(false)
   bpjsKetenagakerjaan     Boolean             @default(false)
   contractEndDate         DateTime?
-  taxStatus               String              @default("TK-0")
   language                String              @default("id")
   faceReferenceUrl        String?
   isActive                Boolean             @default(true)
   reportToId              Int?
   resignDate              DateTime?
   lastDeviceId            String?
+  taxStatus               String              @default("TK-0")
   assets                  Asset[]
   attendances             Attendance[]
   bonuses                 Bonus[]
@@ -218,6 +233,9 @@ model User {
   overtimeRequests        OvertimeRequest[]
   payrolls                Payroll[]
   reimbursements          Reimbursement[]
+  sales                   Sale[]
+  pendingBills            PendingBill[]
+  posClosings             PosClosing[]
   branch                  Branch?             @relation(fields: [branchId], references: [id])
   company                 Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   reportTo                User?               @relation("ReportingLine", fields: [reportToId], references: [id])
@@ -270,9 +288,9 @@ model Attendance {
   clockOutPhotoUrl    String?
   faceSimilarityScore Float?
   isFaceVerified      Boolean          @default(false)
+  deviceId            String?
   fraudScore          Float?
   isSuspicious        Boolean          @default(false)
-  deviceId            String?
   company             Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -316,12 +334,12 @@ model Payroll {
   overtimePay                  Float        @default(0)
   bpjsKesehatanDeduction       Float        @default(0)
   bpjsKetenagakerjaanDeduction Float        @default(0)
-  pph21Deduction               Float        @default(0)
-  bpjsCompanyContribution      Float        @default(0)
   sickLeaveCount               Int          @default(0)
   sickLeaveDeduction           Float        @default(0)
   reimbursementPay             Float        @default(0)
   bonusPay                     Float        @default(0)
+  bpjsCompanyContribution      Float        @default(0)
+  pph21Deduction               Float        @default(0)
   company                      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user                         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -643,6 +661,18 @@ model Customer {
   totalSpent Float    @default(0)
   createdAt  DateTime @default(now()) @db.Timestamp(6)
   updatedAt  DateTime @default(now()) @db.Timestamp(6)
+
+  @@unique([companyId, phone], name: "companyId_phone")
+}
+
+model ProductCategory {
+  id        Int       @id @default(autoincrement())
+  companyId Int
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model Product {
@@ -655,13 +685,24 @@ model Product {
   costPrice        Float              @default(0)
   stock            Float              @default(0)
   minStock         Float              @default(0)
-  unit             String             @default("Pcs")
   categoryId       Int?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime
+  unit             String             @default("Pcs")
+  showInPos        Boolean            @default(true)
+  type             ProductType        @default(FINISHED_GOOD)
+  trackStock       Boolean            @default(true)
+  priceGofood      Float              @default(0)
+  priceGrabfood     Float              @default(0)
+  priceShopeefood   Float              @default(0)
+  category         ProductCategory?   @relation(fields: [categoryId], references: [id])
   Company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   StockTransaction StockTransaction[]
   WarehouseStock   WarehouseStock[]
+  expenses         Expense[]
+  Recipes          ProductRecipe[]    @relation("ProductRecipes")
+  UsedInRecipes    ProductRecipe[]    @relation("MaterialRecipes")
+  customizations   ProductCustomization[]
 }
 
 model ProductRecipe {
@@ -670,24 +711,41 @@ model ProductRecipe {
   materialId Int
   quantity   Float
   updatedAt  DateTime? @default(now()) @db.Timestamp(6)
+
+  Product    Product   @relation("ProductRecipes", fields: [productId], references: [id], onDelete: Cascade)
+  Material   Product   @relation("MaterialRecipes", fields: [materialId], references: [id], onDelete: Cascade)
 }
 
 model Sale {
   id            Int          @id @default(autoincrement())
   companyId     Int
+  branchId      Int?
   invoiceNumber String       @unique
   customerId    Int?
+  customerName  String?
+  customerPhone String?
   date          DateTime     @default(now()) @db.Timestamp(6)
-  totalAmount   Float        @default(0)
-  status        String       @default("PAID")
-  accountId     Int?
+  totalAmount     Float        @default(0)
+  status          String       @default("PAID")
+  saleType        String       @default("WALK_IN") // WALK_IN, GOFOOD, GRABFOOD, etc.
+  serviceFee      Float        @default(0)         // Shipping/Courier fee
+  markupPercentage Float       @default(0)         // Percentage markup for platforms
+  totalCommission  Float       @default(0)         // New: Difference between Marketplace Total and Walk-in Total
+  accountId       Int?
   notes         String?
   createdAt     DateTime     @default(now()) @db.Timestamp(6)
   updatedAt     DateTime     @default(now()) @db.Timestamp(6)
+  cashierId     Int?
+  branch        Branch?      @relation(fields: [branchId], references: [id])
+  cashier       User?        @relation(fields: [cashierId], references: [id])
+  isTukarFaktur Boolean      @default(false)
+  tukarFakturDate DateTime?
+  tukarFakturRef  String?
   SaleItem      SaleItem[]
   SaleReturn    SaleReturn[]
 
   @@index([companyId, date])
+  @@index([companyId, branchId])
 }
 
 model SaleItem {
@@ -696,7 +754,9 @@ model SaleItem {
   productId Int
   quantity  Float
   price     Float
+  originalPrice Float @default(0) // New: The base (walk-in) price at time of sale
   total     Float
+  modifiers Json?
   Sale      Sale  @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
@@ -726,29 +786,32 @@ model SaleReturnItem {
 }
 
 model StockTransaction {
-  id        Int      @id @default(autoincrement())
-  productId Int
-  type      String
-  quantity  Float
-  reference String?
-  date      DateTime @default(now())
-  createdAt DateTime @default(now())
-  Product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id          Int        @id @default(autoincrement())
+  productId   Int
+  type        String
+  quantity    Float
+  reference   String?
+  date        DateTime   @default(now())
+  createdAt   DateTime   @default(now())
   warehouseId Int?
-  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  Product     Product    @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
 }
 
 model Warehouse {
-  id              Int                @id @default(autoincrement())
-  companyId       Int
-  name            String
-  location        String?
-  isMain          Boolean            @default(false)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  stocks          WarehouseStock[]
-  transactions    StockTransaction[]
+  id           Int                @id @default(autoincrement())
+  companyId    Int
+  name         String
+  location     String?
+  isMain       Boolean            @default(false)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  branchId     Int?
+  type         WarehouseType      @default(STORE)
+  transactions StockTransaction[]
+  branch       Branch?            @relation(fields: [branchId], references: [id])
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stocks       WarehouseStock[]
 }
 
 model WarehouseStock {
@@ -763,11 +826,28 @@ model WarehouseStock {
   @@unique([productId, warehouseId])
 }
 
+model PeriodClosing {
+  id           Int      @id @default(autoincrement())
+  companyId    Int
+  month        Int
+  year         Int
+  closedAt     DateTime @default(now())
+  closedBy     Int
+  totalIncome  Float
+  totalExpense Float
+  netProfit    Float
+  status       String   @default("CLOSED")
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, month, year])
+}
+
 enum AppModule {
   ABSENSI
   FINANCE
   BOTH
   INVENTORY
+  POS
 }
 
 enum ExpenseStatus {
@@ -792,6 +872,7 @@ enum Role {
   EMPLOYEE
   OWNER
   MANAGER
+  CASHIER
 }
 
 enum AttendanceStatus {
@@ -817,8 +898,8 @@ enum SalaryStatus {
 }
 
 enum ContractType {
-  LUMSUM
-  SATUAN
+  BULANAN
+  TAHUNAN
 }
 
 enum AbsenceDeductionType {
@@ -850,18 +931,103 @@ enum ChatSender {
   AI
   ADMIN
 }
-model PeriodClosing {
-  id           Int      @id @default(autoincrement())
-  companyId    Int
-  month        Int
-  year         Int
-  closedAt     DateTime @default(now())
-  closedBy     Int
-  totalIncome  Float
-  totalExpense Float
-  netProfit    Float
-  status       String   @default("CLOSED")
-  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  @@unique([companyId, month, year])
+enum WarehouseType {
+  STORE
+  WAREHOUSE
+}
+
+enum ProductType {
+  RAW_MATERIAL
+  WIP
+  FINISHED_GOOD
+}
+
+model PendingBill {
+  id              Int      @id @default(autoincrement())
+  companyId       Int
+  branchId        Int
+  cashierId       Int
+  label           String?
+  items           Json
+  saleType        String   @default("WALK_IN")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [cashierId], references: [id])
+}
+
+model PosClosing {
+  id                 Int              @id @default(autoincrement())
+  companyId          Int
+  branchId           Int
+  cashierId          Int
+  date               DateTime         @default(now()) @db.Date
+  startTime          DateTime
+  endTime            DateTime         @default(now())
+  totalGrossSales    Float            @default(0)
+  totalNetSales      Float            @default(0)
+  totalCommission    Float            @default(0)
+  totalTransactions  Int              @default(0)
+  actualCash         Float            @default(0)
+  expectedCash       Float            @default(0)
+  cashDifference     Float            @default(0)
+  notes              String?
+  status             String           @default("COMPLETED")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
+  company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cashier            User             @relation(fields: [cashierId], references: [id])
+
+  @@index([companyId, branchId, date])
+  @@index([companyId, date])
+}
+
+model Transfer {
+  id            Int              @id @default(autoincrement())
+  companyId     Int
+  fromAccountId Int
+  toAccountId   Int
+  amount        Float
+  date          DateTime         @default(now())
+  description   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromAccount   FinancialAccount @relation("FromAccount", fields: [fromAccountId], references: [id])
+  toAccount     FinancialAccount @relation("ToAccount", fields: [toAccountId], references: [id])
+
+  @@index([companyId, date])
+}
+
+model CustomizationGroup {
+  id            Int                    @id @default(autoincrement())
+  companyId     Int
+  name          String
+  isRequired    Boolean                @default(false)
+  minSelections Int                    @default(0)
+  maxSelections Int                    @default(1)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  company       Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  options       CustomizationOption[]
+  products      ProductCustomization[]
+}
+
+model CustomizationOption {
+  id        Int                @id @default(autoincrement())
+  groupId   Int
+  name      String
+  price     Float              @default(0)
+  group     CustomizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model ProductCustomization {
+  productId Int
+  groupId   Int
+  Product   Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  Group     CustomizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([productId, groupId])
 }

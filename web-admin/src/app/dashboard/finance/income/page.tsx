@@ -2,15 +2,19 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, Filter, ArrowUpRight, Wallet, Banknote, Calendar, MoreVertical, FileText, Download, Edit3, Trash2, AlertTriangle, X } from "lucide-react";
+import { Plus, Search, Filter, ArrowUpRight, Wallet, Banknote, Calendar, MoreVertical, FileText, Download, Edit3, Trash2, AlertTriangle, X, Lock } from "lucide-react";
 import api from "@/lib/api";
 import AddIncomeModal from "@/components/finance/AddIncomeModal";
+import TransferModal from "@/components/finance/TransferModal";
 
 export default function IncomesPage() {
     const [incomes, setIncomes] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState<string>("all");
+    const [categories, setCategories] = useState<any[]>([]);
     const [editingIncome, setEditingIncome] = useState<any>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; amount: number } | null>(null);
 
@@ -26,8 +30,18 @@ export default function IncomesPage() {
         }
     };
 
+    const fetchCategories = async () => {
+        try {
+            const res = await api.get('/finance/income-categories');
+            setCategories(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil kategori", error);
+        }
+    };
+
     useEffect(() => {
         fetchIncomes();
+        fetchCategories();
     }, []);
 
     const handleDelete = async () => {
@@ -51,11 +65,15 @@ export default function IncomesPage() {
         setIsModalOpen(true);
     };
 
-    const filteredIncomes = incomes.filter(inc => 
-        inc.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inc.receivedFrom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inc.category?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredIncomes = incomes.filter(inc => {
+        const matchesSearch = inc.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            inc.receivedFrom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            inc.category?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesCategory = selectedCategory === "all" || inc.categoryId.toString() === selectedCategory;
+        
+        return matchesSearch && matchesCategory;
+    });
 
     const totalIncomeThisMonth = incomes
         .filter(inc => new Date(inc.date).getMonth() === new Date().getMonth())
@@ -69,8 +87,11 @@ export default function IncomesPage() {
                     <p className="mt-1 text-sm text-slate-500">Kelola dan catat semua pendapatan perusahaan Anda.</p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
-                        <Download className="h-4 w-4" /> Export
+                    <button 
+                        onClick={() => setIsTransferModalOpen(true)}
+                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+                    >
+                        <ArrowUpRight className="h-4 w-4 text-blue-600" /> Transfer Dana
                     </button>
                     <button 
                         onClick={() => {
@@ -123,10 +144,17 @@ export default function IncomesPage() {
                             className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-medium"
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <button className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
-                            <Filter className="h-4 w-4" /> Filter
-                        </button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <select 
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:border-blue-500"
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                        >
+                            <option value="all">Semua Kategori</option>
+                            {categories.map((cat: any) => (
+                                <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
@@ -174,22 +202,29 @@ export default function IncomesPage() {
                                             <span className="text-sm font-black text-emerald-600">Rp {inc.amount.toLocaleString()}</span>
                                         </td>
                                         <td className="px-6 py-5 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button 
-                                                    onClick={() => openEditModal(inc)}
-                                                    className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 transition-all shadow-sm border border-blue-100 bg-white"
-                                                    title="Edit Transaksi"
-                                                >
-                                                    <Edit3 className="h-4 w-4" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => setDeleteConfirm({ id: inc.id, amount: inc.amount })}
-                                                    className="rounded-lg p-2 text-red-600 hover:bg-red-50 transition-all shadow-sm border border-red-100 bg-white"
-                                                    title="Hapus Transaksi"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
+                                            {inc.category?.name === 'Penjualan POS' ? (
+                                                <div className="flex items-center justify-center text-slate-400 group-hover:text-slate-500 transition-colors" title="Data otomatis dari POS tidak dapat diubah manual">
+                                                    <Lock className="h-4 w-4" />
+                                                    <span className="ml-1 text-[9px] font-bold uppercase tracking-tighter">Locked</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button 
+                                                        onClick={() => openEditModal(inc)}
+                                                        className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 transition-all shadow-sm border border-blue-100 bg-white"
+                                                        title="Edit Transaksi"
+                                                    >
+                                                        <Edit3 className="h-4 w-4" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setDeleteConfirm({ id: inc.id, amount: inc.amount })}
+                                                        className="rounded-lg p-2 text-red-600 hover:bg-red-50 transition-all shadow-sm border border-red-100 bg-white"
+                                                        title="Hapus Transaksi"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -256,6 +291,15 @@ export default function IncomesPage() {
                 }} 
                 onSuccess={fetchIncomes} 
                 initialData={editingIncome}
+            />
+
+            <TransferModal 
+                isOpen={isTransferModalOpen}
+                onClose={() => setIsTransferModalOpen(false)}
+                onSuccess={() => {
+                    fetchIncomes();
+                    // Optional: show a toast or alert
+                }}
             />
         </DashboardLayout>
     );

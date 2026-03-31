@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, Filter, ArrowDownLeft, Wallet, Banknote, Calendar, MoreVertical, FileText, Download, Edit3, Trash2, AlertTriangle, X } from "lucide-react";
+import { Plus, Search, Filter, ArrowDownLeft, Wallet, Banknote, Calendar, MoreVertical, FileText, Download, Edit3, Trash2, AlertTriangle, X, Package } from "lucide-react";
 import api from "@/lib/api";
 import AddExpenseModal from "@/components/finance/AddExpenseModal";
 
@@ -156,8 +156,26 @@ export default function ExpensesPage() {
                                         </td>
                                         <td className="px-6 py-5 font-mono text-xs text-slate-500">EXP-{exp.id.toString().padStart(6, '0')}</td>
                                         <td className="px-6 py-5">
-                                            <div className="text-sm font-bold text-slate-900">{exp.paidTo || '-'}</div>
-                                            <div className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[200px]">{exp.description || 'Tanpa keterangan'}</div>
+                                            <div className="text-sm font-bold text-slate-900">
+                                                {exp.product ? (
+                                                    <span className="flex items-center gap-1.5 text-blue-700">
+                                                        <Package className="h-3.5 w-3.5" />
+                                                        {exp.product.name}
+                                                        <span className="text-[10px] bg-blue-50 px-1 rounded text-blue-500 font-black">
+                                                            {exp.quantity} {exp.product.unit}
+                                                        </span>
+                                                    </span>
+                                                ) : (
+                                                    exp.paidTo || '-'
+                                                )}
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[200px]">
+                                                {exp.product ? (
+                                                    <span className="italic text-slate-400">Dibayar ke: {exp.paidTo || '-'}</span>
+                                                ) : (
+                                                    exp.description || 'Tanpa keterangan'
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-5">
                                             <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">

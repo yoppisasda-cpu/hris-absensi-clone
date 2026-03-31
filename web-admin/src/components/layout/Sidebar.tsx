@@ -188,10 +188,14 @@ export default function Sidebar() {
                 {/* MODUL FINANCE & AKUNTING */}
                 {activeModule === 'FINANCE' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                        <div className="px-3 py-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Transaksi Bisnis</div>
+                        <div className="px-3 py-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Penjualan & Operasional</div>
                         <Link href="/dashboard/sales" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors">
                             <ShoppingCart className="h-5 w-5" />
-                            Penjualan (Sales)
+                            Penjualan B2B
+                        </Link>
+                        <Link href="/dashboard/pos/reports" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors">
+                            <Monitor className="h-5 w-5" />
+                            Laporan Kasir (POS)
                         </Link>
                         <Link href="/dashboard/customers" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <Users className="h-5 w-5 text-indigo-400" />
@@ -210,7 +214,7 @@ export default function Sidebar() {
                             <ArrowUpCircle className="h-5 w-5 text-blue-400" />
                             Buku Piutang (Receivables)
                         </Link>
-                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Arus Kas (Cashflow)</div>
+                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Keuangan & Kas (GL)</div>
                         <Link href="/dashboard/finance/income" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <TrendingUp className="h-5 w-5 text-emerald-400" />
                             Pemasukan (Income)
