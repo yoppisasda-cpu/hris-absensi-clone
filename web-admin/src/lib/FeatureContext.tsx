@@ -57,10 +57,10 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
       case 'ABSENSI':
         return true; // Starter always has Absensi
       case 'FINANCE':
-        return plan === 'PRO' || plan === 'ENTERPRISE';
+        return plan === 'PRO';
       case 'INVENTORY':
       case 'POS':
-        return plan === 'PRO' || plan === 'ENTERPRISE';
+        return plan === 'PRO';
       default:
         return false;
     }
