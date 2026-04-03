@@ -52,6 +52,22 @@ export default function SalesPage() {
         setIsInvoiceModalOpen(true);
     };
 
+    const handleExport = async () => {
+        try {
+            const response = await api.get('/sales/export', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Laporan_Penjualan_${new Date().toISOString().split('T')[0]}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error("Gagal mengekspor data", error);
+            alert("Gagal mengunduh laporan Excel");
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -60,7 +76,10 @@ export default function SalesPage() {
                     <p className="mt-1 text-sm text-slate-500">Kelola transaksi penjualan dan cetak invoice pelanggan.</p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
+                    <button 
+                        onClick={handleExport}
+                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                    >
                         <Download className="h-4 w-4" /> Export
                     </button>
                     <button 

@@ -97,16 +97,16 @@ export default function ClosingPage() {
                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h2 className="text-lg font-semibold">Tutup Periode Baru</h2>
+                <h2 className="text-lg font-bold text-slate-800">Tutup Periode Baru</h2>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Pilih Bulan</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-tight">Pilih Bulan Berjalan</label>
                   <select 
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                    className="w-full rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-2.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    className="w-full rounded-xl border-2 border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-black text-slate-800"
                   >
                     {months.map(m => (
                       <option key={m.id} value={m.id}>{m.name}</option>
@@ -115,11 +115,11 @@ export default function ClosingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Pilih Tahun</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-tight">Pilih Tahun Berjalan</label>
                   <select 
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                    className="w-full rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-2.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    className="w-full rounded-xl border-2 border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-black text-slate-800"
                   >
                     {years.map(y => (
                       <option key={y} value={y}>{y}</option>
@@ -178,8 +178,8 @@ export default function ClosingPage() {
                   </div>
                 ) : closings.length === 0 ? (
                   <div className="p-12 flex flex-col items-center justify-center text-slate-400 gap-4">
-                    <FileSpreadsheet className="h-12 w-12 opacity-20" />
-                    <p>Belum ada periode yang ditutup.</p>
+                    <FileSpreadsheet className="h-12 w-12 text-slate-300 dark:text-white/20 mb-2" />
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-200/60 italic tracking-tight">Belum ada periode yang ditutup.</p>
                   </div>
                 ) : (
                   <table className="w-full text-left">

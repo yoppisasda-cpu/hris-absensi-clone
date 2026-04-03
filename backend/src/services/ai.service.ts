@@ -5,7 +5,11 @@ import path from "path";
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 // Fallback jika dotenv gagal memuat key
-const API_KEY = process.env.GEMINI_API_KEY || "AIzaSyAjuBnd3HclYPs8hPtmEzES1jAMiwqFw8c";
+const API_KEY = process.env.GEMINI_API_KEY;
+
+if (!API_KEY) {
+  console.error("❌ GEMINI_API_KEY is not defined in environment variables.");
+}
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
 
 console.log(`[AI Service] GEMINI_API_KEY status: ${API_KEY ? "LOADED (" + API_KEY.substring(0, 8) + "...)" : "MISSING"}`);

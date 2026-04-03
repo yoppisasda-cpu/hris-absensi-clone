@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { FileSpreadsheet, Download, Calendar, User, Clock, Search, Smile, Meh, Frown, AlertCircle, TrendingUp, ShieldCheck, ShieldAlert, Shield } from 'lucide-react';
+import { FileSpreadsheet, Download, Calendar, User, Clock, Search, Smile, Meh, Frown, AlertCircle, TrendingUp, ShieldCheck, ShieldAlert, Shield, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface Attendance {
@@ -118,6 +118,13 @@ export default function AttendancePage() {
                         />
                     </div>
                     <button
+                        onClick={() => window.print()}
+                        className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
+                    >
+                        <Printer className="h-4 w-4" />
+                        Cetak Laporan
+                    </button>
+                    <button
                         onClick={handleExportExcel}
                         disabled={isLoading || attendances.length === 0}
                         className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -128,7 +135,8 @@ export default function AttendancePage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="printable-content">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 {[
                     { label: 'Senang', count: attendances.filter(a => a.mood === 'Senang').length, icon: Smile, color: 'text-green-600', bg: 'bg-green-50' },
                     { label: 'Netral', count: attendances.filter(a => a.mood === 'Netral').length, icon: Meh, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -320,6 +328,7 @@ export default function AttendancePage() {
                     </div>
                 )}
             </div>
+        </div>
 
             {/* Modal Foto Selfie */}
             {selectedPhoto && (

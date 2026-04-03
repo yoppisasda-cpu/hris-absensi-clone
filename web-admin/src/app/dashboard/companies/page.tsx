@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
-import { Building2, MapPin, Save, AlertTriangle, Trash2, Globe, Edit2 } from 'lucide-react';
+import { Building2, MapPin, Save, AlertTriangle, Trash2, Globe, Edit2, FileText, CheckCircle2, Download, X } from 'lucide-react';
 import MapPicker from '@/components/maps/MapPicker';
 
 interface Company {
@@ -19,8 +19,15 @@ interface Company {
     contractStart: string | null;
     contractEnd: string | null;
     employeeLimit: number;
+    adminLimit: number;
+    posLimit: number;
     photoRetentionDays?: number;
     purchasedInsights?: string[];
+    plan?: 'STARTER' | 'PRO' | 'ENTERPRISE';
+    addons?: string[];
+    _count?: {
+        users: number;
+    };
 }
 
 export default function CompaniesPage() {
@@ -57,11 +64,17 @@ export default function CompaniesPage() {
     const [contractStart, setContractStart] = useState('');
     const [contractEnd, setContractEnd] = useState('');
     const [employeeLimit, setEmployeeLimit] = useState('0');
+    const [adminLimit, setAdminLimit] = useState('2');
+    const [posLimit, setPosLimit] = useState('1');
     const [photoRetentionDays, setPhotoRetentionDays] = useState('30');
 
     // Add-on states
+    const [plan, setPlan] = useState<'STARTER' | 'PRO' | 'ENTERPRISE'>('STARTER');
     const [addonKpi, setAddonKpi] = useState(false);
     const [addonLearning, setAddonLearning] = useState(false);
+    const [addonInventory, setAddonInventory] = useState(false);
+    const [addonAi, setAddonAi] = useState(false);
+    const [addonFraud, setAddonFraud] = useState(false);
 
     // Admin Account States
     const [adminName, setAdminName] = useState('');
@@ -70,6 +83,10 @@ export default function CompaniesPage() {
 
     const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
     const [isMapOpen, setIsMapOpen] = useState(false);
+    
+    // Invoice States
+    const [selectedInvoiceCompany, setSelectedInvoiceCompany] = useState<Company | null>(null);
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
     // Fetch daftar perusahaan saat komponen dimuat
     useEffect(() => {
@@ -98,9 +115,15 @@ export default function CompaniesPage() {
         setContractStart('');
         setContractEnd('');
         setEmployeeLimit('0');
+        setAdminLimit('2');
+        setPosLimit('1');
         setPhotoRetentionDays('30');
+        setPlan('STARTER');
         setAddonKpi(false);
         setAddonLearning(false);
+        setAddonInventory(false);
+        setAddonAi(false);
+        setAddonFraud(false);
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
@@ -133,8 +156,16 @@ export default function CompaniesPage() {
                 contractStart: contractStart || null,
                 contractEnd: contractEnd || null,
                 employeeLimit,
+                adminLimit,
+                posLimit,
                 photoRetentionDays,
                 purchasedInsights: buildInsights(),
+                plan,
+                addons: [
+                    ...(addonInventory ? ['INVENTORY'] : []),
+                    ...(addonAi ? ['AI_ADVISOR'] : []),
+                    ...(addonFraud ? ['FRAUD_DETECTION'] : [])
+                ],
                 ...(editingCompanyId ? {} : { adminName, adminEmail, adminPassword })
             };
 
@@ -146,9 +177,28 @@ export default function CompaniesPage() {
             }
 
             if (res.status === 200 || res.status === 201) {
+                // UPDATE LOCAL STORAGE IF WE ARE EDITING OUR OWN COMPANY
+                const loggedInCompanyId = localStorage.getItem('companyId');
+                if (editingCompanyId && loggedInCompanyId === editingCompanyId.toString()) {
+                    localStorage.setItem('userPlan', plan);
+                    localStorage.setItem('userAddons', JSON.stringify([
+                        ...(addonInventory ? ['INVENTORY'] : []),
+                        ...(addonAi ? ['AI_ADVISOR'] : []),
+                        ...(addonFraud ? ['FRAUD_DETECTION'] : [])
+                    ]));
+                    // Trigger a storage event for other components like Sidebar to update
+                    window.dispatchEvent(new Event('storage'));
+                    // Force refresh or context update might be needed, but local storage is a good start
+                }
+
                 resetForm();
                 fetchCompanies();
                 alert(editingCompanyId ? 'Data klien berhasil diperbarui!' : 'Berhasil mendaftarkan klien dan admin baru!');
+                
+                // If it was our own company, reload to apply all changes across the app
+                if (editingCompanyId && loggedInCompanyId === editingCompanyId.toString()) {
+                    window.location.reload();
+                }
             } else {
                 alert('Gagal memproses data klien.');
             }
@@ -173,11 +223,20 @@ export default function CompaniesPage() {
         setContractStart(company.contractStart ? new Date(company.contractStart).toISOString().split('T')[0] : '');
         setContractEnd(company.contractEnd ? new Date(company.contractEnd).toISOString().split('T')[0] : '');
         setEmployeeLimit(company.employeeLimit?.toString() || '0');
+        setAdminLimit(company.adminLimit?.toString() || '2');
+        setPosLimit(company.posLimit?.toString() || '1');
         setPhotoRetentionDays(company.photoRetentionDays?.toString() || '30');
+        setPlan(company.plan || 'STARTER');
+
         // Set add-on checkboxes
         const insights = company.purchasedInsights || [];
         setAddonKpi(insights.includes('KPI') || insights.includes('KPI_LEARNING'));
         setAddonLearning(insights.includes('LEARNING') || insights.includes('KPI_LEARNING'));
+        
+        const addons = company.addons || [];
+        setAddonInventory(addons.includes('INVENTORY'));
+        setAddonAi(addons.includes('AI_ADVISOR'));
+        setAddonFraud(addons.includes('FRAUD_DETECTION'));
         // Kosongkan admin fields
         setAdminName('');
         setAdminEmail('');
@@ -196,6 +255,121 @@ export default function CompaniesPage() {
             console.error(error);
             alert(error.response?.data?.error || 'Gagal menghapus tenant.');
         }
+    };
+
+    // --- INVOICE CALCULATION LOGIC ---
+    const calculateInvoice = (company: Company) => {
+        const pricing = {
+            plans: {
+                STARTER: 150000,
+                PRO: 350000,
+                ENTERPRISE: 750000
+            },
+            seats: 10000,
+            addons: {
+                KPI: 1500,
+                LEARNING: 2000,
+                BUNDLE_KPI_LRN: 3000,
+                INVENTORY: 20000,
+                AI: 20000,
+                FRAUD: 10000
+            }
+        };
+
+        const plan = company.plan || 'STARTER';
+        const isAnnual = company.contractType === 'TAHUNAN';
+        const multiplier = isAnnual ? 12 : 1;
+        const periodUnit = isAnnual ? '12 Bln' : '1 Bln';
+        const periodLabel = isAnnual ? '1 Thn' : '1 Bln';
+
+        // USE MANUAL CONTRACT VALUE IF SET, otherwise use plan default
+        let basePrice = (company.contractValue && Number(company.contractValue) > 0) 
+            ? Number(company.contractValue) 
+            : pricing.plans[plan as keyof typeof pricing.plans];
+        
+        // Apply multiplier to basePrice
+        basePrice = basePrice * multiplier;
+
+        // Seats calculation (Free 2 Admin, 1 POS)
+        const extraAdmin = Math.max(0, (company.adminLimit || 2) - 2);
+        const extraPos = Math.max(0, (company.posLimit || 1) - 1);
+        const seatCost = (extraAdmin + extraPos) * pricing.seats * multiplier;
+
+        // Addon calculation (Use employeeLimit as purchased capacity, fallback to actual users if limit is 0)
+        const userCount = (company.employeeLimit && company.employeeLimit > 0) 
+            ? company.employeeLimit 
+            : (company._count?.users || 0);
+        const insights = company.purchasedInsights || [];
+        const addons = company.addons || [];
+        
+        let addonTotal = 0;
+        const detailItems: { name: string, price: number, qty: number | string, total: number }[] = [];
+
+        // KPI & Learning Bundle check
+        const hasKpi = insights.includes('KPI') || insights.includes('KPI_LEARNING');
+        const hasLearning = insights.includes('LEARNING') || insights.includes('KPI_LEARNING');
+        
+        if (hasKpi && hasLearning) {
+            const cost = userCount * pricing.addons.BUNDLE_KPI_LRN * multiplier;
+            addonTotal += cost;
+            detailItems.push({ 
+                name: 'Bundle: KPI & Learning', 
+                price: pricing.addons.BUNDLE_KPI_LRN, 
+                qty: `${userCount} u x ${periodUnit}`, 
+                total: cost 
+            });
+        } else {
+            if (hasKpi) {
+                const cost = userCount * pricing.addons.KPI * multiplier;
+                addonTotal += cost;
+                detailItems.push({ 
+                    name: 'Add-on: KPI Penilaian', 
+                    price: pricing.addons.KPI, 
+                    qty: `${userCount} u x ${periodUnit}`, 
+                    total: cost 
+                });
+            }
+            if (hasLearning) {
+                const cost = userCount * pricing.addons.LEARNING * multiplier;
+                addonTotal += cost;
+                detailItems.push({ 
+                    name: 'Add-on: Learning Center', 
+                    price: pricing.addons.LEARNING, 
+                    qty: `${userCount} u x ${periodUnit}`, 
+                    total: cost 
+                });
+            }
+        }
+
+        if (addons.includes('INVENTORY')) {
+            const cost = pricing.addons.INVENTORY * multiplier;
+            addonTotal += cost;
+            detailItems.push({ name: 'Add-on: Inventory Management', price: pricing.addons.INVENTORY, qty: periodUnit, total: cost });
+        }
+        if (addons.includes('AI_ADVISOR')) {
+            const cost = pricing.addons.AI * multiplier;
+            addonTotal += cost;
+            detailItems.push({ name: 'Add-on: Aivola Mind (AI)', price: pricing.addons.AI, qty: periodUnit, total: cost });
+        }
+        if (addons.includes('FRAUD_DETECTION')) {
+            const cost = pricing.addons.FRAUD * multiplier;
+            addonTotal += cost;
+            detailItems.push({ name: 'Add-on: Anti-Fraud Face Check', price: pricing.addons.FRAUD, qty: periodUnit, total: cost });
+        }
+
+        const total = basePrice + seatCost + addonTotal;
+
+        return {
+            basePrice,
+            planName: plan,
+            periodLabel,
+            seatCost,
+            extraAdmin,
+            extraPos,
+            addonTotal,
+            detailItems,
+            total
+        };
     };
 
     return (
@@ -304,17 +478,66 @@ export default function CompaniesPage() {
                                     />
                                 </div>
                             </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-slate-700">Limit Karyawan</label>
-                                <input
-                                    type="number"
-                                    value={employeeLimit}
-                                    onChange={(e) => setEmployeeLimit(e.target.value)}
-                                    placeholder="0 = Tanpa Batas"
-                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                                <p className="mt-1 text-[10px] text-slate-400 italic">Membatasi jumlah karyawan yang bisa didaftarkan oleh tenant ini.</p>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-slate-700">Limit Karyawan</label>
+                                    <input
+                                        type="number"
+                                        value={employeeLimit}
+                                        onChange={(e) => setEmployeeLimit(e.target.value)}
+                                        placeholder="0 = ∞"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                     <div className="flex items-center justify-between mb-1">
+                                         <label className="text-sm font-medium text-slate-700">Slot Back-Office</label>
+                                         <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold">Rp 10.000/kursi/bln</span>
+                                     </div>
+                                    <input
+                                        type="number"
+                                        value={adminLimit}
+                                        onChange={(e) => setAdminLimit(e.target.value)}
+                                        placeholder="2"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
                             </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                     <div className="flex items-center justify-between mb-1">
+                                         <label className="text-sm font-medium text-slate-700">Slot Kasir (POS)</label>
+                                         <span className="text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-700 font-bold">Rp 10.000/unit/bln</span>
+                                     </div>
+                                    <input
+                                        type="number"
+                                        value={posLimit}
+                                        onChange={(e) => setPosLimit(e.target.value)}
+                                        placeholder="1"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div className="flex items-end">
+                                    <p className="mb-2 text-[10px] text-slate-400 italic">Masing-masing POS Terminal di Cabang.</p>
+                                </div>
+                            </div>
+                            <p className="mt-1 text-[10px] text-slate-400 italic">Slot Back-Office membatasi jumlah Admin, Finance, Manager, & Owner.</p>
+                            
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-slate-700">Paket Layanan (Subscription)</label>
+                                <select
+                                    value={plan}
+                                    onChange={(e) => setPlan(e.target.value as any)}
+                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm font-bold text-blue-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                >
+                                    <option value="STARTER">⬜ STARTER (Standard HR)</option>
+                                    <option value="PRO">🟦 PRO (Full HR + Basic Finance)</option>
+                                    <option value="ENTERPRISE">🟪 ENTERPRISE (All-In & Early Access)</option>
+                                </select>
+                                <p className="mt-1 text-[10px] text-slate-400 italic">Menentukan fitur dasar dan limitasi yang didapat tenant.</p>
+                            </div>
+                            
                             <div>
                                 <label className="mb-1 block text-sm font-medium text-slate-700">Retensi Foto (Hari)</label>
                                 <div className="relative">
@@ -332,7 +555,7 @@ export default function CompaniesPage() {
                             </div>
                         </div>
 
-                        {/* === ADD-ON: KPI & LEARNING === */}
+                        {/* === ADD-ON: KPI, FINANCE, AI === */}
                         <div className="space-y-3 border-b border-slate-50 pb-4">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Add-On Aktif</h3>
                             <p className="text-[10px] text-slate-400 italic">Centang fitur tambahan yang sudah dibeli klien.</p>
@@ -371,6 +594,59 @@ export default function CompaniesPage() {
                                     🚀 Bundle aktif — ditagih Rp 3.000/karyawan (hemat Rp 500)
                                 </div>
                             )}
+
+                            <div className="pt-2">
+                                <h4 className="text-[10px] font-bold uppercase text-slate-500 mb-2 mt-2">Add-On Finance & AI Management</h4>
+                                <div className="grid grid-cols-1 gap-2">
+                                    <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={addonInventory}
+                                            onChange={(e) => setAddonInventory(e.target.checked)}
+                                            className="mt-0.5 h-4 w-4 rounded accent-emerald-600"
+                                        />
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                                                📦 Inventory & Stock
+                                                <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Rp 20.000/bln</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Manajemen stok barang, multi-gudang, dan integrasi POS.</div>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-violet-50 hover:border-violet-300 transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={addonAi}
+                                            onChange={(e) => setAddonAi(e.target.checked)}
+                                            className="mt-0.5 h-4 w-4 rounded accent-violet-600"
+                                        />
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                                                🧠 Aivola Mind (AI Advisor)
+                                                <span className="text-[9px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded">Rp 20.000/bln</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Penasehat bisnis AI yang menganalisa performa keuangan & stok.</div>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-rose-50 hover:border-rose-300 transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={addonFraud}
+                                            onChange={(e) => setAddonFraud(e.target.checked)}
+                                            className="mt-0.5 h-4 w-4 rounded accent-rose-600"
+                                        />
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                                                🛡️ Anti-Fraud Face Check
+                                                <span className="text-[9px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded">Rp 10.000/bln</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Verifikasi wajah ketat saat absensi & transaksi sensitif.</div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
 
                         {!editingCompanyId && (
@@ -502,10 +778,19 @@ export default function CompaniesPage() {
                                         <tr key={company.id} className="border-b hover:bg-slate-50">
                                             <td className="px-4 py-4 border-b border-slate-100">
                                                 <div className="font-bold text-slate-900">{company.name}</div>
-                                                <div className="text-xs text-slate-500 mt-0.5">ID: TENANT-{company.id.toString().padStart(3, '0')}</div>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                                        company.plan === 'ENTERPRISE' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                                                        company.plan === 'PRO' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                                                        'bg-slate-100 text-slate-600 border border-slate-200'
+                                                    }`}>
+                                                        {company.plan || 'STARTER'}
+                                                    </span>
+                                                    <div className="text-[10px] text-slate-400">ID: TENANT-{company.id.toString().padStart(3, '0')}</div>
+                                                </div>
                                                 <div className="mt-2 flex items-center gap-2">
-                                                    <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-medium">PIC: {company.picName || '-'}</span>
-                                                    <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{company.picPhone || '-'}</span>
+                                                    <span className="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded font-medium border border-slate-100">PIC: {company.picName || '-'}</span>
+                                                    <span className="text-[10px] text-slate-400">{company.picPhone || '-'}</span>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4 border-b border-slate-100 text-center">
@@ -534,25 +819,34 @@ export default function CompaniesPage() {
                                             </td>
                                             <td className="px-4 py-4 border-b border-slate-100 text-center">
                                                 <div className="text-xs font-bold text-slate-800">{company.employeeLimit || '∞'}</div>
-                                                <div className="text-[10px] text-slate-400">User</div>
+                                                <div className="text-[10px] text-slate-400">Total User</div>
+                                                <div className="mt-1 flex flex-col gap-1 items-center">
+                                                    <span className="text-[9px] font-bold text-blue-600 bg-blue-50 rounded px-1.5 py-0.5 border border-blue-100">{company.adminLimit || 0} Admin</span>
+                                                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 rounded px-1.5 py-0.5 border border-emerald-100">{company.posLimit || 0} POS</span>
+                                                </div>
                                             </td>
                                             <td className="px-4 py-4 border-b border-slate-100 text-center">
-                                                <div className="flex flex-col items-center gap-1">
+                                                <div className="grid grid-cols-1 gap-1 min-w-[100px]">
                                                     {(() => {
                                                         const insights = company.purchasedInsights || [];
+                                                        const addons = company.addons || [];
                                                         const hasKpi = insights.includes('KPI') || insights.includes('KPI_LEARNING');
                                                         const hasLearning = insights.includes('LEARNING') || insights.includes('KPI_LEARNING');
+                                                        const hasInventory = addons.includes('INVENTORY');
+                                                        const hasAi = addons.includes('AI_ADVISOR');
+                                                        const hasFraud = addons.includes('FRAUD_DETECTION');
+                                                        
                                                         return (
                                                             <>
-                                                                {hasKpi ? (
-                                                                    <span className="text-[9px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">🎯 KPI</span>
-                                                                ) : (
-                                                                    <span className="text-[9px] text-slate-300 px-2 py-0.5 rounded-full border border-dashed border-slate-200">🎯 KPI</span>
-                                                                )}
-                                                                {hasLearning ? (
-                                                                    <span className="text-[9px] font-bold bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">📚 Learning</span>
-                                                                ) : (
-                                                                    <span className="text-[9px] text-slate-300 px-2 py-0.5 rounded-full border border-dashed border-slate-200">📚 Learning</span>
+                                                                <div className="flex flex-wrap gap-1 justify-center">
+                                                                    {hasKpi && <span className="text-[8px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-md border border-indigo-100" title="KPI">🎯 KPI</span>}
+                                                                    {hasLearning && <span className="text-[8px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-md border border-sky-100" title="Learning">📚 LRN</span>}
+                                                                    {hasInventory && <span className="text-[8px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md border border-emerald-100" title="Inventory">📦 INV</span>}
+                                                                    {hasAi && <span className="text-[8px] font-bold bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded-md border border-violet-100" title="AI Advisor">🧠 AI</span>}
+                                                                    {hasFraud && <span className="text-[8px] font-bold bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-md border border-rose-100" title="Anti-Fraud">🛡️ SEC</span>}
+                                                                </div>
+                                                                {insights.length === 0 && addons.length === 0 && (
+                                                                    <span className="text-[9px] text-slate-300">Default Only</span>
                                                                 )}
                                                             </>
                                                         );
@@ -561,6 +855,16 @@ export default function CompaniesPage() {
                                             </td>
                                             <td className="px-4 py-4 border-b border-slate-100 text-right">
                                                 <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedInvoiceCompany(company);
+                                                            setShowInvoiceModal(true);
+                                                        }}
+                                                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                        title="Generate Invoice Tagihan"
+                                                    >
+                                                        <FileText className="h-4 w-4" />
+                                                    </button>
                                                     <button
                                                         onClick={() => handleEditClick(company)}
                                                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -590,6 +894,159 @@ export default function CompaniesPage() {
                     </div>
                 </div>
             </div>
+            {/* === MODAL INVOICE === */}
+            {showInvoiceModal && selectedInvoiceCompany && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in duration-200">
+                        {/* Header Modal */}
+                        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-emerald-600" />
+                                <h3 className="text-lg font-bold text-slate-800">Preview Invoice Tagihan</h3>
+                            </div>
+                            <button onClick={() => setShowInvoiceModal(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Konten Invoice */}
+                        <div className="max-h-[70vh] overflow-y-auto p-8 bg-white" id="invoice-content">
+                            {/* Brand Header */}
+                            <div className="flex justify-between items-start mb-10">
+                                <div>
+                                    <div className="text-2xl font-black tracking-tighter text-blue-600">AIVOLA <span className="text-slate-400">CLOUD</span></div>
+                                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Saas Management Platform</p>
+                                </div>
+                                <div className="text-right">
+                                    <h4 className="text-xl font-bold text-slate-800 uppercase">INVOICE</h4>
+                                    <p className="text-xs text-slate-500">#{new Date().getFullYear()}/INV/{selectedInvoiceCompany.id.toString().padStart(4, '0')}</p>
+                                </div>
+                            </div>
+
+                            {/* Client & Info Section */}
+                            <div className="grid grid-cols-2 gap-8 mb-10 border-y border-slate-50 py-6">
+                                <div>
+                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ditujukan Untuk:</h5>
+                                    <div className="font-bold text-slate-900 text-lg uppercase">{selectedInvoiceCompany.name}</div>
+                                    <p className="text-sm text-slate-500 leading-relaxed max-w-[200px]">PIC: {selectedInvoiceCompany.picName || '-'}</p>
+                                    <p className="text-sm text-slate-500">{selectedInvoiceCompany.picPhone || '-'}</p>
+                                </div>
+                                <div className="text-right">
+                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Detail Pembayaran:</h5>
+                                    <p className="text-sm text-slate-700 font-bold">Tanggal Cetak: <span className="font-normal text-slate-500">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span></p>
+                                    <p className="text-sm text-slate-700 font-bold">Periode: <span className="font-normal text-slate-500">{selectedInvoiceCompany.contractType}</span></p>
+                                    <p className="text-sm text-slate-700 font-bold">Mata Uang: <span className="font-normal text-slate-500">IDR (Rupiah)</span></p>
+                                </div>
+                            </div>
+
+                            {/* Items Table */}
+                            {(() => {
+                                const inv = calculateInvoice(selectedInvoiceCompany);
+                                return (
+                                    <>
+                                        <table className="w-full text-sm mb-10">
+                                            <thead>
+                                                <tr className="border-b-2 border-slate-100 text-slate-400 text-left">
+                                                    <th className="py-3 font-bold uppercase text-[10px]">Deskripsi Layanan</th>
+                                                    <th className="py-3 text-right font-bold uppercase text-[10px]">Harga Satuan</th>
+                                                    <th className="py-3 text-right font-bold uppercase text-[10px]">Qty</th>
+                                                    <th className="py-3 text-right font-bold uppercase text-[10px]">Subtotal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="text-slate-700">
+                                                <tr className="border-b border-slate-50">
+                                                    <td className="py-4">
+                                                        <div className="font-bold text-slate-800 tracking-tight">PAKET {inv.planName}</div>
+                                                        <div className="text-[10px] text-slate-400">Paket Dasar Layanan Aivola Cloud</div>
+                                                    </td>
+                                                    <td className="py-4 text-right">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
+                                                    <td className="py-4 text-right">{inv.periodLabel}</td>
+                                                    <td className="py-4 text-right font-semibold">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
+                                                </tr>
+                                                {(inv.extraAdmin > 0 || inv.extraPos > 0) && (
+                                                    <tr className="border-b border-slate-50">
+                                                        <td className="py-4">
+                                                            <div className="font-bold text-slate-800 tracking-tight">KURSI / SLOT TAMBAHAN</div>
+                                                            <div className="text-[10px] text-slate-400">
+                                                                {inv.extraAdmin > 0 && `${inv.extraAdmin} Admin `}
+                                                                {inv.extraPos > 0 && `${inv.extraPos} POS`}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 text-right">Rp 10.000</td>
+                                                        <td className="py-4 text-right">{inv.extraAdmin + inv.extraPos} Unit</td>
+                                                        <td className="py-4 text-right font-semibold">Rp {inv.seatCost.toLocaleString('id-ID')}</td>
+                                                    </tr>
+                                                )}
+                                                {inv.detailItems.map((item, idx) => (
+                                                    <tr key={idx} className="border-b border-slate-50">
+                                                        <td className="py-4">
+                                                            <div className="font-bold text-slate-800 tracking-tight uppercase">{item.name}</div>
+                                                            <div className="text-[10px] text-slate-400">Fitur Tambahan Aktif</div>
+                                                        </td>
+                                                        <td className="py-4 text-right">Rp {item.price.toLocaleString('id-ID')}</td>
+                                                        <td className="py-4 text-right">{item.qty}</td>
+                                                        <td className="py-4 text-right font-semibold">Rp {item.total.toLocaleString('id-ID')}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+
+                                        {/* Total Section */}
+                                        <div className="flex justify-end">
+                                            <div className="w-full max-w-[280px] space-y-3">
+                                                <div className="flex justify-between text-sm text-slate-500">
+                                                    <span>Subtotal</span>
+                                                    <span>Rp {inv.total.toLocaleString('id-ID')}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm text-slate-500">
+                                                    <span>PPN (0%)</span>
+                                                    <span>Rp 0</span>
+                                                </div>
+                                                <div className="flex justify-between border-t border-slate-200 pt-3 text-lg font-black text-slate-900 bg-slate-50 p-3 rounded-lg">
+                                                    <span>TOTAL TAGIHAN</span>
+                                                    <span className="text-blue-600">Rp {inv.total.toLocaleString('id-ID')}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                            
+                            {/* Footer */}
+                            <div className="mt-16 text-center border-t border-slate-50 pt-8">
+                                <p className="text-xs text-slate-400 italic">Harap membayar sebelum masa kontrak berakhir untuk menghindari pembekuan akun secara otomatis oleh sistem.</p>
+                                <p className="text-[10px] font-bold text-slate-300 mt-4 uppercase">Generated by Aivola SaaS System</p>
+                            </div>
+                        </div>
+
+                        {/* Footer Action */}
+                        <div className="bg-slate-50 px-8 py-5 border-t border-slate-100 flex justify-between items-center">
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 italic">
+                                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                Terverifikasi sistem pusat Aivola
+                            </div>
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => setShowInvoiceModal(false)}
+                                    className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                                >
+                                    Tutup
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        window.print();
+                                    }}
+                                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all hover:scale-[1.02]"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Download & Cetak
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <MapPicker 
                 isOpen={isMapOpen} 
                 onClose={() => setIsMapOpen(false)} 

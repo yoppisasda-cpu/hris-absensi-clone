@@ -356,11 +356,25 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            {formData.type !== 'RAW_MATERIAL' ? (
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Harga Beli (Modal Rp)</label>
+                                <input
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-indigo-500 focus:bg-white focus:outline-none transition-all text-indigo-600"
+                                    value={formData.costPrice || ""}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setFormData({ ...formData, costPrice: val === "" ? 0 : parseFloat(val) });
+                                    }}
+                                />
+                            </div>
+                            {formData.type !== 'RAW_MATERIAL' && (
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Harga Jual (Rp)</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Harga Jual POS (Rp)</label>
                                     <input
                                         type="number"
+                                        placeholder="0"
                                         className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-orange-500 focus:bg-white focus:outline-none transition-all text-blue-600"
                                         value={formData.price || ""}
                                         onChange={(e) => {
@@ -369,14 +383,12 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                         }}
                                     />
                                 </div>
-                            ) : (
-                                <div className="invisible"></div>
                             )}
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Stok Aman (Alert)</label>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Batas Stok Aman (Alert)</label>
                                 <input
                                     type="number"
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-orange-500 focus:bg-white focus:outline-none transition-all text-red-600"
+                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-red-500 focus:bg-white focus:outline-none transition-all text-red-600"
                                     value={formData.minStock || ""}
                                     onChange={(e) => {
                                         const val = e.target.value;

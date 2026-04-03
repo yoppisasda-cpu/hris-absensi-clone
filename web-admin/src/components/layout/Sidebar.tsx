@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useFeatures } from '@/lib/FeatureContext';
 import api from '@/lib/api';
+import { Lock } from 'lucide-react';
 
 const menuItems = [
     { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -22,6 +24,7 @@ const menuItems = [
 export default function Sidebar() {
     const router = useRouter();
     const { t } = useLanguage();
+    const { plan, openUpgradeModal } = useFeatures();
     const [userRole, setUserRole] = useState('EMPLOYEE');
     const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | 'INVENTORY' | null>(null);
     const [allowedModules, setAllowedModules] = useState<string>('BOTH');
@@ -77,27 +80,37 @@ export default function Sidebar() {
             </div>
 
             <nav className="flex-1 space-y-1 px-3 py-6">
-                {/* MODULE SWITCHER BUTTON (Hanya muncul jika BOTH) */}
-                {allowedModules === 'BOTH' && (
-                    <div className="px-3 mb-6">
-                        <button 
-                            onClick={() => {
-                                const next = activeModule === 'ABSENSI' ? 'FINANCE' : 'ABSENSI';
-                                setActiveModule(next);
-                                localStorage.setItem('activeModule', next);
-                            }}
-                            className={`flex w-full items-center justify-between gap-3 rounded-lg p-3 text-sm font-bold transition-all border group ${
-                                activeModule === 'ABSENSI' ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
-                            }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                {activeModule === 'ABSENSI' ? <Briefcase className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
-                                <span>Modul: {activeModule === 'ABSENSI' ? 'Absensi & HRIS' : 'Finance & Akunting'}</span>
-                            </div>
+                {/* MODULE SWITCHER BUTTON */}
+                <div className="px-3 mb-6">
+                    <button 
+                        onClick={() => {
+                            if (activeModule === 'ABSENSI' && plan === 'STARTER') {
+                                openUpgradeModal();
+                                return;
+                            }
+                            const next = activeModule === 'ABSENSI' ? 'FINANCE' : 'ABSENSI';
+                            setActiveModule(next);
+                            localStorage.setItem('activeModule', next);
+                        }}
+                        className={`flex w-full items-center justify-between gap-3 rounded-lg p-3 text-sm font-bold transition-all border group relative overflow-hidden ${
+                            activeModule === 'ABSENSI' ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2">
+                            {activeModule === 'ABSENSI' ? <Briefcase className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
+                            <span>Modul: {activeModule === 'ABSENSI' ? 'Absensi & HRIS' : 'Finance & Akunting'}</span>
+                        </div>
+                        {activeModule === 'ABSENSI' && plan === 'STARTER' ? (
+                            <Lock className="h-3.5 w-3.5 text-amber-500" />
+                        ) : (
                             <TrendingUp className="h-3 w-3 opacity-50 group-hover:rotate-180 transition-transform" />
-                        </button>
-                    </div>
-                )}
+                        )}
+                        
+                        {activeModule === 'ABSENSI' && plan === 'STARTER' && (
+                            <div className="absolute top-0 right-0 bg-amber-500 text-slate-900 text-[8px] px-1.5 py-0.5 font-black uppercase tracking-tighter">Premium</div>
+                        )}
+                    </button>
+                </div>
 
 
                 <Link href="/dashboard/executive" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-black bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 text-blue-400 hover:text-white border border-blue-500/30 transition-all mb-4 animate-pulse shadow-lg shadow-blue-500/10">
@@ -265,6 +278,10 @@ export default function Sidebar() {
                         <Link href="/dashboard/inventory/adjustments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <Clock className="h-5 w-5 text-slate-400" />
                             Penyesuaian Stok
+                        </Link>
+                        <Link href="/dashboard/inventory/purchase-orders" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <ShoppingBag className="h-5 w-5 text-blue-400" />
+                            Purchase Order (PO)
                         </Link>
                         <Link href="/dashboard/inventory/warehouses" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <MapPin className="h-5 w-5 text-blue-400" />

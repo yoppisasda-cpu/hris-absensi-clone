@@ -34,6 +34,8 @@ export default function LoginPage() {
       localStorage.setItem('companyId', user.companyId.toString());
       localStorage.setItem('userName', user.name);
       localStorage.setItem('userRole', user.role);
+      localStorage.setItem('userPlan', user.plan || 'STARTER');
+      localStorage.setItem('userAddons', JSON.stringify(user.addons || []));
       router.push('/dashboard');
     } catch (error: any) {
       const status = error?.response?.status;

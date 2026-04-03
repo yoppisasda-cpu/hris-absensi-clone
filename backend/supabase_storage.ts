@@ -45,8 +45,9 @@ export async function uploadToSupabase(localPath: string, destinationFolder: str
 
     return publicUrl;
   } catch (error) {
-    console.error("Supabase Upload Error:", error);
-    throw error;
+    console.error("Supabase Upload Error (Falling back to local Mode):", error);
+    // If upload fails, return local path as fallback instead of crashing
+    return `/${localPath.replace(/\\/g, '/')}`;
   }
 }
 

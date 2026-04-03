@@ -647,9 +647,13 @@ export default function EmployeesPage() {
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Role Akses HRIS</label>
                                         <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm outline-none bg-white font-bold text-indigo-600">
-                                            <option value="EMPLOYEE">Karyawan Biasa</option>
-                                            <option value="MANAGER">Manager / Supervisor</option>
+                                            <option value="OWNER">Owner (Pemilik)</option>
                                             <option value="ADMIN">Administrator HR</option>
+                                            <option value="MANAGER">Manager / Supervisor</option>
+                                            <option value="PURCHASING">Purchasing (Pembelian)</option>
+                                            <option value="OPERATIONAL">Operational (Gudang/Toko)</option>
+                                            <option value="CASHIER">Cashier (Kasir)</option>
+                                            <option value="EMPLOYEE">Karyawan Biasa</option>
                                         </select>
                                     </div>
                                     <div>

@@ -35,7 +35,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 print:p-0 print:bg-white print:static print:inset-auto">
+        <div id="printable-invoice" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 print:p-0 print:bg-white print:static print:inset-auto">
             <div className="w-full max-w-3xl rounded-3xl bg-white shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none">
                 
                 {/* Modal Header - Hidden on Print */}
@@ -57,7 +57,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                     </div>
                 </div>
 
-                <div className="overflow-y-auto p-8 md:p-12 print:overflow-visible print:p-0" id="printable-invoice">
+                <div className="overflow-y-auto p-8 md:p-12 print:overflow-visible print:p-0">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 animate-pulse">
                             <div className="h-12 w-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -67,7 +67,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                         <div className="flex flex-col gap-10">
                             
                             {/* Company Branding & Info */}
-                            <div className="flex flex-col md:flex-row justify-between items-start gap-6 border-b border-slate-100 pb-10">
+                            <div className="flex justify-between items-start gap-6 border-b border-slate-100 pb-8 print:pb-6">
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
                                         {sale.company?.logoUrl ? (
@@ -96,11 +96,14 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                     </div>
                                 </div>
 
-                                <div className="text-right flex flex-col items-end">
-                                    <h2 className="text-4xl font-black text-slate-200 uppercase tracking-tighter mb-2">INVOICE</h2>
-                                    <div className="bg-slate-50 px-4 py-3 rounded-2xl border border-slate-100">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nomor Pesanan</p>
-                                        <p className="text-sm font-mono font-bold text-slate-900">{sale.invoiceNumber}</p>
+                                {/* Invoice ID & Order Box */}
+                                <div className="relative text-right">
+                                    <div className="absolute -top-12 -right-4 text-[110px] font-black text-slate-100 uppercase tracking-[15px] pointer-events-none -z-10 opacity-20 print:opacity-10 italic select-none">
+                                        Invoice
+                                    </div>
+                                    <div className="bg-slate-50 px-5 py-4 rounded-2xl border border-slate-100 print:bg-white print:border-slate-200 shadow-sm print:shadow-none">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Nomor Pesanan</p>
+                                        <p className="text-lg font-black text-slate-900 italic tracking-tight">{sale.invoiceNumber}</p>
                                     </div>
                                 </div>
                             </div>
@@ -216,36 +219,6 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                     )}
                 </div>
 
-                {/* Print Context CSS */}
-                <style jsx global>{`
-                    @media print {
-                        body * {
-                            visibility: hidden;
-                        }
-                        #printable-invoice, #printable-invoice * {
-                            visibility: visible;
-                        }
-                        #printable-invoice {
-                            position: absolute;
-                            left: 0;
-                            top: 0;
-                            width: 100%;
-                            padding: 0 !important;
-                            margin: 0 !important;
-                        }
-                        .print-hidden {
-                            display: none !important;
-                        }
-                        @page {
-                            size: auto;
-                            margin: 15mm;
-                        }
-                        /* Reset bg colors for printing */
-                        .bg-slate-900 { background-color: #0f172a !important; -webkit-print-color-adjust: exact; }
-                        .bg-orange-600 { background-color: #ea580c !important; -webkit-print-color-adjust: exact; }
-                        .text-white { color: #ffffff !important; -webkit-print-color-adjust: exact; }
-                    }
-                `}</style>
             </div>
         </div>
     );

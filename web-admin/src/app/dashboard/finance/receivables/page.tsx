@@ -11,11 +11,24 @@ export default function ReceivablesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isPayModalOpen, setIsPayModalOpen] = useState(false);
     const [modalData, setModalData] = useState({ id: 0, date: '', ref: '' });
+    const [payData, setPayData] = useState({ id: 0, accountId: '', date: new Date().toISOString().split('T')[0] });
+    const [accounts, setAccounts] = useState<any[]>([]);
 
     useEffect(() => {
         fetchReceivables();
+        fetchAccounts();
     }, []);
+
+    const fetchAccounts = async () => {
+        try {
+            const res = await api.get('/finance/accounts');
+            setAccounts(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil data akun", error);
+        }
+    };
 
     const fetchReceivables = async () => {
         try {
@@ -55,6 +68,32 @@ export default function ReceivablesPage() {
             setIsModalOpen(false);
         } catch (error) {
             alert("Gagal memperbarui status tukar faktur.");
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    const handlePayClick = (id: number) => {
+        setPayData({ 
+            id, 
+            accountId: accounts.length > 0 ? accounts[0].id.toString() : '', 
+            date: new Date().toISOString().split('T')[0] 
+        });
+        setIsPayModalOpen(true);
+    };
+
+    const confirmPayment = async () => {
+        if (!payData.accountId) return alert("Pilih akun pembayaran");
+        try {
+            setUpdatingId(payData.id);
+            await api.patch(`/finance/sales/${payData.id}/pay`, {
+                accountId: payData.accountId,
+                paymentDate: payData.date
+            });
+            await fetchReceivables();
+            setIsPayModalOpen(false);
+        } catch (error) {
+            alert("Gagal melunasi piutang");
         } finally {
             setUpdatingId(null);
         }
@@ -196,10 +235,12 @@ export default function ReceivablesPage() {
                                                     </button>
                                                     
                                                     <button 
-                                                        onClick={() => window.location.href = '/dashboard/sales'}
-                                                        className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-1 active:scale-95"
+                                                        onClick={() => handlePayClick(r.id)}
+                                                        disabled={updatingId === r.id}
+                                                        className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
                                                     >
-                                                        <CheckCircle2 className="h-3 w-3" /> Lunasi
+                                                        {updatingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                                                        Lunasi
                                                     </button>
                                                 </div>
                                             </td>
@@ -276,6 +317,64 @@ export default function ReceivablesPage() {
                             >
                                 {updatingId !== null ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                                 Konfirmasi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal Lunasi Piutang */}
+            {isPayModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black italic tracking-tight text-slate-900 uppercase">Pelunasan Piutang</h3>
+                                <p className="text-xs text-slate-500 font-medium tracking-tight">Konfirmasi pembayaran piutang pelanggan.</p>
+                            </div>
+                        </div>
+        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Terima di Akun (Kas/Bank)</label>
+                                <select 
+                                    value={payData.accountId}
+                                    onChange={(e) => setPayData({...payData, accountId: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 focus:border-emerald-500 outline-none transition-all font-bold text-slate-700"
+                                >
+                                    <option value="">Pilih Akun...</option>
+                                    {accounts.map(acc => (
+                                        <option key={acc.id} value={acc.id}>{acc.name} (Rp {acc.balance.toLocaleString()})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Tanggal Pelunasan</label>
+                                <input 
+                                    type="date"
+                                    value={payData.date}
+                                    onChange={(e) => setPayData({...payData, date: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 focus:border-emerald-500 outline-none transition-all font-bold text-slate-700"
+                                />
+                            </div>
+                        </div>
+        
+                        <div className="flex gap-3 mt-8">
+                            <button 
+                                onClick={() => setIsPayModalOpen(false)}
+                                className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-100 transition-all"
+                            >
+                                Batal
+                            </button>
+                            <button 
+                                onClick={confirmPayment}
+                                disabled={updatingId !== null || !payData.accountId}
+                                className="flex-1 py-3 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {updatingId !== null ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
+                                Lunasi Sekarang
                             </button>
                         </div>
                     </div>

@@ -4,6 +4,8 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 
 import { LanguageProvider } from '@/lib/LanguageContext';
+import { FeatureProvider } from '@/lib/FeatureContext';
+import { UpgradeModal } from '@/components/dashboard/UpgradeModal';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,8 +23,11 @@ export default function RootLayout({
     <html lang="id" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
         <LanguageProvider>
-          <Toaster position="top-right" />
-          {children}
+          <FeatureProvider>
+            <Toaster position="top-right" />
+            {children}
+            <UpgradeModal />
+          </FeatureProvider>
         </LanguageProvider>
       </body>
     </html>

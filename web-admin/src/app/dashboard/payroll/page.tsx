@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { Wallet, Calculator, CheckCircle, Clock, User, AlertCircle, Download, FileText, Search, Banknote, Plus, X, ChevronRight } from 'lucide-react';
+import { Wallet, Calculator, CheckCircle, Clock, User, AlertCircle, Download, FileText, Search, Banknote, Plus, X, ChevronRight, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
+import PaycheckModal from '@/components/payroll/PaycheckModal';
 
 interface PayrollRecord {
     id: number;
@@ -43,6 +44,11 @@ export default function PayrollPage() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [companyInfo, setCompanyInfo] = useState<any>(null);
+
+    // Modal Slip Gaji State
+    const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null);
+    const [isPaycheckOpen, setIsPaycheckOpen] = useState(false);
 
     // Default ke bulan & tahun saat ini
     const now = new Date();
@@ -73,6 +79,7 @@ export default function PayrollPage() {
             
             setPayrolls(payrollRes.data);
             setIsFinanceOnly(companyRes.data.modules === 'FINANCE');
+            setCompanyInfo(companyRes.data);
             setEmployees(userRes.data);
             setError('');
         } catch (err: any) {
@@ -127,38 +134,25 @@ export default function PayrollPage() {
         }
     };
 
-    const handleExportExcel = () => {
-        if (payrolls.length === 0) return;
-
-        const exportData = payrolls.map(p => ({
-            'Nama Karyawan': p.user.name,
-            'Email': p.user.email,
-            'Bulan': p.month,
-            'Tahun': p.year,
-            'Gaji Pokok': p.basicSalary,
-            'Tunjangan': p.allowance,
-            'Lembur (Jam)': p.overtimeHours,
-            'Upah Lembur': p.overtimePay,
-            'Total Hadir': p.attendanceCount,
-            'Keterlambatan': p.lateCount,
-            'Potongan Absensi': p.deductions,
-            'Potongan Sakit': p.sickLeaveDeduction,
-            'Potongan Kasbon': p.loanDeduction,
-            'BPJS Kesehatan (1%)': p.bpjsKesehatanDeduction,
-            'BPJS Ketenagakerjaan (Employee)': p.bpjsKetenagakerjaanDeduction,
-            'PPh 21 (Pajak)': p.pph21Deduction,
-            'BPJS Tanggung Perusahaan': p.bpjsCompanyContribution,
-            'Klaim Reimbursement': p.reimbursementPay,
-            'Bonus & THR': p.bonusPay,
-            'Gaji Bersih (THP)': p.netSalary,
-            'Status': p.status === 'PAID' ? 'Sudah Dibayar' : 'Draft/Belum Dibayar'
-        }));
-
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Rekap Payroll");
-
-        XLSX.writeFile(workbook, `Rekap_Payroll_${selectedMonth}_${selectedYear}.xlsx`);
+    const handleExportExcel = async () => {
+        try {
+            const response = await api.get('/payroll/export', {
+                params: { month: selectedMonth, year: selectedYear },
+                responseType: 'blob',
+            });
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Rekap_Payroll_${selectedMonth}_${selectedYear}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Gagal mengekspor payroll excel", error);
+            alert("Gagal mengekspor data penggajian ke Excel. Silakan coba lagi.");
+        }
     };
 
     const handlePay = async (id: number) => {
@@ -179,82 +173,8 @@ export default function PayrollPage() {
     };
 
     const handleDownloadPDF = (p: PayrollRecord) => {
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.getWidth();
-
-        // Header
-        doc.setFontSize(18);
-        doc.setTextColor(30, 41, 59); // slate-800
-        doc.text("SLIP GAJI KARYAWAN", pageWidth / 2, 20, { align: "center" });
-
-        doc.setFontSize(11);
-        doc.setTextColor(100, 116, 139); // slate-500
-        doc.text(`Periode: ${p.month} / ${p.year}`, pageWidth / 2, 28, { align: "center" });
-        doc.setDrawColor(226, 232, 240); // slate-200
-        doc.line(20, 35, pageWidth - 20, 35);
-
-        // Employee Info
-        doc.setFontSize(10);
-        doc.setTextColor(30, 41, 59);
-        doc.text(`Nama Karyawan : ${p.user.name}`, 20, 45);
-        doc.text(`Email          : ${p.user.email}`, 20, 52);
-        doc.text(`Status         : ${p.status === 'PAID' ? 'Selesai Dibayar' : 'Draft / Belum Bayar'}`, 20, 59);
-
-        // Table breakdown
-        const tableBody = [
-            ['Gaji Pokok', formatCurrency(p.basicSalary)],
-            ['Tunjangan Jabatan', `+ ${formatCurrency(p.allowance)}`],
-            ['Lembur (${p.overtimeHours} Jam)', `+ ${formatCurrency(p.overtimePay)}`],
-            ['Klaim Reimbursement', `+ ${formatCurrency(p.reimbursementPay)}`],
-            ['Bonus & THR', `+ ${formatCurrency(p.bonusPay)}`],
-            ['Potongan Keterlambatan/Absen', `- ${formatCurrency(p.deductions)}`],
-            ['Potongan Kasbon', `- ${formatCurrency(p.loanDeduction)}`]
-        ];
-
-        if (p.sickLeaveDeduction > 0) {
-            tableBody.push(['Potongan Tunjangan (Sakit)', `- ${formatCurrency(p.sickLeaveDeduction)}`]);
-        }
-
-        if (p.bpjsKesehatanDeduction > 0) {
-            tableBody.push(['Potongan BPJS Kesehatan (1%)', `- ${formatCurrency(p.bpjsKesehatanDeduction)}`]);
-        }
-        if (p.bpjsKetenagakerjaanDeduction > 0) {
-            tableBody.push(['Potongan BPJS Ketenagakerjaan', `- ${formatCurrency(p.bpjsKetenagakerjaanDeduction)}`]);
-        }
-        if (p.pph21Deduction > 0) {
-            tableBody.push(['Potongan PPh 21 (Pajak)', `- ${formatCurrency(p.pph21Deduction)}`]);
-        }
-
-        tableBody.push(
-            [{ content: 'Total Gaji Bersih (Take Home Pay)', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: formatCurrency(p.netSalary), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }] as any
-        );
-
-        (doc as any).autoTable({
-            startY: 70,
-            head: [['Rincian Pendapatan & Potongan', 'Jumlah']],
-            body: tableBody,
-            theme: 'striped',
-            headStyles: { fillColor: [37, 99, 235], fontSize: 10 },
-            styles: { fontSize: 10, cellPadding: 5 },
-            columnStyles: {
-                1: { halign: 'right' }
-            }
-        });
-
-        // Footer
-        const finalY = (doc as any).lastAutoTable.finalY + 25;
-        doc.setFontSize(9);
-        doc.setTextColor(148, 163, 184);
-        doc.text("Dokumen ini dihasilkan secara otomatis oleh sistem HRIS.", 20, finalY);
-        doc.text("Dicetak pada: " + new Date().toLocaleString('id-ID'), 20, finalY + 5);
-
-        doc.setTextColor(30, 41, 59);
-        doc.text("Disetujui Oleh,", pageWidth - 60, finalY);
-        doc.text("( ____________________ )", pageWidth - 70, finalY + 30);
-        doc.text("Manager HRD", pageWidth - 55, finalY + 35);
-
-        doc.save(`Slip_Gaji_${p.user.name}_${p.month}_${p.year}.pdf`);
+        setSelectedPayroll(p);
+        setIsPaycheckOpen(true);
     };
 
     return (
@@ -468,11 +388,11 @@ export default function PayrollPage() {
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
-                                                    onClick={() => handleDownloadPDF(p)}
+                                                    onClick={() => { setSelectedPayroll(p); setIsPaycheckOpen(true); }}
                                                     className="p-1 px-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                                     title="Cetak Slip PDF"
                                                 >
-                                                    <FileText className="h-4 w-4" />
+                                                    <Printer className="h-4 w-4" />
                                                 </button>
                                                  {p.status === 'DRAFT' ? (
                                                      <button
@@ -508,6 +428,14 @@ export default function PayrollPage() {
                     </ul>
                 </div>
             </div>
+            {/* Paycheck Modal Standar Baru */}
+            <PaycheckModal 
+                isOpen={isPaycheckOpen}
+                onClose={() => setIsPaycheckOpen(false)}
+                payroll={selectedPayroll}
+                company={companyInfo}
+            />
+
             {/* MODAL INPUT MANUAL (Khusus Finance-Only) */}
             {isManualModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">

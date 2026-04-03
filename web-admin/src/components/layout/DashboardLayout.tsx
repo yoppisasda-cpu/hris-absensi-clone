@@ -24,12 +24,16 @@ export default function DashboardLayout({
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden" style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden' }}>
             {/* Sidebar Kiri */}
-            <Sidebar />
+            <div id="main-sidebar" className="print:hidden">
+                <Sidebar />
+            </div>
 
             {/* Konten Kanan */}
             <div className="flex flex-1 flex-col overflow-hidden" style={{ display: 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
                 {/* Header Atas */}
-                <Header />
+                <div id="main-header" className="print:hidden">
+                    <Header />
+                </div>
 
                 {/* Main Workspace */}
                 <main className="flex-1 overflow-y-auto p-6 transition-all duration-300" style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>

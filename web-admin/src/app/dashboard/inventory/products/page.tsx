@@ -197,7 +197,7 @@ export default function ProductsPage() {
                                 <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">POS</th>
                                 <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-right">Harga Jual</th>
                                 <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">% Margin</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">Stok</th>
+                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">Sisa Stok</th>
                                 <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">Status</th>
                                 <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-right">Aksi</th>
                             </tr>
@@ -245,7 +245,7 @@ export default function ProductsPage() {
                                         <td className="px-6 py-4 font-mono text-[11px] text-slate-500 font-bold">{product.sku || '-'}</td>
                                         <td className="px-6 py-4 text-right font-medium text-slate-500 italic">
                                             <div className="flex flex-col items-end">
-                                                <span>Rp {(product.recipeCogs > 0 ? product.recipeCogs : product.costPrice).toLocaleString()}</span>
+                                                 <span>{ (product.recipeCogs > 0 || product.costPrice > 0) ? `Rp ${(product.recipeCogs > 0 ? product.recipeCogs : product.costPrice).toLocaleString()}` : <span className="text-slate-300">Belum diatur</span> }</span>
                                                 {product.recipeCogs > 0 && (
                                                     <span className="text-[10px] text-orange-500 flex items-center gap-0.5 font-bold uppercase tracking-tighter not-italic">
                                                         <ChefHat className="h-3 w-3" /> Resep
@@ -280,12 +280,22 @@ export default function ProductsPage() {
                                         <td className="px-6 py-4 text-center">
                                             {product.trackStock ? (
                                                 <div className="flex flex-col items-center group/tooltip relative text-center">
-                                                    <span className={`text-lg font-black italic ${product.stock <= product.minStock ? 'text-red-600' : 'text-slate-900'}`}>
-                                                        {product.stock} <span className="text-[10px] not-italic text-slate-400 font-bold uppercase">{product.unit}</span>
-                                                    </span>
+                                                     <span className={`text-lg font-black italic ${product.stock <= 0 ? 'text-red-600' : product.stock <= product.minStock ? 'text-orange-500' : 'text-slate-900'}`}>
+                                                        <span className="text-sm not-italic opacity-50 mr-1">Sisa:</span> {product.stock} <span className="text-[10px] not-italic text-slate-400 font-bold uppercase">{product.unit}</span>
+                                                     </span>
+                                                    {product.stock < 0 && (
+                                                        <span className="text-[8px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md font-black uppercase mt-1 animate-pulse">
+                                                            Out of Sync
+                                                        </span>
+                                                    )}
+                                                    {product.stock === 0 && (
+                                                        <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md font-black uppercase mt-1">
+                                                            Habis
+                                                        </span>
+                                                    )}
                                                     {product.WarehouseStock && product.WarehouseStock.length > 0 && (
                                                         <>
-                                                            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter flex items-center gap-0.5 justify-center">
+                                                            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter flex items-center gap-0.5 justify-center mt-1">
                                                                 <MapPin className="h-2 w-2" /> {product.WarehouseStock.length} Lokasi
                                                             </div>
                                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block z-20 w-48 bg-slate-900 text-white p-3 rounded-xl shadow-2xl animate-in fade-in zoom-in duration-200">

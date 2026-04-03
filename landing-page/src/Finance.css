@@ -1,0 +1,473 @@
+.f-app {
+  background-color: #0b0213;
+  color: white;
+  min-height: 100vh;
+  font-family: 'Outfit', 'Inter', sans-serif;
+}
+
+.f-badge {
+  display: inline-block;
+  padding: 0.5rem 1.2rem;
+  background: rgba(236, 72, 153, 0.1);
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  color: #f472b6;
+  border-radius: 99px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+}
+
+.f-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 5%;
+  background: rgba(11, 2, 19, 0.8);
+  backdrop-filter: blur(20px);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  border-bottom: 1px solid rgba(236, 72, 153, 0.1);
+}
+
+.f-logo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.f-logo img {
+  width: 32px;
+  height: 32px;
+}
+
+.f-logo span {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.f-links {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+.f-links a {
+  color: #94a3b8;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.f-links a:hover {
+  color: #f472b6;
+}
+
+.f-btn-login {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.6rem 1.25rem;
+  border-radius: 12px;
+  color: white !important;
+}
+
+.f-btn-login:hover {
+  background: rgba(244, 114, 182, 0.1);
+  border-color: #f472b6;
+}
+
+.f-gradient {
+  background: linear-gradient(135deg, #f472b6, #db2777);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.f-hero {
+  padding: 12rem 5% 6rem;
+  text-align: center;
+}
+
+h1 {
+  font-size: 4rem;
+  font-weight: 900;
+  line-height: 1.1;
+  margin-bottom: 2rem;
+}
+
+.f-subtitle {
+  font-size: 1.2rem;
+  color: #94a3b8;
+  max-width: 600px;
+  margin: 0 auto 3rem;
+  line-height: 1.6;
+}
+
+.f-cta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+}
+
+.f-btn-primary {
+  background: linear-gradient(135deg, #db2777, #ec4899);
+  padding: 1.25rem 2.8rem;
+  border-radius: 18px;
+  color: white;
+  text-decoration: none;
+  font-weight: 800;
+  box-shadow: 0 10px 30px rgba(236, 72, 153, 0.3);
+  transition: all 0.3s;
+}
+
+.f-btn-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 40px rgba(236, 72, 153, 0.4);
+}
+
+.f-btn-secondary {
+  color: #94a3b8;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: all 0.2s;
+  border-bottom: 1px solid transparent;
+}
+
+.f-btn-secondary:hover {
+  color: #f472b6;
+  border-bottom-color: #f472b6;
+}
+
+/* AI Mind Section */
+.f-ai-section {
+  padding: 8rem 5%;
+  background: radial-gradient(circle at 100% 50%, rgba(236, 72, 153, 0.05) 0%, transparent 50%);
+}
+
+.f-ai-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.f-perk {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1.5rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.f-brain-orb {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, #f472b6, #db2777);
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: f-orbPulse 4s infinite;
+  margin: 0 auto;
+}
+
+@keyframes f-orbPulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.1); }
+}
+
+/* Features */
+.f-features {
+  padding: 6rem 5%;
+  text-align: center;
+}
+
+.f-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 4rem;
+}
+
+.f-tabs button {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  padding: 0.8rem 2rem;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.f-tabs button.active {
+  background: #db2777;
+  border-color: #f472b6;
+}
+
+.f-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.f-card {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 2.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: left;
+}
+
+/* Pricing Grid */
+.f-pricing {
+  padding: 8rem 5%;
+  background: linear-gradient(180deg, #0b0213 0%, #1a012a 100%);
+  text-align: center;
+}
+
+.f-pricing-header {
+  margin-bottom: 4rem;
+}
+
+.f-pricing-header h2 {
+  font-size: 3.5rem;
+  font-weight: 900;
+  margin-bottom: 1.5rem;
+}
+
+/* Toggle Switch */
+.f-toggle-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 5rem;
+}
+
+.f-toggle-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.f-toggle-label.active {
+  color: #f472b6;
+}
+
+.f-switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.f-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.f-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: .4s;
+  border-radius: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.f-slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 3px;
+  background-color: #f472b6;
+  transition: .4s;
+  border-radius: 50%;
+  box-shadow: 0 0 15px rgba(244, 114, 182, 0.5);
+}
+
+input:checked + .f-slider:before {
+  transform: translateX(26px);
+}
+
+.f-discount-badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  padding: 0.3rem 0.8rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-left: 0.5rem;
+}
+
+/* Pricing Cards */
+.f-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto 8rem;
+}
+
+.f-price-card {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4rem 2.5rem;
+  border-radius: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.f-price-card:hover {
+  transform: translateY(-10px);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(244, 114, 182, 0.3);
+}
+
+.f-price-card.featured {
+  background: linear-gradient(180deg, rgba(219, 39, 119, 0.1) 0%, rgba(11, 2, 19, 0.1) 100%);
+  border: 2px solid #db2777;
+  transform: scale(1.05);
+}
+
+.f-price-card.featured:hover {
+  transform: scale(1.05) translateY(-5px);
+}
+
+.f-plan-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #f472b6;
+  margin-bottom: 0.5rem;
+}
+
+.f-plan-price {
+  font-size: 3.5rem;
+  font-weight: 950;
+  margin: 1.5rem 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.f-plan-price span {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.f-list {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0;
+  flex-grow: 1;
+}
+
+.f-list li {
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  color: #cbd5e1;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.f-list li b {
+  color: #f472b6;
+}
+
+.f-btn-card {
+  display: block;
+  width: 100%;
+  padding: 1.2rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  color: white;
+  text-decoration: none;
+  font-weight: 800;
+  transition: all 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.f-btn-card:hover {
+  background: #db2777;
+  border-color: #f472b6;
+}
+
+.f-price-card.featured .f-btn-card {
+  background: #db2777;
+  border-color: #f472b6;
+}
+
+/* Add-ons Section */
+.f-addons-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.f-addons-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-top: 4rem;
+}
+
+.f-addon-card {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 2rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: left;
+}
+
+.f-addon-name {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.f-addon-price {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f472b6;
+}
+
+.f-addon-price span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+@media (max-width: 1100px) {
+  .f-pricing-grid { grid-template-columns: repeat(2, 1fr); }
+  .f-price-card.featured { transform: scale(1); }
+  .f-addons-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .f-pricing-grid { grid-template-columns: 1fr; }
+  .f-addons-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 3rem; }
+}
