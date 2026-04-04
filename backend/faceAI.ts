@@ -18,12 +18,37 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 function fileToGenerativePart(filePath: string, mimeType: string) {
-  return {
-    inlineData: {
-      data: Buffer.from(fs.readFileSync(filePath)).toString("base64"),
-      mimeType,
-    },
-  };
+    let finalPath = filePath;
+    
+    // Self-Healing Path Check: Jika alamatnya berantakan, kita coba bereskan
+    if (!fs.existsSync(finalPath)) {
+        console.warn(`[Face AI] Path not found: ${finalPath}. Attempting self-healing...`);
+        
+        // Coba 1: Bersihkan dari double slash atau leading slash yang salah
+        const cleanedPath = filePath.replace(/^\/+/, "").replace(/\/\//g, "/");
+        const try1 = path.join(process.cwd(), cleanedPath);
+        
+        // Coba 2: Jika masih gak ketemu, coba cari langsung di folder uploads
+        const fileName = path.basename(filePath);
+        const folderName = filePath.includes('attendance') ? 'attendance' : 'face_references';
+        const try2 = path.join(process.cwd(), 'uploads', folderName, fileName);
+
+        if (fs.existsSync(try1)) {
+            finalPath = try1;
+        } else if (fs.existsSync(try2)) {
+            finalPath = try2;
+        } else {
+            console.error(`[Face AI] ALL PATH ATTEMPTS FAILED for: ${filePath}`);
+            throw new Error(`ENOENT: File tidak ditemukan di manapun. Cek: ${filePath}`);
+        }
+    }
+
+    return {
+        inlineData: {
+            data: Buffer.from(fs.readFileSync(finalPath)).toString("base64"),
+            mimeType,
+        },
+    };
 }
 
 async function downloadImage(url: string, dest: string) {
