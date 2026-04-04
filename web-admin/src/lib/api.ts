@@ -4,20 +4,31 @@ import axios from 'axios';
 // Helper to determine the backend URL
 const getBaseURL = () => {
     // Priority 1: Use Environment Variable (Defined in Vercel/Railway Dashboard)
-    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+    if (process.env.NEXT_PUBLIC_API_URL) {
+        console.log("[API] Hits Backend at (ENV):", process.env.NEXT_PUBLIC_API_URL);
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
 
     // Priority 2: Client-side detection based on current domain
     if (typeof window !== 'undefined') {
         const host = window.location.hostname;
+
         // If testing on aivola.id domains
         if (host.includes('aivola.id')) {
+            console.log("[API] Hits Backend at (Aivola): https://api.aivola.id/api");
             return 'https://api.aivola.id/api';
         }
-        // If testing on your current Railway deployment URL, use its own backend port 5000 if same domain
-        // Or simply fallback to the primary API if we know it.
+
+        // If on Railway, usually the API is a different service. 
+        // We warn the user to set the ENV variable.
+        if (host.includes('railway.app')) {
+            console.warn("[API WARNING] NEXT_PUBLIC_API_URL IS MISSING! This might cause 401 logouts.");
+        }
     }
     
-    return 'https://api.aivola.id/api'; // Default Production API
+    const defaultApi = 'https://api.aivola.id/api';
+    console.log("[API] Hits Backend at (Default):", defaultApi);
+    return defaultApi; 
 };
 
 const api = axios.create({
@@ -41,18 +52,17 @@ api.interceptors.response.use(
         // --- MULTI-LAYER AUTH PROTECTION ---
         if (error.response && error.response.status === 401) {
             const errorMsg = error.response.data?.error || "";
-            const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
             
-            // Only logout if it's a DEFINITIVE invalid token error (not 401 from something else)
-            const isDefinitiveAuthError = errorMsg.includes('Token tidak valid') || errorMsg.includes('kadaluarsa') || errorMsg.includes('Login');
+            // SECURITY OVERRIDE: We temporarly DISABLE aggressive logout to debug the "kick out" issue.
+            // If it's a 401, we just log it aggressively. But if it's the login page, we let it pass.
+            console.error("🚨 [API 401 ERROR CAUGHT] Backend menolak token Anda!", {
+                url: error.config?.url,
+                message: errorMsg,
+                tokenSent: !!error.config?.headers?.Authorization
+            });
 
-            if (isDefinitiveAuthError && currentPath !== '/' && typeof window !== 'undefined') {
-                console.error("[API REDIRECT] Force Logout due to definitive 401:", errorMsg);
-                localStorage.clear(); // Clear all to be safe
-                window.location.href = '/?error=session_expired'; 
-            } else {
-                console.warn("[API WARNING] Received 401 but it might be transient or specific. Staying logged in. Error:", errorMsg);
-            }
+            // We do NOT clear localStorage or window.location.href here anymore.
+            // This prevents the "ditendang pas refresh" issue completely.
         }
         return Promise.reject(error);
     }

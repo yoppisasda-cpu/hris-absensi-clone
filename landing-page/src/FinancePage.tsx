@@ -168,7 +168,7 @@ const FinancePricing = () => {
             <span>Rp</span> {pricing.enterprise.toLocaleString('id-ID')} <span>/{isAnnual ? 'thn' : 'bln'}</span>
           </div>
           <ul className="f-list">
-            <li><span>✓</span> <b>Unlimited</b> Admin & POS</li>
+            <li><span>✓</span> <b>10</b> Admin & POS</li>
             <li><span>✓</span> Custom Recipe / BOM</li>
             <li><span>✓</span> <b>Aivola Mind</b> AI Advisor</li>
             <li><span>✓</span> <b>Anti-Fraud</b> Protection</li>
