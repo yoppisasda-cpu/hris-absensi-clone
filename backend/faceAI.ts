@@ -43,8 +43,16 @@ function fileToGenerativePart(filePath: string, mimeType: string) {
             finalPath = try2;
         } else {
             const serverInfo = `[CWD: ${process.cwd()}]`;
-            console.error(`[Face AI] FAILED. ${serverInfo} for: ${filePath}`);
-            throw new Error(`ENOENT: File tidak ditemukan. ${serverInfo}. Cek database path: ${filePath}`);
+            
+            // DEBUG: Cek isi folder untuk memastikan filenya ada di mana
+            let dirFiles = "Folder Not Found";
+            const targetDir = path.join(process.cwd(), 'uploads/face_references');
+            if (fs.existsSync(targetDir)) {
+                dirFiles = fs.readdirSync(targetDir).slice(0, 5).join(", ");
+            }
+
+            console.error(`[Face AI] FAILED. ${serverInfo} for: ${filePath}. Files found: ${dirFiles}`);
+            throw new Error(`ENOENT: File tidak ditemukan. ${serverInfo}. Files in folder: [${dirFiles}]. Cek path: ${filePath}`);
         }
     }
 
