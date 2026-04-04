@@ -12,9 +12,10 @@ import AIInsights from "@/components/dashboard/AIInsights";
 
 export default function DashboardPage() {
     const router = useRouter();
-    const [adminName, setAdminName] = useState('Admin');
+    const [adminName, setAdminName] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userName') || 'Admin' : 'Admin'));
     const [companyName, setCompanyName] = useState('Perusahaan Anda');
     const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | 'INVENTORY' | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
     const [stats, setStats] = useState([
         { title: "Total Karyawan", value: "0", icon: <Users className="h-6 w-6 text-blue-500" />, trend: "..." },
         { title: "Hadir Hari Ini", value: "0", icon: <UserCheck className="h-6 w-6 text-green-500" />, trend: "..." },
@@ -32,6 +33,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        setIsMounted(true);
         // 0. Check for Active Module
         const mod = localStorage.getItem('activeModule') as any;
         if (!mod) {
@@ -235,7 +237,7 @@ export default function DashboardPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Halo, {adminName}! 👋</h1>
+                    <h1 className="text-3xl font-bold text-slate-900">Halo, {!isMounted ? 'Admin' : adminName}! 👋</h1>
                     <p className="mt-1 text-sm text-slate-500">Berikut adalah ringkasan absensi harian untuk <span className="font-semibold">{companyName}</span>.</p>
                 </div>
                 {companyContract && (

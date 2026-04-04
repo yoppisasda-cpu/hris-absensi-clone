@@ -7,8 +7,16 @@ import { useLanguage } from '@/lib/LanguageContext';
 
 export default function Header() {
     const { language, setLanguage } = useLanguage();
-    const [profileName, setProfileName] = useState('Memuat...');
-    const [roleLabel, setRoleLabel] = useState('-');
+    const [profileName, setProfileName] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userName') || 'Memuat...' : 'Memuat...'));
+    const [roleLabel, setRoleLabel] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const r = localStorage.getItem('userRole');
+            if (r === 'SUPERADMIN' || r === 'OWNER') return 'SaaS Owner';
+            if (r === 'ADMIN') return 'HR Director';
+            if (r) return 'Karyawan';
+        }
+        return '-';
+    });
     const [companyName, setCompanyName] = useState('');
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -18,16 +26,10 @@ export default function Header() {
     const [allowedModules, setAllowedModules] = useState<string>('BOTH');
     const [contractInfo, setContractInfo] = useState<{ end: string | null; level: number }>({ end: null, level: 0 });
     const [showBanner, setShowBanner] = useState(true);
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        const name = localStorage.getItem('userName');
-        if (name) setProfileName(name);
-
-        const r = localStorage.getItem('userRole');
-        if (r === 'SUPERADMIN') setRoleLabel('SaaS Owner');
-        else if (r === 'ADMIN') setRoleLabel('HR Director');
-        else if (r) setRoleLabel('Karyawan');
-
+        setIsMounted(true);
         const token = localStorage.getItem('jwt_token');
         if (!token) return;
 
@@ -272,8 +274,8 @@ export default function Header() {
 
                 <div className="flex items-center gap-3 border-l pl-4">
                     <div className="text-right">
-                        <p className="text-sm font-medium text-slate-700">{profileName}</p>
-                        <p className="text-xs text-slate-500">{roleLabel} - {companyName}</p>
+                        <p className="text-sm font-medium text-slate-700">{!isMounted ? 'Memuat...' : profileName}</p>
+                        <p className="text-xs text-slate-500">{!isMounted ? '-' : roleLabel} - {companyName}</p>
                     </div>
                     <UserCircle className="h-8 w-8 text-slate-400" />
                 </div>

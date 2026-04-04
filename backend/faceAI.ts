@@ -1,87 +1,100 @@
 
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
+import axios from 'axios';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 /**
- * Face Similarity Verification AI (Phase 50)
- * Memberikan skor kemiripan antara foto referensi (master) dan foto absen (capture).
+ * Real Face Similarity Verification AI (Gemini 1.5 Flash Edition)
+ * Melakukan perbandingan visual nyata antara dua foto.
  */
 export interface FaceResult {
     score: number;       // 0.0 - 1.0
-    verified: boolean;   // true jika score > threshold
+    verified: boolean;   // true jika AI yakin foto orang yang sama
 }
 
-const SIMILARITY_THRESHOLD = 0.75;
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// Helper untuk membaca file ke base64 (format yang diminta Gemini)
+function fileToGenerativePart(path: string, mimeType: string) {
+  return {
+    inlineData: {
+      data: Buffer.from(fs.readFileSync(path)).toString("base64"),
+      mimeType,
+    },
+  };
+}
+
+// Helper untuk download image jika URL
+async function downloadImage(url: string, dest: string) {
+    const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream'
+    });
+    return new Promise((resolve, reject) => {
+        const writer = fs.createWriteStream(dest);
+        response.data.pipe(writer);
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+    });
+}
 
 export async function compareFaces(referencePath: string, capturePath: string): Promise<FaceResult> {
     try {
-        console.log(`[Face AI] Comparing Reference: ${referencePath} with Capture: ${capturePath}`);
+        console.log(`[Face AI] REAL AI Comparison Started...`);
+        console.log(`- Base Reference: ${referencePath}`);
+        console.log(`- Capture To Check: ${capturePath}`);
+
+        let finalRefPath = referencePath;
+        const isRemote = referencePath.startsWith('http');
+
+        // 1. Jika remote (Supabase/URL), download dulu ke temp
+        if (isRemote) {
+            const tempRef = path.join(process.cwd(), 'uploads', `temp_ref_${Date.now()}.jpg`);
+            await downloadImage(referencePath, tempRef);
+            finalRefPath = tempRef;
+        }
+
+        // 2. Kirim ke Gemini untuk Analisis Visual
+        const prompt = "Apakah dua gambar ini menunjukkan orang yang sama? " +
+                       "Gambar pertama adalah foto profil referensi, gambar kedua adalah foto selfie absensi. " +
+                       "Berikan jawaban dalam format JSON: { \"isSamePerson\": boolean, \"confidenceScore\": 0.0-1.0 } " +
+                       "Gunakan confidence score 0.8 ke atas jika Anda yakin 100%. " +
+                       "Jangan berikan teks tambahan selain JSON.";
+
+        const imageParts = [
+            fileToGenerativePart(finalRefPath, "image/jpeg"),
+            fileToGenerativePart(capturePath, "image/jpeg"),
+        ];
+
+        const result = await model.generateContent([prompt, ...imageParts]);
+        const text = result.response.text();
         
-        const isRemoteReference = referencePath.startsWith('http');
+        // Bersihkan teks dari Markdown jika ada (```json ... ```)
+        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const data = JSON.parse(jsonStr);
 
-        // Pastikan file ada (jika local)
-        if (!isRemoteReference && !fs.existsSync(referencePath)) {
-            console.error('[Face AI] Reference file not found for comparison.');
-            return { score: 0, verified: false };
-        }
-        
-        if (!fs.existsSync(capturePath)) {
-            console.error('[Face AI] Capture file not found for comparison.');
-            return { score: 0, verified: false };
+        // Hapus file temp jika tadi di-download
+        if (isRemote && fs.existsSync(finalRefPath)) {
+            fs.unlinkSync(finalRefPath);
         }
 
-        /**
-         * SIMULASI LOGIKA ROBUST:
-         * Dalam implementasi nyata, kita menggunakan face-api.js atau MediaPipe.
-         * Untuk simulasi ini, kita menggunakan kombinasi:
-         * 1. Metadata gambar (size, dimensions).
-         * 2. Buffer hash similarity (untuk mendeteksi jika ini adalah file yang sama).
-         * 3. Random noise yang terkontrol untuk mensimulasikan kegagalan kecil (pencahayaan, dll).
-         */
-        
-        if (isRemoteReference) {
-            // Jika remote, kita simulasikan kemiripan tinggi agar demo lancar
-            const score = 0.85 + (Math.random() * 0.1); // 0.85 - 0.95
-            return {
-                score: parseFloat(score.toFixed(2)),
-                verified: true
-            };
-        }
-
-        const refStats = fs.statSync(referencePath);
-        const capStats = fs.statSync(capturePath);
-
-        // Jika ukuran file identik, kemungkinan besar ini adalah foto yang sama / kemiripan 100%
-        if (refStats.size === capStats.size) {
-            return { score: 1.0, verified: true };
-        }
-
-        // Hitung seed berdasarkan karakteristik file untuk deterministik test
-        const seed = (refStats.size + capStats.size) % 100;
-
-        /**
-         * Logika Skor:
-         * - Sebagian besar (60%) akan dianggap Verified (score 0.75 - 0.95)
-         * - Sisanya (30%) akan dianggap Mismatch (score 0.3 - 0.6)
-         * - 10% kegagalan sistem (score 0)
-         */
-        let score = 0;
-        if (seed < 70) {
-            score = 0.76 + (seed % 20) / 100; // 0.76 - 0.96
-        } else if (seed < 90) {
-            score = 0.4 + (seed % 30) / 100; // 0.4 - 0.7
-        } else {
-            score = 0.1 + (seed % 15) / 100; // 0.1 - 0.25
-        }
+        console.log(`[Face AI] Result: ${data.isSamePerson ? 'MATCH' : 'MISMATCH'} (Score: ${data.confidenceScore})`);
 
         return {
-            score: parseFloat(score.toFixed(2)),
-            verified: score >= SIMILARITY_THRESHOLD
+            score: data.confidenceScore || 0,
+            verified: data.isSamePerson === true && (data.confidenceScore || 0) >= 0.7
         };
 
-    } catch (error) {
-        console.error('[Face AI] Internal Error:', error);
-        return { score: 0, verified: false };
+    } catch (error: any) {
+        console.error('[Face AI] AI Analysis Error:', error.message);
+        // Fallback: Jika AI mati, kita kembalikan false tapi dengan skor tinggi agar tidak memblokir demo 
+        // (opsional: jika ingin tetap ketat, set verified false)
+        return { score: 0.5, verified: false };
     }
 }

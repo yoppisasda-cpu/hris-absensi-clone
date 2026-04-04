@@ -46,9 +46,9 @@ export default function ShiftsPage() {
             setShowForm(false);
             setFormObj({ title: '', startTime: '08:00', endTime: '17:00' });
             fetchShifts();
-        } catch (error) {
-            const err = error as { response?: { data?: { error?: string } } };
-            alert(err.response?.data?.error || 'Terjadi kesalahan sistem');
+        } catch (err: unknown) {
+            const error = err as { response?: { data?: { error?: string } } };
+            alert(error.response?.data?.error || 'Terjadi kesalahan sistem');
         } finally {
             setIsSubmitting(false);
         }
@@ -145,7 +145,7 @@ export default function ShiftsPage() {
                                     <td colSpan={5} className="py-12 text-center text-slate-500">
                                         <Search className="h-12 w-12 text-slate-200 mx-auto mb-4" />
                                         <p className="font-medium text-lg mb-1">Tidak ada hasil ditemukan</p>
-                                        <p className="text-sm">Tidak ada shift yang cocok dengan "{searchQuery}"</p>
+                                        <p className="text-sm">Tidak ada shift yang cocok dengan &quot;{searchQuery}&quot;</p>
                                     </td>
                                 </tr>
                             ) : (

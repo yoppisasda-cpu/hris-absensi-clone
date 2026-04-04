@@ -172,7 +172,7 @@ export default function AttendancePage() {
                     <div className="flex h-64 flex-col items-center justify-center p-6 text-center text-slate-500">
                         <Search className="h-12 w-12 text-slate-200 mb-4" />
                         <p className="font-medium text-lg mb-1">Tidak ada hasil ditemukan</p>
-                        <p className="text-sm">Tidak ada data absensi yang cocok dengan "{searchQuery}"</p>
+                        <p className="text-sm">Tidak ada data absensi yang cocok dengan &quot;{searchQuery}&quot;</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">

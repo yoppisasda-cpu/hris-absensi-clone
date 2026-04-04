@@ -24,7 +24,7 @@ const FinanceHero = () => (
       <span className="f-gradient">dengan Analisis AI Strategis</span>
     </h1>
     <p className="f-subtitle">
-      Bukan sekadar kasir digital. Aivola Finance membantu Anda mengoptimalkan profit, 
+      Bukan sekadar kasir digital. Aivola Finance membantu Anda mengoptimalkan profit,
       memprediksi stok, dan menganalisis margin secara real-time.
     </p>
     <div className="f-cta">
@@ -39,7 +39,7 @@ const FinanceAI = () => (
     <div className="f-ai-grid">
       <div className="f-ai-text">
         <div className="f-badge">Kecerdasan Buatan</div>
-        <h2>Optimasi Profit <br/> Hingga ke Unit Terkecil</h2>
+        <h2>Optimasi Profit <br /> Hingga ke Unit Terkecil</h2>
         <div className="f-perks">
           <div className="f-perk">
             <span>🎯</span>
@@ -114,7 +114,7 @@ const FinancePricing = () => {
     <section id="pricing" className="f-pricing">
       <div className="f-pricing-header">
         <div className="f-badge">Pilihan Paket Bisnis</div>
-        <h2>Satu Harga untuk <br/> Efisiensi Selamanya</h2>
+        <h2>Satu Harga untuk <br /> Efisiensi Selamanya</h2>
         <p className="f-subtitle">Pilih paket yang paling sesuai dengan skala operasional bisnis Anda.</p>
       </div>
 
@@ -186,22 +186,22 @@ const FinancePricing = () => {
           <div className="f-addon-card">
             <span className="f-addon-name">📦 Inventory Pro</span>
             <div className="f-addon-price">Rp 20.000<span>/bln</span></div>
-            <p className="f-subtitle" style={{fontSize: '0.8rem', margin: '0.5rem 0'}}>Manajemen stok bahan baku & resep detail.</p>
+            <p className="f-subtitle" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>Manajemen stok bahan baku & resep detail.</p>
           </div>
           <div className="f-addon-card">
             <span className="f-addon-name">🧠 Aivola Mind (AI)</span>
             <div className="f-addon-price">Rp 20.000<span>/bln</span></div>
-            <p className="f-subtitle" style={{fontSize: '0.8rem', margin: '0.5rem 0'}}>Analisis profit & rekomendasi bisnis strategis.</p>
+            <p className="f-subtitle" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>Analisis profit & rekomendasi bisnis strategis.</p>
           </div>
           <div className="f-addon-card">
             <span className="f-addon-name">🛡️ Anti-Fraud Check</span>
             <div className="f-addon-price">Rp 10.000<span>/bln</span></div>
-            <p className="f-subtitle" style={{fontSize: '0.8rem', margin: '0.5rem 0'}}>Verifikasi wajah & deteksi kecurangan kasir.</p>
+            <p className="f-subtitle" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>Verifikasi wajah & deteksi kecurangan kasir.</p>
           </div>
-          <div className="f-addon-card" style={{borderColor: '#db2777'}}>
+          <div className="f-addon-card" style={{ borderColor: '#db2777' }}>
             <span className="f-addon-name">🎯 Performance Bundle</span>
             <div className="f-addon-price">Rp 3.000<span>/kar/bln</span></div>
-            <p className="f-subtitle" style={{fontSize: '0.8rem', margin: '0.5rem 0'}}>KPI Management + Learning Center (LMS).</p>
+            <p className="f-subtitle" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>KPI Management + Learning Center (LMS).</p>
           </div>
         </div>
       </div>
@@ -247,7 +247,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
           alignItems: 'center',
           background: 'rgba(236, 72, 153, 0.05)'
         }}>
-          <div style={{display: 'flex', gap: '1rem'}}>
+          <div style={{ display: 'flex', gap: '1rem' }}>
             {['invoicing', 'report', 'ai'].map((tab) => (
               <button
                 key={tab}
@@ -268,7 +268,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
               </button>
             ))}
           </div>
-          <button 
+          <button
             onClick={onClose}
             style={{
               background: 'transparent',
@@ -282,15 +282,15 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
           </button>
         </div>
 
-        <div style={{padding: '3rem', height: '600px', overflowY: 'auto'}}>
+        <div style={{ padding: '3rem', height: '600px', overflowY: 'auto' }}>
           {activeTab === 'invoicing' && (
-            <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{margin: 0, color: 'white'}}>Automated Smart Invoicing</h3>
-                  <p style={{color: '#94a3b8', margin: '0.5rem 0 0'}}>Generate tagihan otomatis berdasarkan paket & jumlah karyawan.</p>
+                  <h3 style={{ margin: 0, color: 'white' }}>Automated Smart Invoicing</h3>
+                  <p style={{ color: '#94a3b8', margin: '0.5rem 0 0' }}>Generate tagihan otomatis berdasarkan paket & jumlah karyawan.</p>
                 </div>
-                <button style={{padding: '0.8rem 1.5rem', background: '#ec4899', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700}}>Download PDF</button>
+                <button style={{ padding: '0.8rem 1.5rem', background: '#ec4899', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700 }}>Download PDF</button>
               </div>
 
               <div style={{
@@ -302,109 +302,109 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
                 margin: '0 auto',
                 boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
               }}>
-                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '2rem'}}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
                   <div>
-                    <h4 style={{margin: 0, color: '#ec4899'}}>Invoice #2026-001</h4>
-                    <p style={{fontSize: '0.8rem', color: '#666'}}>PT. MAJU JAYA</p>
+                    <h4 style={{ margin: 0, color: '#ec4899' }}>Invoice #2026-001</h4>
+                    <p style={{ fontSize: '0.8rem', color: '#666' }}>PT. MAJU JAYA</p>
                   </div>
-                  <div style={{textAlign: 'right'}}>
-                    <p style={{fontSize: '0.8rem', color: '#666', margin: 0}}>Date: 3 April 2026</p>
-                    <p style={{fontSize: '0.8rem', color: '#666', margin: 0}}>Period: Tahunan</p>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '0.8rem', color: '#666', margin: 0 }}>Date: 3 April 2026</p>
+                    <p style={{ fontSize: '0.8rem', color: '#666', margin: 0 }}>Period: Tahunan</p>
                   </div>
                 </div>
-                <div style={{borderBottom: '2px solid #f5f5f5', paddingBottom: '1rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', fontSize: '0.8rem', fontWeight: 700}}>
+                <div style={{ borderBottom: '2px solid #f5f5f5', paddingBottom: '1rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', fontSize: '0.8rem', fontWeight: 700 }}>
                   <div>DESKRIPSI</div>
                   <div>QTY</div>
-                  <div style={{textAlign: 'right'}}>TOTAL</div>
+                  <div style={{ textAlign: 'right' }}>TOTAL</div>
                 </div>
-                <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', fontSize: '0.85rem', marginBottom: '1rem'}}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', fontSize: '0.85rem', marginBottom: '1rem' }}>
                   <div>Paket Starter (Maintenance)</div>
                   <div>1 Thn</div>
-                  <div style={{textAlign: 'right'}}>Rp 1.800.000</div>
+                  <div style={{ textAlign: 'right' }}>Rp 1.800.000</div>
                 </div>
-                <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', fontSize: '0.85rem', marginBottom: '1rem'}}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', fontSize: '0.85rem', marginBottom: '1rem' }}>
                   <div>Performance Bundle (100 Staff)</div>
                   <div>12 Bln</div>
-                  <div style={{textAlign: 'right'}}>Rp 3.600.000</div>
+                  <div style={{ textAlign: 'right' }}>Rp 3.600.000</div>
                 </div>
-                <div style={{borderTop: '2px solid #ec4899', paddingTop: '1rem', marginTop: '2rem', textAlign: 'right'}}>
-                  <div style={{fontSize: '1.2rem', fontWeight: 800, color: '#ec4899'}}>TOTAL: Rp 6.000.000</div>
+                <div style={{ borderTop: '2px solid #ec4899', paddingTop: '1rem', marginTop: '2rem', textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ec4899' }}>TOTAL: Rp 6.000.000</div>
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === 'report' && (
-            <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                <h3 style={{margin: 0, color: 'white'}}>Laporan Laba / Rugi (P&L)</h3>
-                <div style={{padding: '0.6rem 1.2rem', background: '#111', borderRadius: '12px', color: '#f472b6', fontSize: '0.8rem', border: '1px solid #ec4899'}}>PERIODE: APRIL 2026</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, color: 'white' }}>Laporan Laba / Rugi (P&L)</h3>
+                <div style={{ padding: '0.6rem 1.2rem', background: '#111', borderRadius: '12px', color: '#f472b6', fontSize: '0.8rem', border: '1px solid #ec4899' }}>PERIODE: APRIL 2026</div>
               </div>
 
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem'}}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
                 {[
-                  {l: 'PENDAPATAN', v: 'Rp 24.000', c: '#4ade80'},
-                  {l: 'HPP (BAHAN)', v: 'Rp 0', c: '#94a3b8'},
-                  {l: 'BEBAN OPS', v: 'Rp 180.000', c: '#f87171'},
-                  {l: 'LABA BERSIH', v: '-Rp 156.000', c: '#fb7185'}
+                  { l: 'PENDAPATAN', v: 'Rp 24.000', c: '#4ade80' },
+                  { l: 'HPP (BAHAN)', v: 'Rp 0', c: '#94a3b8' },
+                  { l: 'BEBAN OPS', v: 'Rp 180.000', c: '#f87171' },
+                  { l: 'LABA BERSIH', v: '-Rp 156.000', c: '#fb7185' }
                 ].map((s, i) => (
-                  <div key={i} style={{padding: '1.5rem', background: '#111', borderRadius: '24px', border: `1px solid ${s.c}33`}}>
-                    <div style={{fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.5rem'}}>{s.l}</div>
-                    <div style={{fontSize: '1.2rem', fontWeight: 800, color: s.c}}>{s.v}</div>
+                  <div key={i} style={{ padding: '1.5rem', background: '#111', borderRadius: '24px', border: `1px solid ${s.c}33` }}>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.5rem' }}>{s.l}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: s.c }}>{s.v}</div>
                   </div>
                 ))}
               </div>
 
-              <div style={{background: 'rgba(255,255,255,0.02)', borderRadius: '24px', padding: '2rem', border: '1px solid rgba(255,255,255,0.05)'}}>
-                <div style={{borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem', fontWeight: 700}}>RINCIAN OPERASIONAL</div>
-                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', color: '#94a3b8'}}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '24px', padding: '2rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem', fontWeight: 700 }}>RINCIAN OPERASIONAL</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', color: '#94a3b8' }}>
                   <span>Penjualan Produk</span>
-                  <span style={{color: 'white'}}>Rp 24,000</span>
+                  <span style={{ color: 'white' }}>Rp 24,000</span>
                 </div>
-                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', color: '#94a3b8'}}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', color: '#94a3b8' }}>
                   <span>Pembelian (Auto-PO)</span>
-                  <span style={{color: '#f87171'}}>(Rp 180,000)</span>
+                  <span style={{ color: '#f87171' }}>(Rp 180,000)</span>
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === 'ai' && (
-            <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                <h3 style={{margin: 0, color: 'white'}}>Aivola Mind - AI Intelligence</h3>
-                <div style={{color: '#ec4899', fontWeight: 800}}>⚡ OPTIMIZING BUSINESS</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, color: 'white' }}>Aivola Mind - AI Intelligence</h3>
+                <div style={{ color: '#ec4899', fontWeight: 800 }}>⚡ OPTIMIZING BUSINESS</div>
               </div>
-              
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem'}}>
-                 <div style={{background: 'linear-gradient(135deg, #2d1b4e, #0b0213)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(236,72,153,0.3)', display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                    <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
-                       <div style={{fontSize: '2rem'}}>📈</div>
-                       <div style={{fontWeight: 800, color: '#f472b6'}}>Optimization Strategy</div>
-                    </div>
-                    <p style={{color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6}}>
-                      "Berdasarkan korelasi stok dan harga suplier, Aivola Mind merekomendasikan pembelian **Biji Kopi Robustica** minggu depan untuk menghemat tambahan 15% biaya produksi."
-                    </p>
-                    <button style={{width: '100%', padding: '1rem', background: '#ec4899', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 800}}>Approve Purchase Strategy</button>
-                 </div>
 
-                 <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                    {[
-                      {t: 'PREDIKSI PROFIT MEI', d: 'Estimasi kenaikan profit 12% berbasis trend Ramadan.', c: '#4ade80'},
-                      {t: 'STOK KRITIS', d: '3 bahan baku diprediksi habis dalam 48 jam.', c: '#fb7185'}
-                    ].map((n, i) => (
-                      <div key={i} style={{padding: '1.5rem', background: '#111', borderRadius: '20px', borderLeft: `4px solid ${n.c}`}}>
-                         <div style={{color: n.c, fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.5rem'}}>{n.t}</div>
-                         <div style={{fontSize: '0.85rem', color: '#94a3b8'}}>{n.d}</div>
-                      </div>
-                    ))}
-                 </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                <div style={{ background: 'linear-gradient(135deg, #2d1b4e, #0b0213)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(236,72,153,0.3)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <div style={{ fontSize: '2rem' }}>📈</div>
+                    <div style={{ fontWeight: 800, color: '#f472b6' }}>Optimization Strategy</div>
+                  </div>
+                  <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
+                    "Berdasarkan korelasi stok dan harga suplier, Aivola Mind merekomendasikan pembelian **Biji Kopi Robustica** minggu depan untuk menghemat tambahan 15% biaya produksi."
+                  </p>
+                  <button style={{ width: '100%', padding: '1rem', background: '#ec4899', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 800 }}>Approve Purchase Strategy</button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {[
+                    { t: 'PREDIKSI PROFIT MEI', d: 'Estimasi kenaikan profit 12% berbasis trend Ramadan.', c: '#4ade80' },
+                    { t: 'STOK KRITIS', d: '3 bahan baku diprediksi habis dalam 48 jam.', c: '#fb7185' }
+                  ].map((n, i) => (
+                    <div key={i} style={{ padding: '1.5rem', background: '#111', borderRadius: '20px', borderLeft: `4px solid ${n.c}` }}>
+                      <div style={{ color: n.c, fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>{n.t}</div>
+                      <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{n.d}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
         </div>
-        
-        <div style={{padding: '1.5rem', textAlign: 'center', background: 'rgba(255,255,255,0.01)', fontSize: '0.8rem', color: '#444', borderTop: '1px solid rgba(255,255,255,0.05)'}}>
+
+        <div style={{ padding: '1.5rem', textAlign: 'center', background: 'rgba(255,255,255,0.01)', fontSize: '0.8rem', color: '#444', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           Aivola Finance System • Intelligent Profit Optimization
         </div>
       </div>
@@ -413,12 +413,12 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
 };
 
 const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
-  <section id="demo" className="f-demo-section" style={{padding: '8rem 5%', textAlign: 'center', background: '#0a0a10'}}>
+  <section id="demo" className="f-demo-section" style={{ padding: '8rem 5%', textAlign: 'center', background: '#0a0a10' }}>
     <div className="f-badge">Demo Dashboard</div>
-    <h2>Lihat Kemudahan <br/> Manajemen Finance</h2>
+    <h2>Lihat Kemudahan <br /> Manajemen Finance</h2>
     <p className="f-subtitle">Tampilan dashboard admin yang intuitif untuk mengontrol seluruh aspek bisnis Anda.</p>
-    
-    <div className="f-demo-container" style={{maxWidth: '1000px', margin: '4rem auto', position: 'relative'}}>
+
+    <div className="f-demo-container" style={{ maxWidth: '1000px', margin: '4rem auto', position: 'relative' }}>
       {/* Laptop Frame Mockup */}
       <div style={{
         background: '#1a1a24',
@@ -427,10 +427,10 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
         border: '1px solid rgba(255,255,255,0.1)',
         borderBottom: 'none'
       }}>
-        <div style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
-          <div style={{width: '10px', height: '10px', borderRadius: '50%', background: '#ff5f56'}}></div>
-          <div style={{width: '10px', height: '10px', borderRadius: '50%', background: '#ffbd2e'}}></div>
-          <div style={{width: '10px', height: '10px', borderRadius: '50%', background: '#27c93f'}}></div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ff5f56' }}></div>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ffbd2e' }}></div>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#27c93f' }}></div>
         </div>
       </div>
       <div style={{
@@ -438,10 +438,10 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
         border: '1px solid rgba(255,255,255,0.1)',
         boxShadow: '0 50px 100px rgba(0,0,0,0.5)'
       }}>
-        <img 
-          src="/admin_invoice_demo.png" 
-          alt="Aivola Finance Dashboard Demo" 
-          style={{width: '100%', display: 'block', opacity: 0.9}}
+        <img
+          src="/admin_invoice_demo.png"
+          alt="Aivola Finance Dashboard Demo"
+          style={{ width: '100%', display: 'block', opacity: 0.9 }}
         />
       </div>
       <div style={{
@@ -452,9 +452,9 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
         borderRadius: '0 0 100px 100px',
         boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
       }}></div>
-      
+
       {/* Play Overlay */}
-      <div 
+      <div
         onClick={onPlay}
         style={{
           position: 'absolute',
@@ -483,19 +483,19 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
         }}></div>
       </div>
     </div>
-    
-    <div className="f-demo-features" style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem', maxWidth: '1000px', margin: '4rem auto'}}>
+
+    <div className="f-demo-features" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem', maxWidth: '1000px', margin: '4rem auto' }}>
       <div className="f-card">
-        <h5 style={{color: '#f472b6', marginBottom: '1rem'}}>Terintegrasi HR</h5>
-        <p style={{fontSize: '0.9rem', color: '#94a3b8'}}>Biaya add-on otomatis sinkron dengan jumlah karyawan di sistem HR.</p>
+        <h5 style={{ color: '#f472b6', marginBottom: '1rem' }}>Terintegrasi HR</h5>
+        <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Biaya add-on otomatis sinkron dengan jumlah karyawan di sistem HR.</p>
       </div>
       <div className="f-card">
-        <h5 style={{color: '#f472b6', marginBottom: '1rem'}}>Invoice Instan</h5>
-        <p style={{fontSize: '0.9rem', color: '#94a3b8'}}>Cetak tagihan bulanan atau tahunan dalam hitungan detik.</p>
+        <h5 style={{ color: '#f472b6', marginBottom: '1rem' }}>Invoice Instan</h5>
+        <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Cetak tagihan bulanan atau tahunan dalam hitungan detik.</p>
       </div>
       <div className="f-card">
-        <h5 style={{color: '#f472b6', marginBottom: '1rem'}}>Laporan AI</h5>
-        <p style={{fontSize: '0.9rem', color: '#94a3b8'}}>Analisis margin dan stok real-time dengan bantuan Aivola Mind AI.</p>
+        <h5 style={{ color: '#f472b6', marginBottom: '1rem' }}>Laporan AI</h5>
+        <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Analisis margin dan stok real-time dengan bantuan Aivola Mind AI.</p>
       </div>
     </div>
   </section>

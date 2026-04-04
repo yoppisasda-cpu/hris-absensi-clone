@@ -37,7 +37,8 @@ export default function LoginPage() {
       localStorage.setItem('userPlan', user.plan || 'STARTER');
       localStorage.setItem('userAddons', JSON.stringify(user.addons || []));
       router.push('/dashboard');
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { error?: string } } };
       const status = error?.response?.status;
       const msg = error?.response?.data?.error || 'Email atau Kata Sandi salah.';
       

@@ -162,8 +162,9 @@ export default function EmployeesPage() {
             setFaceFile(null);
             setFacePreview(null);
             fetchUsers();
-        } catch (err: any) {
-            alert(err.response?.data?.error || 'Gagal mengupload foto referensi.');
+        } catch (err: unknown) {
+            const error = err as { response?: { data?: { error?: string } } };
+            alert(error.response?.data?.error || 'Gagal mengupload foto referensi.');
         } finally {
             setIsUploadingFace(false);
         }
@@ -227,9 +228,11 @@ export default function EmployeesPage() {
             await api.delete(`/users/${user.id}`);
             alert('Karyawan berhasil dihapus secara permanen.');
             fetchUsers();
-        } catch (error: any) {
+        } catch (err: unknown) {
+            const error = err as { response?: { data?: { error?: string } } };
             console.error(error);
             alert(error.response?.data?.error || 'Gagal menghapus karyawan.');
+        } finally {
         }
     };
 
