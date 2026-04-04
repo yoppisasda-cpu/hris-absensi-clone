@@ -42,6 +42,21 @@ const cleanupLocalFile = (filePath: string | null) => {
 const app = express();
 const prisma = new PrismaClient();
 
+// --- DIRECTORY INITIALIZATION ---
+// Create required upload folders on startup (important for Railway/Cloud)
+const requiredFolders = [
+  path.join(process.cwd(), 'uploads'),
+  path.join(process.cwd(), 'uploads/attendance'),
+  path.join(process.cwd(), 'uploads/face_references')
+];
+
+requiredFolders.forEach(folder => {
+  if (!fs.existsSync(folder)) {
+    fs.mkdirSync(folder, { recursive: true });
+    console.log(`[BOOT] Created directory: ${folder}`);
+  }
+});
+
 // --- DB SEQUENCE SYNC ---
 // Fix for auto-increment out of sync (common in dev/migrated DBs)
 (async () => {
@@ -426,18 +441,9 @@ const logoStorage = multer.diskStorage({
 const uploadLogo = multer({ storage: logoStorage });
 
 // --- CONFIG MULTER UNTUK FOTO REFERENSI WAJAH ---
-const faceReferenceStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = 'uploads/face_references';
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'face-ref-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const uploadFaceReference = multer({ storage: faceReferenceStorage });
+// --- STORAGE CONFIGURATION (Absolute Paths) ---
+const uploadAttendance = multer({ dest: path.join(process.cwd(), 'uploads/attendance/') });
+const uploadFaceReference = multer({ dest: path.join(process.cwd(), 'uploads/face_references/') });
 
 // --- 1. MIDDLEWARE MULTI-TENANT & AUTH (CRITICAL) ---
 // Middleware ini mengekstrak profil Karyawan dari token JWT.
