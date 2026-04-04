@@ -4,11 +4,17 @@ import path from 'path';
 
 // Configuration for Supabase Storage
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 const SUPABASE_BUCKET_NAME = process.env.SUPABASE_BUCKET_NAME || 'hris-uploads';
 
-export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.warn("⚠️ [BOOT] Supabase Storage variables are MISSING (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY). Uploads will fall back to local folder.");
+} else {
+  console.log(`✅ [BOOT] Supabase Storage configured. Bucket: ${SUPABASE_BUCKET_NAME}`);
+}
+
+export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
+  ? createClient(SUPABASE_URL, SUPABASE_KEY) 
   : null;
 
 /**
@@ -26,10 +32,11 @@ export async function uploadToSupabase(localPath: string, destinationFolder: str
   try {
     const fileContent = fs.readFileSync(localPath);
     const fileName = path.basename(localPath);
-    const filePath = `${destinationFolder}/${fileName}`;
+    const bucketName = destinationFolder; // Now use destinationFolder as the bucket name (face_references or attendance)
+    const filePath = fileName; // No more folder prefix inside bucket
 
     const { data, error } = await supabase.storage
-      .from(SUPABASE_BUCKET_NAME)
+      .from(bucketName)
       .upload(filePath, fileContent, {
         cacheControl: '3600',
         upsert: true,
@@ -40,7 +47,7 @@ export async function uploadToSupabase(localPath: string, destinationFolder: str
 
     // Get Public URL
     const { data: { publicUrl } } = supabase.storage
-      .from(SUPABASE_BUCKET_NAME)
+      .from(bucketName)
       .getPublicUrl(filePath);
 
     return publicUrl;
