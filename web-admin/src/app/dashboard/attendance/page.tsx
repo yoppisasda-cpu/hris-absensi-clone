@@ -97,6 +97,16 @@ export default function AttendancePage() {
         });
     };
 
+    const getFullImageUrl = (path: string | null) => {
+        if (!path) return '';
+        if (path.startsWith('http')) return path;
+        
+        // Strip out '/api' from the backend URL to get the root serving /uploads
+        const backendRoot = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+        const cleanPath = path.startsWith('/') ? path : `/${path}`;
+        return `${backendRoot}${cleanPath}`;
+    };
+
     return (
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -212,11 +222,11 @@ export default function AttendancePage() {
                                         <td className="px-6 py-4 text-center">
                                             {att.photoUrl ? (
                                                 <button
-                                                    onClick={() => setSelectedPhoto({ url: att.photoUrl!, title: 'Foto Clock-In' })}
+                                                    onClick={() => setSelectedPhoto({ url: getFullImageUrl(att.photoUrl), title: 'Foto Clock-In' })}
                                                     className="group relative h-10 w-10 overflow-hidden rounded-lg border border-slate-200 inline-block"
                                                 >
                                                     <img
-                                                        src={att.photoUrl}
+                                                        src={getFullImageUrl(att.photoUrl)}
                                                         alt="In"
                                                         className="h-full w-full object-cover transition group-hover:scale-110"
                                                     />
@@ -233,11 +243,11 @@ export default function AttendancePage() {
                                         <td className="px-6 py-4 text-center">
                                             {att.clockOutPhotoUrl ? (
                                                 <button
-                                                    onClick={() => setSelectedPhoto({ url: att.clockOutPhotoUrl!, title: 'Foto Clock-Out' })}
+                                                    onClick={() => setSelectedPhoto({ url: getFullImageUrl(att.clockOutPhotoUrl), title: 'Foto Clock-Out' })}
                                                     className="group relative h-10 w-10 overflow-hidden rounded-lg border border-slate-200 inline-block"
                                                 >
                                                     <img
-                                                        src={att.clockOutPhotoUrl}
+                                                        src={getFullImageUrl(att.clockOutPhotoUrl)}
                                                         alt="Out"
                                                         className="h-full w-full object-cover transition group-hover:scale-110"
                                                     />
@@ -348,7 +358,7 @@ export default function AttendancePage() {
                             </button>
                         </div>
                         <div className="aspect-[4/3] bg-slate-900 flex items-center justify-center">
-                            <img src={selectedPhoto.url} alt="Zoom Selfie" className="max-h-full max-w-full object-contain" />
+                            <img src={getFullImageUrl(selectedPhoto.url)} alt="Zoom Selfie" className="max-h-full max-w-full object-contain" />
                         </div>
                         <div className="p-4 bg-slate-50 text-center">
                             <p className="text-xs text-slate-500">Karyawan wajib melakukan selfie saat absensi sebagai bukti kehadiran valid.</p>
