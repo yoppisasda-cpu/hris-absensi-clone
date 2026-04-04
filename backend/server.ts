@@ -426,20 +426,25 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
 
     // --- GRADUAL CONTRACT ENFORCEMENT ---
     if (decoded.role !== 'SUPERADMIN') {
-      const expiryLevel = await getTenantExpiryLevel(tenantId);
-      console.log(`[AUTH] Tenant: ${tenantId}, Role: ${decoded.role}, ExpiryLevel: ${expiryLevel}`);
+      try {
+        const expiryLevel = await getTenantExpiryLevel(tenantId);
+        console.log(`[AUTH] Tenant: ${tenantId}, Role: ${decoded.role}, ExpiryLevel: ${expiryLevel}`);
 
-      if (expiryLevel >= 3) {
-        return res.status(403).json({ 
-          error: 'Kontrak Anda telah berakhir lebih dari 30 hari. Akses dibekukan sepenuhnya. Silakan hubungi admin pusat.' 
-        });
-      }
+        if (expiryLevel >= 3) {
+          return res.status(403).json({ 
+            error: 'Kontrak Anda telah berakhir lebih dari 30 hari. Akses dibekukan sepenuhnya. Silakan hubungi admin pusat.' 
+          });
+        }
 
-      if (expiryLevel >= 2 && req.method !== 'GET') {
-        console.warn(`[AUTH] Blocked Write Request for Expired Tenant: ${tenantId}`);
-        return res.status(403).json({ 
-          error: 'Kontrak Anda telah berakhir lebih dari 15 hari. Mode Read-Only diaktifkan. Anda tidak dapat merubah data atau melakukan absensi.' 
-        });
+        if (expiryLevel >= 2 && req.method !== 'GET') {
+          console.warn(`[AUTH] Blocked Write Request for Expired Tenant: ${tenantId}`);
+          return res.status(403).json({ 
+            error: 'Kontrak Anda telah berakhir lebih dari 15 hari. Mode Read-Only diaktifkan. Anda tidak dapat merubah data atau melakukan absensi.' 
+          });
+        }
+      } catch (expiryError) {
+        console.error(`[AUTH WARNING] Failed to fetch expiry level for tenant ${tenantId}, continuing with default access.`, expiryError);
+        // We continue to allow access even if expiry check fails, to avoid 401 logout loop
       }
     }
 

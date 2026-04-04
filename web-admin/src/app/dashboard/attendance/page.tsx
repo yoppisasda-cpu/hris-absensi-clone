@@ -98,15 +98,20 @@ export default function AttendancePage() {
     };
 
     const getFullImageUrl = (path: string | null) => {
-        if (!path) return '';
-        if (path.startsWith('http')) return path;
-        
-        // Simple and safe URL joining
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : '';
-        if (!baseUrl) return path; // Return as-is if no base URL
-        
-        const cleanPath = path.startsWith('/') ? path : `/${path}`;
-        return `${baseUrl}${cleanPath}`;
+        try {
+            if (!path) return '';
+            if (typeof path !== 'string') return '';
+            if (path.startsWith('http')) return path;
+            
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : '';
+            if (!baseUrl) return path;
+            
+            const cleanPath = path.startsWith('/') ? path : `/${path}`;
+            return `${baseUrl}${cleanPath}`;
+        } catch (err) {
+            console.error("Error resolving image URL:", err);
+            return '';
+        }
     };
 
     return (
