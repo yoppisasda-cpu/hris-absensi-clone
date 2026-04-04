@@ -42,17 +42,8 @@ function fileToGenerativePart(filePath: string, mimeType: string) {
         } else if (fs.existsSync(try2)) {
             finalPath = try2;
         } else {
-            const serverInfo = `[CWD: ${process.cwd()}]`;
-            
-            // DEBUG: Cek isi folder untuk memastikan filenya ada di mana
-            let dirFiles = "Folder Not Found";
-            const targetDir = path.join(process.cwd(), 'uploads/face_references');
-            if (fs.existsSync(targetDir)) {
-                dirFiles = fs.readdirSync(targetDir).slice(0, 5).join(", ");
-            }
-
-            console.error(`[Face AI] FAILED. ${serverInfo} for: ${filePath}. Files found: ${dirFiles}`);
-            throw new Error(`ENOENT: File tidak ditemukan. ${serverInfo}. Files in folder: [${dirFiles}]. Cek path: ${filePath}`);
+            console.error(`[Face AI] ENOENT File not found for: ${filePath}. Current CWD: ${process.cwd()}`);
+            throw new Error(`Verifikasi Gagal: Foto Master bapak tidak ditemukan di server. Silakan hubungi Admin atau daftar ulang wajah bapak di Web Admin.`);
         }
     }
 
@@ -146,18 +137,10 @@ export async function compareFaces(referencePath: string, capturePath: string): 
         }
     }
 
-    // JIKA SEMUA GAGAL, TANYA GOOGLE: "SAYA BOLEH PAKAI MODEL APA?!" (DIAGNOSTIK TOTAL)
-    let availableModels = "Unknown";
-    try {
-        const diagResp = await axios.get(`https://generativelanguage.googleapis.com/v1/models?key=${process.env.GEMINI_API_KEY}`);
-        availableModels = diagResp.data.models.map((m: any) => m.name.split('/').pop()).join(", ");
-    } catch (diagErr: any) {
-        availableModels = `Gagal list models: ${diagErr.message}`;
-    }
-
+    console.error(`[Face AI] ALL MODELS FAILED. Last error: ${lastError}`);
     return { 
         verified: false, 
         score: 0.5, 
-        errorMessage: `AI 404 Terus. Model tersedia untuk Kunci Bapak: [${availableModels}]. Terakhir nyoba: ${lastError}` 
+        errorMessage: "AI Verifikasi sedang tidak tersedia (Internal Error). Silakan coba lagi nanti." 
     };
 }
