@@ -20,15 +20,19 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 function fileToGenerativePart(filePath: string, mimeType: string) {
     let finalPath = filePath;
     
-    // Self-Healing Path Check: Jika alamatnya berantakan, kita coba bereskan
+    // Self-Healing Path Check
     if (!fs.existsSync(finalPath)) {
-        console.warn(`[Face AI] Path not found: ${finalPath}. Attempting self-healing...`);
+        console.warn(`[Face AI] Path not found: ${finalPath}. Attempting deeper self-healing...`);
         
-        // Coba 1: Bersihkan dari double slash atau leading slash yang salah
-        const cleanedPath = filePath.replace(/^\/+/, "").replace(/\/\//g, "/");
-        const try1 = path.join(process.cwd(), cleanedPath);
+        // Coba 1: Bersihkan total (buang //, buang /app/ di depan jika ada)
+        let cleaned = filePath.replace(/^\/+/, "").replace(/\/\//g, "/");
+        if (cleaned.startsWith('app/')) {
+            cleaned = cleaned.replace('app/', '');
+        }
+
+        const try1 = path.join(process.cwd(), cleaned);
         
-        // Coba 2: Jika masih gak ketemu, coba cari langsung di folder uploads
+        // Coba 2: Cari langsung di folder uploads root
         const fileName = path.basename(filePath);
         const folderName = filePath.includes('attendance') ? 'attendance' : 'face_references';
         const try2 = path.join(process.cwd(), 'uploads', folderName, fileName);
@@ -38,8 +42,9 @@ function fileToGenerativePart(filePath: string, mimeType: string) {
         } else if (fs.existsSync(try2)) {
             finalPath = try2;
         } else {
-            console.error(`[Face AI] ALL PATH ATTEMPTS FAILED for: ${filePath}`);
-            throw new Error(`ENOENT: File tidak ditemukan di manapun. Cek: ${filePath}`);
+            const serverInfo = `[CWD: ${process.cwd()}]`;
+            console.error(`[Face AI] FAILED. ${serverInfo} for: ${filePath}`);
+            throw new Error(`ENOENT: File tidak ditemukan. ${serverInfo}. Cek database path: ${filePath}`);
         }
     }
 
