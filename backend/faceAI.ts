@@ -74,26 +74,30 @@ async function downloadImage(url: string, dest: string) {
  * Kini dengan Sistem Auto-Fallback (Multi-Brain) agar anti-error
  */
 export async function compareFaces(referencePath: string, capturePath: string): Promise<FaceResult> {
+    console.log(`[Face AI] START Verification. Ref: ${referencePath}, Cap: ${capturePath}`);
+    
     if (!process.env.GEMINI_API_KEY) {
-        return { verified: false, score: 0.5, errorMessage: "GEMINI_API_KEY_MISSING" };
+        console.error("[Face AI] GEMINI_API_KEY is MISSING in environment!");
+        return { verified: false, score: 0.5, errorMessage: "Sistem AI tidak terkonfigurasi (API Key Hilang)." };
     }
 
     const modelNames = [
+        "models/gemini-1.5-flash", 
         "models/gemini-2.0-flash",
-        "models/gemini-1.5-flash",
         "models/gemini-pro-vision"
     ];
 
-    let lastError = "";
+    let lastError = "Tidak ada model yang merespons.";
     const tempFiles: string[] = [];
 
-    // Coba satu per satu model sampai ada yang berhasil
+    // loop through all potential models
     for (const modelName of modelNames) {
         try {
-            console.log(`[Face AI] Attempting verification with model: ${modelName}...`);
+            console.log(`[Face AI] Trying model: ${modelName}...`);
             const model = genAI.getGenerativeModel({ model: modelName });
             
             let finalRefPath = referencePath;
+            // Handle remote references (Supabase)
             if (referencePath.startsWith('http')) {
                 const tempRef = path.join(os.tmpdir(), `ref-${Date.now()}.jpg`);
                 await downloadImage(referencePath, tempRef);
@@ -105,42 +109,37 @@ export async function compareFaces(referencePath: string, capturePath: string): 
             const capPart = fileToGenerativePart(capturePath, "image/jpeg");
 
             const prompt = `
-                Analyze these two images and determine if they show the SAME PERSON.
-                Comparison Task:
-                1. Look for definitive facial features (eyes, nose, bone structure).
-                2. Ignore lighting, background, or head tilt.
-                3. Return a JSON object: {"isSamePerson": boolean, "confidenceScore": number (0.0 to 1.0)}.
-                Only return the JSON.
+                Analyze these two images and determine if they show the same person.
+                Focus on permanent facial structures. Ignore age, facial hair, or accessories if possible.
+                Return ONLY a JSON object: {"isSamePerson": boolean, "confidenceScore": number (0 to 1)}.
             `;
 
             const result = await model.generateContent([prompt, refPart, capPart]);
             const response = await result.response;
             const text = response.text();
             
-            // Parsing hasil JSON
             const cleanText = text.replace(/```json|```/g, "").trim();
             const json = JSON.parse(cleanText);
 
+            console.log(`[Face AI] ${modelName} SUCCESS:`, json);
             return {
                 verified: json.isSamePerson,
                 score: json.confidenceScore
             };
         } catch (error: any) {
-            console.warn(`[Face AI] Model ${modelName} failed:`, error.message);
+            console.error(`[Face AI] ${modelName} FAILED:`, error.message);
             lastError = error.message;
-            // Jika bukan error 404 (misal: API key salah), tidak perlu coba model lain
-            if (!error.message.includes("404")) {
-                break;
-            }
+            // We NO LONGER break. We try every model in the list.
         } finally {
             tempFiles.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
         }
     }
 
-    console.error(`[Face AI] ALL MODELS FAILED. Last error: ${lastError}`);
+    // Final failure response
+    console.error(`[Face AI] CRITICAL: ALL MODELS FAILED. Error: ${lastError}`);
     return { 
         verified: false, 
-        score: 0.5, 
-        errorMessage: "AI Verifikasi sedang tidak tersedia (Internal Error). Silakan coba lagi nanti." 
+        score: 0, 
+        errorMessage: `AI Sedang Sibuk atau Error (${lastError.substring(0, 50)}...). Silakan coba lagi sebentar lagi.` 
     };
 }

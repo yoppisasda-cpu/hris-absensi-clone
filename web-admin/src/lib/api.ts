@@ -3,29 +3,31 @@ import axios from 'axios';
 // Ini akan merujuk ke API Backend Node.js yang sudah kita buat sebelumnya
 // Helper to determine the backend URL
 const getBaseURL = () => {
-    // Force direct Railway URL in production to bypass broken api.aivola.id
+    // Priority 1: Use Environment Variable (Defined in Vercel/Railway Dashboard)
+    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+
+    // Priority 2: Client-side detection based on current domain
     if (typeof window !== 'undefined') {
         const host = window.location.hostname;
-        if (host.includes('aivola.id') || host.includes('vercel.app')) {
+        // If testing on aivola.id domains
+        if (host.includes('aivola.id')) {
             return 'https://api.aivola.id/api';
         }
+        // If testing on your current Railway deployment URL, use its own backend port 5000 if same domain
+        // Or simply fallback to the primary API if we know it.
     }
     
-    // Allow local override if .env exists
-    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-    
-    return 'http://localhost:5000/api'; // Local development fallback
+    return 'https://api.aivola.id/api'; // Default Production API
 };
 
 const api = axios.create({
     baseURL: getBaseURL(),
+    timeout: 30000, // Extend timeout to 30s for heavy reports
 });
 
 // Interceptor otomatis menyisipkan Token JWT (Bearer) Admin yang sedang login
 api.interceptors.request.use((config) => {
-    // Mengekstrak token dari Session Cache Browser
     const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,21 +38,20 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Hanya logout otomatis jika benar-benar 401 (Unauthorized) dari server
-        // Dan pastikan bukan error koneksi biasa (timeout/disconnected)
+        // --- MULTI-LAYER AUTH PROTECTION ---
         if (error.response && error.response.status === 401) {
+            const errorMsg = error.response.data?.error || "";
             const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
             
-            // Jangan logout jika kita memang sudah berada di halaman login ( / )
-            if (currentPath !== '/' && typeof window !== 'undefined') {
-                console.warn("[API] Sesi habis atau tidak sah. Mengarahkan kembali ke login.");
-                localStorage.removeItem('jwt_token');
-                localStorage.removeItem('userName');
-                localStorage.removeItem('userRole');
-                // Tunggu sebentar sebelum redirect agar tidak loop
-                setTimeout(() => {
-                    window.location.href = '/'; 
-                }, 500);
+            // Only logout if it's a DEFINITIVE invalid token error (not 401 from something else)
+            const isDefinitiveAuthError = errorMsg.includes('Token tidak valid') || errorMsg.includes('kadaluarsa') || errorMsg.includes('Login');
+
+            if (isDefinitiveAuthError && currentPath !== '/' && typeof window !== 'undefined') {
+                console.error("[API REDIRECT] Force Logout due to definitive 401:", errorMsg);
+                localStorage.clear(); // Clear all to be safe
+                window.location.href = '/?error=session_expired'; 
+            } else {
+                console.warn("[API WARNING] Received 401 but it might be transient or specific. Staying logged in. Error:", errorMsg);
             }
         }
         return Promise.reject(error);
