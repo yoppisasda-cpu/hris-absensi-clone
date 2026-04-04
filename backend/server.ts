@@ -424,34 +424,10 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
     (req as any).userId = Number(decoded.userId);
     (req as any).userRole = decoded.role;
 
-    // --- GRADUAL CONTRACT ENFORCEMENT ---
-    if (decoded.role !== 'SUPERADMIN') {
-      try {
-        const expiryLevel = await getTenantExpiryLevel(tenantId);
-        console.log(`[AUTH] Tenant: ${tenantId}, Role: ${decoded.role}, ExpiryLevel: ${expiryLevel}`);
-
-        if (expiryLevel >= 3) {
-          return res.status(403).json({ 
-            error: 'Kontrak Anda telah berakhir lebih dari 30 hari. Akses dibekukan sepenuhnya. Silakan hubungi admin pusat.' 
-          });
-        }
-
-        if (expiryLevel >= 2 && req.method !== 'GET') {
-          console.warn(`[AUTH] Blocked Write Request for Expired Tenant: ${tenantId}`);
-          return res.status(403).json({ 
-            error: 'Kontrak Anda telah berakhir lebih dari 15 hari. Mode Read-Only diaktifkan. Anda tidak dapat merubah data atau melakukan absensi.' 
-          });
-        }
-      } catch (expiryError) {
-        console.error(`[AUTH WARNING] Failed to fetch expiry level for tenant ${tenantId}, continuing with default access.`, expiryError);
-        // We continue to allow access even if expiry check fails, to avoid 401 logout loop
-      }
-    }
-
     // Tambahan: Izinkan SuperAdmin untuk "mengintip" tenant lain lewat Header jika diperlukan
     const targetTenantId = req.headers['x-tenant-id'];
     if (decoded.role === 'SUPERADMIN' && targetTenantId) {
-      (req as any).tenantId = parseInt(targetTenantId as string);
+        (req as any).tenantId = parseInt(targetTenantId as string);
     }
 
     next();
@@ -638,16 +614,6 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     }
 
     console.log(`[LOGIN SUCCESS] User: ${user.email}`);
-
-    // --- ENFORCE CONTRACT LEVEL 3 (HARD BLOCK) ---
-    if (user.role !== 'SUPERADMIN') {
-      const expiryLevel = await getTenantExpiryLevel(user.companyId);
-      if (expiryLevel >= 3) {
-        return res.status(403).json({ 
-          error: 'Kontrak Perusahaan Anda telah berakhir lebih dari 30 hari. Akses dibekukan. Silakan hubungi admin pusat.' 
-        });
-      }
-    }
 
     // Buat JWT Token yang membungkus rahasia perusahaan milik karyawan terkait
     const token = jwt.sign(
@@ -1534,15 +1500,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
     });
 
     if (company) {
-      // 1. Check Contract Expiry Level
-      const expiryLevel = await getTenantExpiryLevel(tenantId);
-      if (expiryLevel >= 1) {
-        return res.status(403).json({ 
-          error: "Kontrak Anda telah berakhir. Anda tidak dapat menambah karyawan baru. Silakan hubungi admin pusat untuk perpanjangan." 
-        });
-      }
-
-      // 2. Check Employee Limit
+      // 1. Check Employee Limit
       if (company.employeeLimit > 0 && company._count.users >= company.employeeLimit) {
         return res.status(403).json({ 
           error: `Limit karyawan tercapai! Tenant ini hanya diizinkan memiliki maksimal ${company.employeeLimit} karyawan.` 
