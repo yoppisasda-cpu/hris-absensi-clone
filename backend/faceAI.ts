@@ -146,9 +146,18 @@ export async function compareFaces(referencePath: string, capturePath: string): 
         }
     }
 
+    // JIKA SEMUA GAGAL, TANYA GOOGLE: "SAYA BOLEH PAKAI MODEL APA?!" (DIAGNOSTIK TOTAL)
+    let availableModels = "Unknown";
+    try {
+        const diagResp = await axios.get(`https://generativelanguage.googleapis.com/v1/models?key=${process.env.GEMINI_API_KEY}`);
+        availableModels = diagResp.data.models.map((m: any) => m.name.split('/').pop()).join(", ");
+    } catch (diagErr: any) {
+        availableModels = `Gagal list models: ${diagErr.message}`;
+    }
+
     return { 
         verified: false, 
         score: 0.5, 
-        errorMessage: `Sistem AI sedang sibuk/tidak tersedia. Error: ${lastError}` 
+        errorMessage: `AI 404 Terus. Model tersedia untuk Kunci Bapak: [${availableModels}]. Terakhir nyoba: ${lastError}` 
     };
 }
