@@ -368,36 +368,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- CONFIG MULTER UNTUK UPLOAD ABSENSI ---
-const attendanceStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = 'uploads/attendance';
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'absensi-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const uploadAttendance = multer({ storage: attendanceStorage });
-
-// --- CONFIG MULTER UNTUK PENGUMUMAN (Phase 26) ---
-const announcementStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = 'uploads/announcements';
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'announcement-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const uploadAnnouncement = multer({ storage: announcementStorage });
-
 // --- CONFIG MULTER UNTUK DOKUMEN KARYAWAN (Phase 26) ---
 const documentStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -426,24 +396,11 @@ const assetStorage = multer.diskStorage({
 });
 const uploadAsset = multer({ storage: assetStorage });
 
-// --- CONFIG MULTER UNTUK LOGO PERUSAHAAN (Phase 19) ---
-const logoStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = 'uploads/logos';
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'logo-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const uploadLogo = multer({ storage: logoStorage });
-
-// --- CONFIG MULTER UNTUK FOTO REFERENSI WAJAH ---
-// --- STORAGE CONFIGURATION (Absolute Paths) ---
+// --- STORAGE CONFIGURATION (Unified & Absolute) ---
 const uploadAttendance = multer({ dest: path.join(process.cwd(), 'uploads/attendance/') });
 const uploadFaceReference = multer({ dest: path.join(process.cwd(), 'uploads/face_references/') });
+const uploadAnnouncement = multer({ dest: path.join(process.cwd(), 'uploads/announcements/') });
+const uploadLogo = multer({ dest: path.join(process.cwd(), 'uploads/logos/') });
 
 // --- 1. MIDDLEWARE MULTI-TENANT & AUTH (CRITICAL) ---
 // Middleware ini mengekstrak profil Karyawan dari token JWT.
@@ -4816,7 +4773,7 @@ app.post('/api/announcements', tenantMiddleware, uploadAnnouncement.single('imag
 
     if (req.file) {
       try {
-        const fullLocalPath = path.join(__dirname, 'uploads/announcements', req.file.filename);
+        const fullLocalPath = path.join(process.cwd(), 'uploads/announcements', req.file.filename);
         imageUrl = await uploadToSupabase(fullLocalPath, 'announcements');
       } catch (uploadError) {
         console.error('Failed to upload announcement image to R2:', uploadError);
@@ -4838,7 +4795,7 @@ app.post('/api/announcements', tenantMiddleware, uploadAnnouncement.single('imag
     });
 
     if (req.file) {
-      const fullLocalPath = path.join(__dirname, 'uploads/announcements', req.file.filename);
+      const fullLocalPath = path.join(process.cwd(), 'uploads/announcements', req.file.filename);
       cleanupLocalFile(fullLocalPath);
     }
 
