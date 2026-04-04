@@ -2045,7 +2045,7 @@ app.patch('/api/users/:id/face-reference', tenantMiddleware, uploadFaceReference
     }
 
     const localPath = `/uploads/face_references/${req.file.filename}`;
-    const fullPath = path.join(__dirname, localPath);
+    const fullPath = path.join(process.cwd(), localPath.replace(/^\/+/, ""));
 
     // Upload ke Supabase
     let finalUrl = localPath;
