@@ -102,10 +102,10 @@ const FinanceFeatures = () => {
 };
 
 const FinancePricing = () => {
-  const [isAnnual, setIsAnnual] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(true);
 
   const pricing = {
-    starter: isAnnual ? 1500000 : 150000, // example 10 months for 12? or just 12x
+    starter: isAnnual ? 1500000 : 150000,
     pro: isAnnual ? 3500000 : 350000,
     enterprise: isAnnual ? 7500000 : 750000,
   };
@@ -113,9 +113,9 @@ const FinancePricing = () => {
   return (
     <section id="pricing" className="f-pricing">
       <div className="f-pricing-header">
-        <div className="f-badge">Pilihan Paket Bisnis</div>
+        <div className="f-badge">Pilihan Paket Bisnis Terpadu</div>
         <h2>Satu Harga untuk <br /> Efisiensi Selamanya</h2>
-        <p className="f-subtitle">Pilih paket yang paling sesuai dengan skala operasional bisnis Anda.</p>
+        <p className="f-subtitle">Pilih paket All-in-One (HR + Finance + POS) dengan skala kuota yang Anda butuhkan.</p>
       </div>
 
       <div className="f-toggle-container">
@@ -135,13 +135,20 @@ const FinancePricing = () => {
             <span>Rp</span> {pricing.starter.toLocaleString('id-ID')} <span>/{isAnnual ? 'thn' : 'bln'}</span>
           </div>
           <ul className="f-list">
-            <li><span>✓</span> <b>2</b> Admin Slot</li>
-            <li><span>✓</span> <b>1</b> Digital POS Terminal</li>
-            <li><span>✓</span> Absensi Liveness (Wajah)</li>
-            <li><span>✓</span> Laporan Penjualan Harian</li>
-            <li><span>✓</span> Manajemen Karyawan Dasar</li>
+            <li><span>✓</span> <b>Maks 10</b> Karyawan</li>
+            <li><span>✓</span> 1 Terminal Digital POS</li>
+            <li><span>✓</span> 2 Admin Slot</li>
+            <li><span>✓</span> Absensi Wajah & GPS</li>
+            <li><span>✓</span> Laporan Penjualan Dasar</li>
           </ul>
-          <a href="https://wa.me/6287882716935" className="f-btn-card">Pilih Starter</a>
+          <a 
+            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket STARTER FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="f-btn-card"
+          >
+            Pilih Starter
+          </a>
         </div>
 
         {/* PRO */}
@@ -151,14 +158,21 @@ const FinancePricing = () => {
             <span>Rp</span> {pricing.pro.toLocaleString('id-ID')} <span>/{isAnnual ? 'thn' : 'bln'}</span>
           </div>
           <ul className="f-list">
-            <li><span>✓</span> <b>5</b> Admin Slot</li>
-            <li><span>✓</span> <b>2</b> Digital POS Terminal</li>
-            <li><span>✓</span> <b>Full</b> Inventory & Stok</li>
+            <li><span>✓</span> <b>Maks 50</b> Karyawan</li>
+            <li><span>✓</span> 5 Terminal Digital POS</li>
+            <li><span>✓</span> 5 Admin Slot</li>
+            <li className="f-highlight"><span>✓</span> <b>Inventory & Stock (Incl)</b></li>
+            <li><span>✓</span> Laba Rugi (P&L) Real-time</li>
             <li><span>✓</span> AI Stock Forecasting</li>
-            <li><span>✓</span> Laporan Laba Rugi (P&L)</li>
-            <li><span>✓</span> Multi-Outlet Sync</li>
           </ul>
-          <a href="https://wa.me/6287882716935" className="f-btn-card">Mulai Skala Bisnis</a>
+          <a 
+            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket PRO FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="f-btn-card"
+          >
+            Mulai Skala Bisnis
+          </a>
         </div>
 
         {/* ENTERPRISE */}
@@ -168,40 +182,85 @@ const FinancePricing = () => {
             <span>Rp</span> {pricing.enterprise.toLocaleString('id-ID')} <span>/{isAnnual ? 'thn' : 'bln'}</span>
           </div>
           <ul className="f-list">
-            <li><span>✓</span> <b>10</b> Admin & POS</li>
-            <li><span>✓</span> Custom Recipe / BOM</li>
-            <li><span>✓</span> <b>Aivola Mind</b> AI Advisor</li>
-            <li><span>✓</span> <b>Anti-Fraud</b> Protection</li>
+            <li><span>✓</span> <b>Maks 100</b> Karyawan</li>
+            <li><span>✓</span> 10 Terminal Digital POS</li>
+            <li><span>✓</span> 10 Admin Slot</li>
+            <li><span>✓</span> <b>Warehouse Management</b></li>
+            <li><span>✓</span> Audit Log & Anti Fraud Dasar</li>
             <li><span>✓</span> Prioritas Support 24/7</li>
-            <li><span>✓</span> Warehouse Management</li>
           </ul>
-          <a href="https://wa.me/6287882716935" className="f-btn-card">Hubungi Sales</a>
+          <a 
+            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket ENTERPRISE FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="f-btn-card"
+          >
+            Hubungi Sales
+          </a>
         </div>
       </div>
 
-      <div className="f-addons-section">
-        <div className="f-badge">Power Up</div>
-        <h3>Fitur Spesialis Tambahan</h3>
-        <div className="f-addons-grid">
-          <div className="f-addon-card">
-            <span className="f-addon-name">📦 Inventory Pro</span>
-            <div className="f-addon-price">Rp 20.000<span>/bln</span></div>
-            <p className="f-subtitle" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>Manajemen stok bahan baku & resep detail.</p>
+      {/* POWER-UPS / SPECIALIST ADD-ONS */}
+      <div style={{ marginTop: '6rem', maxWidth: '1200px', margin: '6rem auto 0' }}>
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <div className="f-badge">⚡ Power-ups</div>
+          <h2 style={{ color: 'white' }}>Personalize Your Base Plan</h2>
+          <p style={{ color: '#94a3b8' }}>Gunakan Add-on untuk menambah fitur spesifik sesuai kebutuhan tanpa harus berpindah paket.</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+          {/* HR Add-ons */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ color: '#8b5cf6', fontWeight: 800, fontSize: '0.75rem', letterSpacing: '1px', marginBottom: '1.5rem', borderBottom: '1px solid rgba(139, 92, 246, 0.2)', paddingBottom: '0.5rem' }}>HR & TALENT MANAGEMENT</div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>🎯 KPI & Penilaian Kinerja</span>
+                <span style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 1.500/kar</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Fitur pembuatan KPI, penilaian, and laporan performa tim.</p>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>📚 Learning & Development</span>
+                <span style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 2.000/kar</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Modul pelatihan, ujian online, and tracking kompetensi.</p>
+            </div>
           </div>
-          <div className="f-addon-card">
-            <span className="f-addon-name">🧠 Aivola Mind (AI)</span>
-            <div className="f-addon-price">Rp 20.000<span>/bln</span></div>
-            <p className="f-subtitle" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>Analisis profit & rekomendasi bisnis strategis.</p>
+
+          {/* Finance Add-ons */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ color: '#ec4899', fontWeight: 800, fontSize: '0.75rem', letterSpacing: '1px', marginBottom: '1.5rem', borderBottom: '1px solid rgba(236, 72, 153, 0.2)', paddingBottom: '0.5rem' }}>FINANCE & AI MANAGEMENT</div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>📦 Inventory & Stock</span>
+                <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 20.000/bln</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Manajemen stok bahan. <b style={{color: '#4ade80'}}>Gratis di paket PRO</b>.</p>
+            </div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>🧠 Aivola Mind (AI Advisor)</span>
+                <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 20.000/bln</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Penasehat bisnis AI strategis untuk seluruh level paket Anda.</p>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>🛡️ Anti-Fraud Face Check</span>
+                <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 10.000/bln</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Verifikasi wajah ketat saat absensi & transaksi sensitif.</p>
+            </div>
           </div>
-          <div className="f-addon-card">
-            <span className="f-addon-name">🛡️ Anti-Fraud Check</span>
-            <div className="f-addon-price">Rp 10.000<span>/bln</span></div>
-            <p className="f-subtitle" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>Verifikasi wajah & deteksi kecurangan kasir.</p>
-          </div>
-          <div className="f-addon-card" style={{ borderColor: '#db2777' }}>
-            <span className="f-addon-name">🎯 Performance Bundle</span>
-            <div className="f-addon-price">Rp 3.000<span>/kar/bln</span></div>
-            <p className="f-subtitle" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>KPI Management + Learning Center (LMS).</p>
+
+          {/* Expansion Add-on */}
+          <div style={{ background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(74, 222, 128, 0.2)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ color: '#4ade80', fontWeight: 800, fontSize: '0.75rem', letterSpacing: '1px', marginBottom: '1rem' }}>SISTEM EKSPANSI</div>
+            <h4 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '1rem' }}>Expansion Pack (Staff)</h4>
+            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'white', marginBottom: '1rem' }}>Rp 7.000 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>/kar /bln</span></div>
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.5rem' }}>Tambah kuota karyawan pada paket apapun tanpa harus ganti plan.</p>
+            <a href="https://wa.me/6287882716935" style={{ textDecoration: 'none', color: '#4ade80', fontWeight: 700, fontSize: '0.9rem' }}>Tambah Kapasitas Sekarang →</a>
           </div>
         </div>
       </div>
@@ -323,12 +382,12 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
                   <div style={{ textAlign: 'right' }}>Rp 1.800.000</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                  <div>Performance Bundle (100 Staff)</div>
+                  <div>Expansion Pack (10 Staff Tambahan)</div>
                   <div>12 Bln</div>
-                  <div style={{ textAlign: 'right' }}>Rp 3.600.000</div>
+                  <div style={{ textAlign: 'right' }}>Rp 840.000</div>
                 </div>
                 <div style={{ borderTop: '2px solid #ec4899', paddingTop: '1rem', marginTop: '2rem', textAlign: 'right' }}>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ec4899' }}>TOTAL: Rp 6.000.000</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ec4899' }}>TOTAL: Rp 2.640.000</div>
                 </div>
               </div>
             </div>
@@ -383,7 +442,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
                     <div style={{ fontWeight: 800, color: '#f472b6' }}>Optimization Strategy</div>
                   </div>
                   <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
-                    "Berdasarkan korelasi stok dan harga suplier, Aivola Mind merekomendasikan pembelian **Biji Kopi Robustica** minggu depan untuk menghemat tambahan 15% biaya produksi."
+                    "Berdasarkan korelasi stok and harga suplier, Aivola Mind merekomendasikan pembelian **Biji Kopi Robustica** minggu depan untuk menghemat tambahan 15% biaya produksi."
                   </p>
                   <button style={{ width: '100%', padding: '1rem', background: '#ec4899', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 800 }}>Approve Purchase Strategy</button>
                 </div>
@@ -495,7 +554,7 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
       </div>
       <div className="f-card">
         <h5 style={{ color: '#f472b6', marginBottom: '1rem' }}>Laporan AI</h5>
-        <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Analisis margin dan stok real-time dengan bantuan Aivola Mind AI.</p>
+        <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Analisis margin and stok real-time dengan bantuan Aivola Mind AI.</p>
       </div>
     </div>
   </section>

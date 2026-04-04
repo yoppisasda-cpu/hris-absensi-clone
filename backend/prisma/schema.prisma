@@ -39,6 +39,15 @@ model Company {
   purchasedInsights      String[]             @default([])
   addons                 String[]             @default([])
   plan                   SubscriptionPlan     @default(STARTER)
+  
+  // Discount Percentages per Add-on
+  discountKpi            Int                  @default(0)
+  discountLearning       Int                  @default(0)
+  discountInventory      Int                  @default(0)
+  discountAi             Int                  @default(0)
+  discountFraud          Int                  @default(0)
+  discountExpansion      Int                  @default(0)
+
   crmEnabled             Boolean              @default(true)
   announcements          Announcement[]
   assets                 Asset[]

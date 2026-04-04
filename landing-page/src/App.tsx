@@ -99,6 +99,186 @@ const FeaturesShowcase = () => {
   );
 };
 
+const PricingSection = () => {
+  const [isAnnual, setIsAnnual] = useState(true);
+
+  const pricingData = {
+    starter: isAnnual ? 1500000 : 150000,
+    pro: isAnnual ? 3500000 : 350000,
+    enterprise: isAnnual ? 7500000 : 750000,
+  };
+
+  return (
+    <section id="pricing" className="pricing-section" style={{ background: '#0a0a0f', padding: '8rem 5%' }}>
+      <div className="section-header">
+        <div className="hero-badge">Harga Transparan</div>
+        <h2 style={{ color: 'white' }}>Satu Harga untuk Seluruh Bisnis</h2>
+        <p style={{ color: '#94a3b8' }}>Pilih paket dengan batas kuota yang sesuai dengan skala operasional Anda.</p>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', marginBottom: '4rem' }}>
+        <span style={{ color: isAnnual ? '#94a3b8' : '#8b5cf6', fontWeight: 700 }}>Bulanan</span>
+        <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '60px', height: '34px' }}>
+          <input type="checkbox" checked={isAnnual} onChange={() => setIsAnnual(!isAnnual)} style={{ opacity: 0, width: 0, height: 0 }} />
+          <span className="slider" style={{ position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0, background: '#1a1a24', transition: '.4s', borderRadius: '34px', border: '1px solid rgba(255,255,255,0.1)' }}></span>
+        </label>
+        <span style={{ color: isAnnual ? '#8b5cf6' : '#94a3b8', fontWeight: 700 }}>Tahunan <span style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#4ade80', padding: '2px 8px', borderRadius: '99px', fontSize: '0.7rem' }}>Hemat 20%</span></span>
+      </div>
+
+      <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+        {/* STARTER */}
+        <div className="price-card" style={{ background: 'rgba(255,255,255,0.02)', padding: '3rem 2rem', borderRadius: '32px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'left', position: 'relative' }}>
+          <div style={{ color: '#8b5cf6', fontSize: '0.8rem', fontWeight: 800, letterSpacing: '2px', marginBottom: '1rem' }}>STARTER</div>
+          <div style={{ fontSize: '3rem', fontWeight: 900, color: 'white', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '1.2rem', verticalAlign: 'top', marginRight: '4px' }}>Rp</span>
+            {pricingData.starter.toLocaleString('id-ID')}
+            <span style={{ fontSize: '0.9rem', color: '#444', fontWeight: 400 }}>/{isAnnual ? 'thn' : 'bln'}</span>
+          </div>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '2rem' }}>Cocok untuk UMKM pemula yang ingin mulai digitalisasi.</p>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> <b>Maks 10</b> Karyawan</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> 1 Terminal Digital POS</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> 2 Admin Slot</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Absensi Wajah & GPS</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Laporan Penjualan Dasar</li>
+          </ul>
+          <a 
+            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket STARTER (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="btn-cta-big" 
+            style={{ display: 'block', width: '100%', textAlign: 'center', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '14px', color: 'white', fontWeight: 700, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            Mulai Starter
+          </a>
+        </div>
+
+        {/* PRO */}
+        <div className="price-card" style={{ background: 'linear-gradient(180deg, rgba(139, 92, 246, 0.1) 0%, rgba(10, 10, 15, 0.1) 100%)', padding: '3rem 2rem', borderRadius: '32px', border: '2px solid #8b5cf6', textAlign: 'left', position: 'relative', transform: 'scale(1.05)' }}>
+          <div style={{ position: 'absolute', top: '-15px', left: '50%', transform: 'translateX(-50%)', background: '#8b5cf6', color: 'white', padding: '4px 12px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>PALING POPULER</div>
+          <div style={{ color: '#a78bfa', fontSize: '0.8rem', fontWeight: 800, letterSpacing: '2px', marginBottom: '1rem' }}>PRO</div>
+          <div style={{ fontSize: '3rem', fontWeight: 900, color: 'white', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '1.2rem', verticalAlign: 'top', marginRight: '4px' }}>Rp</span>
+            {pricingData.pro.toLocaleString('id-ID')}
+            <span style={{ fontSize: '0.9rem', color: '#444', fontWeight: 400 }}>/{isAnnual ? 'thn' : 'bln'}</span>
+          </div>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '2rem' }}>Solusi lengkap untuk manajemen stok & profit bisnis.</p>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> <b>Maks 50</b> Karyawan</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> 5 Terminal Digital POS</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> 5 Admin Slot</li>
+            <li style={{ marginBottom: '1rem', color: 'white' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> <b>Inventory & Stock (Incl)</b></li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Laba Rugi (P&L) Real-time</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> AI Stock Forecasting</li>
+          </ul>
+          <a 
+            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket PRO (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="btn-cta-big" 
+            style={{ display: 'block', width: '100%', textAlign: 'center', padding: '1rem', background: '#8b5cf6', borderRadius: '14px', color: 'white', fontWeight: 700, textDecoration: 'none', boxShadow: '0 10px 30px rgba(139, 92, 246, 0.3)' }}
+          >
+            Pilih Paket Pro
+          </a>
+        </div>
+
+        {/* ENTERPRISE */}
+        <div className="price-card" style={{ background: 'rgba(255,255,255,0.02)', padding: '3rem 2rem', borderRadius: '32px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'left', position: 'relative' }}>
+          <div style={{ color: '#ec4899', fontSize: '0.8rem', fontWeight: 800, letterSpacing: '2px', marginBottom: '1rem' }}>ENTERPRISE</div>
+          <div style={{ fontSize: '3rem', fontWeight: 900, color: 'white', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '1.2rem', verticalAlign: 'top', marginRight: '4px' }}>Rp</span>
+            {pricingData.enterprise.toLocaleString('id-ID')}
+            <span style={{ fontSize: '0.9rem', color: '#444', fontWeight: 400 }}>/{isAnnual ? 'thn' : 'bln'}</span>
+          </div>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '2rem' }}>Otomasi skala korporasi dengan batas kuota terbesar.</p>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> <b>Maks 100</b> Karyawan</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> 10 Terminal Digital POS</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> 10 Admin Slot</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> <b>Warehouse Management</b></li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Audit Log & Anti Fraud Dasar</li>
+            <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Prioritas Support 24/7</li>
+          </ul>
+          <a 
+            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket ENTERPRISE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="btn-cta-big" 
+            style={{ display: 'block', width: '100%', textAlign: 'center', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '14px', color: 'white', fontWeight: 700, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            Hubungi Sales
+          </a>
+        </div>
+      </div>
+
+      {/* POWER-UPS / SPECIALIST ADD-ONS */}
+      <div style={{ marginTop: '6rem', maxWidth: '1200px', margin: '6rem auto 0' }}>
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <div className="hero-badge">⚡ Power-ups</div>
+          <h2 style={{ color: 'white', fontSize: '2.5rem' }}>Personalize Your Base Plan</h2>
+          <p style={{ color: '#94a3b8' }}>Gunakan Add-on untuk menambah fitur spesifik sesuai kebutuhan tanpa harus berpindah paket.</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+          {/* HR Add-ons */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ color: '#8b5cf6', fontWeight: 800, fontSize: '0.75rem', letterSpacing: '1px', marginBottom: '1.5rem', borderBottom: '1px solid rgba(139, 92, 246, 0.2)', paddingBottom: '0.5rem' }}>HR & TALENT MANAGEMENT</div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>🎯 KPI & Penilaian Kinerja</span>
+                <span style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 1.500/kar</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Fitur pembuatan KPI, penilaian, and laporan performa tim.</p>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>📚 Learning & Development</span>
+                <span style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 2.000/kar</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Modul pelatihan, ujian online, and tracking kompetensi.</p>
+            </div>
+          </div>
+
+          {/* Finance Add-ons */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ color: '#ec4899', fontWeight: 800, fontSize: '0.75rem', letterSpacing: '1px', marginBottom: '1.5rem', borderBottom: '1px solid rgba(236, 72, 153, 0.2)', paddingBottom: '0.5rem' }}>FINANCE & AI MANAGEMENT</div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>📦 Inventory & Stock</span>
+                <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 20.000/bln</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Manajemen stok bahan. <b style={{color: '#4ade80'}}>Gratis di paket PRO</b>.</p>
+            </div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>🧠 Aivola Mind (AI Advisor)</span>
+                <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 20.000/bln</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Penasehat bisnis AI strategis untuk seluruh level paket Anda.</p>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ color: 'white', fontWeight: 700 }}>🛡️ Anti-Fraud Face Check</span>
+                <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 10.000/bln</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Verifikasi wajah ketat saat absensi & transaksi sensitif.</p>
+            </div>
+          </div>
+
+          {/* Expansion Add-on */}
+          <div style={{ background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(74, 222, 128, 0.2)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ color: '#4ade80', fontWeight: 800, fontSize: '0.75rem', letterSpacing: '1px', marginBottom: '1rem' }}>SISTEM EKSPANSI</div>
+            <h4 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '1rem' }}>Expansion Pack (Staff)</h4>
+            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'white', marginBottom: '1rem' }}>Rp 7.000 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>/kar /bln</span></div>
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.5rem' }}>Tambah kuota karyawan pada paket apapun tanpa harus ganti plan.</p>
+            <a href="https://wa.me/6287882716935" style={{ textDecoration: 'none', color: '#4ade80', fontWeight: 700, fontSize: '0.9rem' }}>Tambah Kapasitas Sekarang →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const AboutSection = () => (
   <section id="about" className="about-section">
     <div className="section-header">
@@ -116,8 +296,8 @@ const AboutSection = () => (
       </div>
       <div className="about-perks">
         {[
-          { icon: '🚀', title: 'Efisiensi Tanpa Batas', desc: 'Automasi payroll, absensi wajah, dan administrasi HR dalam satu platform terintegrasi.' },
-          { icon: '📊', title: 'Keputusan Berbasis Data', desc: 'Analisis real-time dan "Pulse of Company" untuk memahami kesehatan organisasi Anda.' },
+          { icon: '🚀', title: 'Efisiensi Tanpa Batas', desc: 'Automasi payroll, absensi wajah, and administrasi HR dalam satu platform terintegrasi.' },
+          { icon: '📊', title: 'Keputusan Berbasis Data', desc: 'Analisis real-time and "Pulse of Company" untuk memahami kesehatan organisasi Anda.' },
           { icon: '🏗️', title: 'Skalabilitas Tinggi', desc: 'Dirancang untuk tumbuh bersama bisnis Anda, dari UKM hingga korporasi besar.' }
         ].map((p, i) => (
           <div key={i} className="perk-card">
@@ -141,14 +321,14 @@ const IndustrySection = () => (
     </div>
     <div className="industry-grid">
       {[
-        { icon: '🚚', name: 'Logistik', desc: 'Solusi HR bagi tim dengan operasional 24/7 dan mobilitas tinggi.' },
-        { icon: '🏭', name: 'Manufaktur', desc: 'Kelola shift dan upah pekerja dalam jumlah besar di pabrik.' },
-        { icon: '📦', name: 'Trading', desc: 'Solusi HCM terintegrasi untuk real sector dan operasi lapangan.' },
-        { icon: '🛒', name: 'Ritel', desc: 'Optimalkan pengaturan shift, absensi, dan payroll multi-cabang.' },
+        { icon: '🚚', name: 'Logistik', desc: 'Solusi HR bagi tim dengan operasional 24/7 and mobilitas tinggi.' },
+        { icon: '🏭', name: 'Manufaktur', desc: 'Kelola shift and upah pekerja dalam jumlah besar di pabrik.' },
+        { icon: '📦', name: 'Trading', desc: 'Solusi HCM terintegrasi untuk real sector and operasi lapangan.' },
+        { icon: '🛒', name: 'Ritel', desc: 'Optimalkan pengaturan shift, absensi, and payroll multi-cabang.' },
         { icon: '☕', name: 'F&B', desc: 'Tingkatkan efisiensi HR untuk operasional restoran dan outlet.' },
-        { icon: '🏨', name: 'Hospitality', desc: 'Permudah kelola absensi dan shift perhotelan yang dinamis.' },
-        { icon: '💼', name: 'Jasa Profesional', desc: 'Pantau kinerja dan KPI tim ahli dengan data yang akurat.' },
-        { icon: '💻', name: 'Teknologi', desc: 'Manajemen talenta dan kolaborasi untuk startup dan tech-firm.' }
+        { icon: '🏨', name: 'Hospitality', desc: 'Permudah kelola absensi and shift perhotelan yang dinamis.' },
+        { icon: '💼', name: 'Jasa Profesional', desc: 'Pantau kinerja and KPI tim ahli dengan data yang akurat.' },
+        { icon: '💻', name: 'Teknologi', desc: 'Manajemen talenta and kolaborasi untuk startup and tech-firm.' }
       ].map((ind, i) => (
         <div key={i} className="industry-card">
           <span className="ind-icon">{ind.icon}</span>
@@ -158,155 +338,6 @@ const IndustrySection = () => (
           </div>
         </div>
       ))}
-    </div>
-  </section>
-);
-
-const PricingSection = () => (
-  <section id="pricing" className="pricing-section">
-    <div className="section-header">
-      <h2>Harga Transparan</h2>
-      <p>Pilih Paket Sesuai Kebutuhan</p>
-    </div>
-
-    <div className="pricing-main-card">
-      <div className="card-badge-top">✨ All-in-One</div>
-      <h3>Aivola HR Core</h3>
-      <div className="price-display">
-        <span className="currency">Rp</span>
-        <span className="amount">7.000</span>
-        <span className="unit">/karyawan/bulan</span>
-      </div>
-      <p className="price-meta">(Dibayar tahunan)</p>
-
-      <div className="pricing-features-grid">
-        <div className="price-col">
-          <div className="col-header"><span className="col-icon">⏰</span> KEHADIRAN & JADWAL</div>
-          <ul>
-            <li>✓ Absensi Wajah & GPS</li>
-            <li>✓ Manajemen Cuti & Izin</li>
-            <li>✓ Manajemen Shift</li>
-            <li>✓ Lembur dengan Approval</li>
-          </ul>
-        </div>
-        <div className="price-col">
-          <div className="col-header"><span className="col-icon">💰</span> PENGGAJIAN & KEUANGAN</div>
-          <ul>
-            <li>✓ Hitung Payroll Otomatis</li>
-            <li>✓ Slip Gaji Digital</li>
-            <li>✓ Bonus & THR</li>
-            <li>✓ Reimbursement</li>
-            <li>✓ Pinjaman Karyawan</li>
-          </ul>
-        </div>
-        <div className="price-col">
-          <div className="col-header"><span className="col-icon">👥</span> DATA & ASET SDM</div>
-          <ul>
-            <li>✓ Database Karyawan Aman</li>
-            <li>✓ Kelola Aset Perusahaan</li>
-            <li>✓ Hari Libur & Kalender</li>
-          </ul>
-        </div>
-        <div className="price-col">
-          <div className="col-header"><span className="col-icon">🏢</span> ORGANISASI</div>
-          <ul>
-            <li>✓ Multi Cabang</li>
-            <li>✓ Pengumuman Perusahaan</li>
-          </ul>
-        </div>
-        <div className="price-col">
-          <div className="col-header"><span className="col-icon">💬</span> ENGAGEMENT</div>
-          <ul>
-            <li>✓ Pulse of Company</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="card-footer-info">
-        <strong>15+ fitur</strong> dalam satu paket sederhana
-      </div>
-      <a href="https://admin.aivola.id/register" className="btn-cta-big">🚀 Mulai 14 Hari Gratis</a>
-      <p className="cta-meta">Tanpa kartu kredit. Batalkan kapan saja.</p>
-    </div>
-
-    <div className="power-ups-container">
-      <div className="hero-badge">⚡ Power-ups</div>
-      <h2>Tambah Kemampuan Tim Anda</h2>
-      <p className="power-up-sub">Add-on per karyawan untuk fitur spesialis.</p>
-      
-      <div className="power-ups-grid">
-        <div className="power-card">
-          <span className="p-icon">📊</span>
-          <h4>KPI Management</h4>
-          <div className="p-price">Rp 1.500<span>/kar/bln</span></div>
-          <p>Pantau performa tim dengan KPI terukur & dashboard real-time.</p>
-        </div>
-        <div className="power-card">
-          <span className="p-icon">🎓</span>
-          <h4>Learning & Development</h4>
-          <div className="p-price">Rp 2.000<span>/kar/bln</span></div>
-          <p>Pusat pelatihan, modul belajar mandiri & sertifikasi internal.</p>
-        </div>
-        <div className="power-card best-value">
-          <div className="best-badge">BEST VALUE</div>
-          <span className="p-icon">🚀</span>
-          <h4>Performance Bundle</h4>
-          <div className="p-price">Rp 3.000<span>/kar/bln</span></div>
-          <p>KPI + Learning & Development dalam satu paket hemat.</p>
-          <div className="save-badge">Hemat Rp 500 vs terpisah</div>
-        </div>
-      </div>
-
-      <div className="promo-banner">
-        <span className="gift-icon">🎁</span>
-        <div className="promo-text">
-          <strong>Promo Early Adopter!</strong>
-          <p>Dapatkan tambahan storage 10GB dan sesi konsultasi HR gratis untuk pendaftaran paket tahunan minggu ini!</p>
-        </div>
-        <button className="btn-claim">Klaim Promo</button>
-      </div>
-    </div>
-  </section>
-);
-
-const RenewalSection = () => (
-  <section className="renewal-section">
-    <div className="hero-badge">🔄 Perpanjang / Upgrade Langganan</div>
-    <h2>Pulihkan Akses Akun Anda</h2>
-    <p>Jika langganan Anda habis, pilih paket di bawah dan hubungi kami via WhatsApp.</p>
-
-    <div className="renewal-grid">
-      <div className="renewal-card">
-        <h4>Paket Bulanan</h4>
-        <div className="r-price">Rp 9.000<span>/karyawan/bulan</span></div>
-        <p>Fleksibel, bayar bulan ke bulan.</p>
-        <button className="btn-wa">💬 Perpanjang via WhatsApp</button>
-      </div>
-      <div className="renewal-card featured">
-        <div className="best-badge">BEST VALUE</div>
-        <h4>Paket Tahunan</h4>
-        <div className="r-price">Rp 7.000<span>/karyawan/bulan</span></div>
-        <p>Hemat Rp 2.000/karyawan vs bulanan. Tagih sekali setahun.</p>
-        <button className="btn-wa primary">💬 Perpanjang via WhatsApp</button>
-      </div>
-    </div>
-
-    <div className="r-steps">
-      <h4>Cara Perpanjang — 3 Langkah Mudah</h4>
-      <div className="steps-grid">
-        <div className="step-item">
-          <span className="step-icon">💬</span>
-          <p><strong>Chat WhatsApp</strong><br/>Klik tombol di atas, pilih paket, dan kirim pesan ke tim kami.</p>
-        </div>
-        <div className="step-item">
-          <span className="step-icon">💳</span>
-          <p><strong>Proses Pembayaran</strong><br/>Kami kirimkan invoice dan instruksi transfer yang jelas.</p>
-        </div>
-        <div className="step-item">
-          <span className="step-icon">✅</span>
-          <p><strong>Akses Pulih</strong><br/>Konfirmasi pembayaran → akun Anda aktif kembali dalam menit.</p>
-        </div>
-      </div>
     </div>
   </section>
 );
@@ -390,7 +421,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                 <div>
                   <h3 style={{margin: 0, color: 'white'}}>Laporan Absensi Real-time</h3>
-                  <p style={{color: '#94a3b8', margin: '0.5rem 0 0'}}>Pantau mood dan produktivitas tim secara instan.</p>
+                  <p style={{color: '#94a3b8', margin: '0.5rem 0 0'}}>Pantau mood and produktivitas tim secara instan.</p>
                 </div>
                 <div style={{display: 'flex', gap: '0.5rem'}}>
                   {['Senang', 'Netral', 'Lelah', 'Stres'].map((mood) => (
@@ -427,7 +458,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                 <div>
                   <h3 style={{margin: 0, color: 'white'}}>Learning & Development</h3>
-                  <p style={{color: '#94a3b8', margin: '0.5rem 0 0'}}>Pusat peningkatan kompetensi dan verifikasi pemahaman SOP.</p>
+                  <p style={{color: '#94a3b8', margin: '0.5rem 0 0'}}>Pusat peningkatan kompetensi and verifikasi pemahaman SOP.</p>
                 </div>
                 <button style={{padding: '0.8rem 1.5rem', background: '#8b5cf6', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700}}>+ Upload SOP (AI Exam)</button>
               </div>
@@ -483,7 +514,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
 
                 <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
                   {[
-                    {t: 'AI: OPTIMALISASI MARGIN', c: 'Berdasarkan korelasi HPP dan Penjualan, Anda bisa menghemat 12% biaya.', color: '#4ade80'},
+                    {t: 'AI: OPTIMALISASI MARGIN', c: 'Berdasarkan korelasi HPP and Penjualan, Anda bisa menghemat 12% biaya.', color: '#4ade80'},
                     {t: 'AI: DETEKSI BURNOUT', c: 'Terditeksi peningkatan pola keterlambatan di Departemen Ops. Risiko resign naik 15%.', color: '#f87171'}
                   ].map((insight, i) => (
                     <div key={i} style={{padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: `1px solid ${insight.color}33`}}>
@@ -509,7 +540,7 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
   <section id="demo" className="demo-section" style={{padding: '8rem 5%', textAlign: 'center', background: '#0a0a0f'}}>
     <div className="hero-badge">Demo Aplikasi HR</div>
     <h2>Kelola Karyawan <br/> Secepat Kilat</h2>
-    <p className="hero-subtitle">Pantau kehadiran, payroll, dan performa tim dalam satu dashboard modern.</p>
+    <p className="hero-subtitle">Pantau kehadiran, payroll, and performa tim dalam satu dashboard modern.</p>
     
     <div className="demo-player-container" style={{maxWidth: '1000px', margin: '4rem auto', position: 'relative'}}>
       <div style={{
@@ -621,7 +652,6 @@ function AttendancePage() {
       <AboutSection />
       <IndustrySection />
       <PricingSection />
-      <RenewalSection />
       <Footer />
       <VideoModal isOpen={isVideoOpen} onClose={() => setIsVideoOpen(false)} />
     </div>

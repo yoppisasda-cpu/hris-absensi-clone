@@ -823,6 +823,7 @@ app.post('/api/companies', async (req: Request, res: Response) => {
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons,
+      discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion,
       adminEmail, adminPassword, adminName
     } = req.body;
 
@@ -847,7 +848,13 @@ app.post('/api/companies', async (req: Request, res: Response) => {
           posLimit: posLimit ? parseInt(posLimit, 10) : 1,
           photoRetentionDays: photoRetentionDays ? parseInt(photoRetentionDays, 10) : 30,
           plan: plan || 'STARTER',
-          addons: addons || []
+          addons: addons || [],
+          discountKpi: parseInt(discountKpi, 10) || 0,
+          discountLearning: parseInt(discountLearning, 10) || 0,
+          discountInventory: parseInt(discountInventory, 10) || 0,
+          discountAi: parseInt(discountAi, 10) || 0,
+          discountFraud: parseInt(discountFraud, 10) || 0,
+          discountExpansion: parseInt(discountExpansion, 10) || 0
         }
       });
 
@@ -1230,7 +1237,8 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
-      plan, addons, purchasedInsights
+      plan, addons, purchasedInsights,
+      discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion
     } = req.body;
 
     const updatedCompany = await prisma.company.update({
@@ -1252,7 +1260,13 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         photoRetentionDays: (photoRetentionDays !== undefined && photoRetentionDays !== null) ? parseInt(photoRetentionDays.toString(), 10) : undefined,
         plan: plan !== undefined ? plan : undefined,
         addons: addons !== undefined ? addons : undefined,
-        purchasedInsights: purchasedInsights !== undefined ? purchasedInsights : undefined
+        purchasedInsights: purchasedInsights !== undefined ? purchasedInsights : undefined,
+        discountKpi: discountKpi !== undefined ? parseInt(discountKpi.toString(), 10) : undefined,
+        discountLearning: discountLearning !== undefined ? parseInt(discountLearning.toString(), 10) : undefined,
+        discountInventory: discountInventory !== undefined ? parseInt(discountInventory.toString(), 10) : undefined,
+        discountAi: discountAi !== undefined ? parseInt(discountAi.toString(), 10) : undefined,
+        discountFraud: discountFraud !== undefined ? parseInt(discountFraud.toString(), 10) : undefined,
+        discountExpansion: discountExpansion !== undefined ? parseInt(discountExpansion.toString(), 10) : undefined
       }
     });
 

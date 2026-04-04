@@ -28,6 +28,12 @@ interface Company {
     _count?: {
         users: number;
     };
+    discountKpi?: number;
+    discountLearning?: number;
+    discountInventory?: number;
+    discountAi?: number;
+    discountFraud?: number;
+    discountExpansion?: number;
 }
 
 export default function CompaniesPage() {
@@ -75,6 +81,15 @@ export default function CompaniesPage() {
     const [addonInventory, setAddonInventory] = useState(false);
     const [addonAi, setAddonAi] = useState(false);
     const [addonFraud, setAddonFraud] = useState(false);
+    const [addonExpansion, setAddonExpansion] = useState(false);
+
+    // Discount States (Percent)
+    const [discountKpi, setDiscountKpi] = useState('0');
+    const [discountLearning, setDiscountLearning] = useState('0');
+    const [discountInventory, setDiscountInventory] = useState('0');
+    const [discountAi, setDiscountAi] = useState('0');
+    const [discountFraud, setDiscountFraud] = useState('0');
+    const [discountExpansion, setDiscountExpansion] = useState('0');
 
     // Admin Account States
     const [adminName, setAdminName] = useState('');
@@ -124,6 +139,13 @@ export default function CompaniesPage() {
         setAddonInventory(false);
         setAddonAi(false);
         setAddonFraud(false);
+        setAddonExpansion(false);
+        setDiscountKpi('0');
+        setDiscountLearning('0');
+        setDiscountInventory('0');
+        setDiscountAi('0');
+        setDiscountFraud('0');
+        setDiscountExpansion('0');
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
@@ -146,26 +168,33 @@ export default function CompaniesPage() {
 
             const payload = {
                 name,
-                latitude,
-                longitude,
-                radius,
+                latitude: latitude ? parseFloat(latitude) : null,
+                longitude: longitude ? parseFloat(longitude) : null,
+                radius: parseInt(radius) || 100,
                 picName,
                 picPhone,
                 contractType,
-                contractValue,
+                contractValue: parseFloat(contractValue) || 0,
                 contractStart: contractStart || null,
                 contractEnd: contractEnd || null,
-                employeeLimit,
-                adminLimit,
-                posLimit,
-                photoRetentionDays,
+                employeeLimit: parseInt(employeeLimit) || 0,
+                adminLimit: parseInt(adminLimit) || 0,
+                posLimit: parseInt(posLimit) || 0,
+                photoRetentionDays: parseInt(photoRetentionDays) || 30,
                 purchasedInsights: buildInsights(),
                 plan,
                 addons: [
                     ...(addonInventory ? ['INVENTORY'] : []),
                     ...(addonAi ? ['AI_ADVISOR'] : []),
-                    ...(addonFraud ? ['FRAUD_DETECTION'] : [])
+                    ...(addonFraud ? ['FRAUD_DETECTION'] : []),
+                    ...(addonExpansion ? ['STAFF_EXPANSION'] : [])
                 ],
+                discountKpi: parseInt(discountKpi) || 0,
+                discountLearning: parseInt(discountLearning) || 0,
+                discountInventory: parseInt(discountInventory) || 0,
+                discountAi: parseInt(discountAi) || 0,
+                discountFraud: parseInt(discountFraud) || 0,
+                discountExpansion: parseInt(discountExpansion) || 0,
                 ...(editingCompanyId ? {} : { adminName, adminEmail, adminPassword })
             };
 
@@ -184,7 +213,8 @@ export default function CompaniesPage() {
                     localStorage.setItem('userAddons', JSON.stringify([
                         ...(addonInventory ? ['INVENTORY'] : []),
                         ...(addonAi ? ['AI_ADVISOR'] : []),
-                        ...(addonFraud ? ['FRAUD_DETECTION'] : [])
+                        ...(addonFraud ? ['FRAUD_DETECTION'] : []),
+                        ...(addonExpansion ? ['STAFF_EXPANSION'] : [])
                     ]));
                     // Trigger a storage event for other components like Sidebar to update
                     window.dispatchEvent(new Event('storage'));
@@ -237,6 +267,14 @@ export default function CompaniesPage() {
         setAddonInventory(addons.includes('INVENTORY'));
         setAddonAi(addons.includes('AI_ADVISOR'));
         setAddonFraud(addons.includes('FRAUD_DETECTION'));
+        setAddonExpansion(addons.includes('STAFF_EXPANSION'));
+
+        setDiscountKpi(company.discountKpi?.toString() || '0');
+        setDiscountLearning(company.discountLearning?.toString() || '0');
+        setDiscountInventory(company.discountInventory?.toString() || '0');
+        setDiscountAi(company.discountAi?.toString() || '0');
+        setDiscountFraud(company.discountFraud?.toString() || '0');
+        setDiscountExpansion(company.discountExpansion?.toString() || '0');
         // Kosongkan admin fields
         setAdminName('');
         setAdminEmail('');
@@ -272,13 +310,19 @@ export default function CompaniesPage() {
                 BUNDLE_KPI_LRN: 3000,
                 INVENTORY: 20000,
                 AI: 20000,
-                FRAUD: 10000
+                FRAUD: 10000,
+                EXPANSION: 7000
+            },
+            planLimits: {
+                STARTER: 10,
+                PRO: 50,
+                ENTERPRISE: 100
             }
         };
 
         const plan = company.plan || 'STARTER';
         const isAnnual = company.contractType === 'TAHUNAN';
-        const multiplier = isAnnual ? 12 : 1;
+        const multiplier = isAnnual ? 10 : 1; // Sync with landing page: 10x monthly = 1 Year
         const periodUnit = isAnnual ? '12 Bln' : '1 Bln';
         const periodLabel = isAnnual ? '1 Thn' : '1 Bln';
 
@@ -287,8 +331,16 @@ export default function CompaniesPage() {
             ? Number(company.contractValue) 
             : pricing.plans[plan as keyof typeof pricing.plans];
         
-        // Apply multiplier to basePrice
-        basePrice = basePrice * multiplier;
+        // Multiplier for basePrice (Plan package)
+        let totalBasePrice = basePrice * (isAnnual ? 12 : 1); // For display
+        
+        basePrice = basePrice * multiplier; 
+
+        // Discount logic for each item
+        const applyDiscount = (price: number, discountPercent: number) => {
+            if (!discountPercent || discountPercent <= 0) return price;
+            return price * (1 - (discountPercent / 100));
+        };
 
         // Seats calculation (Free 2 Admin, 1 POS)
         const extraAdmin = Math.max(0, (company.adminLimit || 2) - 2);
@@ -310,31 +362,37 @@ export default function CompaniesPage() {
         const hasLearning = insights.includes('LEARNING') || insights.includes('KPI_LEARNING');
         
         if (hasKpi && hasLearning) {
-            const cost = userCount * pricing.addons.BUNDLE_KPI_LRN * multiplier;
+            const disc = Math.max(company.discountKpi || 0, company.discountLearning || 0);
+            const unitPrice = applyDiscount(pricing.addons.BUNDLE_KPI_LRN, disc);
+            const cost = userCount * unitPrice * multiplier;
             addonTotal += cost;
             detailItems.push({ 
-                name: 'Bundle: KPI & Learning', 
-                price: pricing.addons.BUNDLE_KPI_LRN, 
+                name: `Bundle: KPI & Learning ${disc > 0 ? `(Disc ${disc}%)` : ''}`, 
+                price: unitPrice, 
                 qty: `${userCount} u x ${periodUnit}`, 
                 total: cost 
             });
         } else {
             if (hasKpi) {
-                const cost = userCount * pricing.addons.KPI * multiplier;
+                const disc = company.discountKpi || 0;
+                const unitPrice = applyDiscount(pricing.addons.KPI, disc);
+                const cost = userCount * unitPrice * multiplier;
                 addonTotal += cost;
                 detailItems.push({ 
-                    name: 'Add-on: KPI Penilaian', 
-                    price: pricing.addons.KPI, 
+                    name: `Add-on: KPI Penilaian ${disc > 0 ? `(Disc ${disc}%)` : ''}`, 
+                    price: unitPrice, 
                     qty: `${userCount} u x ${periodUnit}`, 
                     total: cost 
                 });
             }
             if (hasLearning) {
-                const cost = userCount * pricing.addons.LEARNING * multiplier;
+                const disc = company.discountLearning || 0;
+                const unitPrice = applyDiscount(pricing.addons.LEARNING, disc);
+                const cost = userCount * unitPrice * multiplier;
                 addonTotal += cost;
                 detailItems.push({ 
-                    name: 'Add-on: Learning Center', 
-                    price: pricing.addons.LEARNING, 
+                    name: `Add-on: Learning Center ${disc > 0 ? `(Disc ${disc}%)` : ''}`, 
+                    price: unitPrice, 
                     qty: `${userCount} u x ${periodUnit}`, 
                     total: cost 
                 });
@@ -342,19 +400,42 @@ export default function CompaniesPage() {
         }
 
         if (addons.includes('INVENTORY')) {
-            const cost = pricing.addons.INVENTORY * multiplier;
+            const disc = company.discountInventory || 0;
+            const unitPrice = applyDiscount(pricing.addons.INVENTORY, disc);
+            const cost = unitPrice * multiplier;
             addonTotal += cost;
-            detailItems.push({ name: 'Add-on: Inventory Management', price: pricing.addons.INVENTORY, qty: periodUnit, total: cost });
+            detailItems.push({ name: `Add-on: Inventory Management ${disc > 0 ? `(Disc ${disc}%)` : ''}`, price: unitPrice, qty: periodUnit, total: cost });
         }
         if (addons.includes('AI_ADVISOR')) {
-            const cost = pricing.addons.AI * multiplier;
+            const disc = company.discountAi || 0;
+            const unitPrice = applyDiscount(pricing.addons.AI, disc);
+            const cost = unitPrice * multiplier;
             addonTotal += cost;
-            detailItems.push({ name: 'Add-on: Aivola Mind (AI)', price: pricing.addons.AI, qty: periodUnit, total: cost });
+            detailItems.push({ name: `Add-on: Aivola Mind (AI) ${disc > 0 ? `(Disc ${disc}%)` : ''}`, price: unitPrice, qty: periodUnit, total: cost });
         }
         if (addons.includes('FRAUD_DETECTION')) {
-            const cost = pricing.addons.FRAUD * multiplier;
+            const disc = company.discountFraud || 0;
+            const unitPrice = applyDiscount(pricing.addons.FRAUD, disc);
+            const cost = unitPrice * multiplier;
             addonTotal += cost;
-            detailItems.push({ name: 'Add-on: Anti-Fraud Face Check', price: pricing.addons.FRAUD, qty: periodUnit, total: cost });
+            detailItems.push({ name: `Add-on: Anti-Fraud Face Check ${disc > 0 ? `(Disc ${disc}%)` : ''}`, price: unitPrice, qty: periodUnit, total: cost });
+        }
+
+        // Expanded Staff Logic
+        const baseLimit = pricing.planLimits[plan as keyof typeof pricing.planLimits] || 10;
+        const extraStaff = Math.max(0, userCount - baseLimit);
+
+        if (extraStaff > 0 && addons.includes('STAFF_EXPANSION')) {
+            const disc = company.discountExpansion || 0;
+            const unitPrice = applyDiscount(pricing.addons.EXPANSION, disc);
+            const cost = extraStaff * unitPrice * multiplier;
+            addonTotal += cost;
+            detailItems.push({ 
+                name: `Expansion Pack: Extra Staff ${disc > 0 ? `(Disc ${disc}%)` : ''}`, 
+                price: unitPrice, 
+                qty: `${extraStaff} u x ${periodUnit}`, 
+                total: cost 
+            });
         }
 
         const total = basePrice + seatCost + addonTotal;
@@ -572,6 +653,12 @@ export default function CompaniesPage() {
                                         <span className="text-[9px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded">Rp 1.500/karyawan</span>
                                     </div>
                                     <div className="text-[10px] text-slate-400 mt-0.5">Fitur pembuatan KPI, penilaian, dan laporan performa.</div>
+                                    {addonKpi && (
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <span className="text-[10px] text-indigo-600 font-bold">% Diskon:</span>
+                                            <input type="number" value={discountKpi} onChange={(e) => setDiscountKpi(e.target.value)} className="w-16 h-6 text-[10px] border border-indigo-200 rounded px-1" />
+                                        </div>
+                                    )}
                                 </div>
                             </label>
                             <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-sky-50 hover:border-sky-300 transition-all">
@@ -587,6 +674,12 @@ export default function CompaniesPage() {
                                         <span className="text-[9px] bg-sky-100 text-sky-700 font-bold px-1.5 py-0.5 rounded">Rp 2.000/karyawan</span>
                                     </div>
                                     <div className="text-[10px] text-slate-400 mt-0.5">Modul pelatihan, ujian online, dan tracking kompetensi.</div>
+                                    {addonLearning && (
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <span className="text-[10px] text-sky-600 font-bold">% Diskon:</span>
+                                            <input type="number" value={discountLearning} onChange={(e) => setDiscountLearning(e.target.value)} className="w-16 h-6 text-[10px] border border-sky-200 rounded px-1" />
+                                        </div>
+                                    )}
                                 </div>
                             </label>
                             {addonKpi && addonLearning && (
@@ -611,6 +704,12 @@ export default function CompaniesPage() {
                                                 <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Rp 20.000/bln</span>
                                             </div>
                                             <div className="text-[10px] text-slate-400 mt-0.5">Manajemen stok barang, multi-gudang, dan integrasi POS.</div>
+                                            {addonInventory && (
+                                                <div className="mt-1.5 flex items-center gap-2">
+                                                    <span className="text-[10px] text-emerald-600 font-bold">% Diskon:</span>
+                                                    <input type="number" value={discountInventory} onChange={(e) => setDiscountInventory(e.target.value)} className="w-16 h-6 text-[10px] border border-emerald-200 rounded px-1" />
+                                                </div>
+                                            )}
                                         </div>
                                     </label>
 
@@ -627,6 +726,12 @@ export default function CompaniesPage() {
                                                 <span className="text-[9px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded">Rp 20.000/bln</span>
                                             </div>
                                             <div className="text-[10px] text-slate-400 mt-0.5">Penasehat bisnis AI yang menganalisa performa keuangan & stok.</div>
+                                            {addonAi && (
+                                                <div className="mt-1.5 flex items-center gap-2">
+                                                    <span className="text-[10px] text-violet-600 font-bold">% Diskon:</span>
+                                                    <input type="number" value={discountAi} onChange={(e) => setDiscountAi(e.target.value)} className="w-16 h-6 text-[10px] border border-violet-200 rounded px-1" />
+                                                </div>
+                                            )}
                                         </div>
                                     </label>
 
@@ -643,6 +748,47 @@ export default function CompaniesPage() {
                                                 <span className="text-[9px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded">Rp 10.000/bln</span>
                                             </div>
                                             <div className="text-[10px] text-slate-400 mt-0.5">Verifikasi wajah ketat saat absensi & transaksi sensitif.</div>
+                                            {addonFraud && (
+                                                <div className="mt-1.5 flex items-center gap-2">
+                                                    <span className="text-[10px] text-rose-600 font-bold">% Diskon:</span>
+                                                    <input type="number" value={discountFraud} onChange={(e) => setDiscountFraud(e.target.value)} className="w-16 h-6 text-[10px] border border-rose-200 rounded px-1" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={addonExpansion}
+                                            onChange={(e) => setAddonExpansion(e.target.checked)}
+                                            className="mt-0.5 h-4 w-4 rounded accent-emerald-600"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                                                📈 Expansion Pack (Staff)
+                                                <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Rp 7.000/karyawan</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Tambah kapasitas karyawan di atas limit paket standar.</div>
+                                            
+                                            {/* Indikator Real-time */}
+                                            {addonExpansion && (
+                                                <div className="mt-2 bg-emerald-50 border border-emerald-100 rounded px-2 py-1.5">
+                                                    <div className="text-[10px] font-bold text-emerald-700 flex justify-between items-center">
+                                                        <span>Kapasitas Tambahan:</span>
+                                                        <span className="text-sm">
+                                                            {Math.max(0, parseInt(employeeLimit) - (plan === 'PRO' ? 50 : plan === 'ENTERPRISE' ? 100 : 10))} Orang
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[9px] text-emerald-600 italic">
+                                                        *Dihitung dari (Limit {employeeLimit} - Dasar {plan === 'PRO' ? 50 : plan === 'ENTERPRISE' ? 100 : 10})
+                                                    </div>
+                                                    <div className="mt-1.5 pt-1.5 border-t border-emerald-100 flex items-center gap-2">
+                                                        <span className="text-[10px] text-emerald-600 font-bold">% Diskon:</span>
+                                                        <input type="number" value={discountExpansion} onChange={(e) => setDiscountExpansion(e.target.value)} className="w-16 h-6 text-[10px] border border-emerald-200 rounded px-1 bg-white" />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </label>
                                 </div>
