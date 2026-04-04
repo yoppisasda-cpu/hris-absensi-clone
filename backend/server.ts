@@ -1970,7 +1970,7 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
         }
         // Cleanup after Supabase upload and AI processing
         // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
-        if (finalPhotoUrl && !finalPhotoUrl.includes(req.get('host') || 'localhost')) {
+        if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
             cleanupLocalFile(fullPath);
         }
     }
@@ -2015,7 +2015,7 @@ app.patch('/api/users/:id/face-reference', tenantMiddleware, uploadFaceReference
     try {
       finalUrl = await uploadToSupabase(fullPath, 'face_references');
       // Only cleanup if successfully uploaded to Supabase
-      if (finalUrl && !finalUrl.includes(req.get('host') || 'localhost')) {
+      if (finalUrl && finalUrl.startsWith('http')) {
           cleanupLocalFile(fullPath);
       }
     } catch (uploadError) {
@@ -2220,7 +2220,7 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
             }
         }
         // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
-        if (finalPhotoUrl && !finalPhotoUrl.includes(req.get('host') || 'localhost')) {
+        if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
             cleanupLocalFile(fullPath);
         }
     }
