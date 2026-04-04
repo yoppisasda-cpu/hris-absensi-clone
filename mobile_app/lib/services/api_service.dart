@@ -2,9 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Ganti localhost dengan IP lokal komputer Anda jika dio run di real-device/emulator
-  // Emulator Android = 10.0.2.2 || Real Device = IP LAN (192.168.x.x)
-  static const String baseUrl = 'http://localhost:5000/api';
+  // PENTING: Jika menggunakan HP asli, ganti 'localhost' dengan IP komputer Anda (cek pakai ipconfig)
+  // Contoh: static const String baseUrl = 'http://192.168.1.15:5000/api';
+  // Gunakan API Server Live yang sudah dideploy ke Railway
+  static const String baseUrl = 'https://api.aivola.id/api';
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   ApiService() {
@@ -49,7 +50,7 @@ class ApiService {
       if (e.response != null && e.response?.data['error'] != null) {
         throw Exception(e.response?.data['error']);
       }
-      throw Exception('Gagal menghubungi server otentikasi.');
+      throw Exception('Gagal menghubungi server otentikasi (Cek koneksi internet Anda). Endpoint: $baseUrl');
     } catch (e) {
       throw Exception('Gagal login: $e');
     }

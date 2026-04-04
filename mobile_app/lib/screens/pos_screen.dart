@@ -265,7 +265,14 @@ class _POSScreenState extends State<POSScreen> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
           ),
           padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-          child: SingleChildScrollView(
+          child: _buildCheckoutContent(context, setModalState, isModal: true),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCheckoutContent(BuildContext context, Function setPanelState, {bool isModal = true}) {
+    return SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -294,12 +301,12 @@ class _POSScreenState extends State<POSScreen> {
                         children: [
                           IconButton(
                             icon: Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-                            onPressed: () => setModalState(() => _updateCartQty(i, -1)),
+                            onPressed: () => setPanelState(() => _updateCartQty(i, -1)),
                           ),
                           Text('${_cart[i]['quantity']}', style: TextStyle(fontWeight: FontWeight.bold)),
                           IconButton(
                             icon: Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
-                            onPressed: () => setModalState(() => _updateCartQty(i, 1)),
+                            onPressed: () => setPanelState(() => _updateCartQty(i, 1)),
                           ),
                         ],
                       ),
@@ -313,13 +320,13 @@ class _POSScreenState extends State<POSScreen> {
                 SizedBox(height: 10),
                 Row(
                   children: [
-                    _buildSaleTypeChip('WALK_IN', 'Walk-in', Icons.person, setModalState),
+                    _buildSaleTypeChip('WALK_IN', 'Walk-in', Icons.person, setPanelState),
                     SizedBox(width: 8),
-                    _buildSaleTypeChip('GOFOOD', 'GoFood', Icons.delivery_dining, setModalState),
+                    _buildSaleTypeChip('GOFOOD', 'GoFood', Icons.delivery_dining, setPanelState),
                     SizedBox(width: 8),
-                    _buildSaleTypeChip('GRABFOOD', 'GrabFood', Icons.delivery_dining, setModalState),
+                    _buildSaleTypeChip('GRABFOOD', 'GrabFood', Icons.delivery_dining, setPanelState),
                     SizedBox(width: 8),
-                    _buildSaleTypeChip('SHOPEEFOOD', 'ShopeeFood', Icons.delivery_dining, setModalState),
+                    _buildSaleTypeChip('SHOPEEFOOD', 'ShopeeFood', Icons.delivery_dining, setPanelState),
                   ],
                 ),
                 SizedBox(height: 24),
@@ -335,7 +342,7 @@ class _POSScreenState extends State<POSScreen> {
                     displayStringForOption: (option) => (option as Map<String, dynamic>)['name'],
                     onSelected: (Object selection) {
                       final sel = selection as Map<String, dynamic>;
-                      setModalState(() {
+                      setPanelState(() {
                         _customerNameController.text = sel['name'];
                         _customerPhoneController.text = sel['phone'] ?? '';
                       });
@@ -435,7 +442,7 @@ class _POSScreenState extends State<POSScreen> {
                       padding: const EdgeInsets.only(bottom: 12.0),
                       child: InkWell(
                         onTap: () {
-                          setModalState(() {
+                          setPanelState(() {
                             _selectedPaymentMethod = method;
                             
                             if (method == 'Tunai') {
@@ -525,7 +532,7 @@ class _POSScreenState extends State<POSScreen> {
                               padding: EdgeInsets.symmetric(horizontal: 16),
                             ),
                             onPressed: () {
-                              setModalState(() {
+                              setPanelState(() {
                                 _cashReceived = val;
                                 _cashReceivedController.text = val.toStringAsFixed(0);
                               });
@@ -543,7 +550,7 @@ class _POSScreenState extends State<POSScreen> {
                       keyboardType: TextInputType.number,
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                       onChanged: (val) {
-                        setModalState(() {
+                        setPanelState(() {
                           _cashReceived = double.tryParse(val) ?? 0;
                         });
                       },
@@ -574,7 +581,7 @@ class _POSScreenState extends State<POSScreen> {
                 ElevatedButton(
                   onPressed: () {
                     if (_isWaiterMode) {
-                      Navigator.pop(context);
+                      if (isModal) Navigator.pop(context);
                       _showTableLabelDialog();
                       return;
                     }
@@ -588,7 +595,7 @@ class _POSScreenState extends State<POSScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Silahkan buka pengaturan dan tambahkan Akun Keuangan terlebih dahulu')));
                       return;
                     }
-                    _processCheckout(context);
+                    _processCheckout(context, isModal: isModal);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isWaiterMode ? Colors.amber[800] : Colors.blue[800],
@@ -601,18 +608,15 @@ class _POSScreenState extends State<POSScreen> {
                 SizedBox(height: 20),
               ],
             ),
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildSaleTypeChip(String type, String label, IconData icon, Function setModalState) {
+  Widget _buildSaleTypeChip(String type, String label, IconData icon, Function setPanelState) {
     bool isSelected = _saleType == type;
     return Expanded(
       child: GestureDetector(
         onTap: () {
-          setModalState(() {
+          setPanelState(() {
             _saleType = type;
             if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD') {
               _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : 'ShopeeFood');
@@ -664,8 +668,8 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 
-  Future<void> _processCheckout(BuildContext modalContext) async {
-    Navigator.pop(modalContext);
+  Future<void> _processCheckout(BuildContext currentContext, {bool isModal = true}) async {
+    if (isModal) Navigator.pop(currentContext);
     setState(() => _isLoading = true);
     try {
       final checkoutItems = _cart.map((item) {
@@ -985,14 +989,19 @@ class _POSScreenState extends State<POSScreen> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
+                      final bool isLargeScreen = constraints.maxWidth > 900;
                       int cols = 2;
-                      if (constraints.maxWidth > 1400) cols = 10;
-                      else if (constraints.maxWidth > 1200) cols = 8;
-                      else if (constraints.maxWidth > 1000) cols = 6;
-                      else if (constraints.maxWidth > 800) cols = 4;
-                      else if (constraints.maxWidth > 600) cols = 3;
                       
-                      return _filteredProducts.isEmpty
+                      // Calculate columns considering side panel space if large screen
+                      double availableWidth = isLargeScreen ? constraints.maxWidth - 400 : constraints.maxWidth;
+                      
+                      if (availableWidth > 1400) cols = 10;
+                      else if (availableWidth > 1200) cols = 8;
+                      else if (availableWidth > 1000) cols = 6;
+                      else if (availableWidth > 800) cols = 4;
+                      else if (availableWidth > 600) cols = 3;
+                      
+                      Widget mainContent = _filteredProducts.isEmpty
                           ? Center(child: Text('Tidak ada produk ditemukan'))
                           : GridView.builder(
                               padding: EdgeInsets.all(12),
@@ -1080,19 +1089,58 @@ class _POSScreenState extends State<POSScreen> {
                             );
                           },
                         );
+
+                      if (isLargeScreen) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: mainContent),
+                            Container(
+                              width: 400,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border(left: BorderSide(color: Colors.grey[300]!, width: 2)),
+                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: Offset(-2, 0))],
+                              ),
+                              child: _cart.isEmpty
+                                  ? Center(child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.shopping_basket_outlined, size: 64, color: Colors.grey[300]),
+                                        SizedBox(height: 16),
+                                        Text('Keranjang Kosong', style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.bold)),
+                                      ],
+                                    ))
+                                  : Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: _buildCheckoutContent(context, setState, isModal: false),
+                                    ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return mainContent;
                     },
                   ),
                 ),
               ],
             ),
-      floatingActionButton: _cart.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: _showCheckoutModal,
-              backgroundColor: Colors.blue[800],
-              label: Text('LIHAT KERANJANG (${_cart.length})', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-              icon: Icon(Icons.shopping_basket, color: Colors.white),
-            )
-          : null,
+      floatingActionButton: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isLargeScreen = constraints.maxWidth > 900;
+          if (isLargeScreen) return SizedBox();
+          
+          return _cart.isNotEmpty
+              ? FloatingActionButton.extended(
+                  onPressed: _showCheckoutModal,
+                  backgroundColor: Colors.blue[800],
+                  label: Text('LIHAT KERANJANG (${_cart.length})', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  icon: Icon(Icons.shopping_basket, color: Colors.white),
+                )
+              : SizedBox();
+        },
+      ),
     );
   }
 }
