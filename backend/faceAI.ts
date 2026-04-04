@@ -88,8 +88,8 @@ export async function compareFaces(referencePath: string, capturePath: string): 
     }
 
     const modelNames = [
+        "models/gemini-2.0-flash",
         "models/gemini-1.5-flash",
-        "models/gemini-1.5-pro",
         "models/gemini-pro-vision"
     ];
 
