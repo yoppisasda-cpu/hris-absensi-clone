@@ -1879,7 +1879,7 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
 
     if (req.file) {
       try {
-        const capturePath = path.join(__dirname, photoUrl!);
+        const capturePath = path.join(process.cwd(), photoUrl!);
         // @ts-ignore
         const refUrl = user.faceReferenceUrl;
         
@@ -1949,7 +1949,7 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
     let finalPhotoUrl = photoUrl;
     if (photoUrl) {
       try {
-        const fullPath = path.join(__dirname, photoUrl);
+        const fullPath = path.join(process.cwd(), photoUrl);
         finalPhotoUrl = await uploadToSupabase(fullPath, 'attendance');
       } catch (uploadError) {
         console.error('Failed to upload to Supabase, falling back to absolute local URL:', uploadError);
@@ -1981,7 +1981,7 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
 
     // --- AI MOOD ANALYSIS (Phase 36) ---
     if (photoUrl) {
-        const fullPath = path.join(__dirname, photoUrl);
+        const fullPath = path.join(process.cwd(), photoUrl);
         console.log(`[Mood AI] Analyzing photo at: ${fullPath}`);
         if (fs.existsSync(fullPath)) {
             try {
@@ -2135,7 +2135,7 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
 
     if (req.file) {
       try {
-        const capturePath = path.join(__dirname, photoUrl!);
+        const capturePath = path.join(process.cwd(), photoUrl!);
         // @ts-ignore
         const refUrl = attendance.user.faceReferenceUrl;
         const faceResult = await compareFaces(refUrl, capturePath);
@@ -2202,7 +2202,7 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
     let finalPhotoUrl = photoUrl;
     if (photoUrl) {
       try {
-        const fullPath = path.join(__dirname, photoUrl);
+        const fullPath = path.join(process.cwd(), photoUrl);
         finalPhotoUrl = await uploadToSupabase(fullPath, 'attendance');
       } catch (uploadError) {
         console.error('Failed to upload to Supabase, falling back to absolute local URL:', uploadError);
@@ -2233,7 +2233,7 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
 
     // --- AI MOOD ANALYSIS (Phase 36) - Clock Out ---
     if (photoUrl) {
-        const fullPath = path.join(__dirname, photoUrl);
+        const fullPath = path.join(process.cwd(), photoUrl);
         if (fs.existsSync(fullPath)) {
             try {
                 const { analyzeMood } = require('./moodAI');
