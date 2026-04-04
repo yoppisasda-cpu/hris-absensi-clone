@@ -36,13 +36,21 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        // Hanya logout otomatis jika benar-benar 401 (Unauthorized) dari server
+        // Dan pastikan bukan error koneksi biasa (timeout/disconnected)
         if (error.response && error.response.status === 401) {
-            // Jika Unauthorized, kemungkinan token expired. Hapus data & balik ke login.
-            if (typeof window !== 'undefined') {
+            const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+            
+            // Jangan logout jika kita memang sudah berada di halaman login ( / )
+            if (currentPath !== '/' && typeof window !== 'undefined') {
+                console.warn("[API] Sesi habis atau tidak sah. Mengarahkan kembali ke login.");
                 localStorage.removeItem('jwt_token');
                 localStorage.removeItem('userName');
                 localStorage.removeItem('userRole');
-                window.location.href = '/'; // Balik ke halaman login
+                // Tunggu sebentar sebelum redirect agar tidak loop
+                setTimeout(() => {
+                    window.location.href = '/'; 
+                }, 500);
             }
         }
         return Promise.reject(error);
