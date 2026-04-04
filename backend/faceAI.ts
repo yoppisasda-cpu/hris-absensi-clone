@@ -88,9 +88,9 @@ export async function compareFaces(referencePath: string, capturePath: string): 
     }
 
     const modelNames = [
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-8b",
-        "gemini-1.5-pro"
+        "models/gemini-1.5-flash",
+        "models/gemini-1.5-pro",
+        "models/gemini-pro-vision"
     ];
 
     let lastError = "";
@@ -100,7 +100,7 @@ export async function compareFaces(referencePath: string, capturePath: string): 
     for (const modelName of modelNames) {
         try {
             console.log(`[Face AI] Attempting verification with model: ${modelName}...`);
-            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1beta" });
+            const model = genAI.getGenerativeModel({ model: modelName });
             
             let finalRefPath = referencePath;
             if (referencePath.startsWith('http')) {
