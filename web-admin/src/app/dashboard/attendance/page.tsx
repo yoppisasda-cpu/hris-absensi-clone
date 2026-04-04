@@ -101,10 +101,12 @@ export default function AttendancePage() {
         if (!path) return '';
         if (path.startsWith('http')) return path;
         
-        // Strip out '/api' from the backend URL to get the root serving /uploads
-        const backendRoot = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+        // Simple and safe URL joining
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : '';
+        if (!baseUrl) return path; // Return as-is if no base URL
+        
         const cleanPath = path.startsWith('/') ? path : `/${path}`;
-        return `${backendRoot}${cleanPath}`;
+        return `${baseUrl}${cleanPath}`;
     };
 
     return (
