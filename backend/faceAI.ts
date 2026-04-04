@@ -78,46 +78,77 @@ async function downloadImage(url: string, dest: string) {
     });
 }
 
+/**
+ * Membandingkan dua wajah menggunakan Google Gemini AI (Phase Cloud 1.0)
+ * Kini dengan Sistem Auto-Fallback (Multi-Brain) agar anti-error
+ */
 export async function compareFaces(referencePath: string, capturePath: string): Promise<FaceResult> {
-    const tempFiles: string[] = [];
-    try {
-        console.log(`[Face AI] STARTING DIAGNOSTIC COMPARISON...`);
-
-        if (!process.env.GEMINI_API_KEY) {
-            return { score: 0, verified: false, errorMessage: "API_KEY_MISSING: GEMINI_API_KEY tidak terdeteksi di server." };
-        }
-        
-        let finalRefPath = referencePath;
-        const isRemote = referencePath.startsWith('http');
-
-        if (isRemote) {
-            const fileName = `ref_${Date.now()}.jpg`;
-            const tempRef = path.join(os.tmpdir(), fileName);
-            await downloadImage(referencePath, tempRef);
-            finalRefPath = tempRef;
-            tempFiles.push(tempRef);
-        }
-
-        const prompt = "Bandingkan visual dua gambar ini. Berikan jawaban HANYA JSON: { \"isSamePerson\": boolean, \"confidenceScore\": 0.0-1.0 }";
-        const imageParts = [
-            fileToGenerativePart(finalRefPath, "image/jpeg"),
-            fileToGenerativePart(capturePath, "image/jpeg"),
-        ];
-
-        const result = await model.generateContent([prompt, ...imageParts]);
-        const text = result.response.text();
-        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const data = JSON.parse(jsonStr);
-
-        return {
-            score: data.confidenceScore || 0,
-            verified: (data.isSamePerson === true) && (data.confidenceScore || 0) >= 0.7
-        };
-
-    } catch (error: any) {
-        console.error('❌ [Face AI Error]:', error.message);
-        return { score: 0.5, verified: false, errorMessage: error.message };
-    } finally {
-        tempFiles.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
+    if (!process.env.GEMINI_API_KEY) {
+        return { verified: false, score: 0.5, errorMessage: "GEMINI_API_KEY_MISSING" };
     }
+
+    const modelNames = [
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b",
+        "gemini-1.5-pro"
+    ];
+
+    let lastError = "";
+    const tempFiles: string[] = [];
+
+    // Coba satu per satu model sampai ada yang berhasil
+    for (const modelName of modelNames) {
+        try {
+            console.log(`[Face AI] Attempting verification with model: ${modelName}...`);
+            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1beta" });
+            
+            let finalRefPath = referencePath;
+            if (referencePath.startsWith('http')) {
+                const tempRef = path.join(os.tmpdir(), `ref-${Date.now()}.jpg`);
+                await downloadImage(referencePath, tempRef);
+                finalRefPath = tempRef;
+                tempFiles.push(tempRef);
+            }
+
+            const refPart = fileToGenerativePart(finalRefPath, "image/jpeg");
+            const capPart = fileToGenerativePart(capturePath, "image/jpeg");
+
+            const prompt = `
+                Analyze these two images and determine if they show the SAME PERSON.
+                Comparison Task:
+                1. Look for definitive facial features (eyes, nose, bone structure).
+                2. Ignore lighting, background, or head tilt.
+                3. Return a JSON object: {"isSamePerson": boolean, "confidenceScore": number (0.0 to 1.0)}.
+                Only return the JSON.
+            `;
+
+            const result = await model.generateContent([prompt, refPart, capPart]);
+            const response = await result.response;
+            const text = response.text();
+            
+            // Parsing hasil JSON
+            const cleanText = text.replace(/```json|```/g, "").trim();
+            const json = JSON.parse(cleanText);
+
+            return {
+                verified: json.isSamePerson,
+                score: json.confidenceScore
+            };
+        } catch (error: any) {
+            console.warn(`[Face AI] Model ${modelName} failed:`, error.message);
+            lastError = error.message;
+            // Jika bukan error 404 (misal: API key salah), tidak perlu coba model lain
+            if (!error.message.includes("404")) {
+                break;
+            }
+        } finally {
+            tempFiles.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
+        }
+    }
+
+    return { 
+        verified: false, 
+        score: 0.5, 
+        errorMessage: `Sistem AI sedang sibuk/tidak tersedia. Error: ${lastError}` 
+    };
 }
