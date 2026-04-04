@@ -4268,7 +4268,6 @@ app.delete('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Re
     const material = await (prisma as any).learningMaterial.findFirst({
       where: userRole === 'SUPERADMIN' ? { id } : { id, companyId: tenantId }
     });
-
     if (!material) {
         console.warn(`[DEBUG] Material with ID ${id} not found for tenant ${tenantId}`);
         return res.status(404).json({ error: 'Materi tidak ditemukan.' });

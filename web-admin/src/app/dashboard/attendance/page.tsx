@@ -101,13 +101,24 @@ export default function AttendancePage() {
         try {
             if (!path) return '';
             if (typeof path !== 'string') return '';
+            
+            // If already a full cloud URL (Supabase/S3), return as is
             if (path.startsWith('http')) return path;
             
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : '';
-            if (!baseUrl) return path;
+            // If a relative path, resolve it against the backend baseURL
+            // Remove /api from the end of baseURL if present to get the static files root
+            let backendBase = api.defaults.baseURL || '';
+            if (backendBase.endsWith('/api')) {
+                backendBase = backendBase.substring(0, backendBase.length - 4);
+            }
+            
+            // Fallback for production if baseURL is just a relative path
+            if (!backendBase || backendBase === '/api') {
+                backendBase = 'https://api.aivola.id';
+            }
             
             const cleanPath = path.startsWith('/') ? path : `/${path}`;
-            return `${baseUrl}${cleanPath}`;
+            return `${backendBase}${cleanPath}`;
         } catch (err) {
             console.error("Error resolving image URL:", err);
             return '';
