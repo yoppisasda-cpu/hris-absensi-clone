@@ -8,13 +8,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-/**
- * Robust Face Similarity Verification AI (Gemini 1.5 Flash)
- * Menggunakan folder sistem sementara (os.tmpdir) agar aman di server (Railway).
- */
 export interface FaceResult {
     score: number;
     verified: boolean;
+    errorMessage?: string; 
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
@@ -46,39 +43,33 @@ async function downloadImage(url: string, dest: string) {
 export async function compareFaces(referencePath: string, capturePath: string): Promise<FaceResult> {
     const tempFiles: string[] = [];
     try {
-        console.log(`[Face AI] STARTING CLOUD-RESILIENT COMPARISON...`);
+        console.log(`[Face AI] STARTING DIAGNOSTIC COMPARISON...`);
+
+        if (!process.env.GEMINI_API_KEY) {
+            return { score: 0, verified: false, errorMessage: "API_KEY_MISSING: GEMINI_API_KEY tidak terdeteksi di server." };
+        }
         
         let finalRefPath = referencePath;
         const isRemote = referencePath.startsWith('http');
 
-        // 1. Download reference image ke folder /tmp jika remote
         if (isRemote) {
             const fileName = `ref_${Date.now()}.jpg`;
             const tempRef = path.join(os.tmpdir(), fileName);
-            console.log(`[Face AI] Downloading remote reference to: ${tempRef}`);
             await downloadImage(referencePath, tempRef);
             finalRefPath = tempRef;
             tempFiles.push(tempRef);
         }
 
-        // 2. Kirim ke Gemini 1.5 Flash
-        const prompt = "Berikan perbandingan visual antara dua gambar ini. Apakah ini orang yang sama? " +
-                       "Gambar pertama: Referensi, Gambar kedua: Capture. " +
-                       "Balas HANYA dengan JSON: { \"isSamePerson\": boolean, \"confidenceScore\": 0.0-1.0 }";
-
+        const prompt = "Bandingkan visual dua gambar ini. Berikan jawaban HANYA JSON: { \"isSamePerson\": boolean, \"confidenceScore\": 0.0-1.0 }";
         const imageParts = [
             fileToGenerativePart(finalRefPath, "image/jpeg"),
             fileToGenerativePart(capturePath, "image/jpeg"),
         ];
 
-        console.log(`[Face AI] Sending request to Gemini...`);
         const result = await model.generateContent([prompt, ...imageParts]);
         const text = result.response.text();
-        
         const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const data = JSON.parse(jsonStr);
-
-        console.log(`[Face AI] Analysis Complete: ${data.isSamePerson ? 'MATCH' : 'NO MATCH'} (Score: ${data.confidenceScore})`);
 
         return {
             score: data.confidenceScore || 0,
@@ -87,12 +78,8 @@ export async function compareFaces(referencePath: string, capturePath: string): 
 
     } catch (error: any) {
         console.error('❌ [Face AI Error]:', error.message);
-        // Fallback jika API limit atau internet terputus
-        return { score: 0.5, verified: false };
+        return { score: 0.5, verified: false, errorMessage: error.message };
     } finally {
-        // Hapus file sementara dari /tmp
-        tempFiles.forEach(f => {
-            if (fs.existsSync(f)) fs.unlinkSync(f);
-        });
+        tempFiles.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
     }
 }

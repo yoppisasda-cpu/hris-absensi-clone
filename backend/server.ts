@@ -1889,7 +1889,8 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
         console.log(`[Face AI] Clock-In Verification: ${isFaceVerified} (Score: ${faceSimilarityScore})`);
 
         if (!isFaceVerified) {
-          return res.status(400).json({ error: `Verifikasi Wajah Gagal: Foto selfie tidak cocok dengan data referensi (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%). Pastikan wajah terlihat jelas.` });
+          const errMsg = faceResult.errorMessage ? `Error: ${faceResult.errorMessage}` : `Foto selfie tidak cocok dengan data referensi (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%). Pastikan wajah terlihat jelas.`;
+          return res.status(400).json({ error: `Verifikasi Wajah Gagal: ${errMsg}` });
         }
       } catch (faceErr) {
         console.error('[Face AI] Error during Clock-In verification:', faceErr);
@@ -2144,7 +2145,8 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         console.log(`[Face AI] Clock-Out Verification: ${isFaceVerified} (Score: ${faceSimilarityScore})`);
 
         if (!isFaceVerified) {
-          return res.status(400).json({ error: `Verifikasi Wajah Gagal: Foto tidak cocok (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%).` });
+          const errMsg = faceResult.errorMessage ? `Error: ${faceResult.errorMessage}` : `Foto tidak cocok (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%).`;
+          return res.status(400).json({ error: `Verifikasi Wajah Gagal: ${errMsg}` });
         }
       } catch (faceErr) {
         console.error('[Face AI] Error during Clock-Out verification:', faceErr);
