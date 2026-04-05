@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ChatWidget.css';
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = 'https://api.aivola.id';
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
