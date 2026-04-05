@@ -1347,10 +1347,24 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
 // A3. Endpoint Mendapatkan Detail Perusahaan Sendiri (Tenant) - Aligned with above
 // Handled by A2.2 route (already updated)
 
-// A3.1. Endpoint Men-generate Ulang API Key (Integrasi Kasir)
+// A3.1. Endpoint Men-generate Ulang API Key (Integrasi Kasir) - DENGAN PENGECEKAN AKTIVASI
 app.post('/api/companies/my/api-key', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+
+    // Cek apakah fitur integrasi sudah di-approve/diaktifkan oleh Owner Pusat
+    const company = await prisma.company.findUnique({
+        where: { id: tenantId },
+        select: { isApiEnabled: true }
+    });
+
+    if (!company?.isApiEnabled) {
+        return res.status(403).json({ 
+            error: 'Fitur Integrasi API belum aktif.', 
+            message: 'Silakan hubungi Admin Pusat (Aivola Owner) atau lakukan Request melalui menu Integrasi.' 
+        });
+    }
+
     // Generate simple random API key
     const newApiKey = 'ak_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
@@ -1365,6 +1379,112 @@ app.post('/api/companies/my/api-key', tenantMiddleware, async (req: Request, res
   } catch (error) {
     res.status(500).json({ error: 'Gagal membuat API Key baru' });
   }
+});
+
+// A3.1.1 Endpoint Request Integrasi API (Oleh Klien)
+app.post('/api/integrations/request', tenantMiddleware, async (req: Request, res: Response) => {
+    try {
+        const tenantId = (req as any).tenantId;
+        const { note } = req.body;
+
+        // Cek apakah sudah ada request PENDING
+        const existingRequest = await prisma.integrationRequest.findFirst({
+            where: { companyId: tenantId, status: 'PENDING' }
+        });
+
+        if (existingRequest) {
+            return res.status(400).json({ error: 'Anda sudah memiliki permintaan integrasi yang sedang menunggu persetujuan.' });
+        }
+
+        const newRequest = await prisma.integrationRequest.create({
+            data: {
+                companyId: tenantId,
+                note: note || 'Request integrasi eksternal (Pabrik/Industri/POS)',
+                status: 'PENDING'
+            }
+        });
+
+        res.json({ message: 'Permintaan integrasi berhasil dikirim!', request: newRequest });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Gagal mengirim permintaan: ' + error.message });
+    }
+});
+
+// A3.1.2 Endpoint Ambil Status Request Saya (Oleh Klien)
+app.get('/api/integrations/my-status', tenantMiddleware, async (req: Request, res: Response) => {
+    try {
+        const tenantId = (req as any).tenantId;
+        const request = await prisma.integrationRequest.findFirst({
+            where: { companyId: tenantId },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.json({ request });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Gagal mengambil status: ' + error.message });
+    }
+});
+
+// A3.1.3 Endpoint List Request (Oleh Master Admin / SuperAdmin)
+app.get('/api/admin/integrations/requests', tenantMiddleware, async (req: Request, res: Response) => {
+    try {
+        const userRole = (req as any).userRole;
+        if (userRole !== 'SUPERADMIN' && userRole !== 'OWNER') {
+            return res.status(403).json({ error: 'Hanya Admin Pusat yang dapat melihat daftar request' });
+        }
+
+        const requests = await prisma.integrationRequest.findMany({
+            include: { company: { select: { id: true, name: true, plan: true } } },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.json(requests);
+    } catch (error: any) {
+        res.status(500).json({ error: 'Gagal mengambil daftar request: ' + error.message });
+    }
+});
+
+// A3.1.4 Endpoint Approve/Reject Request (Oleh Master Admin / SuperAdmin)
+app.patch('/api/admin/integrations/requests/:id', tenantMiddleware, async (req: Request, res: Response) => {
+    try {
+        const userRole = (req as any).userRole;
+        if (userRole !== 'SUPERADMIN' && userRole !== 'OWNER') {
+            return res.status(403).json({ error: 'Hanya Admin Pusat yang dapat memproses request' });
+        }
+
+        const requestId = parseInt(req.params.id as string);
+        const { status } = req.body; // 'APPROVED' atau 'REJECTED'
+
+        const request = await prisma.integrationRequest.findUnique({
+            where: { id: requestId }
+        });
+
+        if (!request) return res.status(404).json({ error: 'Request tidak ditemukan' });
+
+        // Update Request Status
+        await prisma.integrationRequest.update({
+            where: { id: requestId },
+            data: { status }
+        });
+
+        // Jika APPROVED, aktifkan fiturnya di tabel Company
+        if (status === 'APPROVED') {
+            await prisma.company.update({
+                where: { id: request.companyId },
+                data: { isApiEnabled: true }
+            });
+        } else if (status === 'REJECTED') {
+            // Optional: Nonaktifkan juga jika di-reject (misal mencabut akses lama)
+            await prisma.company.update({
+                where: { id: request.companyId },
+                data: { isApiEnabled: false }
+            });
+        }
+
+        res.json({ message: `Request berhasil ${status.toLowerCase()}!` });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Gagal memproses request: ' + error.message });
+    }
 });
 
 // A3.2. Endpoint Upload Logo Perusahaan (Phase 19)
@@ -5085,21 +5205,29 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     const monthlyProfit = Number(incomesMonth._sum.amount || 0) - Number(expensesMonth._sum.amount || 0);
 
     // 5.1 Hutang (Pending Expenses)
-    const payableRes: any[] = await prisma.$queryRawUnsafe(`
-      SELECT SUM(amount) as value FROM "Expense" WHERE "companyId" = $1 AND "status"::text = 'PENDING'
-    `, tenantId);
-    const totalPayable = Number(payableRes[0]?.value || 0);
+    const payableAgg = await prisma.expense.aggregate({
+      _sum: { amount: true },
+      where: { companyId: tenantId, status: 'PENDING' }
+    });
+    const totalPayable = Number(payableAgg._sum.amount || 0);
 
     // 5.2 Piutang (Unpaid Sales)
-    const receivableRes: any[] = await prisma.$queryRawUnsafe(`
-      SELECT SUM("totalAmount") as value FROM "Sale" WHERE "companyId" = $1 AND "status" = 'UNPAID'
-    `, tenantId);
-    const totalReceivable = Number(receivableRes[0]?.value || 0);
+    const receivableAgg = await prisma.sale.aggregate({
+      _sum: { totalAmount: true },
+      where: { companyId: tenantId, status: 'UNPAID' }
+    });
+    const totalReceivable = Number(receivableAgg._sum.totalAmount || 0);
 
-    const inventoryRes: any[] = await prisma.$queryRawUnsafe(`
+    const inventoryAgg = await prisma.product.aggregate({
+      _sum: { stock: true }, // Simple sum for stock count as backup, but we need stock * price
+      where: { companyId: tenantId }
+    });
+
+    // For stock value (stock * price), we still need queryRaw or similar if we want a single query
+    const inventoryValRes: any[] = await prisma.$queryRawUnsafe(`
       SELECT SUM(stock * price) as value FROM "Product" WHERE "companyId" = $1
     `, tenantId);
-    const inventoryValue = Number(inventoryRes[0]?.value || 0);
+    const inventoryValue = Number(inventoryValRes[0]?.value || 0);
 
     // 6. Nama Perusahaan & Detail Kontrak
     const company = await prisma.company.findUnique({
@@ -5513,36 +5641,42 @@ app.delete('/api/assets/:id', tenantMiddleware, async (req: Request, res: Respon
 app.get('/api/stats/visual-finance', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    // 1. Get Sales Aggregated by Date
+    const salesData: any[] = await prisma.$queryRawUnsafe(`
+      SELECT DATE_TRUNC('day', "date") as day, SUM("totalAmount") as total 
+      FROM "Sale" 
+      WHERE "companyId" = $1 AND "date" >= $2
+      GROUP BY day 
+      ORDER BY day ASC
+    `, tenantId, thirtyDaysAgo);
+
+    // 2. Get Expenses Aggregated by Date
+    const expenseData: any[] = await prisma.$queryRawUnsafe(`
+      SELECT DATE_TRUNC('day', "date") as day, SUM("amount") as total 
+      FROM "Expense" 
+      WHERE "companyId" = $1 AND "date" >= $2
+      GROUP BY day 
+      ORDER BY day ASC
+    `, tenantId, thirtyDaysAgo);
+
+    // 3. Map to the expected format (30 days)
     const history: any[] = [];
-    
-    // Get last 30 days
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+      const dayStr = date.toISOString().split('T')[0];
 
-      // Calculate Revenue (from Sale table)
-      const sales: any[] = await prisma.$queryRawUnsafe(`
-        SELECT SUM("totalAmount") as total FROM "Sale" 
-        WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
-      `, tenantId, startOfDay, endOfDay);
-      const revenue = Number(sales[0]?.total || 0);
-
-      // Calculate Expenses (from Expense table)
-      const expenses = await prisma.expense.aggregate({
-        _sum: { amount: true },
-        where: {
-          companyId: tenantId,
-          date: { gte: startOfDay, lte: endOfDay }
-        }
-      });
-      const expense = Number(expenses._sum.amount || 0);
+      const saleMatch = salesData.find(s => s.day.toISOString().split('T')[0] === dayStr);
+      const expMatch = expenseData.find(e => e.day.toISOString().split('T')[0] === dayStr);
 
       history.push({
         date: date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
-        revenue,
-        expense
+        revenue: Number(saleMatch?.total || 0),
+        expense: Number(expMatch?.total || 0)
       });
     }
 

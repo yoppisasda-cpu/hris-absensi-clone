@@ -201,21 +201,33 @@ async function main() {
     console.log('Seed Expense Categories selesai!');
 
     // 0.2 Buat OWNER (Tenant Owner)
-    await prisma.user.upsert({
+    const yoppi = await prisma.user.upsert({
         where: { email: 'yoppi@rki.com' },
         create: {
             companyId: ptRki.id,
             name: 'YOPPI',
             email: 'yoppi@rki.com',
             password: hashedPassword,
-            role: 'ADMIN',
+            role: 'OWNER',
             jobTitle: 'HR Director'
         },
         update: {
-            role: 'ADMIN',
+            role: 'OWNER',
             password: hashedPassword,
             companyId: ptRki.id
         }
+    });
+
+    // --- SEED INTEGRATION REQUEST ---
+    await (prisma as any).integrationRequest.upsert({
+        where: { id: 1 },
+        create: {
+            id: 1,
+            companyId: ptMaju.id,
+            note: 'Mohon izin akses API untuk integrasi dengan sistem kasir kami.',
+            status: 'PENDING'
+        },
+        update: {}
     });
 
     // --- SEED POS DATA (PT RKI) ---

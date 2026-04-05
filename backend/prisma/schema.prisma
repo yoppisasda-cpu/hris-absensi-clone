@@ -39,6 +39,8 @@ model Company {
   purchasedInsights      String[]             @default([])
   addons                 String[]             @default([])
   plan                   SubscriptionPlan     @default(STARTER)
+  isApiEnabled           Boolean              @default(false)
+  integrationRequests    IntegrationRequest[]
   
   // Discount Percentages per Add-on
   discountKpi            Int                  @default(0)
@@ -1109,6 +1111,22 @@ model PurchaseOrderItem {
   
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   product         Product       @relation(fields: [productId], references: [id])
+}
+
+model IntegrationRequest {
+  id        Int           @id @default(autoincrement())
+  companyId Int
+  status    RequestStatus @default(PENDING)
+  note      String?       @db.Text
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum POStatus {

@@ -16,6 +16,7 @@ interface Company {
     latitude: number | null;
     radius: number | null;
     integrationApiKey: string | null;
+    isApiEnabled: boolean;
     lateDeductionRate?: number;
     absenceDeductionType?: string;
     absenceDeductionRate?: number;
@@ -50,12 +51,23 @@ export default function CompanyProfilePage() {
     });
     const [isSavingPayroll, setIsSavingPayroll] = useState(false);
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [apiReqStatus, setApiReqStatus] = useState<any>(null);
+    const [isRequestingApi, setIsRequestingApi] = useState(false);
 
     const fetchCompany = async () => {
         try {
             setIsLoading(true);
             const response = await api.get('/companies/my');
             setCompany(response.data);
+            
+            // Check API Request Status
+            try {
+                const reqStatus = await api.get('/integrations/my-status');
+                setApiReqStatus(reqStatus.data.request);
+            } catch (e) {
+                console.log("No API request yet");
+            }
+
             setFormData({
                 name: response.data.name || '',
                 address: response.data.address || '',
@@ -145,8 +157,22 @@ export default function CompanyProfilePage() {
             const res = await api.post('/companies/my/api-key');
             setCompany(prev => prev ? { ...prev, integrationApiKey: res.data.apiKey } : null);
             alert("API Key berhasil di-generate ulang!");
-        } catch (error) {
-            alert("Gagal meng-generate API Key.");
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Gagal meng-generate API Key.");
+        }
+    };
+
+    const handleRequestApi = async () => {
+        const note = prompt("Catatan (Opsional): Untuk apa Anda memerlukan integrasi ini? (Misal: Integrasi Mesin Pabrik)");
+        setIsRequestingApi(true);
+        try {
+            await api.post('/integrations/request', { note });
+            alert("Permintaan berhasil dikirim. Tim kami akan segera meninjau dan menghubungi Anda.");
+            fetchCompany();
+        } catch (error: any) {
+            alert(error.response?.data?.error || "Gagal mengirim permintaan.");
+        } finally {
+            setIsRequestingApi(false);
         }
     };
 
@@ -460,48 +486,85 @@ export default function CompanyProfilePage() {
                                 </div>
                             </form>
                         </div>
-
+                        
                         {/* Integration Section */}
-                        {(userRole === 'OWNER' || userRole === 'SUPERADMIN') && (
-                            <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-1 shadow-2xl shadow-blue-500/20">
-                                <div className="bg-slate-900 rounded-[14px] p-8">
-                                    <div className="flex items-start justify-between mb-8">
-                                        <div>
-                                            <h2 className="text-white font-extrabold text-xl tracking-tight">Kunci Integrasi Metrik</h2>
-                                            <p className="text-blue-100/60 text-xs mt-1 font-medium italic">Rahasia. Hubungkan HRIS dengan sistem POS/Kasir eksternal.</p>
-                                        </div>
-                                        <div className="bg-blue-500/20 p-2.5 rounded-xl border border-blue-500/30">
-                                            <span className="text-xl">🛠️</span>
-                                        </div>
+                        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-1 shadow-2xl shadow-blue-500/20">
+                            <div className="bg-slate-900 rounded-[14px] p-8">
+                                <div className="flex items-start justify-between mb-8">
+                                    <div>
+                                        <h2 className="text-white font-extrabold text-xl tracking-tight">Kunci Integrasi Metrik</h2>
+                                        <p className="text-blue-100/60 text-xs mt-1 font-medium italic">Rahasia. Hubungkan HRIS dengan sistem POS/Kasir eksternal.</p>
                                     </div>
+                                    <div className="bg-blue-500/20 p-2.5 rounded-xl border border-blue-500/30">
+                                        <span className="text-xl">🛠️</span>
+                                    </div>
+                                </div>
 
+                                {company?.isApiEnabled ? (
                                     <div className="space-y-4">
-                                        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-2 flex items-center group">
-                                            <input
-                                                type="text"
-                                                readOnly
-                                                value={company?.integrationApiKey || 'API Key belum dibuat...'}
-                                                className="flex-grow bg-transparent px-4 py-3 text-sm font-mono font-bold text-blue-400 outline-none"
-                                            />
-                                            {company?.integrationApiKey && (
+                                        {company?.integrationApiKey ? (
+                                            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-2 flex items-center group">
+                                                <input
+                                                    type="text"
+                                                    readOnly
+                                                    value={company?.integrationApiKey || 'API Key belum dibuat...'}
+                                                    className="flex-grow bg-transparent px-4 py-3 text-sm font-mono font-bold text-blue-400 outline-none"
+                                                />
                                                 <button
                                                     onClick={handleCopyApiKey}
                                                     className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors mr-2 shadow-lg"
                                                 >
                                                     Copy
                                                 </button>
-                                            )}
-                                        </div>
-                                        <button
-                                            onClick={handleGenerateApiKey}
-                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 active:scale-[0.98]"
-                                        >
-                                            {company?.integrationApiKey ? 'Generate Ulang Kunci Rahasia' : 'Buat Kunci Integrasi Baru'}
-                                        </button>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-blue-600/10 border border-blue-600/20 rounded-xl p-6 text-center mb-4">
+                                                <p className="text-blue-400 text-xs font-bold mb-3 uppercase tracking-wider">🎉 Akses Telah Disetujui!</p>
+                                                <p className="text-slate-400 text-[10px] mb-4">Akses API Anda sudah aktif. Silakan buat kunci rahasia pertama Anda untuk mulai integrasi.</p>
+                                                <button
+                                                    onClick={handleGenerateApiKey}
+                                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                                                >
+                                                    Generate Kunci API Pertama
+                                                </button>
+                                            </div>
+                                        )}
+                                        {company?.integrationApiKey && (
+                                            <button
+                                                onClick={handleGenerateApiKey}
+                                                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-slate-700"
+                                            >
+                                                Generate Ulang Kunci Rahasia
+                                            </button>
+                                        )}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="text-center py-4">
+                                        {apiReqStatus?.status === 'PENDING' ? (
+                                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 text-center">
+                                                <div className="h-12 w-12 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                    <Loader2 className="h-6 w-6 text-amber-500 animate-spin" />
+                                                </div>
+                                                <h3 className="text-amber-500 font-black text-sm uppercase tracking-widest">Menunggu Approval</h3>
+                                                <p className="text-slate-400 text-xs mt-2">Permintaan Anda sedang ditinjau oleh Admin Aivola. Kami akan menghubungi Anda segera.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-8">
+                                                <p className="text-slate-400 text-sm mb-6 font-medium">Buka akses API untuk menghubungkan Aivola dengan aplikasi eksternal (Pabrik, POS, IoT).</p>
+                                                <button
+                                                    onClick={handleRequestApi}
+                                                    disabled={isRequestingApi}
+                                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/30 active:scale-[0.98] flex items-center justify-center gap-3"
+                                                >
+                                                    {isRequestingApi ? <Loader2 className="h-4 w-4 animate-spin" /> : "🚀 Request Akses Integrasi"}
+                                                </button>
+                                                <p className="text-[10px] text-slate-500 mt-4 italic">* Layanan ini mungkin memerlukan biaya tambahan sesuai paket langganan.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
             )}

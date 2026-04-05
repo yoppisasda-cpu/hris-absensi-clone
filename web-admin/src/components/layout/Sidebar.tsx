@@ -311,6 +311,10 @@ export default function Sidebar() {
                             <CreditCard className="h-5 w-5" />
                             Billing SaaS
                         </Link>
+                        <Link href="/dashboard/admin/integrations" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-amber-600/10 text-amber-500 hover:bg-slate-800 transition-colors">
+                            <Laptop className="h-5 w-5" />
+                            Integrasi API
+                        </Link>
                     </div>
                 )}
             </nav>
