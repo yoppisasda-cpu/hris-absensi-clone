@@ -9,6 +9,7 @@ import AttendanceChart from "@/components/dashboard/AttendanceChart";
 import FinanceVisualChart from "@/components/dashboard/FinanceVisualChart";
 import InventoryVisualStats from "@/components/dashboard/InventoryVisualStats";
 import AIInsights from "@/components/dashboard/AIInsights";
+import MorningBrief from "@/components/dashboard/MorningBrief";
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -97,6 +98,16 @@ export default function DashboardPage() {
                     <p className="mt-1 text-sm text-slate-500">Ringkasan kondisi finansial dan inventori <span className="font-semibold">{companyName}</span> saat ini.</p>
                 </div>
                 
+                {/* AI SMART DASHBOARD SUMMARY (MORNING BRIEF) */}
+                <div className="mb-8">
+                    <MorningBrief 
+                        stats={summaryStats} 
+                        insights={aiInsights} 
+                        loading={loading} 
+                        adminName={adminName} 
+                    />
+                </div>
+
                 {/* AI INSIGHTS SECTION */}
                 <div className="mb-8">
                     <AIInsights insights={aiInsights} loading={loading} />
@@ -267,6 +278,16 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 )}
+            </div>
+
+            {/* AI SMART DASHBOARD SUMMARY (MORNING BRIEF) */}
+            <div className="mb-8">
+                <MorningBrief 
+                    stats={summaryStats} 
+                    insights={aiInsights} 
+                    loading={loading} 
+                    adminName={adminName} 
+                />
             </div>
 
             {/* AI INSIGHTS SECTION */}

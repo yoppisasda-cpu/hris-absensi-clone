@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 import InvoiceModal from "@/components/sales/InvoiceModal";
-import { Search, Monitor, TrendingUp, Download, Eye, Printer, ShoppingBag, Receipt } from "lucide-react";
+import { Search, Monitor, TrendingUp, Download, Eye, Printer, ShoppingBag, Receipt, Building2 } from "lucide-react";
 
 export default function POSReportsPage() {
     const [sales, setSales] = useState<any[]>([]);
@@ -12,11 +12,24 @@ export default function POSReportsPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+    const [branches, setBranches] = useState<any[]>([]);
+    const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
 
-    const fetchSales = async () => {
+    const fetchBranches = async () => {
+        try {
+            const res = await api.get('/branches');
+            setBranches(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil data cabang", error);
+        }
+    };
+
+    const fetchSales = async (branchId: string = "all") => {
         setLoading(true);
         try {
-            const res = await api.get('/sales');
+            const res = await api.get('/sales', {
+                params: { branchId }
+            });
             // Filter hanya transaksi POS
             const posData = res.data.filter((s: any) => s.invoiceNumber?.startsWith('POS-'));
             setSales(posData);
@@ -28,8 +41,9 @@ export default function POSReportsPage() {
     };
 
     useEffect(() => {
-        fetchSales();
-    }, []);
+        fetchBranches();
+        fetchSales(selectedBranchId);
+    }, [selectedBranchId]);
 
     const stats = useMemo(() => {
         const gross = sales.reduce((sum, s) => sum + s.totalAmount, 0);
@@ -48,6 +62,12 @@ export default function POSReportsPage() {
         setIsInvoiceModalOpen(true);
     };
 
+    const handleExport = () => {
+        const token = localStorage.getItem('jwt_token');
+        const url = `${api.defaults.baseURL}/sales/export?branchId=${selectedBranchId}&token=${token}`;
+        window.open(url, '_blank');
+    };
+
     return (
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -59,7 +79,10 @@ export default function POSReportsPage() {
                     <p className="mt-1 text-sm text-slate-500 font-medium">Monitoring transaksi retail harian dan komisi pihak ketiga.</p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
+                    <button 
+                        onClick={handleExport}
+                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+                    >
                         <Download className="h-4 w-4" /> Export Laporan
                     </button>
                 </div>
@@ -82,15 +105,35 @@ export default function POSReportsPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 p-6">
-                    <div className="relative w-full sm:w-96 group text-slate-900">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                        <input
-                            type="text"
-                            placeholder="Cari transaksi POS..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-4 text-sm focus:border-emerald-500 focus:bg-white focus:outline-none transition-all font-medium"
-                        />
+                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                        <div className="relative w-full sm:w-80 group text-slate-900">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Cari nomor invoice..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-4 text-sm focus:border-emerald-500 focus:bg-white focus:outline-none transition-all font-medium"
+                            />
+                        </div>
+
+                        <div className="relative w-full sm:w-64 group">
+                            <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none z-10" />
+                            <select
+                                value={selectedBranchId}
+                                onChange={(e) => setSelectedBranchId(e.target.value)}
+                                className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm focus:border-emerald-500 focus:outline-none transition-all font-bold text-slate-700 cursor-pointer shadow-sm"
+                            >
+                                <option value="all">Semua Cabang</option>
+                                <option value="null">Kantor Pusat</option>
+                                {branches.map((branch) => (
+                                    <option key={branch.id} value={branch.id}>
+                                        {branch.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-bold text-[10px]">▼</div>
+                        </div>
                     </div>
                 </div>
 

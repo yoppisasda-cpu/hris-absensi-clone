@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, Filter, MoreVertical, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit3, Trash2, Box, Info, TrendingUp, ScanLine, MapPin, Edit2, Tag, ChefHat } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit3, Trash2, Box, Info, TrendingUp, ScanLine, MapPin, Edit2, Tag, ChefHat, Building2 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import AddProductModal from "@/components/inventory/AddProductModal";
@@ -22,17 +22,44 @@ export default function ProductsPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [selectedType, setSelectedType] = useState<string>("all");
     const [categories, setCategories] = useState<any[]>([]);
+    const [branches, setBranches] = useState<any[]>([]);
+    const [warehouses, setWarehouses] = useState<any[]>([]);
+    const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("all");
     const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/inventory/products');
+            const res = await api.get('/inventory/products', {
+                params: {
+                    branchId: selectedBranchId,
+                    warehouseId: selectedWarehouseId
+                }
+            });
             setProducts(res.data);
         } catch (error) {
             console.error("Gagal mengambil data produk", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchBranches = async () => {
+        try {
+            const res = await api.get('/branches');
+            setBranches(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil data cabang", error);
+        }
+    };
+
+    const fetchWarehouses = async () => {
+        try {
+            const res = await api.get('/inventory/warehouses');
+            setWarehouses(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil data gudang", error);
         }
     };
 
@@ -47,7 +74,12 @@ export default function ProductsPage() {
 
     useEffect(() => {
         fetchProducts();
+    }, [selectedBranchId, selectedWarehouseId]);
+
+    useEffect(() => {
         fetchCategories();
+        fetchBranches();
+        fetchWarehouses();
     }, []);
 
     const filteredProducts = products.filter(p => {
@@ -164,6 +196,43 @@ export default function ProductsPage() {
                         </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        <div className="relative group">
+                            <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 pointer-events-none z-10" />
+                            <select 
+                                className="appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-10 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:border-orange-500"
+                                value={selectedBranchId}
+                                onChange={(e) => {
+                                    setSelectedBranchId(e.target.value);
+                                    setSelectedWarehouseId("all");
+                                }}
+                            >
+                                <option value="all">Semua Cabang</option>
+                                <option value="null">Kantor Pusat</option>
+                                {branches.map((b: any) => (
+                                    <option key={b.id} value={b.id.toString()}>{b.name}</option>
+                                ))}
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-bold text-[10px]">▼</div>
+                        </div>
+
+                        <div className="relative group">
+                            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 pointer-events-none z-10" />
+                            <select 
+                                className="appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-10 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:border-orange-500"
+                                value={selectedWarehouseId}
+                                onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                            >
+                                <option value="all">Semua Gudang</option>
+                                {warehouses
+                                    .filter(w => selectedBranchId === "all" || (selectedBranchId === "null" ? w.branchId === null : w.branchId === Number(selectedBranchId)))
+                                    .map((w: any) => (
+                                        <option key={w.id} value={w.id.toString()}>{w.name}</option>
+                                    ))
+                                }
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-bold text-[10px]">▼</div>
+                        </div>
+
                         <select 
                             className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:border-orange-500"
                             value={selectedCategory}

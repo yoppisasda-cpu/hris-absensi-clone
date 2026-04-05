@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { X, Save, Landmark, Wallet } from "lucide-react";
+import { X, Save, Landmark, Wallet, Building2 } from "lucide-react";
 import api from "@/lib/api";
 
 interface AddAccountModalProps {
@@ -13,6 +13,7 @@ interface AddAccountModalProps {
         name: string;
         type: string;
         balance: number;
+        branchId?: number | null;
     } | null;
 }
 
@@ -20,9 +21,24 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
     const [formData, setFormData] = useState({
         name: initialData?.name || '',
         type: initialData?.type || 'BANK',
-        balance: initialData?.balance.toString() || '0'
+        balance: initialData?.balance.toString() || '0',
+        branchId: initialData?.branchId?.toString() || ''
     });
+    const [branches, setBranches] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // Fetch branches
+    useEffect(() => {
+        const fetchBranches = async () => {
+            try {
+                const res = await api.get('/branches');
+                setBranches(res.data);
+            } catch (error) {
+                console.error("Gagal mengambil daftar cabang", error);
+            }
+        };
+        if (isOpen) fetchBranches();
+    }, [isOpen]);
 
     // Update form when initialData changes (when modal opens for edit)
     useEffect(() => {
@@ -30,10 +46,11 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
             setFormData({
                 name: initialData.name,
                 type: initialData.type,
-                balance: initialData.balance.toString()
+                balance: initialData.balance.toString(),
+                branchId: initialData.branchId?.toString() || ''
             });
         } else {
-            setFormData({ name: '', type: 'BANK', balance: '0' });
+            setFormData({ name: '', type: 'BANK', balance: '0', branchId: '' });
         }
     }, [initialData, isOpen]);
 
@@ -41,19 +58,23 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
         e.preventDefault();
         setLoading(true);
         try {
+            const payload = {
+                name: formData.name,
+                type: formData.type,
+                balance: formData.balance,
+                branchId: formData.branchId ? parseInt(formData.branchId) : null
+            };
+
             if (initialData) {
                 // Edit mode
-                await api.patch(`/finance/accounts/${initialData.id}`, {
-                    name: formData.name,
-                    type: formData.type
-                });
+                await api.patch(`/finance/accounts/${initialData.id}`, payload);
             } else {
                 // Create mode
-                await api.post('/finance/accounts', formData);
+                await api.post('/finance/accounts', payload);
             }
             onSuccess();
             onClose();
-            if (!initialData) setFormData({ name: '', type: 'BANK', balance: '0' });
+            if (!initialData) setFormData({ name: '', type: 'BANK', balance: '0', branchId: '' });
         } catch (error: any) {
             console.error("Gagal menyimpan akun", error);
             alert(error.response?.data?.error || "Gagal menyimpan akun keuangan.");
@@ -90,6 +111,23 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
                     </div>
 
                     <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                            <Building2 className="h-3 w-3" /> Penempatan Cabang
+                        </label>
+                        <select
+                            value={formData.branchId}
+                            onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 outline-none transition-all"
+                        >
+                            <option value="">Kantor Pusat / Umum</option>
+                            {branches.map(branch => (
+                                <option key={branch.id} value={branch.id}>{branch.name}</option>
+                            ))}
+                        </select>
+                        <p className="text-[10px] text-slate-400 italic">Pilih cabang jika saldo ini khusus untuk outlet tertentu.</p>
+                    </div>
+
+                    <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipe Akun</label>
                         <div className="grid grid-cols-2 gap-3">
                             <button
@@ -101,7 +139,7 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
                                     : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                                 }`}
                             >
-                                <Landmark className="h-4 w-4" /> Bank
+                                < Landmark className="h-4 w-4" /> Bank
                             </button>
                             <button
                                 type="button"

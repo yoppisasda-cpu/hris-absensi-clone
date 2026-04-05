@@ -2,21 +2,65 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Landmark, Wallet, MoreVertical, Search, ArrowUpRight, ArrowDownLeft, History, Edit3, Trash2, X, AlertTriangle } from "lucide-react";
+import { Plus, Landmark, Wallet, MoreVertical, Search, ArrowUpRight, ArrowDownLeft, History, Edit3, Trash2, X, AlertTriangle, Building2, Sparkles, Loader2, BrainCircuit } from "lucide-react";
 import api from "@/lib/api";
 import AddAccountModal from "@/components/finance/AddAccountModal";
 
 export default function AccountsPage() {
     const [accounts, setAccounts] = useState<any[]>([]);
+    const [branches, setBranches] = useState<any[]>([]);
+    const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAccount, setEditingAccount] = useState<any>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
 
-    const fetchAccounts = async () => {
+    // AI Analysis States
+    const [aiInsight, setAiInsight] = useState<string | null>(null);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+
+    const handleAiAnalysis = async () => {
+        setIsAiLoading(true);
+        try {
+            const context = {
+                type: 'FINANCIAL_ACCOUNTS_ANALYSIS',
+                totalBalance: accounts.reduce((sum, acc) => sum + acc.balance, 0),
+                accountDetails: accounts.map(acc => ({
+                    name: acc.name,
+                    type: acc.type,
+                    balance: acc.balance,
+                    branch: acc.branch?.name || 'Pusat'
+                }))
+            };
+
+            const res = await api.post('/ai/chat', {
+                message: "Lakukan analisa strategis terhadap kondisi keuangan kas dan bank saya saat ini. Berikan saran langkah konkret untuk optimalisasi arus kas dengan gaya bicara elite business consultant.",
+                context: context
+            });
+            
+            setAiInsight(res.data.reply);
+        } catch (error) {
+            console.error("Gagal melakukan analisa AI:", error);
+            alert("Gagal memanggil asisten AI. Pastikan server sudah siap.");
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
+
+    const fetchBranches = async () => {
+        try {
+            const res = await api.get('/branches');
+            setBranches(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil daftar cabang", error);
+        }
+    };
+
+    const fetchAccounts = async (branchId = selectedBranchId) => {
         try {
             setLoading(true);
-            const res = await api.get('/finance/accounts');
+            const url = branchId === 'all' ? '/finance/accounts' : `/finance/accounts?branchId=${branchId}`;
+            const res = await api.get(url);
             setAccounts(res.data);
         } catch (error) {
             console.error("Gagal mengambil daftar akun", error);
@@ -54,27 +98,59 @@ export default function AccountsPage() {
     };
 
     useEffect(() => {
+        fetchBranches();
         fetchAccounts();
     }, []);
+
+    useEffect(() => {
+        fetchAccounts(selectedBranchId);
+    }, [selectedBranchId]);
 
     const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
     return (
         <DashboardLayout>
-            <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Kas & Bank</h1>
                     <p className="mt-1 text-sm text-slate-500">Kelola semua rekening bank dan kas tunai perusahaan Anda.</p>
                 </div>
-                <button 
-                    onClick={() => {
-                        setEditingAccount(null);
-                        setIsModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all"
-                >
-                    <Plus className="h-4 w-4" /> Tambah Akun
-                </button>
+                
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    {/* Branch Filter */}
+                    <div className="flex items-center gap-3 bg-white border border-slate-200 p-2 rounded-2xl shadow-sm">
+                        <span className="text-xs font-bold text-slate-400 pl-2 uppercase">Cabang:</span>
+                        <select 
+                            value={selectedBranchId}
+                            onChange={(e) => setSelectedBranchId(e.target.value)}
+                            className="bg-transparent border-none text-sm font-bold text-slate-700 focus:ring-0 cursor-pointer pr-8"
+                        >
+                            <option value="all">Semua Cabang</option>
+                            {branches.map(branch => (
+                                <option key={branch.id} value={branch.id}>{branch.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button 
+                        onClick={handleAiAnalysis}
+                        disabled={isAiLoading || accounts.length === 0}
+                        className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-200 hover:bg-violet-700 active:scale-95 transition-all disabled:opacity-50 group min-w-[140px] justify-center"
+                    >
+                        {isAiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 group-hover:animate-pulse" />}
+                        Analisa AI
+                    </button>
+
+                    <button 
+                        onClick={() => {
+                            setEditingAccount(null);
+                            setIsModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all"
+                    >
+                        <Plus className="h-4 w-4" /> Tambah Akun
+                    </button>
+                </div>
             </div>
 
             <div className="mb-8 rounded-3xl bg-gradient-to-br from-blue-700 to-blue-900 p-8 text-white shadow-2xl shadow-blue-200 overflow-hidden relative">
@@ -131,9 +207,16 @@ export default function AccountsPage() {
                                 </div>
                             </div>
                             
-                            <div>
-                                <h3 className="font-bold text-slate-900">{acc.name}</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{acc.type === 'BANK' ? 'Rekening Bank' : 'Kas Tunai'}</p>
+                            <div className="flex flex-col gap-1">
+                                <h3 className="font-bold text-slate-900 leading-tight">{acc.name}</h3>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{acc.type === 'BANK' ? 'Rekening Bank' : 'Kas Tunai'}</span>
+                                    <span className="text-[10px] text-slate-300">•</span>
+                                    <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-600">
+                                        <Building2 className="h-2.5 w-2.5" />
+                                        {acc.branch?.name || 'Kantor Pusat'}
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
@@ -189,6 +272,57 @@ export default function AccountsPage() {
                                 className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white shadow-lg shadow-red-200 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50"
                             >
                                 {loading ? 'Menghapus...' : 'Ya, Hapus'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Insight Modal */}
+            {aiInsight && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                    <div className="w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[85vh]">
+                        <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-6 text-white flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                                    <BrainCircuit className="h-6 w-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold leading-none">AI Strategic Insights</h3>
+                                    <p className="text-violet-100 text-[10px] uppercase tracking-widest mt-1 font-bold">Financial Analysis Report</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setAiInsight(null)}
+                                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+                        <div className="p-8 overflow-y-auto bg-slate-50/50">
+                            <div className="prose prose-slate max-w-none">
+                                <div className="text-slate-700 leading-relaxed whitespace-pre-line text-sm md:text-base">
+                                    {aiInsight}
+                                </div>
+                            </div>
+                            
+                            <div className="mt-8 pt-6 border-t border-slate-200">
+                                <div className="bg-violet-50 rounded-2xl p-4 flex items-start gap-4 border border-violet-100">
+                                    <div className="p-2 bg-violet-600 text-white rounded-lg shrink-0">
+                                        <Sparkles className="h-4 w-4" />
+                                    </div>
+                                    <p className="text-xs text-violet-800 leading-relaxed italic">
+                                        Rekomendasi ini dibuat secara otomatis oleh Aivola AI berdasarkan data saldo saat ini. Harap tinjau kembali sebelum mengambil keputusan strategis yang signifikan.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-white border-t border-slate-100 flex justify-end shrink-0">
+                            <button 
+                                onClick={() => setAiInsight(null)}
+                                className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+                            >
+                                Mengerti, Terima Kasih
                             </button>
                         </div>
                     </div>

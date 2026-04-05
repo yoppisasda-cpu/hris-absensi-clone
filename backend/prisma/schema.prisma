@@ -96,6 +96,8 @@ model FinancialAccount {
   balance       Float          @default(0)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  branchId      Int?
+  branch        Branch?        @relation(fields: [branchId], references: [id])
   expenses      Expense[]
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   incomes       Income[]
@@ -126,11 +128,14 @@ model Income {
   receivedFrom String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
+  branchId     Int?
   account      FinancialAccount @relation(fields: [accountId], references: [id])
   category     IncomeCategory   @relation(fields: [categoryId], references: [id])
   company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch       Branch?          @relation(fields: [branchId], references: [id])
 
   @@index([companyId, date])
+  @@index([companyId, branchId])
 }
 
 model ExpenseCategory {
@@ -162,13 +167,16 @@ model Expense {
   supplierId  Int?
   productId   Int?
   quantity    Float?            @default(0)
+  branchId    Int?
   account     FinancialAccount? @relation(fields: [accountId], references: [id])
   category    ExpenseCategory   @relation(fields: [categoryId], references: [id])
   product     Product?          @relation(fields: [productId], references: [id])
   company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch      Branch?           @relation(fields: [branchId], references: [id])
   supplier    Supplier?         @relation(fields: [supplierId], references: [id], onUpdate: NoAction)
 
   @@index([companyId, date])
+  @@index([companyId, branchId])
 }
 
 model Supplier {
@@ -194,11 +202,14 @@ model Branch {
   longitude  Float?
   radius     Int?        @default(100)
   createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  users      User[]
+  updatedAt  DateTime           @updatedAt
+  company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   warehouses Warehouse[]
   sales      Sale[]
+  incomes    Income[]
+  expenses   Expense[]
+  accounts   FinancialAccount[]
+  users      User[]
 }
 
 model User {

@@ -1,14 +1,41 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 
+// Mock icons to avoid lucide-react dependency issues if install fails
+const Sparkles = ({ size }: any) => <span style={{ fontSize: size }}>✨</span>;
+const Brain = ({ className }: any) => <span className={className} style={{ fontSize: '24px' }}>🧠</span>;
+const MessageSquare = ({ className }: any) => <span className={className} style={{ fontSize: '24px' }}>💬</span>;
+const LineChart = ({ className }: any) => <span className={className} style={{ fontSize: '24px' }}>📈</span>;
+const Zap = ({ size }: any) => <span style={{ fontSize: size }}>⚡</span>;
+const ChevronRight = ({ size }: any) => <span style={{ fontSize: size }}>›</span>;
+const Star = ({ className }: any) => <span className={className} style={{ fontSize: '20px' }}>⭐</span>;
+
+const Logo = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 48 46">
+    <path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" style={{ fill: '#863bff' }} />
+  </svg>
+);
+
+const PromotionBanner = () => (
+  <div className="promo-banner">
+    <div className="promo-content">
+      <Sparkles className="promo-icon" size={14} />
+      <span>PROMO: Dapatkan <b>AI Co-Pilot & WhatsApp Auto-Reply</b> GRATIS di Paket PRO Tahunan!</span>
+      <a href="#pricing" className="promo-link">Lihat Promo Sekarang <ChevronRight size={14} /></a>
+    </div>
+  </div>
+);
+
 const Header = () => (
   <nav className="header-nav">
     <div className="logo-container">
-      <img src="/logo.png" alt="Aivola Logo" className="logo-img" />
+      <Logo />
       <span className="logo-text">aivola</span>
+      <span className="logo-badge">AI Powered</span>
     </div>
     <div className="nav-links">
       <a href="#features">Fitur</a>
+      <a href="#ai-showcase" className="nav-ai-link">AI Co-Pilot</a>
       <a href="#finance" className="nav-finance-link">Finance & POS</a>
       <a href="#pricing">Harga</a>
       <a href="https://admin.aivola.id" className="btn-login">Masuk</a>
@@ -35,6 +62,71 @@ const Hero = () => (
     </div>
   </section>
 );
+
+const AIShowcase = () => {
+  const aiFeatures = [
+    {
+      icon: <MessageSquare className="ai-icon-large text-indigo-500" />,
+      title: "WhatsApp AI Co-Pilot",
+      desc: "Klien pilih paket di landing page? AI kami yang membalas WhatsApp mereka secara instan dan profesional 24/7.",
+      tag: "Otomasi"
+    },
+    {
+      icon: <Brain className="ai-icon-large text-purple-500" />,
+      title: "Smart Morning Brief",
+      desc: "Laporan dashboard dikirim langsung ke pikiran Anda (via admin dashboard). Ringkasan performa bisnis dalam satu paragraf cerdas.",
+      tag: "Intelligence"
+    },
+    {
+      icon: <LineChart className="ai-icon-large text-emerald-500" />,
+      title: "Strategic Finance Analysis",
+      desc: "Bukan sekadar angka. AI kami menganalisa arus kas dan memberikan rekomendasi strategis untuk meningkatkan profit Anda.",
+      tag: "Strategic"
+    }
+  ];
+
+  return (
+    <section id="ai-showcase" className="ai-showcase-section">
+      <div className="ai-container">
+        <div className="ai-header">
+            <div className="hero-badge animate-pulse">
+                <Zap size={14} className="fill-amber-400 text-amber-400" /> NEW: AIVOLA MIND AI
+            </div>
+            <h2>Kelola Bisnis dengan <span className="text-gradient">Kekuatan AI</span></h2>
+            <p>Hanya di Aivola, bisnis Anda dikelola oleh asisten cerdas yang bekerja 24 jam penuh tanpa lelah.</p>
+        </div>
+
+        <div className="ai-grid">
+            {aiFeatures.map((f, i) => (
+                <div key={i} className="ai-card group">
+                    <div className="ai-card-inner">
+                        <div className="ai-icon-wrapper">
+                            {f.icon}
+                        </div>
+                        <div className="ai-tag">{f.tag}</div>
+                        <h3>{f.title}</h3>
+                        <p>{f.desc}</p>
+                        <div className="ai-card-footer">
+                            <span className="ai-learn-more">Pelajari Cara Kerjanya <ChevronRight size={16} /></span>
+                        </div>
+                    </div>
+                    {/* Decorative Background */}
+                    <div className="ai-card-glow"></div>
+                </div>
+            ))}
+        </div>
+
+        <div className="ai-bottom-promo">
+            <div className="ai-promo-content">
+                <Star className="text-amber-400" fill="currentColor" />
+                <p>Fitur AI saat ini tersedia eksklusif untuk pengguna <b>Paket PRO & Enterprise</b></p>
+                <a href="#pricing" className="btn-ai-upgrade">Aktifkan AI Sekarang</a>
+            </div>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 const FeaturesShowcase = () => {
   const categories = [
@@ -645,8 +737,10 @@ function AttendancePage() {
 
   return (
     <div className="app-container">
+      <PromotionBanner />
       <Header />
       <Hero />
+      <AIShowcase />
       <FeaturesShowcase />
       <DemoSection onPlay={() => setIsVideoOpen(true)} />
       <AboutSection />
@@ -659,6 +753,7 @@ function AttendancePage() {
 }
 
 import FinancePage from './FinancePage';
+import { ChatWidget } from './components/ChatWidget';
 
 function App() {
   const [activePage, setActivePage] = useState('attendance');
@@ -680,6 +775,7 @@ function App() {
   return (
     <>
       {activePage === 'finance' ? <FinancePage /> : <AttendancePage />}
+      <ChatWidget />
     </>
   );
 }

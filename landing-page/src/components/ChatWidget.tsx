@@ -5,7 +5,6 @@ const API_BASE_URL = 'http://localhost:5000';
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<{sender: string, content: string}[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,49 +18,48 @@ export function ChatWidget() {
     scrollToBottom();
   }, [messages]);
 
-  const initChat = async () => {
-    if (sessionId) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visitorName: 'Visitor' })
-      });
-      const data = await res.json();
-      setSessionId(data.id);
-      setMessages(data.messages);
-    } catch (err) {
-      console.error('Chat init error:', err);
+  const initChat = () => {
+    // Basic welcome message
+    if (messages.length === 0) {
+      setMessages([
+        { sender: 'AI', content: 'Halo! Saya Aivola Strategic Assistant. Ada yang bisa saya bantu terkait Absensi, Payroll, atau Manajemen Keuangan Bisnis Anda?' }
+      ]);
     }
   };
 
   const toggleChat = () => {
     const nextState = !isOpen;
     setIsOpen(nextState);
-    if (nextState && !sessionId) {
+    if (nextState) {
       initChat();
     }
   };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !sessionId || isLoading) return;
+    if (!input.trim() || isLoading) return;
 
     const userMsg = input;
+    const historyContext = messages.map(m => `${m.sender}: ${m.content}`).join('\n');
+    
     setInput('');
     setMessages(prev => [...prev, { sender: 'USER', content: userMsg }]);
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/message`, {
+      const res = await fetch(`${API_BASE_URL}/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, content: userMsg })
+        body: JSON.stringify({ 
+          message: userMsg, 
+          context: { history: historyContext } 
+        })
       });
       const data = await res.json();
-      setMessages(prev => [...prev, data.aiResponse]);
+      setMessages(prev => [...prev, { sender: 'AI', content: data.reply }]);
     } catch (err) {
       console.error('Chat send error:', err);
+      setMessages(prev => [...prev, { sender: 'AI', content: 'Maaf, sepertinya saya sedang tidak bisa terhubung ke server. Mohon coba lagi nanti.' }]);
     } finally {
       setIsLoading(false);
     }

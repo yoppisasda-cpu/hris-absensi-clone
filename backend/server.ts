@@ -11,7 +11,8 @@ import { uploadToSupabase } from './supabase_storage';
 import dotenv from 'dotenv';
 import { initCleanupCron, runCleanup } from './cron_jobs';
 import { compareFaces } from './faceAI';
-import { getAIChatResponse } from './chatAI';
+import { getAIChatResponse, generateSubscriptionResponse } from './chatAI';
+import { sendWhatsAppMessage } from './whatsappAPI';
 import aiRoutes from './src/routes/ai.routes';
 
 
@@ -140,6 +141,72 @@ app.get('/api/fix-sequences', async (req: Request, res: Response) => {
 });
 
 app.use('/api/ai', aiRoutes);
+app.post('/api/ai/subscription-draft', async (req: Request, res: Response) => {
+  try {
+    const { clientName, plan, isAnnual } = req.body;
+    if (!clientName || !plan) {
+      return res.status(400).json({ error: 'Nama klien dan paket harus diisi' });
+    }
+
+    const draft = await generateSubscriptionResponse(clientName, plan, isAnnual !== false);
+    res.json({ draft });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal membuat draft AI: ' + error.message });
+  }
+});
+
+// --- WHATSAPP CLOUD API WEBHOOK (META) ---
+
+// 1. Verifikasi Webhook (Dibutuhkan saat mendaftarkan webhook di Meta Dashboard)
+app.get('/api/webhook/whatsapp', (req: Request, res: Response) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode && token) {
+    if (mode === 'subscribe' && token === (process.env.WA_VERIFY_TOKEN || 'aivola_webhook_secret_123')) {
+      console.log('✅ [WA WEBHOOK] Webhook verified successfully!');
+      return res.status(200).send(challenge);
+    } else {
+      console.warn('❌ [WA WEBHOOK] Verification failed: Token mismatch or mode incorrect.');
+      return res.sendStatus(403);
+    }
+  }
+  res.sendStatus(400);
+});
+
+// 2. Menerima Pesan Masuk dan Membalas via AI (Auto-Reply 24/7)
+app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
+  try {
+    const body = req.body;
+    console.log(`📩 [WA WEBHOOK] Inbound Payload: ${JSON.stringify(body)}`);
+
+    // Pastikan ini adalah event pesan masuk dari WhatsApp
+    if (body.object === 'whatsapp_business_account' && body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
+      const messageObj = body.entry[0].changes[0].value.messages[0];
+      const from = messageObj.from; // Nomor WA klien
+      const text = messageObj.text?.body; // Isi pesan teks
+
+      if (text) {
+        console.log(`🤖 [WA AI] Memproses pesan dari ${from}: "${text}"`);
+        
+        // --- LOGIKA AI AUTO-REPLY ---
+        // 1. Tanya AI (Cek data paket/harga jika msg mengandung kata kunci)
+        const aiResponse = await getAIChatResponse(text, []);
+        
+        // 2. Kirim balasan balasan otomatis ke klien lewat Meta API
+        await sendWhatsAppMessage(from, aiResponse);
+        console.log(`✅ [WA AI] Balasan otomatis terkirim ke ${from}`);
+      }
+    }
+
+    res.status(200).send('EVENT_RECEIVED');
+
+  } catch (error: any) {
+    console.error('❌ [WA WEBHOOK Error]:', error.message);
+    res.status(200).send('EVENT_RECEIVED'); // Tetap balas 200 ke Meta biar tidak error persistent
+  }
+});
 
 app.get('/api/setup-master', async (req: Request, res: Response) => {
 
@@ -6270,8 +6337,16 @@ app.get('/api/chat/admin/sessions/:id', tenantMiddleware, async (req: Request, r
 // F1.1. Get Accounts
 app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Response) => {
   try {
+    const { branchId } = req.query;
+    const where: any = { companyId: (req as any).tenantId };
+    
+    if (branchId && branchId !== 'all') {
+      where.branchId = parseInt(branchId as string);
+    }
+
     const accounts = await prisma.financialAccount.findMany({
-      where: { companyId: (req as any).tenantId },
+      where,
+      include: { branch: true },
       orderBy: { name: 'asc' }
     });
     res.json(accounts);
@@ -6283,10 +6358,11 @@ app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Res
 // F1.2. Create Account
 app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, type, balance } = req.body;
+    const { name, type, balance, branchId } = req.body;
     const account = await prisma.financialAccount.create({
       data: {
         companyId: (req as any).tenantId,
+        branchId: branchId ? parseInt(branchId) : null,
         name,
         type,
         balance: parseFloat(balance) || 0
@@ -6377,8 +6453,15 @@ app.post('/api/finance/income-categories', tenantMiddleware, async (req: Request
 app.get('/api/finance/income', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const { branchId } = req.query;
+    
+    const where: any = { companyId: tenantId };
+    if (branchId && branchId !== 'all') {
+      where.branchId = parseInt(branchId as string);
+    }
+
     const incomes = await prisma.income.findMany({
-      where: { companyId: tenantId },
+      where,
       include: {
         account: true,
         category: true
@@ -6394,7 +6477,7 @@ app.get('/api/finance/income', tenantMiddleware, async (req: Request, res: Respo
 // F3.2. Record Income
 app.post('/api/finance/income', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { accountId, categoryId, amount, date, description, receivedFrom } = req.body;
+    const { accountId, categoryId, branchId, amount, date, description, receivedFrom } = req.body;
     const tenantId = Number((req as any).tenantId);
 
     // --- CHECK CLOSING ---
@@ -6406,6 +6489,7 @@ app.post('/api/finance/income', tenantMiddleware, async (req: Request, res: Resp
       const income = await tx.income.create({
         data: {
           companyId: tenantId,
+          branchId: branchId ? parseInt(branchId) : null,
           accountId: parseInt(accountId),
           categoryId: parseInt(categoryId),
           amount: parseFloat(amount),
@@ -6540,8 +6624,16 @@ app.post('/api/finance/expense-categories', tenantMiddleware, async (req: Reques
 // F5.1. Get Expenses
 app.get('/api/finance/expense', tenantMiddleware, async (req: Request, res: Response) => {
   try {
+    const tenantId = Number((req as any).tenantId);
+    const { branchId } = req.query;
+    
+    const where: any = { companyId: tenantId };
+    if (branchId && branchId !== 'all') {
+      where.branchId = parseInt(branchId as string);
+    }
+
     const expenses = await prisma.expense.findMany({
-      where: { companyId: (req as any).tenantId },
+      where,
       include: {
         account: true,
         category: true,
@@ -6559,7 +6651,7 @@ app.get('/api/finance/expense', tenantMiddleware, async (req: Request, res: Resp
 // F5.2. Record Expense
 app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { accountId, categoryId, amount, date, description, paidTo, status, dueDate, productId, quantity } = req.body;
+    const { accountId, categoryId, branchId, amount, date, description, paidTo, status, dueDate, productId, quantity } = req.body;
     const tenantId = Number((req as any).tenantId);
 
     // --- CHECK CLOSING ---
@@ -6615,9 +6707,9 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
       const dueDateVal = dueDate ? new Date(dueDate) : null;
       
       const insertRes = await tx.$queryRawUnsafe<any[]>(
-        `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "dueDate", "status", "description", "paidTo", "updatedAt")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::"ExpenseStatus", $11, $12, NOW())
-         RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "dueDate", "status", "description", "paidTo"`,
+        `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "dueDate", "status", "description", "paidTo", "branchId", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::"ExpenseStatus", $11, $12, $13, NOW())
+         RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "dueDate", "status", "description", "paidTo", "branchId"`,
         tenantId, 
         accountId ? parseInt(accountId) : null,
         finalCategoryId,
@@ -6629,7 +6721,8 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
         dueDateVal,
         status || 'PAID',
         description,
-        paidTo
+        paidTo,
+        branchId ? parseInt(branchId) : null
       );
       
       const expense = insertRes[0];
@@ -8211,6 +8304,8 @@ app.delete('/api/pos/categories/:id', tenantMiddleware, async (req: Request, res
 app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const { branchId, warehouseId } = req.query;
+
     const products = await prisma.product.findMany({
       where: { companyId: tenantId },
       include: {
@@ -8230,30 +8325,42 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
       orderBy: { name: 'asc' }
     });
 
-    const productsWithCogs = products.map(p => {
+    const productsWithFilteredStock = products.map(p => {
        const getProductCost = (product: any, visited = new Set<number>()): number => {
          if (!product || visited.has(product.id)) return 0;
          visited.add(product.id);
 
-         // If product has a recipe, sum up its materials recursively
          if (product.Recipes && product.Recipes.length > 0) {
            return product.Recipes.reduce((sum: number, r: any) => {
-             // Find the material in our pre-fetched products list to get its potential recipes
              const material = products.find(m => m.id === r.materialId);
              const materialUnitCost = material ? getProductCost(material, new Set(visited)) : (r.Material?.costPrice || 0);
              return sum + (r.quantity * materialUnitCost);
            }, 0);
          }
 
-         // Base case: return static costPrice
          return product.costPrice || 0;
        };
 
        const recipeCogs = (p.Recipes && p.Recipes.length > 0) ? getProductCost(p) : 0;
-       return { ...p, recipeCogs };
+       
+       let displayStock = p.stock;
+       if (warehouseId && warehouseId !== 'all') {
+         const ws = p.WarehouseStock.find((ws: any) => ws.warehouseId === Number(warehouseId));
+         displayStock = ws ? ws.quantity : 0;
+       } else if (branchId && branchId !== 'all') {
+         if (branchId === 'null') {
+            const hqWarehouse = p.WarehouseStock.find((ws: any) => ws.warehouse.branchId === null);
+            displayStock = hqWarehouse ? hqWarehouse.quantity : 0;
+         } else {
+            const branchWarehouses = p.WarehouseStock.filter((ws: any) => ws.warehouse.branchId === Number(branchId));
+            displayStock = branchWarehouses.reduce((sum: number, ws: any) => sum + ws.quantity, 0);
+         }
+       }
+
+       return { ...p, stock: displayStock, originalTotalStock: p.stock, recipeCogs };
     });
 
-    res.json(productsWithCogs);
+    res.json(productsWithFilteredStock);
   } catch (error: any) {
     console.error('Get Products Error:', error);
     res.status(500).json({ error: 'Gagal mengambil data produk: ' + error.message });
@@ -8976,28 +9083,62 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     // 1. Get user branch
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
+    const { branchId } = req.query;
 
-    // 2. Build query based on branch
+    // 2. Build query based on branch and role
     let sales;
     if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER') {
-      // Admins and owners see everything for the company
-      sales = await prisma.$queryRawUnsafe(`
-        SELECT s.*, c.name as "customerName"
-        FROM "Sale" s
-        LEFT JOIN "Customer" c ON s."customerId" = c.id
-        WHERE s."companyId" = $1 
-        ORDER BY s."date" DESC
-      `, tenantId);
+      // Admins and owners see everything for the company, but can filter by branchId if provided
+      if (branchId && branchId !== 'all') {
+        const bId = branchId === 'null' ? null : parseInt(branchId as string);
+        
+        if (bId === null) {
+          sales = await prisma.$queryRawUnsafe(`
+            SELECT s.*, c.name as "customerName"
+            FROM "Sale" s
+            LEFT JOIN "Customer" c ON s."customerId" = c.id
+            WHERE s."companyId" = $1 AND s."branchId" IS NULL
+            ORDER BY s."date" DESC
+          `, tenantId);
+        } else {
+          sales = await prisma.$queryRawUnsafe(`
+            SELECT s.*, c.name as "customerName"
+            FROM "Sale" s
+            LEFT JOIN "Customer" c ON s."customerId" = c.id
+            WHERE s."companyId" = $1 AND s."branchId" = $2
+            ORDER BY s."date" DESC
+          `, tenantId, bId);
+        }
+      } else {
+        sales = await prisma.$queryRawUnsafe(`
+          SELECT s.*, c.name as "customerName"
+          FROM "Sale" s
+          LEFT JOIN "Customer" c ON s."customerId" = c.id
+          WHERE s."companyId" = $1 
+          ORDER BY s."date" DESC
+        `, tenantId);
+      }
     } else {
       // Cashiers/Staff see only their branch's sales
-      sales = await prisma.$queryRawUnsafe(`
-        SELECT s.*, c.name as "customerName"
-        FROM "Sale" s
-        JOIN "User" u ON s."cashierId" = u.id
-        LEFT JOIN "Customer" c ON s."customerId" = c.id
-        WHERE s."companyId" = $1 AND u."branchId" = $2
-        ORDER BY s."date" DESC
-      `, tenantId, user?.branchId);
+      if (user?.branchId === null) {
+        sales = await prisma.$queryRawUnsafe(`
+          SELECT s.*, c.name as "customerName"
+          FROM "Sale" s
+          JOIN "User" u ON s."cashierId" = u.id
+          LEFT JOIN "Customer" c ON s."customerId" = c.id
+          WHERE s."companyId" = $1 AND u."branchId" IS NULL
+          ORDER BY s."date" DESC
+        `, tenantId);
+      } else {
+        sales = await prisma.$queryRawUnsafe(`
+          SELECT s.*, c.name as "customerName"
+          FROM "Sale" s
+          JOIN "User" u ON s."cashierId" = u.id
+          LEFT JOIN "Customer" c ON s."customerId" = c.id
+          WHERE s."companyId" = $1 AND u."branchId" = $2
+          ORDER BY s."date" DESC
+        `, tenantId, user?.branchId);
+      }
     }
     
     res.json(sales);
@@ -9016,24 +9157,58 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     // 1. Fetch Data (logic same as List Sales)
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
     
+    const { branchId } = req.query;
+    
     let sales: any[];
     if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER') {
-      sales = await prisma.$queryRawUnsafe(`
-        SELECT s.*, c.name as "customerName"
-        FROM "Sale" s
-        LEFT JOIN "Customer" c ON s."customerId" = c.id
-        WHERE s."companyId" = $1 
-        ORDER BY s."date" DESC
-      `, tenantId);
+      if (branchId && branchId !== 'all') {
+        const bId = branchId === 'null' ? null : parseInt(branchId as string);
+        if (bId === null) {
+          sales = await prisma.$queryRawUnsafe(`
+            SELECT s.*, c.name as "customerName"
+            FROM "Sale" s
+            LEFT JOIN "Customer" c ON s."customerId" = c.id
+            WHERE s."companyId" = $1 AND s."branchId" IS NULL
+            ORDER BY s."date" DESC
+          `, tenantId);
+        } else {
+          sales = await prisma.$queryRawUnsafe(`
+            SELECT s.*, c.name as "customerName"
+            FROM "Sale" s
+            LEFT JOIN "Customer" c ON s."customerId" = c.id
+            WHERE s."companyId" = $1 AND s."branchId" = $2
+            ORDER BY s."date" DESC
+          `, tenantId, bId);
+        }
+      } else {
+        sales = await prisma.$queryRawUnsafe(`
+          SELECT s.*, c.name as "customerName"
+          FROM "Sale" s
+          LEFT JOIN "Customer" c ON s."customerId" = c.id
+          WHERE s."companyId" = $1 
+          ORDER BY s."date" DESC
+        `, tenantId);
+      }
     } else {
-      sales = await prisma.$queryRawUnsafe(`
-        SELECT s.*, c.name as "customerName"
-        FROM "Sale" s
-        JOIN "User" u ON s."cashierId" = u.id
-        LEFT JOIN "Customer" c ON s."customerId" = c.id
-        WHERE s."companyId" = $1 AND u."branchId" = $2
-        ORDER BY s."date" DESC
-      `, tenantId, user?.branchId);
+      if (user?.branchId === null) {
+        sales = await prisma.$queryRawUnsafe(`
+          SELECT s.*, c.name as "customerName"
+          FROM "Sale" s
+          JOIN "User" u ON s."cashierId" = u.id
+          LEFT JOIN "Customer" c ON s."customerId" = c.id
+          WHERE s."companyId" = $1 AND u."branchId" IS NULL
+          ORDER BY s."date" DESC
+        `, tenantId);
+      } else {
+        sales = await prisma.$queryRawUnsafe(`
+          SELECT s.*, c.name as "customerName"
+          FROM "Sale" s
+          JOIN "User" u ON s."cashierId" = u.id
+          LEFT JOIN "Customer" c ON s."customerId" = c.id
+          WHERE s."companyId" = $1 AND u."branchId" = $2
+          ORDER BY s."date" DESC
+        `, tenantId, user?.branchId);
+      }
     }
 
     // 2. Create Workbook
@@ -9647,6 +9822,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       await tx.income.create({
         data: {
           companyId: tenantId,
+          branchId: user?.branchId || null,
           accountId,
           categoryId: category.id,
           amount: totalAmount,

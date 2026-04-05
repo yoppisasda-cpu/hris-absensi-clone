@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
-import { Building2, MapPin, Save, AlertTriangle, Trash2, Globe, Edit2, FileText, CheckCircle2, Download, X } from 'lucide-react';
+import { Building2, MapPin, Save, AlertTriangle, Trash2, Globe, Edit2, FileText, CheckCircle2, Download, X, MessageSquare, Wand2, Loader2 } from 'lucide-react';
 import MapPicker from '@/components/maps/MapPicker';
 
 interface Company {
@@ -97,11 +97,43 @@ export default function CompaniesPage() {
     const [adminPassword, setAdminPassword] = useState('');
 
     const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
+    const [isAiLoading, setIsAiLoading] = useState<number | null>(null);
     const [isMapOpen, setIsMapOpen] = useState(false);
+
+    const handleAiReply = async (company: Company) => {
+        if (!company.picPhone) {
+            alert("Nomor HP PIC tidak ditemukan!");
+            return;
+        }
+
+        setIsAiLoading(company.id);
+        try {
+            const res = await api.post('/ai/subscription-draft', {
+                clientName: company.picName || company.name,
+                plan: company.plan || 'STARTER',
+                isAnnual: company.contractType === 'TAHUNAN'
+            });
+            
+            const draft = res.data.draft;
+            let phone = company.picPhone.replace(/\D/g, '');
+            if (phone.startsWith('0')) {
+                phone = '62' + phone.substring(1);
+            }
+            
+            const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(draft)}`;
+            window.open(waUrl, '_blank');
+        } catch (error) {
+            console.error("Gagal membuat draf AI:", error);
+            alert("Gagal menghubungi AI Assistant.");
+        } finally {
+            setIsAiLoading(null);
+        }
+    };
     
     // Invoice States
     const [selectedInvoiceCompany, setSelectedInvoiceCompany] = useState<Company | null>(null);
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [invoiceDiscount, setInvoiceDiscount] = useState('0');
 
     // Fetch daftar perusahaan saat komponen dimuat
     useEffect(() => {
@@ -449,7 +481,7 @@ export default function CompaniesPage() {
             extraPos,
             addonTotal,
             detailItems,
-            total
+            total: Math.max(0, total - (parseInt(invoiceDiscount) || 0))
         };
     };
 
@@ -654,9 +686,18 @@ export default function CompaniesPage() {
                                     </div>
                                     <div className="text-[10px] text-slate-400 mt-0.5">Fitur pembuatan KPI, penilaian, dan laporan performa.</div>
                                     {addonKpi && (
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <span className="text-[10px] text-indigo-600 font-bold">% Diskon:</span>
-                                            <input type="number" value={discountKpi} onChange={(e) => setDiscountKpi(e.target.value)} className="w-16 h-6 text-[10px] border border-indigo-200 rounded px-1" />
+                                        <div className="mt-2 flex items-center gap-2 bg-indigo-50/50 p-1.5 rounded border border-indigo-100">
+                                            <span className="text-[10px] text-indigo-700 font-bold">Diskon Khusus:</span>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" 
+                                                    value={discountKpi} 
+                                                    onChange={(e) => setDiscountKpi(e.target.value)} 
+                                                    className="w-20 h-7 text-xs border border-indigo-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-indigo-500 outline-none" 
+                                                    placeholder="0"
+                                                />
+                                                <span className="absolute right-2 top-1.5 text-[10px] text-indigo-400 font-bold">%</span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -675,9 +716,18 @@ export default function CompaniesPage() {
                                     </div>
                                     <div className="text-[10px] text-slate-400 mt-0.5">Modul pelatihan, ujian online, dan tracking kompetensi.</div>
                                     {addonLearning && (
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <span className="text-[10px] text-sky-600 font-bold">% Diskon:</span>
-                                            <input type="number" value={discountLearning} onChange={(e) => setDiscountLearning(e.target.value)} className="w-16 h-6 text-[10px] border border-sky-200 rounded px-1" />
+                                        <div className="mt-2 flex items-center gap-2 bg-sky-50/50 p-1.5 rounded border border-sky-100">
+                                            <span className="text-[10px] text-sky-700 font-bold">Diskon Khusus:</span>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" 
+                                                    value={discountLearning} 
+                                                    onChange={(e) => setDiscountLearning(e.target.value)} 
+                                                    className="w-20 h-7 text-xs border border-sky-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-sky-500 outline-none" 
+                                                    placeholder="0"
+                                                />
+                                                <span className="absolute right-2 top-1.5 text-[10px] text-sky-400 font-bold">%</span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -705,9 +755,18 @@ export default function CompaniesPage() {
                                             </div>
                                             <div className="text-[10px] text-slate-400 mt-0.5">Manajemen stok barang, multi-gudang, dan integrasi POS.</div>
                                             {addonInventory && (
-                                                <div className="mt-1.5 flex items-center gap-2">
-                                                    <span className="text-[10px] text-emerald-600 font-bold">% Diskon:</span>
-                                                    <input type="number" value={discountInventory} onChange={(e) => setDiscountInventory(e.target.value)} className="w-16 h-6 text-[10px] border border-emerald-200 rounded px-1" />
+                                                <div className="mt-2 flex items-center gap-2 bg-emerald-50/50 p-1.5 rounded border border-emerald-100">
+                                                    <span className="text-[10px] text-emerald-700 font-bold">Diskon:</span>
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            value={discountInventory} 
+                                                            onChange={(e) => setDiscountInventory(e.target.value)} 
+                                                            className="w-20 h-7 text-xs border border-emerald-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none" 
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute right-2 top-1.5 text-[10px] text-emerald-400 font-bold">%</span>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -727,9 +786,18 @@ export default function CompaniesPage() {
                                             </div>
                                             <div className="text-[10px] text-slate-400 mt-0.5">Penasehat bisnis AI yang menganalisa performa keuangan & stok.</div>
                                             {addonAi && (
-                                                <div className="mt-1.5 flex items-center gap-2">
-                                                    <span className="text-[10px] text-violet-600 font-bold">% Diskon:</span>
-                                                    <input type="number" value={discountAi} onChange={(e) => setDiscountAi(e.target.value)} className="w-16 h-6 text-[10px] border border-violet-200 rounded px-1" />
+                                                <div className="mt-2 flex items-center gap-2 bg-violet-50/50 p-1.5 rounded border border-violet-100">
+                                                    <span className="text-[10px] text-violet-700 font-bold">Diskon:</span>
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            value={discountAi} 
+                                                            onChange={(e) => setDiscountAi(e.target.value)} 
+                                                            className="w-20 h-7 text-xs border border-violet-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-violet-500 outline-none" 
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute right-2 top-1.5 text-[10px] text-violet-400 font-bold">%</span>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -749,9 +817,18 @@ export default function CompaniesPage() {
                                             </div>
                                             <div className="text-[10px] text-slate-400 mt-0.5">Verifikasi wajah ketat saat absensi & transaksi sensitif.</div>
                                             {addonFraud && (
-                                                <div className="mt-1.5 flex items-center gap-2">
-                                                    <span className="text-[10px] text-rose-600 font-bold">% Diskon:</span>
-                                                    <input type="number" value={discountFraud} onChange={(e) => setDiscountFraud(e.target.value)} className="w-16 h-6 text-[10px] border border-rose-200 rounded px-1" />
+                                                <div className="mt-2 flex items-center gap-2 bg-rose-50/50 p-1.5 rounded border border-rose-100">
+                                                    <span className="text-[10px] text-rose-700 font-bold">Diskon:</span>
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            value={discountFraud} 
+                                                            onChange={(e) => setDiscountFraud(e.target.value)} 
+                                                            className="w-20 h-7 text-xs border border-rose-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-rose-500 outline-none" 
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute right-2 top-1.5 text-[10px] text-rose-400 font-bold">%</span>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -783,9 +860,18 @@ export default function CompaniesPage() {
                                                     <div className="text-[9px] text-emerald-600 italic">
                                                         *Dihitung dari (Limit {employeeLimit} - Dasar {plan === 'PRO' ? 50 : plan === 'ENTERPRISE' ? 100 : 10})
                                                     </div>
-                                                    <div className="mt-1.5 pt-1.5 border-t border-emerald-100 flex items-center gap-2">
-                                                        <span className="text-[10px] text-emerald-600 font-bold">% Diskon:</span>
-                                                        <input type="number" value={discountExpansion} onChange={(e) => setDiscountExpansion(e.target.value)} className="w-16 h-6 text-[10px] border border-emerald-200 rounded px-1 bg-white" />
+                                                    <div className="mt-2 pt-2 border-t border-emerald-100 flex items-center gap-2">
+                                                        <span className="text-[10px] text-emerald-700 font-bold">Diskon:</span>
+                                                        <div className="relative">
+                                                            <input 
+                                                                type="number" 
+                                                                value={discountExpansion} 
+                                                                onChange={(e) => setDiscountExpansion(e.target.value)} 
+                                                                className="w-20 h-7 text-xs border border-emerald-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none bg-white" 
+                                                                placeholder="0"
+                                                            />
+                                                            <span className="absolute right-2 top-1.5 text-[10px] text-emerald-400 font-bold">%</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
@@ -985,11 +1071,12 @@ export default function CompaniesPage() {
                                                         return (
                                                             <>
                                                                 <div className="flex flex-wrap gap-1 justify-center">
-                                                                    {hasKpi && <span className="text-[8px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-md border border-indigo-100" title="KPI">🎯 KPI</span>}
-                                                                    {hasLearning && <span className="text-[8px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-md border border-sky-100" title="Learning">📚 LRN</span>}
-                                                                    {hasInventory && <span className="text-[8px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md border border-emerald-100" title="Inventory">📦 INV</span>}
-                                                                    {hasAi && <span className="text-[8px] font-bold bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded-md border border-violet-100" title="AI Advisor">🧠 AI</span>}
-                                                                    {hasFraud && <span className="text-[8px] font-bold bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-md border border-rose-100" title="Anti-Fraud">🛡️ SEC</span>}
+                                                                    {hasKpi && <span className="text-[8px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-md border border-indigo-100" title={`KPI ${(company.discountKpi || 0) > 0 ? `(Disc ${company.discountKpi}%)` : ''}`}>🎯 KPI {(company.discountKpi || 0) > 0 && `-${company.discountKpi}%`}</span>}
+                                                                    {hasLearning && <span className="text-[8px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-md border border-sky-100" title={`Learning ${(company.discountLearning || 0) > 0 ? `(Disc ${company.discountLearning}%)` : ''}`}>📚 LRN {(company.discountLearning || 0) > 0 && `-${company.discountLearning}%`}</span>}
+                                                                    {hasInventory && <span className="text-[8px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md border border-emerald-100" title={`Inventory ${(company.discountInventory || 0) > 0 ? `(Disc ${company.discountInventory}%)` : ''}`}>📦 INV {(company.discountInventory || 0) > 0 && `-${company.discountInventory}%`}</span>}
+                                                                    {hasAi && <span className="text-[8px] font-bold bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded-md border border-violet-100" title={`AI Advisor ${(company.discountAi || 0) > 0 ? `(Disc ${company.discountAi}%)` : ''}`}>🧠 AI {(company.discountAi || 0) > 0 && `-${company.discountAi}%`}</span>}
+                                                                    {hasFraud && <span className="text-[8px] font-bold bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-md border border-rose-100" title={`Anti-Fraud ${(company.discountFraud || 0) > 0 ? `(Disc ${company.discountFraud}%)` : ''}`}>🛡️ SEC {(company.discountFraud || 0) > 0 && `-${company.discountFraud}%`}</span>}
+                                                                    {addons.includes('STAFF_EXPANSION') && <span className="text-[8px] font-bold bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded-md border border-teal-100" title={`Expansion ${(company.discountExpansion || 0) > 0 ? `(Disc ${company.discountExpansion}%)` : ''}`}>📈 EXP {(company.discountExpansion || 0) > 0 && `-${company.discountExpansion}%`}</span>}
                                                                 </div>
                                                                 {insights.length === 0 && addons.length === 0 && (
                                                                     <span className="text-[9px] text-slate-300">Default Only</span>
@@ -1001,6 +1088,14 @@ export default function CompaniesPage() {
                                             </td>
                                             <td className="px-4 py-4 border-b border-slate-100 text-right">
                                                 <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => handleAiReply(company)}
+                                                        disabled={isAiLoading === company.id}
+                                                        className={`p-2 rounded-lg transition-all ${isAiLoading === company.id ? 'text-violet-400 bg-violet-100' : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50'}`}
+                                                        title="Balas via AI WhatsApp"
+                                                    >
+                                                        {isAiLoading === company.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                                                    </button>
                                                     <button
                                                         onClick={() => {
                                                             setSelectedInvoiceCompany(company);
@@ -1050,7 +1145,7 @@ export default function CompaniesPage() {
                                 <FileText className="h-5 w-5 text-emerald-600" />
                                 <h3 className="text-lg font-bold text-slate-800">Preview Invoice Tagihan</h3>
                             </div>
-                            <button onClick={() => setShowInvoiceModal(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600">
+                            <button onClick={() => { setShowInvoiceModal(false); setInvoiceDiscount('0'); }} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
@@ -1102,8 +1197,8 @@ export default function CompaniesPage() {
                                             <tbody className="text-slate-700">
                                                 <tr className="border-b border-slate-50">
                                                     <td className="py-4">
-                                                        <div className="font-bold text-slate-800 tracking-tight">PAKET {inv.planName}</div>
-                                                        <div className="text-[10px] text-slate-400">Paket Dasar Layanan Aivola Cloud</div>
+                                                        <div className="font-bold text-slate-800 tracking-tight text-blue-700">🚀 PAKET {inv.planName}</div>
+                                                        <div className="text-[10px] text-slate-400">Layanan Inti Platform Aivola</div>
                                                     </td>
                                                     <td className="py-4 text-right">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
                                                     <td className="py-4 text-right">{inv.periodLabel}</td>
@@ -1112,8 +1207,8 @@ export default function CompaniesPage() {
                                                 {(inv.extraAdmin > 0 || inv.extraPos > 0) && (
                                                     <tr className="border-b border-slate-50">
                                                         <td className="py-4">
-                                                            <div className="font-bold text-slate-800 tracking-tight">KURSI / SLOT TAMBAHAN</div>
-                                                            <div className="text-[10px] text-slate-400">
+                                                            <div className="font-bold text-slate-800 tracking-tight">👤 KURSI / SLOT TAMBAHAN</div>
+                                                            <div className="text-[10px] text-slate-400 italic">
                                                                 {inv.extraAdmin > 0 && `${inv.extraAdmin} Admin `}
                                                                 {inv.extraPos > 0 && `${inv.extraPos} POS`}
                                                             </div>
@@ -1126,8 +1221,8 @@ export default function CompaniesPage() {
                                                 {inv.detailItems.map((item, idx) => (
                                                     <tr key={idx} className="border-b border-slate-50">
                                                         <td className="py-4">
-                                                            <div className="font-bold text-slate-800 tracking-tight uppercase">{item.name}</div>
-                                                            <div className="text-[10px] text-slate-400">Fitur Tambahan Aktif</div>
+                                                            <div className="font-bold text-slate-800 tracking-tight uppercase">💎 {item.name}</div>
+                                                            <div className="text-[10px] text-slate-400">Fitur Ekstra Aktif</div>
                                                         </td>
                                                         <td className="py-4 text-right">Rp {item.price.toLocaleString('id-ID')}</td>
                                                         <td className="py-4 text-right">{item.qty}</td>
@@ -1139,17 +1234,22 @@ export default function CompaniesPage() {
 
                                         {/* Total Section */}
                                         <div className="flex justify-end">
-                                            <div className="w-full max-w-[280px] space-y-3">
-                                                <div className="flex justify-between text-sm text-slate-500">
-                                                    <span>Subtotal</span>
-                                                    <span>Rp {inv.total.toLocaleString('id-ID')}</span>
+                                            <div className="w-full max-w-[300px] space-y-3">
+                                                <div className="flex justify-between text-sm text-slate-500 pr-2">
+                                                    <span>Subtotal Layanan</span>
+                                                    <span>Rp {(inv.total + (parseInt(invoiceDiscount) || 0)).toLocaleString('id-ID')}</span>
                                                 </div>
-                                                <div className="flex justify-between text-sm text-slate-500">
-                                                    <span>PPN (0%)</span>
-                                                    <span>Rp 0</span>
+                                                <div className="flex justify-between items-center text-sm text-orange-600 bg-orange-50 p-2 rounded border border-orange-100">
+                                                    <span className="font-bold">DISKON TAMBAHAN (RP)</span>
+                                                    <input 
+                                                        type="number"
+                                                        value={invoiceDiscount}
+                                                        onChange={(e) => setInvoiceDiscount(e.target.value)}
+                                                        className="w-24 h-7 text-xs border border-orange-200 rounded px-2 text-right font-bold focus:ring-1 focus:ring-orange-500 outline-none bg-white"
+                                                    />
                                                 </div>
-                                                <div className="flex justify-between border-t border-slate-200 pt-3 text-lg font-black text-slate-900 bg-slate-50 p-3 rounded-lg">
-                                                    <span>TOTAL TAGIHAN</span>
+                                                <div className="flex justify-between border-t-2 border-blue-100 pt-3 text-lg font-black text-slate-900 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                                                    <span className="uppercase tracking-tight">TOTAL TAGIHAN</span>
                                                     <span className="text-blue-600">Rp {inv.total.toLocaleString('id-ID')}</span>
                                                 </div>
                                             </div>
@@ -1159,33 +1259,56 @@ export default function CompaniesPage() {
                             })()}
                             
                             {/* Footer */}
-                            <div className="mt-16 text-center border-t border-slate-50 pt-8">
-                                <p className="text-xs text-slate-400 italic">Harap membayar sebelum masa kontrak berakhir untuk menghindari pembekuan akun secara otomatis oleh sistem.</p>
-                                <p className="text-[10px] font-bold text-slate-300 mt-4 uppercase">Generated by Aivola SaaS System</p>
+                            <div className="mt-16 text-center border-t border-slate-100 pt-8">
+                                <p className="text-[10px] text-slate-400 italic">Harap membayar sebelum masa kontrak berakhir untuk menghindari pembekuan akun.</p>
+                                <p className="text-[10px] font-bold text-slate-300 mt-4 uppercase tracking-widest">© {new Date().getFullYear()} Aivola Cloud System</p>
                             </div>
                         </div>
 
                         {/* Footer Action */}
                         <div className="bg-slate-50 px-8 py-5 border-t border-slate-100 flex justify-between items-center">
-                            <div className="flex items-center gap-2 text-[10px] text-slate-400 italic">
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 italic font-medium">
                                 <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                                Terverifikasi sistem pusat Aivola
+                                Validated Digital Invoice
                             </div>
                             <div className="flex gap-3">
                                 <button 
-                                    onClick={() => setShowInvoiceModal(false)}
-                                    className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                                    onClick={() => { setShowInvoiceModal(false); setInvoiceDiscount('0'); }}
+                                    className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 transition-colors"
                                 >
                                     Tutup
                                 </button>
                                 <button 
                                     onClick={() => {
-                                        window.print();
+                                        const printContent = document.getElementById('invoice-content');
+                                        const printWindow = window.open('', '', 'width=900,height=900');
+                                        if (printWindow) {
+                                            printWindow.document.write(`
+                                                <html>
+                                                    <head>
+                                                        <title>Invoice - ${selectedInvoiceCompany?.name}</title>
+                                                        <script src="https://cdn.tailwindcss.com"></script>
+                                                    </head>
+                                                    <body>
+                                                        <div class="p-8">
+                                                            ${printContent?.innerHTML}
+                                                        </div>
+                                                        <script>
+                                                            window.onload = function() {
+                                                                window.print();
+                                                                window.close();
+                                                            };
+                                                        </script>
+                                                    </body>
+                                                </html>
+                                            `);
+                                            printWindow.document.close();
+                                        }
                                     }}
-                                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all hover:scale-[1.02]"
+                                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all hover:scale-[1.02] active:scale-95"
                                 >
                                     <Download className="h-4 w-4" />
-                                    Download & Cetak
+                                    Cetak PDF / Print
                                 </button>
                             </div>
                         </div>
