@@ -471,36 +471,59 @@ const uploadLogo = multer({ dest: path.join(process.cwd(), 'uploads/logos/') });
 
 // --- 1. MIDDLEWARE MULTI-TENANT & AUTH (CRITICAL) ---
 // Middleware ini mengekstrak profil Karyawan dari token JWT.
+// --- RESTART TRIGGER: Ensuring API Key Support is Live ---
 const tenantMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
+  const apiKey = req.headers['x-api-key'];
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      error: 'Akses Ditolak: Token otentikasi (JWT) tidak ditemukan'
-    });
-  }
+  // 1. JWT PATH (Login Aplikasi Standar)
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      (req as any).tenantId = Number(decoded.companyId);
+      (req as any).userId = Number(decoded.userId);
+      (req as any).userRole = decoded.role;
 
-  const token = authHeader.split(' ')[1];
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-
-    // Inject companyId dan userId ke object request agar dibaca oleh endpoint di bawah
-    const tenantId = Number(decoded.companyId);
-    (req as any).tenantId = tenantId;
-    (req as any).userId = Number(decoded.userId);
-    (req as any).userRole = decoded.role;
-
-    // Tambahan: Izinkan SuperAdmin untuk "mengintip" tenant lain lewat Header jika diperlukan
-    const targetTenantId = req.headers['x-tenant-id'];
-    if (decoded.role === 'SUPERADMIN' && targetTenantId) {
-        (req as any).tenantId = parseInt(targetTenantId as string);
+      const targetTenantId = req.headers['x-tenant-id'];
+      if (decoded.role === 'SUPERADMIN' && targetTenantId) {
+          (req as any).tenantId = parseInt(targetTenantId as string);
+      }
+      return next();
+    } catch (error) {
+      return res.status(401).json({ error: 'Token tidak valid atau sudah kadaluarsa.' });
     }
-
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Token tidak valid atau sudah kadaluarsa.' });
   }
+
+  // 2. API KEY PATH (Integrasi Dashboard Eksternal)
+  if (apiKey) {
+    try {
+        const company = await prisma.company.findUnique({
+            where: { integrationApiKey: apiKey as string }
+        });
+
+        if (!company) {
+            console.warn(`[AUTH] API Key NOT FOUND in DB: ${apiKey}`);
+            return res.status(401).json({ error: 'API Key TIDAK terdaftar di database Aivola (Periksa Profil).' });
+        }
+
+        if (!company.isApiEnabled) {
+            console.warn(`[AUTH] API Integration DISABLED for: ${company.name}`);
+            return res.status(401).json({ error: 'Fitur API belum diaktifkan (isApiEnabled: false) untuk perusahaan ini.' });
+        }
+
+        (req as any).tenantId = company.id;
+        (req as any).userId = 0; // System/API User
+        (req as any).userRole = 'API_USER';
+        return next();
+    } catch (error) {
+        return res.status(500).json({ error: 'Gagal memverifikasi API Key.' });
+    }
+  }
+
+  return res.status(401).json({
+    error: 'Akses Ditolak: Token JWT atau API Key tidak ditemukan'
+  });
 };
 
 // --- 2. FUNGSI PEMBANTU (HAVERSINE MATEMATIKA) ---
@@ -1696,20 +1719,23 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
 
     // --- ENFORCE EMPLOYEE LIMIT (PRO REQUEST) ---
     const company = await prisma.company.findUnique({
-      where: { id: tenantId },
-      include: { _count: { select: { users: true } } }
+      where: { id: tenantId }
     });
 
     if (company) {
-      // 1. Check Employee Limit
-      if (company.employeeLimit > 0 && company._count.users >= company.employeeLimit) {
+      // 1. Check Employee Limit (Active Employees Only)
+      const activeUserCount = await prisma.user.count({
+          where: { companyId: tenantId, isActive: true }
+      });
+
+      if (company.employeeLimit > 0 && activeUserCount >= company.employeeLimit) {
         return res.status(403).json({ 
           error: `Limit karyawan tercapai! Tenant ini hanya diizinkan memiliki maksimal ${company.employeeLimit} karyawan.` 
         });
       }
 
       // 3. Check Admin/Back-office Limit (NEW)
-      const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL'] as any;
+      const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'PURCHASING', 'OPERATIONAL'] as any;
       if (backOfficeRoles.includes(role)) {
           const currentAdminCount = await prisma.user.count({
               where: { 
@@ -1812,7 +1838,7 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
     if (!checkUser) return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
 
     // --- ENFORCE ADMIN LIMIT ON UPDATE ---
-    const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL'] as any;
+    const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'PURCHASING', 'OPERATIONAL'] as any;
     if (role && role !== checkUser.role && backOfficeRoles.includes(role)) {
         const company = await prisma.company.findUnique({ where: { id: tenantId } });
         const currentAdminCount = await prisma.user.count({
@@ -5149,6 +5175,19 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
 
+    const company = await prisma.company.findUnique({
+      where: { id: tenantId },
+      select: { 
+        name: true,
+        contractStart: true,
+        contractEnd: true,
+        employeeLimit: true,
+        photoRetentionDays: true,
+        contractType: true,
+        lateDeductionRate: true
+      }
+    });
+
     // 1. Total Karyawan
     const totalEmployees = await prisma.user.count({
       where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }
@@ -5168,7 +5207,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     const presentCount = attendancesToday.length;
 
     // 3. Terlambat Hari Ini
-    const lateCount = await prisma.attendance.count({
+    const lateCountCurrentDay = await prisma.attendance.count({
       where: {
         ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
         status: 'LATE',
@@ -5176,7 +5215,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
       }
     });
 
-    // 4. Cuti/Sakit (Leave Requests yang APPROVED dan hari ini termasuk dalam rentang cuti)
+    // 4. Cuti/Sakit
     const leaveCount = await prisma.leaveRequest.count({
       where: {
         ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
@@ -5186,7 +5225,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
       }
     });
 
-    // 5. Finance Summary (New)
+    // 5. Finance Summary
     const financialAccounts = await prisma.financialAccount.aggregate({
       _sum: { balance: true },
       where: { companyId: tenantId }
@@ -5204,48 +5243,61 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     });
     const monthlyProfit = Number(incomesMonth._sum.amount || 0) - Number(expensesMonth._sum.amount || 0);
 
-    // 5.1 Hutang (Pending Expenses)
+    // 5.1 Hutang & Piutang
     const payableAgg = await prisma.expense.aggregate({
       _sum: { amount: true },
       where: { companyId: tenantId, status: 'PENDING' }
     });
     const totalPayable = Number(payableAgg._sum.amount || 0);
 
-    // 5.2 Piutang (Unpaid Sales)
     const receivableAgg = await prisma.sale.aggregate({
       _sum: { totalAmount: true },
       where: { companyId: tenantId, status: 'UNPAID' }
     });
     const totalReceivable = Number(receivableAgg._sum.totalAmount || 0);
 
-    const inventoryAgg = await prisma.product.aggregate({
-      _sum: { stock: true }, // Simple sum for stock count as backup, but we need stock * price
-      where: { companyId: tenantId }
-    });
-
-    // For stock value (stock * price), we still need queryRaw or similar if we want a single query
     const inventoryValRes: any[] = await prisma.$queryRawUnsafe(`
       SELECT SUM(stock * price) as value FROM "Product" WHERE "companyId" = $1
     `, tenantId);
     const inventoryValue = Number(inventoryValRes[0]?.value || 0);
 
-    // 6. Nama Perusahaan & Detail Kontrak
-    const company = await prisma.company.findUnique({
-      where: { id: tenantId },
-      select: { 
-        name: true,
-        contractStart: true,
-        contractEnd: true,
-        employeeLimit: true,
-        photoRetentionDays: true,
-        contractType: true
-      }
+    // 7. NEW: Rincian Gaji Karyawan (Untuk Dashboard Coffee)
+    const activeStaff = await prisma.user.findMany({
+        where: { companyId: tenantId, isActive: true },
+        select: { id: true, name: true, jobTitle: true, basicSalary: true, allowance: true }
     });
+
+    const staff_list = await Promise.all(activeStaff.map(async (st) => {
+        const attendances = await prisma.attendance.findMany({
+            where: { userId: st.id, clockIn: { gte: firstDayOfMonth } }
+        });
+
+        let totalSeconds = 0;
+        attendances.forEach(a => {
+            if (a.clockIn && a.clockOut) {
+                totalSeconds += (new Date(a.clockOut).getTime() - new Date(a.clockIn).getTime()) / 1000;
+            }
+        });
+
+        const lateCount = attendances.filter(a => a.status === 'LATE').length;
+        const deductions = lateCount * (company?.lateDeductionRate || 0);
+
+        return {
+            id: st.id,
+            name: st.name,
+            job_title: st.jobTitle,
+            worked_hours: Math.round((totalSeconds / 3600) * 10) / 10, // 1 decimal place
+            basic_salary: st.basicSalary,
+            allowance: st.allowance,
+            estimated_payroll: Math.max(0, (st.basicSalary + st.allowance) - deductions)
+        };
+    }));
 
     res.json({
       totalEmployees,
+      total_staff: totalEmployees, // Alias for Dashboard Compatibility
       presentCount,
-      lateCount,
+      lateCount: lateCountCurrentDay,
       leaveCount,
       totalBalance,
       monthlyProfit,
@@ -5253,7 +5305,8 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
       totalReceivable,
       inventoryValue,
       companyName: company?.name || 'Perusahaan Anda',
-      companyContract: company
+      companyContract: company,
+      staff_list // Detailed data for Gaji Page sync
     });
   } catch (error) {
     console.error(error);
