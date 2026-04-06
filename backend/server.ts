@@ -58,41 +58,20 @@ requiredFolders.forEach(folder => {
   }
 });
 
-// --- DB SEQUENCE SYNC ---
-// Fix for auto-increment out of sync (common in dev/migrated DBs)
+// --- DB SEQUENCE SYNC (OFF BY DEFAULT FOR PERFORMANCE) ---
+// Visit http://localhost:5000/api/fix-sequences once instead.
+/*
 (async () => {
-  try {
-    const tables: any[] = await prisma.$queryRawUnsafe(`
-      SELECT table_name, column_name 
-      FROM information_schema.columns 
-      WHERE table_schema = 'public' 
-      AND column_default LIKE 'nextval(%'
-    `);
-
-    for (const table of tables) {
-      const tableName = table.table_name;
-      const columnName = table.column_name;
-      const maxResult: any[] = await prisma.$queryRawUnsafe(`SELECT MAX("${columnName}") as max_id FROM "${tableName}"`);
-      const maxId = maxResult[0].max_id || 0;
-      await prisma.$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"${tableName}"', '${columnName}'), ${maxId + 1}, false)`);
-    }
-    console.log('✅ [DB] All sequences synchronized successfully.');
-  } catch (err: any) {
-    console.warn('⚠️ [DB] Sequence sync skipped or failed:', err.message);
-  }
+...
 })();
+*/
 
-// --- MODULE FIX (ENSURE ALL COMPANIES HAVE ACCESS TO BOTH MODULES) ---
+// --- MODULE FIX (OFF BY DEFAULT - ONLY RUN ONCE VIA SCRIPT) ---
+/*
 (async () => {
-  try {
-    const result = await prisma.company.updateMany({
-      data: { modules: 'BOTH' }
-    });
-    console.log(`✅ [BOOT] Automatically enabled FINANCE & ABSENSI modules for ${result.count} companies.`);
-  } catch (err: any) {
-    console.warn('⚠️ [BOOT] Module fix failed:', err.message);
-  }
+...
 })();
+*/
 
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_hris_key_123';
@@ -1981,8 +1960,15 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
     // Ini memastikan PT. A tidak bisa melihat karyawan PT. B
     const users = await (prisma.user as any).findMany({
       where: {
-        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
-        ...(status === 'inactive' ? { isActive: false } : status === 'active' ? { isActive: true } : { isActive: true }) // Default active
+        ...(userRole === 'SUPERADMIN' 
+          ? {} 
+          : { 
+              companyId: tenantId, 
+              role: { not: 'SUPERADMIN' },
+              name: { not: 'Aivola Owner' }
+            }
+        ),
+        ...(status === 'inactive' ? { isActive: false } : { isActive: true }) // Default active
       },
       include: {
         shift: true,
@@ -5353,12 +5339,19 @@ app.get('/api/stats/ai-insights', tenantMiddleware, async (req: Request, res: Re
   try {
     const tenantId = (req as any).tenantId;
     
-    // Fetch Company to check purchasedInsights
+    // Fetch Company to check purchasedInsights & addons
     const company = await prisma.company.findUnique({
       where: { id: tenantId },
-      select: { purchasedInsights: true }
+      select: { purchasedInsights: true, addons: true }
     });
-    const purchased = company?.purchasedInsights || [];
+    
+    // Combine purchased insights with addons (if AI_ADVISOR is present, unlock all)
+    let purchased = company?.purchasedInsights || [];
+    const addons = company?.addons || [];
+    
+    if (addons.includes('AI_ADVISOR')) {
+        purchased = [...new Set([...purchased, 'PREMIUM_PROFIT', 'PREMIUM_RETENTION', 'PREMIUM_STOCK', 'AI_ADVISOR'])];
+    }
     
     const insights: any[] = [];
 
