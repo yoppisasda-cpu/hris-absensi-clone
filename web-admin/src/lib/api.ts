@@ -52,17 +52,18 @@ api.interceptors.response.use(
         // --- MULTI-LAYER AUTH PROTECTION ---
         if (error.response && error.response.status === 401) {
             const errorMsg = error.response.data?.error || "";
+            const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
             
-            // SECURITY OVERRIDE: We temporarly DISABLE aggressive logout to debug the "kick out" issue.
-            // If it's a 401, we just log it aggressively. But if it's the login page, we let it pass.
-            console.error("🚨 [API 401 ERROR CAUGHT] Backend menolak token Anda!", {
+            console.error("🚨 [API 401 ERROR CAUGHT]", {
                 url: error.config?.url,
                 message: errorMsg,
-                tokenSent: !!error.config?.headers?.Authorization
+                path: currentPath
             });
 
-            // We do NOT clear localStorage or window.location.href here anymore.
-            // This prevents the "ditendang pas refresh" issue completely.
+            // Only logout if explicitly requested by the error message or if we are NOT on the login page
+            // and NOT on a dashboard page that might be doing background sync.
+            // For now, let's just log it and NOT kick the user out automatically.
+            // This prevents the "ditendang pas buka produk" issue.
         }
         return Promise.reject(error);
     }
