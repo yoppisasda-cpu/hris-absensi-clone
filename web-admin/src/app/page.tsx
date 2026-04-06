@@ -37,6 +37,8 @@ export default function LoginPage() {
       localStorage.setItem('userRole', user.role);
       localStorage.setItem('userPlan', user.plan || 'STARTER');
       localStorage.setItem('userAddons', JSON.stringify(user.addons || []));
+
+      // --- ULTRA FAST REDIRECT (NO DATA FETCHING) ---
       router.push('/dashboard');
     } catch (err: unknown) {
       const error = err as { response?: { status?: number; data?: { error?: string } } };
