@@ -19,6 +19,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setIsHardBlocked(false);
     setErrorMsg('');
+    console.log('[DEBUG] Memulai proses login...');
 
     try {
       const res = await api.post('/auth/login', { email, password });
@@ -48,7 +49,6 @@ export default function LoginPage() {
       } else {
         setErrorMsg(msg);
       }
-    } finally {
       setIsLoading(false);
     }
   };
@@ -159,13 +159,36 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="group flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-400"
+                className="group relative flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-400 overflow-hidden"
               >
-                {isLoading ? 'Memproses...' : 'Masuk ke Dashboard'}
-                {!isLoading && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />}
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Memproses...
+                  </div>
+                ) : (
+                  <>
+                    Masuk ke Dashboard
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </>
+                )}
               </button>
             )}
           </form>
+
+          {/* Loading Overlay */}
+          {isLoading && (
+            <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm animate-in fade-in duration-300">
+               <div className="relative mb-6">
+                  <div className="h-20 w-20 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                     <img src="/logo.png" alt="aivola" className="h-8 w-8 animate-pulse" />
+                  </div>
+               </div>
+               <h3 className="text-xl font-black text-slate-900">Menyiapkan Dashboard...</h3>
+               <p className="mt-2 text-slate-500 font-medium">Mohon tunggu, kami sedang menyinkronkan data Anda.</p>
+            </div>
+          )}
 
           <p className="mt-6 text-center text-sm text-slate-500">
             Belum punya akun?{' '}

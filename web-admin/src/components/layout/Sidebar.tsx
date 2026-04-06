@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useFeatures } from '@/lib/FeatureContext';
 import api from '@/lib/api';
@@ -24,7 +24,7 @@ const menuItems = [
 export default function Sidebar() {
     const router = useRouter();
     const { t } = useLanguage();
-    const { plan, openUpgradeModal } = useFeatures();
+    const { plan, openUpgradeModal, hasFeature } = useFeatures();
     const [userRole, setUserRole] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userRole') || 'EMPLOYEE' : 'EMPLOYEE'));
     const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | 'INVENTORY' | null>(null);
     const [allowedModules, setAllowedModules] = useState<string>('BOTH');
@@ -110,10 +110,32 @@ export default function Sidebar() {
                 </div>
 
 
-                <Link href="/dashboard/executive" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-black bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 text-blue-400 hover:text-white border border-blue-500/30 transition-all mb-4 animate-pulse shadow-lg shadow-blue-500/10">
+                <Link href="/dashboard/executive" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-black bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 text-blue-400 hover:text-white border border-blue-500/30 transition-all mb-2 animate-pulse shadow-lg shadow-blue-500/10">
                     <Monitor className="h-5 w-5" />
                     EXECUTIVE INTEL
                 </Link>
+
+                <div 
+                    onClick={() => {
+                        if (!hasFeature('AI_ADVISOR')) {
+                            openUpgradeModal();
+                        } else {
+                            router.push('/dashboard');
+                        }
+                    }}
+                    className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-black transition-all mb-4 cursor-pointer group relative overflow-hidden ${
+                        hasFeature('AI_ADVISOR') 
+                        ? 'bg-gradient-to-r from-violet-600/20 to-purple-600/20 text-violet-400 border border-violet-500/30 hover:from-violet-600/40 hover:to-purple-600/40' 
+                        : 'bg-slate-800/50 text-slate-500 border border-slate-700/50'
+                    }`}
+                >
+                    <div className="flex items-center gap-3">
+                        <BrainCircuit className="h-5 w-5" />
+                        AIVOLA MIND
+                    </div>
+                    {!hasFeature('AI_ADVISOR') && <Lock className="h-3.5 w-3.5 text-amber-500" />}
+                    {hasFeature('AI_ADVISOR') && <div className="absolute top-0 right-0 bg-violet-500 text-white text-[7px] px-1 py-0.5 font-black uppercase tracking-tighter rounded-bl-md">Active</div>}
+                </div>
 
                 <Link href="/dashboard" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                     <LayoutDashboard className="h-5 w-5" />

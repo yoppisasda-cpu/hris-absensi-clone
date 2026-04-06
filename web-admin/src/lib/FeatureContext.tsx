@@ -24,8 +24,9 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isLoading, setIsLoading] = useState(true);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
-  const loadFeatures = () => {
+  const loadFeatures = async () => {
     if (typeof window !== 'undefined') {
+      // 1. Load initial state from localStorage for immediate (though potentially stale) UI
       const storedPlan = localStorage.getItem('userPlan') as SubscriptionPlan;
       const storedAddons = localStorage.getItem('userAddons');
       
@@ -38,11 +39,39 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
       setIsLoading(false);
+
+      // 2. BACKGROUND SYNC: Fetch latest plan from server to ensure accuracy
+      try {
+        const token = localStorage.getItem('jwt_token');
+        if (!token) return;
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/companies/my`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.plan) {
+            setPlan(data.plan);
+            localStorage.setItem('userPlan', data.plan);
+          }
+          if (data.addons) {
+            setAddons(data.addons);
+            localStorage.setItem('userAddons', JSON.stringify(data.addons));
+          }
+          console.log(`[FeatureContext] Auto-sync completed. Plan: ${data.plan}`);
+        }
+      } catch (error) {
+        console.error('[FeatureContext] Failed to auto-sync features:', error);
+      }
     }
   };
 
   useEffect(() => {
     loadFeatures();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hasFeature = (feature: string) => {
@@ -68,6 +97,15 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const openUpgradeModal = () => setIsUpgradeModalOpen(true);
   const closeUpgradeModal = () => setIsUpgradeModalOpen(false);
+
+  // Listen for storage events (e.g., when companies/page.tsx updates plan)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      loadFeatures();
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Expose to window for simpler legacy integration if needed
   useEffect(() => {

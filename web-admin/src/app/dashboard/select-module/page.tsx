@@ -9,8 +9,14 @@ export default function ModuleSelection() {
     const router = useRouter();
     const [company, setCompany] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [userRole, setUserRole] = useState<string>('');
 
     useEffect(() => {
+        // Safe check for localStorage
+        if (typeof window !== 'undefined') {
+            setUserRole(localStorage.getItem('userRole') || '');
+        }
+
         const fetchCompany = async () => {
             try {
                 const res = await api.get('/companies/my');
@@ -18,15 +24,19 @@ export default function ModuleSelection() {
                 setCompany(comp);
 
                 // Point 3: Deteksi Otomatis
-                // Jika hanya ada satu modul yang tersedia, langsung pilih modul tersebut
-                if (comp.modules === 'ABSENSI') {
-                    localStorage.setItem('activeModule', 'ABSENSI');
-                    router.push('/dashboard');
-                } else if (comp.modules === 'FINANCE') {
-                    localStorage.setItem('activeModule', 'FINANCE');
-                    router.push('/dashboard');
+                // Jika hanya ada satu modul yang tersedia, dan BUKAN superadmin, langsung pilih modul tersebut
+                const isSuperAdmin = localStorage.getItem('userRole') === 'SUPERADMIN' || localStorage.getItem('userRole') === 'OWNER';
+                
+                if (!isSuperAdmin) {
+                    if (comp.modules === 'ABSENSI') {
+                        localStorage.setItem('activeModule', 'ABSENSI');
+                        router.push('/dashboard');
+                    } else if (comp.modules === 'FINANCE') {
+                        localStorage.setItem('activeModule', 'FINANCE');
+                        router.push('/dashboard');
+                    }
                 }
-                // Jika BOTH, biarkan user memilih (UI akan muncul)
+                // Jika BOTH atau SuperAdmin, biarkan user memilih (UI akan muncul)
             } catch (error) {
                 console.error("Gagal mengambil data perusahaan", error);
             } finally {
@@ -55,9 +65,10 @@ export default function ModuleSelection() {
     }
 
     // Determine what modules are available based on company.modules
-    // For now, if company.modules is BOTH, we show both.
-    const isAbsensiAvailable = company?.modules === 'BOTH' || company?.modules === 'ABSENSI';
-    const isFinanceAvailable = company?.modules === 'BOTH' || company?.modules === 'FINANCE';
+    // Bypass constraints for SUPERADMIN / OWNER
+    const isSuperAdmin = userRole === 'SUPERADMIN' || userRole === 'OWNER';
+    const isAbsensiAvailable = isSuperAdmin || company?.modules === 'BOTH' || company?.modules === 'ABSENSI';
+    const isFinanceAvailable = isSuperAdmin || company?.modules === 'BOTH' || company?.modules === 'FINANCE';
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-50 via-white to-slate-50">
