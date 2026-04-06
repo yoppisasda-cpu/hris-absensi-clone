@@ -79,6 +79,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_hris_key_123';
 app.use(cors());
 app.use(express.json());
 
+
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -504,6 +505,191 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
     error: 'Akses Ditolak: Token JWT atau API Key tidak ditemukan'
   });
 };
+
+// ==========================================
+// SALES ORDERS (CUSTOMER PO) MODULE (B2B)
+// ==========================================
+
+// Debug Route
+app.get('/api/sales/debug', (req: Request, res: Response) => {
+  res.json({ status: 'SALES MODULE ACTIVE', time: new Date().toISOString() });
+});
+
+// 1. Get All Sales Orders
+app.get('/api/sales/orders', tenantMiddleware, async (req: Request, res: Response) => {
+  console.log(`[API] GET /sales/orders called by tenant: ${(req as any).tenantId}`);
+  try {
+    const tenantId = Number((req as any).tenantId);
+    if (!tenantId) return res.status(401).json({ error: 'Tenant ID required' });
+    
+    const orders = await prisma.salesOrder.findMany({
+      where: { companyId: tenantId },
+      include: {
+        customer: true,
+        items: {
+          include: { product: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(orders);
+  } catch (error: any) {
+    console.error("GET SALES ORDERS ERROR:", error);
+    res.status(500).json({ error: 'Gagal memuat pesanan penjualan: ' + error.message });
+  }
+});
+
+// 2. Create Sales Order
+app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { customerId, orderNumber, date, notes, items } = req.body;
+
+    if (!customerId || !orderNumber || !items || items.length === 0) {
+      return res.status(400).json({ error: 'Data pesanan tidak lengkap' });
+    }
+
+    let totalAmount = 0;
+    const validatedItems = items.map((item: any) => {
+      const q = Number(item.quantity) || 0;
+      const p = Number(item.price) || 0;
+      const t = q * p;
+      totalAmount += t;
+      return {
+        productId: Number(item.productId),
+        quantity: q,
+        price: p,
+        total: t
+      };
+    });
+
+    const newOrder = await prisma.salesOrder.create({
+      data: {
+        companyId: tenantId,
+        customerId: Number(customerId),
+        orderNumber,
+        date: date ? new Date(date) : new Date(),
+        totalAmount,
+        notes,
+        status: 'PENDING',
+        items: {
+          create: validatedItems
+        }
+      },
+      include: { items: true, customer: true }
+    });
+
+    res.status(201).json(newOrder);
+  } catch (error: any) {
+    console.error("CREATE SALES ORDER ERROR:", error);
+    if (error.code === 'P2002') return res.status(400).json({ error: 'Nomor PO sudah digunakan' });
+    res.status(500).json({ error: 'Gagal membuat pesanan penjualan: ' + error.message });
+  }
+});
+
+// 3. Update Status
+app.patch('/api/sales/orders/:id/status', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const orderId = Number(req.params.id);
+    const { status } = req.body;
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id: orderId, companyId: tenantId }
+    });
+
+    if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan atau bukan milik Anda' });
+
+    const updated = await prisma.salesOrder.update({
+      where: { id: orderId },
+      data: { status }
+    });
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengupdate status: ' + error.message });
+  }
+});
+
+// 4. Convert to Invoice (Sale)
+app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const orderId = Number(req.params.id);
+    const userId = Number((req as any).userId);
+    
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id: orderId, companyId: tenantId },
+      include: { items: true, customer: true }
+    });
+
+    if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan' });
+    if (order.status === 'INVOICED' || order.saleId) {
+      return res.status(400).json({ error: 'Pesanan ini sudah ditagihkan sebelumnya' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create Sale (Invoice)
+      const newSale = await tx.sale.create({
+        data: {
+          companyId: tenantId,
+          branchId: user?.branchId || null,
+          invoiceNumber: `INV-${order.orderNumber}`,
+          customerId: order.customerId,
+          customerName: order.customer.name,
+          customerPhone: order.customer.phone,
+          totalAmount: order.totalAmount,
+          status: 'UNPAID',
+          saleType: 'B2B',
+          cashierId: userId,
+          notes: `Dikonversi dari PO Customer: ${order.orderNumber}`,
+          SaleItem: {
+             create: order.items.map((i: any) => ({
+               productId: i.productId,
+               quantity: i.quantity,
+               price: i.price,
+               total: i.total
+             }))
+          }
+        }
+      });
+
+      // 2. Deduct Stock for trackable items
+      for (const item of order.items) {
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        if (product && product.trackStock && (product as any).type === 'FINISHED_GOOD') {
+           await tx.product.update({
+             where: { id: product.id },
+             data: { stock: { decrement: item.quantity } }
+           });
+           
+           await tx.stockTransaction.create({
+               data: {
+                   productId: product.id,
+                   type: 'OUT',
+                   quantity: item.quantity,
+                   reference: `B2B Sale Order: ${order.orderNumber}`
+               }
+           });
+        }
+      }
+
+      await tx.salesOrder.update({
+        where: { id: order.id },
+        data: { status: 'INVOICED', saleId: newSale.id }
+      });
+
+      return newSale;
+    });
+
+    res.json({ message: 'Berhasil dikonversi menjadi Invoice', sale: result });
+  } catch (error: any) {
+    console.error("CONVERT SALES ORDER ERROR:", error);
+    res.status(500).json({ error: error.message || 'Gagal mengonversi pesanan ke Invoice' });
+  }
+});
+
 
 // --- 2. FUNGSI PEMBANTU (HAVERSINE MATEMATIKA) ---
 // Menghitung jarak melengkung permukaan bumi antara 2 titik koordinat
@@ -2001,7 +2187,7 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
     const user = await prisma.user.findUnique({
       where: { id: userId },
       // @ts-ignore
-      include: { company: true, branch: true }
+      include: { company: true, branch: true, shift: true }
     });
 
     // @ts-ignore
@@ -2105,7 +2291,26 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
         lat: parseFloat(lat),
         lng: parseFloat(lng),
         photoUrl: finalPhotoUrl,
-        status: 'PRESENT',
+        ...(() => {
+            // @ts-ignore
+            if (user?.shift?.startTime) {
+                const now = new Date();
+                // @ts-ignore
+                const [sh, sm] = user.shift.startTime.split(':').map(Number);
+                const shiftStartTime = new Date(now);
+                shiftStartTime.setHours(sh, sm, 0, 0);
+                
+                // @ts-ignore
+                const gracePeriod = user.company.lateGracePeriod || 0;
+                const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
+                
+                if (now > threshold) {
+                    const lateMinutes = Math.floor((now.getTime() - shiftStartTime.getTime()) / 60000);
+                    return { status: 'LATE', lateMinutes };
+                }
+            }
+            return { status: 'PRESENT', lateMinutes: 0 };
+        })(),
         // @ts-ignore
         faceSimilarityScore,
         // @ts-ignore
@@ -2257,7 +2462,7 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         clockOut: null
       },
       orderBy: { clockIn: 'desc' },
-      include: { user: { include: { company: true, branch: true } } }
+      include: { user: { include: { company: true, branch: true, shift: true } } }
     });
 
     if (!attendance) {
@@ -2368,7 +2573,22 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         // @ts-ignore
         isSuspicious: fraudResult.isSuspicious,
         // @ts-ignore
-        deviceId: deviceId || (attendance as any).deviceId
+        deviceId: deviceId || (attendance as any).deviceId,
+        earlyCheckOutMinutes: (() => {
+            // @ts-ignore
+            if (attendance.user?.shift?.endTime) {
+                const now = new Date();
+                // @ts-ignore
+                const [eh, em] = attendance.user.shift.endTime.split(':').map(Number);
+                const shiftEndTime = new Date(now);
+                shiftEndTime.setHours(eh, em, 0, 0);
+                
+                if (now < shiftEndTime) {
+                    return Math.floor((shiftEndTime.getTime() - now.getTime()) / 60000);
+                }
+            }
+            return 0;
+        })()
       }
     });
 
@@ -10217,8 +10437,11 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
   }
 });
 
+
+
 app.listen(PORT, () => {
   console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
   console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);
   initCleanupCron(); // Start the background cleanup job
 });
+// Trigger reload

@@ -88,6 +88,7 @@ model Company {
   warehouses             Warehouse[]
   customizationGroups    CustomizationGroup[]
   purchaseOrders         PurchaseOrder[]
+  salesOrders            SalesOrder[]
 }
 
 model FinancialAccount {
@@ -322,6 +323,8 @@ model Attendance {
   deviceId            String?
   fraudScore          Float?
   isSuspicious        Boolean          @default(false)
+  lateMinutes         Int?             @default(0)
+  earlyCheckOutMinutes Int?             @default(0)
   company             Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -698,6 +701,7 @@ model Customer {
   totalSpent Float    @default(0)
   createdAt  DateTime @default(now()) @db.Timestamp(6)
   updatedAt  DateTime @default(now()) @db.Timestamp(6)
+  salesOrders SalesOrder[]
 
   @@unique([companyId, phone], name: "companyId_phone")
 }
@@ -741,6 +745,7 @@ model Product {
   UsedInRecipes    ProductRecipe[]    @relation("MaterialRecipes")
   customizations   ProductCustomization[]
   purchaseOrderItems PurchaseOrderItem[]
+  salesOrderItems    SalesOrderItem[]
 }
 
 model ProductRecipe {
@@ -1133,5 +1138,46 @@ enum POStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+model SalesOrder {
+  id            Int               @id @default(autoincrement())
+  companyId     Int
+  customerId    Int
+  orderNumber   String            @unique
+  date          DateTime          @default(now())
+  totalAmount   Float             @default(0)
+  status        SOStatus          @default(PENDING)
+  notes         String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer      Customer          @relation(fields: [customerId], references: [id])
+  items         SalesOrderItem[]
+  
+  // Relating it eventually to a Sale/Invoice
+  saleId        Int?              @unique
+}
+
+model SalesOrderItem {
+  id              Int           @id @default(autoincrement())
+  salesOrderId    Int
+  productId       Int
+  quantity        Float
+  price           Float
+  total           Float
+  
+  salesOrder      SalesOrder    @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id])
+}
+
+enum SOStatus {
+  PENDING
+  APPROVED
+  PREPARING
+  SHIPPED
+  INVOICED
+  CANCELLED
 }
 

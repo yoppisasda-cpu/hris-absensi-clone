@@ -27,6 +27,9 @@ interface Attendance {
     fraudScore: number | null;
     isSuspicious: boolean;
     deviceId: string | null;
+    status: 'PRESENT' | 'LATE' | 'ABSENT';
+    lateMinutes: number | null;
+    earlyCheckOutMinutes: number | null;
 }
 
 export default function AttendancePage() {
@@ -68,6 +71,9 @@ export default function AttendancePage() {
             'Out Lat': att.clockOutLat || '-',
             'Out Lng': att.clockOutLng || '-',
             'Mood': att.mood || '-',
+            'Status Presensi': att.status === 'LATE' ? 'Terlambat' : 'Hadir',
+            'Menit Terlambat': att.lateMinutes || 0,
+            'Menit Pulang Cepat': att.earlyCheckOutMinutes || 0,
             'Fraud Score': att.fraudScore || 0,
             'Suspicious': att.isSuspicious ? 'YES' : 'NO'
         }));
@@ -213,6 +219,7 @@ export default function AttendancePage() {
                                     <th className="px-6 py-4 text-center">Foto Pulang</th>
                                     <th className="px-6 py-4 text-center">Clock-In</th>
                                     <th className="px-6 py-4 text-center">Clock-Out</th>
+                                    <th className="px-6 py-4 text-center">Presensi</th>
                                     <th className="px-6 py-4 text-center">Mood</th>
                                     <th className="px-6 py-4 text-center">Verifikasi Wajah</th>
                                     <th className="px-6 py-4 text-center">Tingkat Risiko</th>
@@ -294,6 +301,32 @@ export default function AttendancePage() {
                                             ) : (
                                                 <span className="text-slate-400 italic">Belum Keluar</span>
                                             )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex flex-col items-center gap-1">
+                                                {att.status === 'LATE' && (
+                                                    <div className="flex flex-col items-center gap-0.5">
+                                                        <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2.5 py-1 rounded-full text-[11px] font-bold border border-red-100">
+                                                            <AlertCircle className="h-3 w-3" /> TERLAMBAT
+                                                        </span>
+                                                        <span className="text-[10px] text-red-500 font-medium">{att.lateMinutes} Menit</span>
+                                                    </div>
+                                                )}
+                                                {att.earlyCheckOutMinutes && att.earlyCheckOutMinutes > 0 ? (
+                                                    <div className="flex flex-col items-center gap-0.5">
+                                                        <span className="inline-flex items-center gap-1 text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full text-[11px] font-bold border border-orange-100">
+                                                            <Clock className="h-3 w-3" /> PULANG CEPAT
+                                                        </span>
+                                                        <span className="text-[10px] text-orange-500 font-medium">{att.earlyCheckOutMinutes} Menit</span>
+                                                    </div>
+                                                ) : (
+                                                    att.status === 'PRESENT' && (
+                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2.5 py-1 rounded-full text-[11px] font-bold border border-green-100">
+                                                            <Clock className="h-3 w-3" /> HADIR
+                                                        </span>
+                                                    )
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {att.mood === 'Senang' && <span className="flex items-center justify-center gap-1 text-green-600"><Smile className="h-5 w-5" /> <span className="text-xs font-medium">Senang</span></span>}
