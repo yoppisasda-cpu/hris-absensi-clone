@@ -5176,7 +5176,10 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
 
     // 1. Total Karyawan
     const totalEmployees = await prisma.user.count({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }
+      where: {
+        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        ...(userRole !== 'SUPERADMIN' ? { name: { not: 'Aivola Owner' } } : {})
+      }
     });
 
     // 2. Hadir Hari Ini (PRESENT atau LATE)
