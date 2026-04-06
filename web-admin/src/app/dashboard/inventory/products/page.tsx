@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import AddProductModal from "@/components/inventory/AddProductModal";
 import StockAdjustModal from "@/components/inventory/StockAdjustModal";
+import ProductionModal from "@/components/inventory/ProductionModal";
 import CategoryModal from "@/components/inventory/CategoryModal";
 import WarehouseModal from "@/components/inventory/WarehouseModal";
 
@@ -16,6 +17,7 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+    const [isProductionModalOpen, setIsProductionModalOpen] = useState(false);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -438,6 +440,23 @@ export default function ProductsPage() {
                                                             >
                                                                 <Edit3 className="h-4 w-4" /> Sesuaikan Stok
                                                             </button>
+
+                                                            {(product.type === 'FINISHED_GOOD' || product.type === 'WIP') && (
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        if (!product.Recipes || product.Recipes.length === 0) {
+                                                                            toast.error("Atur resep (BOM) terlebih dahulu untuk produk ini.");
+                                                                            return;
+                                                                        }
+                                                                        setSelectedProduct(product);
+                                                                        setIsProductionModalOpen(true);
+                                                                        setOpenMenuId(null);
+                                                                    }}
+                                                                    className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-3 transition-colors"
+                                                                >
+                                                                    <ChefHat className="h-4 w-4" /> Catat Produksi
+                                                                </button>
+                                                            )}
                                                             <div className="h-px bg-slate-50 my-1"></div>
                                                             <button 
                                                                 onClick={() => {
@@ -514,6 +533,16 @@ export default function ProductsPage() {
                 isOpen={isWarehouseModalOpen}
                 onClose={() => setIsWarehouseModalOpen(false)}
                 onSuccess={fetchProducts}
+            />
+
+            <ProductionModal
+                isOpen={isProductionModalOpen}
+                onClose={() => {
+                    setIsProductionModalOpen(false);
+                    setSelectedProduct(null);
+                }}
+                onSuccess={fetchProducts}
+                product={selectedProduct}
             />
         </DashboardLayout>
     );

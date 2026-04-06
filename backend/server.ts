@@ -9091,6 +9091,126 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
+// I3.5. Production API (Manufacturing: Raw/WIP -> Finished Good)
+app.post('/api/inventory/produce', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { productId, sku, quantity, warehouseId, notes } = req.body;
+    const producedQty = parseFloat(quantity);
+
+    if ((!productId && !sku) || isNaN(producedQty) || producedQty <= 0 || !warehouseId) {
+      return res.status(400).json({ error: 'Data produksi tidak lengkap. Sertakan productId atau sku.' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Get Product & its Recipe
+      let product;
+      if (productId) {
+        product = await tx.product.findUnique({
+          where: { id: parseInt(productId), companyId: tenantId },
+          include: {
+            Recipes: {
+              include: { Material: true }
+            }
+          }
+        });
+      } else {
+        product = await tx.product.findFirst({
+          where: { sku: String(sku), companyId: tenantId },
+          include: {
+            Recipes: {
+              include: { Material: true }
+            }
+          }
+        });
+      }
+
+      if (!product) throw new Error('Produk tidak ditemukan.');
+      if (!product.Recipes || product.Recipes.length === 0) {
+        throw new Error('Produk ini tidak memiliki Bill of Materials (Resep). Silakan atur resep terlebih dahulu.');
+      }
+
+      // 2. Process each material in the recipe
+      for (const recipeItem of product.Recipes) {
+        const neededQty = parseFloat(recipeItem.quantity.toString()) * producedQty;
+        const materialId = recipeItem.materialId;
+
+        // Check if sufficient stock exists in the warehouse
+        const wStock = await tx.warehouseStock.findUnique({
+          where: { productId_warehouseId: { productId: materialId, warehouseId: parseInt(warehouseId) } }
+        });
+
+        const currentQty = wStock?.quantity || 0;
+        if (currentQty < neededQty) {
+          throw new Error(`Stok tidak mencukupi untuk bahan baku: ${recipeItem.Material.name}. Dibutuhkan ${neededQty} ${recipeItem.Material.unit}, tersedia ${currentQty} ${recipeItem.Material.unit}.`);
+        }
+
+        // --- DEDUCT MATERIAL STOCK ---
+        // Update WarehouseStock
+        await tx.warehouseStock.update({
+          where: { productId_warehouseId: { productId: materialId, warehouseId: parseInt(warehouseId) } },
+          data: { quantity: { decrement: neededQty } }
+        });
+
+        // Update Total Product Stock
+        await tx.product.update({
+          where: { id: materialId },
+          data: { stock: { decrement: neededQty } }
+        });
+
+        // Record Transaction (OUT)
+        await tx.stockTransaction.create({
+          data: {
+            productId: materialId,
+            type: 'OUT',
+            quantity: neededQty,
+            reference: `Produksi ${product.name}: ${notes || '-'}`,
+            warehouseId: parseInt(warehouseId)
+          }
+        });
+      }
+
+      // 3. --- INCREMENT PRODUCED PRODUCT STOCK ---
+      // Update WarehouseStock
+      await tx.warehouseStock.upsert({
+        where: { productId_warehouseId: { productId: product.id, warehouseId: parseInt(warehouseId) } },
+        update: { quantity: { increment: producedQty } },
+        create: { productId: product.id, warehouseId: parseInt(warehouseId), quantity: producedQty }
+      });
+
+      // Update Total Product Stock
+      await tx.product.update({
+        where: { id: product.id },
+        data: { stock: { increment: producedQty } }
+      });
+
+      // Record Transaction (IN)
+      await tx.stockTransaction.create({
+        data: {
+          productId: product.id,
+          type: 'IN',
+          quantity: producedQty,
+          reference: `Hasil Produksi: ${notes || '-'}`,
+          warehouseId: parseInt(warehouseId)
+        }
+      });
+
+      return { 
+        producedProduct: product.name,
+        producedQty,
+        remainingUnit: product.unit
+      };
+    });
+
+    res.json({ message: 'Produksi berhasil dicatat, stok otomatis disesuaikan.', result });
+  } catch (error: any) {
+    fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] PRODUCTION ERROR: \n${error.stack || error.message}\n`);
+    console.error('Production Error:', error);
+    res.status(500).json({ error: 'Gagal memproses produksi: ' + error.message });
+  }
+});
+
+
 // Get all stock transactions for the tenant
 app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) => {
   try {
