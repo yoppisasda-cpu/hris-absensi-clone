@@ -149,15 +149,33 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     const handleSubmit = async (e: any) => {
         e.preventDefault();
         setLoading(true);
+
+        // Sanitize numeric fields to ensure they are numbers, defaulting to 0 if blank
+        const sanitizedData = {
+            ...formData,
+            price: Number(formData.price) || 0,
+            costPrice: Number(formData.costPrice) || 0,
+            minStock: Number(formData.minStock) || 0,
+            stock: Number(formData.stock) || 0,
+            priceGofood: Number(formData.priceGofood) || 0,
+            priceGrabfood: Number(formData.priceGrabfood) || 0,
+            priceShopeefood: Number(formData.priceShopeefood) || 0
+        };
+
         try {
             const res = product 
-                ? await api.patch(`/inventory/products/${product.id}`, formData)
-                : await api.post('/inventory/products', formData);
+                ? await api.patch(`/inventory/products/${product.id}`, sanitizedData)
+                : await api.post('/inventory/products', sanitizedData);
             
             const productId = product ? product.id : res.data.productId;
 
             if (hasRecipe && recipeItems.length > 0) {
-                await api.post(`/inventory/products/${productId}/recipe`, { items: recipeItems });
+                // Ensure recipe quantities are also sanitized
+                const sanitizedRecipe = recipeItems.map(item => ({
+                    ...item,
+                    quantity: Number(item.quantity) || 0
+                }));
+                await api.post(`/inventory/products/${productId}/recipe`, { items: sanitizedRecipe });
             }
 
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
