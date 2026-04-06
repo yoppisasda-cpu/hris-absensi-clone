@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import api from '@/lib/api';
 
 type SubscriptionPlan = 'STARTER' | 'PRO' | 'ENTERPRISE';
 
@@ -45,14 +46,10 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const token = localStorage.getItem('jwt_token');
         if (!token) return;
 
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/companies/my`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const res = await api.get('/companies/my');
 
-        if (res.ok) {
-          const data = await res.json();
+        if (res.status === 200) {
+          const data = res.data;
           if (data.plan) {
             setPlan(data.plan);
             localStorage.setItem('userPlan', data.plan);
