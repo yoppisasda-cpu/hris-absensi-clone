@@ -38,9 +38,17 @@ export default function LoginPage() {
       localStorage.setItem('userRole', user.role);
       localStorage.setItem('userPlan', user.plan || 'STARTER');
       localStorage.setItem('userAddons', JSON.stringify(user.addons || []));
+      
+      // Set default activeModule based on role/plan
+      // OWNER/SUPERADMIN will see module selection UI, others get ABSENSI as default
+      const existingModule = localStorage.getItem('activeModule');
+      if (!existingModule) {
+        // Default to ABSENSI for first-time users; OWNER/SUPERADMIN can change later from sidebar
+        localStorage.setItem('activeModule', 'ABSENSI');
+      }
 
-      // --- ULTRA FAST REDIRECT (NO DATA FETCHING) ---
-      // Use href to ensure clean navigation (avoids Next.js routing cache issues)
+      // --- ULTRA FAST REDIRECT ---
+      // Use href for a full page load to ensure all state is fresh
       window.location.href = '/dashboard';
     } catch (err: unknown) {
       const error = err as { response?: { status?: number; data?: { error?: string } } };
