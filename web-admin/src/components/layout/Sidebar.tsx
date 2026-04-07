@@ -38,22 +38,37 @@ export default function Sidebar() {
                 const modules = res.data.modules || 'BOTH';
                 setAllowedModules(modules);
                 
-                // Jika hanya satu modul, paksa activeModule ke modul tersebut
+                // Priority order:
+                // 1. If company only has one module, force it (no choice)
+                // 2. Otherwise, respect the user's saved preference from localStorage
+                // 3. If no saved preference, default based on role (FINANCE -> FINANCE, others -> ABSENSI)
                 if (modules === 'ABSENSI') {
                     setActiveModule('ABSENSI');
                     localStorage.setItem('activeModule', 'ABSENSI');
-                } else if (userRole === 'FINANCE') {
-                    // Jika role adalah FINANCE, default ke modul FINANCE
+                } else if (modules === 'FINANCE') {
                     setActiveModule('FINANCE');
                     localStorage.setItem('activeModule', 'FINANCE');
                 } else {
-                    const saved = localStorage.getItem('activeModule') as any;
-                    setActiveModule(saved || 'ABSENSI');
+                    // Company has BOTH modules available — respect saved preference first
+                    const saved = localStorage.getItem('activeModule') as 'ABSENSI' | 'FINANCE' | null;
+                    if (saved === 'FINANCE' || saved === 'ABSENSI') {
+                        setActiveModule(saved);
+                    } else if (userRole === 'FINANCE') {
+                        // No saved preference, user is Finance role → default to Finance
+                        setActiveModule('FINANCE');
+                        localStorage.setItem('activeModule', 'FINANCE');
+                    } else {
+                        setActiveModule('ABSENSI');
+                    }
                 }
             } catch (err) {
                 console.error("Failed to fetch modules", err);
-                const saved = localStorage.getItem('activeModule') as any;
-                setActiveModule(saved || 'ABSENSI');
+                const saved = localStorage.getItem('activeModule') as 'ABSENSI' | 'FINANCE' | null;
+                if (saved === 'FINANCE' || saved === 'ABSENSI') {
+                    setActiveModule(saved);
+                } else {
+                    setActiveModule(userRole === 'FINANCE' ? 'FINANCE' : 'ABSENSI');
+                }
             }
         };
 
