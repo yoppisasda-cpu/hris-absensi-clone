@@ -1323,6 +1323,8 @@ app.get('/api/companies/my', tenantMiddleware, async (req: Request, res: Respons
     }
     
     const expiryLevel = await getTenantExpiryLevel(tenantId);
+    // Prevent 304 Not Modified caching issues that break module detection
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.json({ ...company, expiryLevel });
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil data perusahaan' });

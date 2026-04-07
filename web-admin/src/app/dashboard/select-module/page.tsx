@@ -14,11 +14,15 @@ export default function ModuleSelection() {
     useEffect(() => {
         // Safe check for localStorage
         if (typeof window !== 'undefined') {
-            setUserRole(localStorage.getItem('userRole') || '');
+            const role = localStorage.getItem('userRole') || '';
+            setUserRole(role);
+            const token = localStorage.getItem('jwt_token');
+            console.log('[SELECT-MODULE] Checking state:', { role, hasToken: !!token, activeModule: localStorage.getItem('activeModule') });
 
             // If activeModule is already set, skip module selection and go directly to dashboard
             const existingModule = localStorage.getItem('activeModule');
             if (existingModule) {
+                console.log('[SELECT-MODULE] activeModule already set, going to dashboard:', existingModule);
                 router.push('/dashboard');
                 return;
             }
@@ -28,28 +32,35 @@ export default function ModuleSelection() {
             try {
                 const res = await api.get('/companies/my');
                 const comp = res.data;
+                console.log('[SELECT-MODULE] Company fetched:', { modules: comp?.modules, name: comp?.name });
                 setCompany(comp);
 
                 // Auto-detect module for non-OWNER/SUPERADMIN roles
                 const role = localStorage.getItem('userRole') || '';
                 const isSuperAdmin = role === 'SUPERADMIN' || role === 'OWNER';
+                console.log('[SELECT-MODULE] Role check:', { role, isSuperAdmin, modules: comp?.modules });
                 
                 if (!isSuperAdmin) {
                     if (comp.modules === 'ABSENSI') {
                         localStorage.setItem('activeModule', 'ABSENSI');
+                        console.log('[SELECT-MODULE] Auto-select ABSENSI, redirecting...');
                         router.push('/dashboard');
                     } else if (comp.modules === 'FINANCE') {
                         localStorage.setItem('activeModule', 'FINANCE');
+                        console.log('[SELECT-MODULE] Auto-select FINANCE, redirecting...');
                         router.push('/dashboard');
                     } else if (comp.modules === 'BOTH' || comp.modules === 'INVENTORY') {
                         // For BOTH: default to ABSENSI for non-admin roles
                         localStorage.setItem('activeModule', 'ABSENSI');
+                        console.log('[SELECT-MODULE] Auto-select ABSENSI (BOTH plan), redirecting...');
                         router.push('/dashboard');
                     }
+                } else {
+                    console.log('[SELECT-MODULE] OWNER/SUPERADMIN with BOTH plan - showing module selection UI');
                 }
                 // If BOTH & OWNER/SUPERADMIN → show module selection UI
             } catch (error) {
-                console.error("Gagal mengambil data perusahaan", error);
+                console.error("[SELECT-MODULE] ERROR fetching company:", error);
             } finally {
                 setLoading(false);
             }
@@ -58,6 +69,7 @@ export default function ModuleSelection() {
     }, [router]);
 
     const selectModule = (moduleId: 'ABSENSI' | 'FINANCE' | 'INVENTORY') => {
+        console.log('[SELECT-MODULE] User manually selected:', moduleId);
         localStorage.setItem('activeModule', moduleId);
         router.push('/dashboard');
     };
