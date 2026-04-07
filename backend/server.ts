@@ -486,9 +486,12 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
               });
               if (access) {
                   (req as any).tenantId = requestedTenantId;
-                  console.log(`[AUTH] Owner ${decoded.userId} switched to Tenant ${requestedTenantId}`);
+                  console.log(`[AUTH] Owner ${decoded.userId} authorized Switch to Tenant ${requestedTenantId}`);
               } else {
                   console.warn(`[AUTH] Unauthorized Tenant Switch attempt by Owner ${decoded.userId} to Tenant ${requestedTenantId}`);
+                  return res.status(403).json({ 
+                    error: 'Akses Ditolak: Anda tidak memiliki izin akses untuk perusahaan ini. Hubungi pusat untuk menghubungkan akun.' 
+                  });
               }
           }
       }

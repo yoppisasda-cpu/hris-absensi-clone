@@ -15,6 +15,13 @@ export default function ModuleSelection() {
         // Safe check for localStorage
         if (typeof window !== 'undefined') {
             setUserRole(localStorage.getItem('userRole') || '');
+
+            // If activeModule is already set, skip module selection and go directly to dashboard
+            const existingModule = localStorage.getItem('activeModule');
+            if (existingModule) {
+                router.push('/dashboard');
+                return;
+            }
         }
 
         const fetchCompany = async () => {
@@ -23,9 +30,9 @@ export default function ModuleSelection() {
                 const comp = res.data;
                 setCompany(comp);
 
-                // Point 3: Deteksi Otomatis
-                // Jika hanya ada satu modul yang tersedia, dan BUKAN superadmin, langsung pilih modul tersebut
-                const isSuperAdmin = localStorage.getItem('userRole') === 'SUPERADMIN' || localStorage.getItem('userRole') === 'OWNER';
+                // Auto-detect module for non-OWNER/SUPERADMIN roles
+                const role = localStorage.getItem('userRole') || '';
+                const isSuperAdmin = role === 'SUPERADMIN' || role === 'OWNER';
                 
                 if (!isSuperAdmin) {
                     if (comp.modules === 'ABSENSI') {
@@ -34,9 +41,13 @@ export default function ModuleSelection() {
                     } else if (comp.modules === 'FINANCE') {
                         localStorage.setItem('activeModule', 'FINANCE');
                         router.push('/dashboard');
+                    } else if (comp.modules === 'BOTH' || comp.modules === 'INVENTORY') {
+                        // For BOTH: default to ABSENSI for non-admin roles
+                        localStorage.setItem('activeModule', 'ABSENSI');
+                        router.push('/dashboard');
                     }
                 }
-                // Jika BOTH atau SuperAdmin, biarkan user memilih (UI akan muncul)
+                // If BOTH & OWNER/SUPERADMIN → show module selection UI
             } catch (error) {
                 console.error("Gagal mengambil data perusahaan", error);
             } finally {
