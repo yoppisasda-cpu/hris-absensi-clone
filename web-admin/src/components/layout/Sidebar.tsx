@@ -102,9 +102,19 @@ export default function Sidebar() {
     }, [pathname]);
 
     const handleSwitchCompany = (companyId: number) => {
+        if (!companyId || isNaN(companyId)) return;
+        
+        // Verify this company is in our accessible list before switching
+        const isAccessible = accessibleCompanies.some(c => c.id === companyId);
+        if (!isAccessible) {
+            console.warn(`[SWITCH] Attempted to switch to inaccessible company: ${companyId}`);
+            return;
+        }
+        
+        console.log(`[SWITCH] Switching to company: ${companyId}`);
         localStorage.setItem('currentTenantId', companyId.toString());
-        // Forcing a full reload is the safest way to reset all states for the new tenant
-        window.location.reload();
+        // Use href navigation to /dashboard to avoid reload going through login page
+        window.location.href = '/dashboard';
     };
 
     const handleLinkCompany = async () => {

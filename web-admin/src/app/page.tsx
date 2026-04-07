@@ -33,13 +33,15 @@ export default function LoginPage() {
 
       localStorage.setItem('jwt_token', token);
       localStorage.setItem('companyId', user.companyId.toString());
+      localStorage.setItem('currentTenantId', user.companyId.toString()); // Initialize for company switcher
       localStorage.setItem('userName', user.name);
       localStorage.setItem('userRole', user.role);
       localStorage.setItem('userPlan', user.plan || 'STARTER');
       localStorage.setItem('userAddons', JSON.stringify(user.addons || []));
 
       // --- ULTRA FAST REDIRECT (NO DATA FETCHING) ---
-      router.push('/dashboard');
+      // Use href to ensure clean navigation (avoids Next.js routing cache issues)
+      window.location.href = '/dashboard';
     } catch (err: unknown) {
       const error = err as { response?: { status?: number; data?: { error?: string } } };
       const status = error?.response?.status;
