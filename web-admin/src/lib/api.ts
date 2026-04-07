@@ -39,9 +39,16 @@ const api = axios.create({
 // Interceptor otomatis menyisipkan Token JWT (Bearer) Admin yang sedang login
 api.interceptors.request.use((config) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+    const currentTenantId = typeof window !== 'undefined' ? localStorage.getItem('currentTenantId') : null;
+
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (currentTenantId) {
+        config.headers['x-tenant-id'] = currentTenantId;
+    }
+
     return config;
 });
 

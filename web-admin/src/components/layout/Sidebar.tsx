@@ -23,59 +23,104 @@ const menuItems = [
 
 export default function Sidebar() {
     const router = useRouter();
+    const pathname = usePathname();
     const { t } = useLanguage();
     const { plan, openUpgradeModal, hasFeature } = useFeatures();
     const [userRole, setUserRole] = useState<string | null>(null);
-    const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | 'INVENTORY' | null>(null);
+    const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | null>(null);
     const [allowedModules, setAllowedModules] = useState<string>('BOTH');
     const [isMounted, setIsMounted] = useState(false);
+    
+    // Holding / Multi-Company States
+    const [accessibleCompanies, setAccessibleCompanies] = useState<any[]>([]);
+    const [currentCompanyName, setCurrentCompanyName] = useState<string>('');
 
     useEffect(() => {
         setIsMounted(true);
         const role = localStorage.getItem('userRole');
         setUserRole(role);
+        
+        const fetchAccessibleCompanies = async () => {
+            if (role === 'OWNER' || role === 'SUPERADMIN') {
+                try {
+                    const res = await api.get('/companies/accessible');
+                    setAccessibleCompanies(res.data);
+                } catch (err) {
+                    console.error("Failed to fetch accessible companies", err);
+                }
+            }
+        };
+
+        fetchAccessibleCompanies();
+    }, []);
+
+    // --- NEW: RE-RUN DETECTION ON EVERY NAVIGATION ---
+    useEffect(() => {
+        const role = localStorage.getItem('userRole');
+        const savedModule = localStorage.getItem('activeModule') as any;
+        
+        if (role === 'FINANCE') {
+            setActiveModule('FINANCE');
+            return;
+        }
+
+        if (pathname.includes('/dashboard/finance') || pathname.includes('/dashboard/loans') || pathname.includes('/dashboard/reimbursements') || pathname.includes('/dashboard/inventory') || pathname.includes('/dashboard/pos') || pathname.includes('/dashboard/payroll')) {
+            setActiveModule('FINANCE');
+            localStorage.setItem('activeModule', 'FINANCE');
+        } else if (pathname.includes('/dashboard/employees') || pathname.includes('/dashboard/shifts') || pathname.includes('/dashboard/attendance')) {
+            setActiveModule('ABSENSI');
+            localStorage.setItem('activeModule', 'ABSENSI');
+        } else if (savedModule && (activeModule === null)) {
+            // Only use saved module on initial load if URL doesn't match a specific module
+            setActiveModule(savedModule === 'INVENTORY' ? 'FINANCE' : savedModule);
+        } else if (activeModule === null) {
+            setActiveModule('ABSENSI');
+        }
 
         const fetchCompanyModules = async () => {
             try {
                 const res = await api.get('/companies/my');
                 const modules = res.data.modules || 'BOTH';
                 setAllowedModules(modules);
+                setCurrentCompanyName(res.data.name);
                 
-                if (role === 'FINANCE') {
-                    setActiveModule('FINANCE');
-                    localStorage.setItem('activeModule', 'FINANCE');
-                } else if (modules === 'ABSENSI') {
+                // Soft protection: only override if we are on a generic page (dashboard)
+                // If the user is ALREADY on a finance/inventory page, don't kick them out
+                const isFinanceOrInventoryPage = pathname.includes('/dashboard/finance') || pathname.includes('/dashboard/loans') || pathname.includes('/dashboard/reimbursements') || pathname.includes('/dashboard/inventory') || pathname.includes('/dashboard/pos') || pathname.includes('/dashboard/payroll');
+
+                if (modules === 'ABSENSI' && !isFinanceOrInventoryPage) {
                     setActiveModule('ABSENSI');
-                    localStorage.setItem('activeModule', 'ABSENSI');
                 } else if (modules === 'FINANCE') {
                     setActiveModule('FINANCE');
-                    localStorage.setItem('activeModule', 'FINANCE');
-                } else {
-                    const saved = localStorage.getItem('activeModule') as 'ABSENSI' | 'FINANCE' | null;
-                    if (saved === 'FINANCE' || saved === 'ABSENSI') {
-                        setActiveModule(saved);
-                    } else {
-                        setActiveModule('ABSENSI');
-                    }
                 }
             } catch (err) {
                 console.error("Failed to fetch modules", err);
-                if (role === 'FINANCE') {
-                    setActiveModule('FINANCE');
-                    localStorage.setItem('activeModule', 'FINANCE');
-                } else {
-                    const saved = localStorage.getItem('activeModule') as 'ABSENSI' | 'FINANCE' | null;
-                    if (saved === 'FINANCE' || saved === 'ABSENSI') {
-                        setActiveModule(saved);
-                    } else {
-                        setActiveModule('ABSENSI');
-                    }
-                }
             }
         };
 
         fetchCompanyModules();
-    }, []);
+    }, [pathname]);
+
+    const handleSwitchCompany = (companyId: number) => {
+        localStorage.setItem('currentTenantId', companyId.toString());
+        // Forcing a full reload is the safest way to reset all states for the new tenant
+        window.location.reload();
+    };
+
+    const handleLinkCompany = async () => {
+        const name = window.prompt("Masukkan Nama Perusahaan Target:");
+        if (!name) return;
+        const pass = window.prompt(`Masukkan Password Admin untuk ${name}:`);
+        if (!pass) return;
+
+        try {
+            const res = await api.post('/companies/link', { companyName: name, adminPassword: pass });
+            alert(res.data.message);
+            window.location.reload();
+        } catch (err: any) {
+            alert("Gagal menghubungkan: " + (err.response?.data?.error || err.message));
+        }
+    };
     return (
         <div className="flex h-screen w-64 flex-col bg-slate-900 text-white shadow-xl transition-all overflow-y-auto" style={{ display: 'flex', height: '100vh', width: '16rem', flexDirection: 'column', backgroundColor: '#0f172a', color: 'white', overflowY: 'auto' }}>
             <style jsx>{`
@@ -84,14 +129,44 @@ export default function Sidebar() {
                 .nav-link.active { background-color: #2563eb; color: white; }
             `}</style>
             
-            <div className="flex h-16 items-center justify-center border-b border-slate-700 mt-4 pb-4" style={{ display: 'flex', height: '4rem', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #334155', marginTop: '1rem', paddingBottom: '1rem' }}>
-                <div className="flex items-center gap-2" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div className="flex flex-col items-center justify-center border-b border-slate-700 mt-4 pb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #334155', marginTop: '1rem', paddingBottom: '1rem' }}>
+                <div className="flex items-center gap-2 mb-2" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <img src="/logo.png" alt="aivola Logo" className="h-8 w-8 rounded-lg object-contain bg-white p-1" style={{ height: '2rem', width: '2rem', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'white', padding: '0.25rem' }} />
                     <div className="flex flex-col">
                         <span className="text-xl font-bold tracking-tight text-slate-100 font-primary" style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f1f5f9' }}>aivola <span style={{ color: '#3b82f6' }}>Admin</span></span>
-                        <span className="text-[10px] text-slate-500 font-mono">Build v1.0.6-Final-Live</span>
+                        <span className="text-[10px] text-slate-500 font-mono">v1.0.7-Holding-Live</span>
                     </div>
                 </div>
+
+                {/* HOLDING COMPANY SWITCHER */}
+                {isMounted && (userRole === 'OWNER' || userRole === 'SUPERADMIN') && accessibleCompanies.length > 0 && (
+                    <div className="px-3 w-full animate-in fade-in zoom-in duration-300">
+                        <div className="relative group">
+                            <select 
+                                onChange={(e) => {
+                                    if (e.target.value === 'LINK_NEW') {
+                                        handleLinkCompany();
+                                    } else {
+                                        handleSwitchCompany(Number(e.target.value));
+                                    }
+                                }}
+                                value={localStorage.getItem('currentTenantId') || ''}
+                                className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-[11px] rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer hover:bg-slate-700 transition-colors"
+                            >
+                                <option value="" disabled>-- Perusahaan Aktif --</option>
+                                {accessibleCompanies.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                        🏢 {c.name} {c.isPrimary ? '(Pusat)' : ''}
+                                    </option>
+                                ))}
+                                <option value="LINK_NEW" className="text-blue-400 font-bold">+ Hubungkan Perusahaan Lain</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none opacity-50">
+                                <TrendingUp className="h-3 w-3 rotate-90" />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <nav className="flex-1 space-y-1 px-3 py-6">
@@ -311,6 +386,10 @@ export default function Sidebar() {
                         <Link href="/dashboard/finance/closing" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <FileText className="h-5 w-5 text-orange-400" />
                             Tutup Buku (Closing)
+                        </Link>
+                        <Link href="/dashboard/assets" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <Laptop className="h-5 w-5 text-indigo-400" />
+                            Manajemen Aset (Fixed Assets)
                         </Link>
 
                         <div className="px-3 py-2 mt-4 text-[10px] font-bold text-orange-400 uppercase tracking-widest">Manajemen Inventori</div>

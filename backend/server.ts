@@ -464,10 +464,33 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
       (req as any).tenantId = Number(decoded.companyId);
       (req as any).userId = Number(decoded.userId);
       (req as any).userRole = decoded.role;
+      (req as any).primaryCompanyId = Number(decoded.companyId);
 
       const targetTenantId = req.headers['x-tenant-id'];
-      if (decoded.role === 'SUPERADMIN' && targetTenantId) {
-          (req as any).tenantId = parseInt(targetTenantId as string);
+      if (targetTenantId) {
+          const requestedTenantId = parseInt(targetTenantId as string);
+          
+          // 1. SuperAdmin can switch to ANY tenant
+          if (decoded.role === 'SUPERADMIN') {
+              (req as any).tenantId = requestedTenantId;
+          } 
+          // 2. Owner can switch if they have access in UserAccess table
+          else if (decoded.role === 'OWNER' && requestedTenantId !== Number(decoded.companyId)) {
+              const access = await prisma.userAccess.findUnique({
+                  where: {
+                      userId_companyId: {
+                          userId: Number(decoded.userId),
+                          companyId: requestedTenantId
+                      }
+                  }
+              });
+              if (access) {
+                  (req as any).tenantId = requestedTenantId;
+                  console.log(`[AUTH] Owner ${decoded.userId} switched to Tenant ${requestedTenantId}`);
+              } else {
+                  console.warn(`[AUTH] Unauthorized Tenant Switch attempt by Owner ${decoded.userId} to Tenant ${requestedTenantId}`);
+              }
+          }
       }
       return next();
     } catch (error) {
@@ -505,6 +528,96 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
     error: 'Akses Ditolak: Token JWT atau API Key tidak ditemukan'
   });
 };
+
+// ==========================================
+// HOLDING / MULTI-COMPANY MANAGEMENT
+// ==========================================
+
+// 1. Get List of Accessible Companies
+app.get('/api/companies/accessible', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const primaryCompanyId = (req as any).primaryCompanyId;
+
+    // Fetch primary company
+    const primaryCompany = await prisma.company.findUnique({
+      where: { id: primaryCompanyId },
+      select: { id: true, name: true, logoUrl: true }
+    });
+
+    // Fetch secondary companies from UserAccess
+    const accessList = await prisma.userAccess.findMany({
+      where: { userId },
+      include: { company: { select: { id: true, name: true, logoUrl: true } } }
+    });
+
+    const results = [];
+    if (primaryCompany) results.push({ ...primaryCompany, isPrimary: true });
+    
+    accessList.forEach(acc => {
+      if (acc.companyId !== primaryCompanyId) {
+        results.push({ ...acc.company, isPrimary: false });
+      }
+    });
+
+    res.json(results);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil daftar perusahaan: ' + error.message });
+  }
+});
+
+// 2. Link a New Company (Self-Service for Owner)
+app.post('/api/companies/link', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const userRole = (req as any).userRole;
+    const { companyName, adminPassword } = req.body;
+
+    if (userRole !== 'OWNER' && userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Hanya Role Owner yang dapat menghubungkan perusahaan.' });
+    }
+
+    if (!companyName || !adminPassword) {
+      return res.status(400).json({ error: 'Nama perusahaan dan password admin wajib diisi.' });
+    }
+
+    // 1. Find target company
+    const targetCompany = await prisma.company.findFirst({
+      where: { name: { equals: companyName, mode: 'insensitive' } }
+    });
+
+    if (!targetCompany) {
+      return res.status(404).json({ error: 'Perusahaan tidak ditemukan. Pastikan nama sesuai.' });
+    }
+
+    // 2. Find primary ADMIN of that company to verify password
+    const targetAdmin = await prisma.user.findFirst({
+      where: { companyId: targetCompany.id, role: 'ADMIN' },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    if (!targetAdmin) {
+      return res.status(404).json({ error: 'Admin perusahaan target tidak ditemukan. Hubungi CS.' });
+    }
+
+    // 3. Verify Password
+    const isValid = await bcrypt.compare(adminPassword, targetAdmin.password);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Password Admin perusahaan salah. Verifikasi gagal.' });
+    }
+
+    // 4. Create UserAccess Link
+    await prisma.userAccess.upsert({
+      where: { userId_companyId: { userId, companyId: targetCompany.id } },
+      update: { role: 'OWNER' },
+      create: { userId, companyId: targetCompany.id, role: 'OWNER' }
+    });
+
+    res.json({ success: true, message: `Berhasil menghubungkan ke ${targetCompany.name}!` });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menghubungkan perusahaan: ' + error.message });
+  }
+});
 
 // ==========================================
 // SALES ORDERS (CUSTOMER PO) MODULE (B2B)
@@ -1112,6 +1225,8 @@ app.post('/api/companies', async (req: Request, res: Response) => {
           photoRetentionDays: photoRetentionDays ? parseInt(photoRetentionDays, 10) : 30,
           plan: plan || 'STARTER',
           addons: addons || [],
+          // --- AUTO-SYNC MODULES ---
+          modules: (plan === 'PRO' || plan === 'ENTERPRISE') ? 'BOTH' : (req.body.modules || 'ABSENSI'),
           discountKpi: parseInt(discountKpi, 10) || 0,
           discountLearning: parseInt(discountLearning, 10) || 0,
           discountInventory: parseInt(discountInventory, 10) || 0,
@@ -1555,6 +1670,8 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         plan: plan !== undefined ? plan : undefined,
         addons: addons !== undefined ? addons : undefined,
         purchasedInsights: purchasedInsights !== undefined ? purchasedInsights : undefined,
+        // --- AUTO-SYNC MODULES ---
+        modules: (plan === 'PRO' || plan === 'ENTERPRISE') ? 'BOTH' : (req.body.modules || undefined),
         discountKpi: safeParseInt(discountKpi),
         discountLearning: safeParseInt(discountLearning),
         discountInventory: safeParseInt(discountInventory),
@@ -2003,7 +2120,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
       }
 
       // 3. Check Admin/Back-office Limit
-      const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL'] as any;
+      const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING'] as any;
       if (backOfficeRoles.includes(role)) {
           // Gunakan raw query untuk melewati validasi enum Prisma yang terkadang cache
           const adminCountResult: any = await prisma.$queryRawUnsafe(
@@ -2125,7 +2242,7 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
     }
 
     // --- ENFORCE ADMIN LIMIT ON UPDATE ---
-    const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL'] as any;
+    const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING'] as any;
     if (requestorRole !== 'SUPERADMIN' && role && role !== checkUser.role && backOfficeRoles.includes(role)) {
         const company = await prisma.company.findUnique({ where: { id: checkUser.companyId } });
         const currentAdminCount = await prisma.user.count({
@@ -5886,6 +6003,13 @@ app.get('/api/assets', tenantMiddleware, async (req: Request, res: Response) => 
     const userRole = (req as any).userRole;
     const userId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
 
+    // --- ROLE CHECK ---
+    const allowedRoles = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'];
+    if (!allowedRoles.includes(userRole)) {
+      console.warn(`[AUTH] Unauthorized Asset Access attempt by User: ${(req as any).userId}, Role: ${userRole}`);
+      return res.status(403).json({ error: 'Akses Ditolak: Role Anda tidak memiliki izin untuk mengelola aset' });
+    }
+
     const assets = await prisma.asset.findMany({
       where: {
         ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
@@ -5908,6 +6032,14 @@ app.get('/api/assets', tenantMiddleware, async (req: Request, res: Response) => 
 app.post('/api/assets', tenantMiddleware, uploadAsset.single('image'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+    
+    // --- ROLE CHECK ---
+    const allowedRoles = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'];
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({ error: 'Akses Ditolak: Role Anda tidak memiliki izin untuk mengelola aset' });
+    }
+
     const { name, serialNumber, condition, purchaseDate, userId, purchasePrice, residualValue, usefulLife, isDepreciating, category, taxCategory } = req.body;
     let imageUrl = req.file ? `/uploads/assets/${req.file.filename}` : null;
 
@@ -5973,7 +6105,15 @@ app.post('/api/assets', tenantMiddleware, uploadAsset.single('image'), async (re
 app.put('/api/assets/:id', tenantMiddleware, uploadAsset.single('image'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
     const id = parseInt(req.params.id as string);
+
+    // --- ROLE CHECK ---
+    const allowedRoles = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'];
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({ error: 'Akses Ditolak: Role Anda tidak memiliki izin untuk mengelola aset' });
+    }
+
     const { name, serialNumber, condition, purchaseDate, userId, purchasePrice, residualValue, usefulLife, isDepreciating, category, taxCategory } = req.body;
 
     // Siapkan data update
@@ -6022,7 +6162,14 @@ app.put('/api/assets/:id', tenantMiddleware, uploadAsset.single('image'), async 
 app.delete('/api/assets/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
     const id = parseInt(req.params.id as string);
+
+    // --- ROLE CHECK ---
+    const allowedRoles = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'];
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({ error: 'Akses Ditolak: Role Anda tidak memiliki izin untuk mengelola aset' });
+    }
 
     await prisma.asset.delete({
       where: { id, companyId: tenantId }

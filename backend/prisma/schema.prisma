@@ -89,6 +89,7 @@ model Company {
   customizationGroups    CustomizationGroup[]
   purchaseOrders         PurchaseOrder[]
   salesOrders            SalesOrder[]
+  userAccess             UserAccess[]
 }
 
 model FinancialAccount {
@@ -273,7 +274,22 @@ model User {
   reportTo                User?               @relation("ReportingLine", fields: [reportToId], references: [id])
   subordinates            User[]              @relation("ReportingLine")
   shift                   Shift?              @relation(fields: [shiftId], references: [id])
+  accessibleCompanies     UserAccess[]
 }
+
+model UserAccess {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  companyId Int
+  role      Role     @default(OWNER)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+}
+
 
 model OvertimeRequest {
   id            Int            @id @default(autoincrement())
@@ -924,6 +940,7 @@ enum Role {
   CASHIER
   PURCHASING
   FINANCE
+  OPERATIONAL
 }
 
 enum AttendanceStatus {

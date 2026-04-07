@@ -227,6 +227,7 @@ export default function CompaniesPage() {
                 discountAi: parseInt(discountAi) || 0,
                 discountFraud: parseInt(discountFraud) || 0,
                 discountExpansion: parseInt(discountExpansion) || 0,
+                modules: (plan === 'PRO' || plan === 'ENTERPRISE') ? 'BOTH' : 'ABSENSI',
                 adminName, adminEmail, adminPassword
             };
 
