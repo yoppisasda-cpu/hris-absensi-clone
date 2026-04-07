@@ -53,7 +53,7 @@ export default function ClosingPage() {
   }, []);
 
   const handleClosing = async () => {
-    if (!confirm(`Apakah Anda yakin ingin menutup buku untuk periode ${months.find(m => m.id === selectedMonth)?.name} ${selectedYear}? \n\nSetelah ditutup, transaksi di periode ini tidak dapat diubah.`)) return;
+    if (!confirm(`Apakah Anda yakin ingin menutup buku untuk periode ${months.find(m => m.id === selectedMonth)?.name} ${selectedYear}? \n\nPenutupan buku ini akan mencatat ringkasan laba rugi untuk periode tersebut.`)) return;
 
     try {
       setIsClosing(true);
@@ -85,7 +85,7 @@ export default function ClosingPage() {
               <ShieldCheck className="h-8 w-8 text-blue-500" />
               Penutupan Buku <span className="text-blue-500">(Closing)</span>
             </h1>
-            <p className="text-slate-500 mt-2">Finalisasi laporan bulanan dan kunci transaksi untuk integritas data.</p>
+            <p className="text-slate-500 mt-2">Finalisasi laporan bulanan untuk pencatatan ringkasan kinerja keuangan.</p>
           </div>
         </div>
 
@@ -131,7 +131,7 @@ export default function ClosingPage() {
                   <div className="flex gap-3">
                     <AlertCircle className="h-5 w-5 text-orange-600 shrink-0" />
                     <p className="text-xs text-orange-800 dark:text-orange-300 leading-relaxed">
-                      <strong>PENTING:</strong> Penutupan buku akan menghitung total pemasukan & pengeluaran, kemudian <strong>MENGUNCI</strong> semua transaksi di periode tersebut.
+                      <strong>INFO:</strong> Penutupan buku akan menghitung total pemasukan & pengeluaran untuk periode tersebut sebagai arsip laporan.
                     </p>
                   </div>
                 </div>
@@ -153,7 +153,7 @@ export default function ClosingPage() {
                 Integritas Data
               </h3>
               <p className="text-sm text-blue-100">
-                Sistem ini memastikan laporan keuangan Anda akurat dan tidak dapat dimanipulasi setelah audit internal selesai dilakukan.
+                Sistem ini membantu Anda merangkum performa bisnis bulanan untuk mempermudah evaluasi kinerja.
               </p>
             </div>
           </div>
@@ -215,8 +215,8 @@ export default function ClosingPage() {
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
-                              <Lock className="h-3 w-3" />
-                              CLOSED
+                              <ShieldCheck className="h-3 w-3" />
+                              RECORDED
                             </span>
                           </td>
                         </tr>

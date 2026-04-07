@@ -923,7 +923,7 @@ enum Role {
   MANAGER
   CASHIER
   PURCHASING
-  OPERATIONAL
+  FINANCE
 }
 
 enum AttendanceStatus {

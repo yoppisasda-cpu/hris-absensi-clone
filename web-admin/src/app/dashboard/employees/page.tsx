@@ -76,6 +76,7 @@ export default function EmployeesPage() {
 
     const [availableShifts, setAvailableShifts] = useState<Shift[]>([]);
     const [availableBranches, setAvailableBranches] = useState<Branch[]>([]);
+    const [userRole, setUserRole] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userRole') || 'EMPLOYEE' : 'EMPLOYEE'));
 
     const fetchUsers = async () => {
         try {
@@ -268,21 +269,23 @@ export default function EmployeesPage() {
                             {showExpiringOnly ? 'Semua Karyawan' : 'Kontrak Habis 30hr'}
                         </button>
                     </div>
-                    <button
-                        onClick={() => {
-                            setIsEditMode(false);
-                            setFormData({
-                                id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
-                                basicSalary: 0, allowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
-                                contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: ''
-                            });
-                            setIsModalOpen(true);
-                        }}
-                        className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
-                    >
-                        <UserPlus className="h-4 w-4" />
-                        Tambah Karyawan
-                    </button>
+                    {userRole !== 'FINANCE' && (
+                        <button
+                            onClick={() => {
+                                setIsEditMode(false);
+                                setFormData({
+                                    id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
+                                    basicSalary: 0, allowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
+                                    contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: ''
+                                });
+                                setIsModalOpen(true);
+                            }}
+                            className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
+                        >
+                            <UserPlus className="h-4 w-4" />
+                            Tambah Karyawan
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -447,60 +450,76 @@ export default function EmployeesPage() {
                                                 >
                                                     <FileText className="h-4 w-4" />
                                                 </button>
-                                                <button onClick={() => handleOpenEdit(user)} className="p-1 px-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors" title="Edit Karyawan">
-                                                    <Edit2 className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedUserForAssets({ id: user.id, name: user.name });
-                                                        setIsAssetsModalOpen(true);
-                                                    }}
-                                                    className="p-1 px-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
-                                                    title="Aset Inventaris"
-                                                >
-                                                    <Laptop className="h-4 w-4" />
-                                                </button>
+                                                {userRole !== 'FINANCE' && (
+                                                    <>
+                                                        <button onClick={() => handleOpenEdit(user)} className="p-1 px-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors" title="Edit Karyawan">
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedUserForAssets({ id: user.id, name: user.name });
+                                                                setIsAssetsModalOpen(true);
+                                                            }}
+                                                            className="p-1 px-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
+                                                            title="Aset Inventaris"
+                                                        >
+                                                            <Laptop className="h-4 w-4" />
+                                                        </button>
 
-                                                {activeTab === 'active' ? (
+                                                        {activeTab === 'active' ? (
+                                                            <button
+                                                                onClick={() => handleDeactivate(user)}
+                                                                className="p-1 px-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                                title="Menonaktifkan (Ex-Employee)"
+                                                            >
+                                                                <UserX className="h-4 w-4" />
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleReactivate(user)}
+                                                                className="p-1 px-2 text-green-500 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                                                title="Aktifkan Kembali"
+                                                            >
+                                                                <UserCheck className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedUserForFace({ 
+                                                                    id: user.id, 
+                                                                    name: user.name, 
+                                                                    currentPhoto: user.faceReferenceUrl 
+                                                                });
+                                                                setIsFaceModalOpen(true);
+                                                            }}
+                                                            className={`p-1 px-2 rounded transition-colors ${user.faceReferenceUrl ? 'text-green-600 hover:bg-green-50' : 'text-slate-400 hover:bg-slate-100'}`}
+                                                            title="Foto Referensi Wajah (AI)"
+                                                        >
+                                                            <Camera className="h-4 w-4" />
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => handleDeleteUser(user)}
+                                                            className="p-1 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                            title="Hapus Permanen"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {userRole === 'FINANCE' && (
                                                     <button
-                                                        onClick={() => handleDeactivate(user)}
-                                                        className="p-1 px-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                        title="Menonaktifkan (Ex-Employee)"
+                                                        onClick={() => {
+                                                            setSelectedUserForAssets({ id: user.id, name: user.name });
+                                                            setIsAssetsModalOpen(true);
+                                                        }}
+                                                        className="p-1 px-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
+                                                        title="Aset Inventaris"
                                                     >
-                                                        <UserX className="h-4 w-4" />
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleReactivate(user)}
-                                                        className="p-1 px-2 text-green-500 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
-                                                        title="Aktifkan Kembali"
-                                                    >
-                                                        <UserCheck className="h-4 w-4" />
+                                                        <Laptop className="h-4 w-4" />
                                                     </button>
                                                 )}
-
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedUserForFace({ 
-                                                            id: user.id, 
-                                                            name: user.name, 
-                                                            currentPhoto: user.faceReferenceUrl 
-                                                        });
-                                                        setIsFaceModalOpen(true);
-                                                    }}
-                                                    className={`p-1 px-2 rounded transition-colors ${user.faceReferenceUrl ? 'text-green-600 hover:bg-green-50' : 'text-slate-400 hover:bg-slate-100'}`}
-                                                    title="Foto Referensi Wajah (AI)"
-                                                >
-                                                    <Camera className="h-4 w-4" />
-                                                </button>
-
-                                                <button
-                                                    onClick={() => handleDeleteUser(user)}
-                                                    className="p-1 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                    title="Hapus Permanen"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -653,6 +672,7 @@ export default function EmployeesPage() {
                                             <option value="OWNER">Owner (Pemilik)</option>
                                             <option value="ADMIN">Administrator HR</option>
                                             <option value="MANAGER">Manager / Supervisor</option>
+                                            <option value="FINANCE">Finance (Keuangan)</option>
                                             <option value="PURCHASING">Purchasing (Pembelian)</option>
                                             <option value="OPERATIONAL">Operational (Gudang/Toko)</option>
                                             <option value="CASHIER">Cashier (Kasir)</option>

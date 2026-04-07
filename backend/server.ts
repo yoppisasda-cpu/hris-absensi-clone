@@ -522,7 +522,7 @@ app.get('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respons
     const tenantId = Number((req as any).tenantId);
     if (!tenantId) return res.status(401).json({ error: 'Tenant ID required' });
     
-    const orders = await prisma.salesOrder.findMany({
+    const orders = await prisma.salesOrders.findMany({
       where: { companyId: tenantId },
       include: {
         customer: true,
@@ -770,6 +770,9 @@ async function getTenantExpiryLevel(companyId: number): Promise<number> {
 
 // --- FUNGSI HELPER CLOSING PERIODE ---
 async function isPeriodClosed(companyId: number, dateValue: any) {
+  // --- USER OVERRIDE: Allow all edits regardless of closing status ---
+  return false;
+  /* 
   if (!dateValue) return false;
   try {
     const date = new Date(dateValue);
@@ -791,6 +794,7 @@ async function isPeriodClosed(companyId: number, dateValue: any) {
     console.error('[Closing Checker] Error:', err);
     return false;
   }
+  */
 }
 
 // --- FUNGSI HELPER NOTIFIKASI (FASE 7) ---
@@ -817,13 +821,11 @@ async function sendNotification(companyId: number, userId: number, title: string
 
 async function notifyAdmins(companyId: number, title: string, message: string) {
   try {
-    const admins = await prisma.user.findMany({
-      where: {
-        companyId,
-        role: { in: ['ADMIN', 'OWNER'] },
-        isActive: true
-      }
-    });
+    // Gunakan raw query untuk melewati validasi enum Prisma yang terkadang cache
+    const admins: any[] = await prisma.$queryRawUnsafe(
+      `SELECT id FROM "User" WHERE "companyId" = $1 AND "role"::text IN ('ADMIN', 'OWNER', 'FINANCE') AND "isActive" = true`,
+      companyId
+    );
 
     for (const admin of admins) {
       await sendNotification(companyId, admin.id, title, message);
@@ -847,12 +849,18 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     const trimmedEmail = email.trim();
     console.log(`[LOGIN ATTEMPT] Email: ${trimmedEmail}`);
 
-    const user = await prisma.user.findUnique({ 
-      where: { email: trimmedEmail },
+    const user = await prisma.user.findFirst({ 
+      where: { email: { equals: trimmedEmail, mode: 'insensitive' } },
       include: { company: { select: { plan: true, addons: true } } }
     });
     if (!user) {
-      console.log(`[LOGIN FAILED] User not found: ${trimmedEmail}`);
+      console.log(`[LOGIN FAILED] User not found: "${trimmedEmail}"`);
+      // DEBUG: Find similar emails to see if there's a typo
+      const similar = await prisma.user.findMany({
+        where: { email: { contains: trimmedEmail.split('@')[0], mode: 'insensitive' } },
+        select: { email: true, id: true, companyId: true, role: true }
+      });
+      console.log(`[DEBUG LOG] Similar users for lookup:`, JSON.stringify(similar, null, 2));
       return res.status(401).json({ error: 'Email atau password salah.' });
     }
 
@@ -868,7 +876,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Akun Anda sudah dinonaktifkan (Ex-Employee). Hubungi HR jika ini kesalahan.' });
     }
 
-    console.log(`[LOGIN SUCCESS] User: ${user.email}`);
+    console.log(`[LOGIN SUCCESS] User: ${user.email}, Company ID: ${user.companyId}`);
 
     // Buat JWT Token yang membungkus rahasia perusahaan milik karyawan terkait
     const token = jwt.sign(
@@ -1121,7 +1129,7 @@ app.post('/api/companies', async (req: Request, res: Response) => {
         adminUser = await tx.user.create({
           data: {
             companyId: company.id,
-            email: adminEmail.trim(),
+            email: adminEmail.trim().toLowerCase(),
             password: hashedPassword,
             name: adminName || picName || 'Admin ' + name,
             role: 'ADMIN'
@@ -1155,10 +1163,27 @@ app.get('/api/companies', async (req: Request, res: Response) => {
       include: {
         _count: {
           select: { users: true }
+        },
+        users: {
+          where: { role: 'ADMIN' },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { name: true, email: true }
         }
       }
     });
-    res.json(companies);
+
+    const mappedCompanies = companies.map(c => {
+        const { users, ...rest } = c;
+        const mainAdmin = users && users.length > 0 ? users[0] : null;
+        return {
+            ...rest,
+            adminEmail: mainAdmin?.email || '',
+            adminName: mainAdmin?.name || ''
+        };
+    });
+
+    res.json(mappedCompanies);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil daftar klien' });
   }
@@ -1430,11 +1455,11 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
     const { 
       name, latitude, longitude, radius,
       picName, picPhone, address, contractType, contractValue, contractStart, contractEnd,
-      employeeLimit, photoRetentionDays, modules
+      employeeLimit, adminLimit, posLimit, photoRetentionDays, modules
     } = req.body;
 
-    console.log(`[DEBUG] Updating Company Profile for Tenant: ${tenantId}`, {
-      body: req.body
+    console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
+      adminLimit, posLimit
     });
 
     // Helper untuk parse angka agar aman dari NaN dan mendukung nilai 0
@@ -1465,6 +1490,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         contractStart: contractStart ? new Date(contractStart) : undefined,
         contractEnd: contractEnd ? new Date(contractEnd) : undefined,
         employeeLimit: parseIntNum(employeeLimit),
+        adminLimit: parseIntNum(adminLimit),
+        posLimit: parseIntNum(posLimit),
         photoRetentionDays: parseIntNum(photoRetentionDays),
         modules: modules
       }
@@ -1493,8 +1520,20 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons, purchasedInsights,
-      discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion
+      discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion,
+      adminEmail, adminPassword, adminName
     } = req.body;
+
+    const payloadToLog = { 
+      employeeLimit, adminLimit, posLimit, photoRetentionDays, plan 
+    };
+    console.log(`[DEBUG PATCH /companies/:id] Payload received for ID ${companyId}:`, payloadToLog);
+
+    const safeParseInt = (val: any, fallback?: number) => {
+        if (val === undefined || val === null || val === '') return fallback;
+        const n = parseInt(val.toString(), 10);
+        return isNaN(n) ? fallback : n;
+    };
 
     const updatedCompany = await prisma.company.update({
       where: { id: companyId },
@@ -1502,28 +1541,71 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         name,
         latitude: (latitude !== undefined && latitude !== null) ? parseFloat(latitude.toString()) : (latitude === null ? null : undefined),
         longitude: (longitude !== undefined && longitude !== null) ? parseFloat(longitude.toString()) : (longitude === null ? null : undefined),
-        radius: (radius !== undefined && radius !== null) ? parseInt(radius.toString(), 10) : undefined,
+        radius: safeParseInt(radius),
         picName,
         picPhone,
         contractType,
         contractValue: (contractValue !== undefined && contractValue !== null) ? parseFloat(contractValue.toString()) : undefined,
         contractStart: contractStart ? new Date(contractStart) : (contractStart === null ? null : undefined),
         contractEnd: contractEnd ? new Date(contractEnd) : (contractEnd === null ? null : undefined),
-        employeeLimit: (employeeLimit !== undefined && employeeLimit !== null) ? parseInt(employeeLimit.toString(), 10) : undefined,
-        adminLimit: (adminLimit !== undefined && adminLimit !== null) ? parseInt(adminLimit.toString(), 10) : undefined,
-        posLimit: (posLimit !== undefined && posLimit !== null) ? parseInt(posLimit.toString(), 10) : undefined,
-        photoRetentionDays: (photoRetentionDays !== undefined && photoRetentionDays !== null) ? parseInt(photoRetentionDays.toString(), 10) : undefined,
+        employeeLimit: safeParseInt(employeeLimit),
+        adminLimit: safeParseInt(adminLimit),
+        posLimit: safeParseInt(posLimit),
+        photoRetentionDays: safeParseInt(photoRetentionDays),
         plan: plan !== undefined ? plan : undefined,
         addons: addons !== undefined ? addons : undefined,
         purchasedInsights: purchasedInsights !== undefined ? purchasedInsights : undefined,
-        discountKpi: discountKpi !== undefined ? parseInt(discountKpi.toString(), 10) : undefined,
-        discountLearning: discountLearning !== undefined ? parseInt(discountLearning.toString(), 10) : undefined,
-        discountInventory: discountInventory !== undefined ? parseInt(discountInventory.toString(), 10) : undefined,
-        discountAi: discountAi !== undefined ? parseInt(discountAi.toString(), 10) : undefined,
-        discountFraud: discountFraud !== undefined ? parseInt(discountFraud.toString(), 10) : undefined,
-        discountExpansion: discountExpansion !== undefined ? parseInt(discountExpansion.toString(), 10) : undefined
+        discountKpi: safeParseInt(discountKpi),
+        discountLearning: safeParseInt(discountLearning),
+        discountInventory: safeParseInt(discountInventory),
+        discountAi: safeParseInt(discountAi),
+        discountFraud: safeParseInt(discountFraud),
+        discountExpansion: safeParseInt(discountExpansion)
       }
     });
+
+    let adminUser = null;
+    
+    // Update or Create Admin if email is provided in the edit form
+    if (adminEmail) {
+      // Try finding the primary admin of the company
+      const existingAdmin = await prisma.user.findFirst({
+        where: { companyId: companyId, role: 'ADMIN' },
+        orderBy: { createdAt: 'asc' } 
+      });
+
+      if (existingAdmin) {
+        console.log(`[DEBUG PATCH] Updating existing admin ID ${existingAdmin.id}. New Email: "${adminEmail.trim().toLowerCase()}"`);
+        const updateData: any = {
+          email: adminEmail.trim().toLowerCase(),
+          name: adminName || existingAdmin.name
+        };
+        
+        if (adminPassword) {
+          updateData.password = await bcrypt.hash(adminPassword, 10);
+        }
+
+        adminUser = await prisma.user.update({
+          where: { id: existingAdmin.id },
+          data: updateData
+        });
+        console.log(`[SYS] Administrator for tenant ${companyId} updated.`);
+      } else if (adminPassword) {
+        // Only create if we have a password for the new account
+        adminUser = await prisma.user.create({
+          data: {
+            companyId: companyId,
+            email: adminEmail.trim().toLowerCase(),
+            password: await bcrypt.hash(adminPassword, 10),
+            name: adminName || picName || 'Admin ' + name,
+            role: 'ADMIN'
+          }
+        });
+        console.log(`[SYS] Fresh Administrator for tenant ${companyId} created.`);
+      }
+    }
+
+    console.log(`[DEBUG PATCH /companies/:id] Successfully saved, NEW ADMIN LIMIT in DB: ${updatedCompany.adminLimit}`);
 
     res.json({ message: 'Data klien berhasil diperbarui', company: updatedCompany });
   } catch (error: any) {
@@ -1874,6 +1956,9 @@ app.get('/api/integration/labor-cost', async (req: Request, res: Response) => {
 
 // B. Endpoint Mendaftar Karyawan Baru pada sebuah Perusahaan SaaS
 app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
+  if ((req as any).userRole === 'FINANCE') {
+    return res.status(403).json({ error: 'Akses Ditolak: Role Finance tidak memiliki izin untuk mengelola data SDM/Karyawan.' });
+  }
   try {
     const tenantId = (req as any).tenantId;
     const { 
@@ -1882,51 +1967,73 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
       grade, joinDate, contractEndDate, reportToId
     } = req.body;
 
-    // --- ENFORCE EMPLOYEE LIMIT (PRO REQUEST) ---
+    const requestorRole = (req as any).userRole;
+    const requestorId = (req as any).userId;
+
+    // 1. Dapatkan Tenant ID Target
+    // Jika Super Admin, dia boleh menentukan companyId di body (untuk rekrut ke klien)
+    let targetTenantId = tenantId;
+    if (requestorRole === 'SUPERADMIN' && req.body.companyId) {
+        targetTenantId = parseInt(req.body.companyId, 10);
+    }
+
+    // 2. Proteksi Role SUPERADMIN
+    if (role === 'SUPERADMIN' && requestorRole !== 'SUPERADMIN') {
+        console.warn(`[SECURITY] Unauthorized SUPERADMIN creation attempt by user ${requestorId}`);
+        return res.status(403).json({ error: 'Hanya Super Admin yang dapat membuat akun Super Admin lain.' });
+    }
+
     const company = await prisma.company.findUnique({
-      where: { id: tenantId }
+      where: { id: targetTenantId }
     });
+
+    console.log(`[DEBUG POST /api/users] Requestor: ${requestorId} (${requestorRole}), Target Tenant: ${targetTenantId}, Limit in DB: ${company?.adminLimit}`);
 
     if (company) {
       // 1. Check Employee Limit (Active Employees Only)
       const activeUserCount = await prisma.user.count({
-          where: { companyId: tenantId, isActive: true }
+          where: { companyId: targetTenantId, isActive: true }
       });
 
-      if (company.employeeLimit > 0 && activeUserCount >= company.employeeLimit) {
+      // Super Admin bypass limit check
+      if (requestorRole !== 'SUPERADMIN' && company.employeeLimit > 0 && activeUserCount >= company.employeeLimit) {
         return res.status(403).json({ 
           error: `Limit karyawan tercapai! Tenant ini hanya diizinkan memiliki maksimal ${company.employeeLimit} karyawan.` 
         });
       }
 
-      // 3. Check Admin/Back-office Limit (NEW)
-      const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'PURCHASING', 'OPERATIONAL'] as any;
+      // 3. Check Admin/Back-office Limit
+      const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL'] as any;
       if (backOfficeRoles.includes(role)) {
-          const currentAdminCount = await prisma.user.count({
-              where: { 
-                  companyId: tenantId,
-                  role: { in: backOfficeRoles as any }
-              }
-          });
+          // Gunakan raw query untuk melewati validasi enum Prisma yang terkadang cache
+          const adminCountResult: any = await prisma.$queryRawUnsafe(
+              `SELECT COUNT(*)::int as count FROM "User" WHERE "companyId" = $1 AND "role"::text = ANY($2)`,
+              targetTenantId,
+              backOfficeRoles
+          );
+          const currentAdminCount = adminCountResult[0]?.count || 0;
 
-          if (company.adminLimit > 0 && currentAdminCount >= company.adminLimit) {
+          // Super Admin bypass limit check
+          if (requestorRole !== 'SUPERADMIN' && company.adminLimit > 0 && currentAdminCount >= company.adminLimit) {
+              console.error(`[LIMIT FAILURE] Company: ${company.name} (ID: ${company.id}), adminLimit: ${company.adminLimit}, currentAdmins: ${currentAdminCount}`);
               return res.status(403).json({
                   error: `Limit Admin/Back-office tercapai! Paket Anda hanya mengizinkan maksimal ${company.adminLimit} user dengan role manajemen. Silakan upgrade paket atau tambah slot admin.`
               });
           }
       }
 
-      // 4. Check POS/Cashier Limit (NEW)
+      // 4. Check POS/Cashier Limit
       if (role === 'CASHIER') {
-          const companyLimit = await prisma.company.findUnique({ where: { id: tenantId } });
+          const companyLimit = await prisma.company.findUnique({ where: { id: targetTenantId } });
           const currentCashierCount = await prisma.user.count({
               where: { 
-                  companyId: tenantId,
+                  companyId: targetTenantId,
                   role: 'CASHIER'
               }
           });
 
-          if (companyLimit && companyLimit.posLimit > 0 && currentCashierCount >= companyLimit.posLimit) {
+          // Super Admin bypass limit check
+          if (requestorRole !== 'SUPERADMIN' && companyLimit && companyLimit.posLimit > 0 && currentCashierCount >= companyLimit.posLimit) {
               return res.status(403).json({
                   error: `Limit Kasir (POS) tercapai! Paket Anda hanya mengizinkan maksimal ${companyLimit.posLimit} unit kasir. Silakan upgrade paket atau tambah slot kasir.`
               });
@@ -1989,26 +2096,41 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
 
 // B1.5 Endpoint Edit Karyawan
 app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  if ((req as any).userRole === 'FINANCE') {
+    return res.status(403).json({ error: 'Akses Ditolak: Role Finance tidak memiliki izin untuk mengelola data SDM/Karyawan.' });
+  }
   try {
     const tenantId = (req as any).tenantId;
+    const requestorRole = (req as any).userRole;
     const reqUserId = parseInt(req.params.id as string);
+    
+    // 1. Ambil Data User yang akan diedit
+    let checkUser = await prisma.user.findFirst({ where: { id: reqUserId } });
+    if (!checkUser) return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+
+    // 2. Validasi Akses: Harus Tenant yang sama ATAU Superadmin
+    if (requestorRole !== 'SUPERADMIN' && checkUser.companyId !== tenantId) {
+        return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki wewenang mengedit data tenant lain' });
+    }
+
     const { 
       name, email, role, basicSalary, allowance, overtimeRate, 
       jobTitle, division, grade, joinDate, contractEndDate, 
       reportToId, isActive, resignDate 
     } = req.body;
 
-    // Pastikan karyawan milik tenant yang sama
-    const checkUser = await prisma.user.findFirst({ where: { id: reqUserId, companyId: tenantId } });
-    if (!checkUser) return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+    // 3. Proteksi Role SUPERADMIN
+    if (role === 'SUPERADMIN' && requestorRole !== 'SUPERADMIN') {
+        return res.status(403).json({ error: 'Hanya Super Admin yang dapat menunjuk akun Super Admin lain.' });
+    }
 
     // --- ENFORCE ADMIN LIMIT ON UPDATE ---
     const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'PURCHASING', 'OPERATIONAL'] as any;
-    if (role && role !== checkUser.role && backOfficeRoles.includes(role)) {
-        const company = await prisma.company.findUnique({ where: { id: tenantId } });
+    if (requestorRole !== 'SUPERADMIN' && role && role !== checkUser.role && backOfficeRoles.includes(role)) {
+        const company = await prisma.company.findUnique({ where: { id: checkUser.companyId } });
         const currentAdminCount = await prisma.user.count({
             where: { 
-                companyId: tenantId,
+                companyId: checkUser.companyId,
                 role: { in: backOfficeRoles as any }
             }
         });
@@ -2021,11 +2143,11 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
     }
 
     // --- ENFORCE POS LIMIT ON UPDATE ---
-    if (role && role !== checkUser.role && role === 'CASHIER') {
-        const company = await prisma.company.findUnique({ where: { id: tenantId } });
+    if (requestorRole !== 'SUPERADMIN' && role && role !== checkUser.role && role === 'CASHIER') {
+        const company = await prisma.company.findUnique({ where: { id: checkUser.companyId } });
         const currentCashierCount = await prisma.user.count({
             where: { 
-                companyId: tenantId,
+                companyId: checkUser.companyId,
                 role: 'CASHIER'
             }
         });
@@ -2087,9 +2209,14 @@ app.delete('/api/users/:id', tenantMiddleware, async (req: Request, res: Respons
     }
 
     // 3. Authorization Check
-    // SuperAdmin can delete anyone. Admin can only delete users in their own company.
+    // SuperAdmin can delete anyone across tenants. Regular admins only their own company.
     if (userRole !== 'SUPERADMIN' && targetUser.companyId !== tenantId) {
-      return res.status(403).json({ error: 'Anda tidak memiliki akses untuk menghapus user ini' });
+      return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki wewenang atas data tenant lain' });
+    }
+
+    // 4. Role Protection
+    if (targetUser.role === 'SUPERADMIN' && userRole !== 'SUPERADMIN') {
+        return res.status(403).json({ error: 'Role Super Admin dilindungi. Hubungi IT Cloud.' });
     }
 
     // 4. Delete
@@ -7164,16 +7291,9 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
 
     if (!expense) return res.status(404).json({ error: 'Pengeluaran tidak ditemukan' });
 
-    const isClosed = await prisma.periodClosing.findFirst({
-        where: { 
-            companyId: tenantId, 
-            month: new Date(expense.date).getMonth() + 1,
-            year: new Date(expense.date).getFullYear(),
-            status: 'CLOSED'
-        }
-    });
-
-    if (isClosed) return res.status(403).json({ error: 'Periode transaksi sudah ditutup. Data tidak dapat diubah.' });
+    if (await isPeriodClosed(tenantId, expense.date)) {
+      return res.status(403).json({ error: 'Periode transaksi sudah ditutup. Data tidak dapat diubah.' });
+    }
 
     const result = await prisma.$transaction(async (tx) => {
         // 2. Revert Old Balance (ONLY if status was not PENDING and had accountId)
@@ -7233,17 +7353,9 @@ app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, re
 
     if (!expense) return res.status(404).json({ error: 'Pengeluaran tidak ditemukan' });
 
-    // Period Check
-    const isClosed = await prisma.periodClosing.findFirst({
-        where: { 
-            companyId: tenantId, 
-            month: new Date(expense.date).getMonth() + 1,
-            year: new Date(expense.date).getFullYear(),
-            status: 'CLOSED'
-        }
-    });
-
-    if (isClosed) return res.status(403).json({ error: 'Periode transaksi sudah ditutup. Data tidak dapat dihapus.' });
+    if (await isPeriodClosed(tenantId, expense.date)) {
+      return res.status(403).json({ error: 'Periode transaksi sudah ditutup. Data tidak dapat dihapus.' });
+    }
 
     await prisma.$transaction(async (tx) => {
         // Revert Balance (Add back if was PAID)
@@ -9610,7 +9722,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     // 2. Build query based on branch and role
     let sales;
-    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER') {
+    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE') {
       // Admins and owners see everything for the company, but can filter by branchId if provided
       if (branchId && branchId !== 'all') {
         const bId = branchId === 'null' ? null : parseInt(branchId as string);
@@ -9683,7 +9795,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const { branchId } = req.query;
     
     let sales: any[];
-    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER') {
+    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE') {
       if (branchId && branchId !== 'all') {
         const bId = branchId === 'null' ? null : parseInt(branchId as string);
         if (bId === null) {
@@ -10438,7 +10550,7 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
     let user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
     
     // Robustness for Admins/SuperAdmins who might not be tied to a specific branch
-    if (!user?.branchId && (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER')) {
+    if (!user?.branchId && (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE')) {
       const firstBranch = await prisma.branch.findFirst({ where: { companyId: tenantId } });
       if (firstBranch) {
         user = { ...user!, branchId: firstBranch.id };

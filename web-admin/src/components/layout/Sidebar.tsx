@@ -42,7 +42,8 @@ export default function Sidebar() {
                 if (modules === 'ABSENSI') {
                     setActiveModule('ABSENSI');
                     localStorage.setItem('activeModule', 'ABSENSI');
-                } else if (modules === 'FINANCE') {
+                } else if (userRole === 'FINANCE') {
+                    // Jika role adalah FINANCE, default ke modul FINANCE
                     setActiveModule('FINANCE');
                     localStorage.setItem('activeModule', 'FINANCE');
                 } else {

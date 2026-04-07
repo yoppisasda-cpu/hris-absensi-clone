@@ -227,7 +227,7 @@ export default function CompaniesPage() {
                 discountAi: parseInt(discountAi) || 0,
                 discountFraud: parseInt(discountFraud) || 0,
                 discountExpansion: parseInt(discountExpansion) || 0,
-                ...(editingCompanyId ? {} : { adminName, adminEmail, adminPassword })
+                adminName, adminEmail, adminPassword
             };
 
             let res;
@@ -307,9 +307,9 @@ export default function CompaniesPage() {
         setDiscountAi(company.discountAi?.toString() || '0');
         setDiscountFraud(company.discountFraud?.toString() || '0');
         setDiscountExpansion(company.discountExpansion?.toString() || '0');
-        // Kosongkan admin fields
-        setAdminName('');
-        setAdminEmail('');
+        // Fetch mapped admin fields from backend
+        setAdminName((company as any).adminName || '');
+        setAdminEmail((company as any).adminEmail || '');
         setAdminPassword('');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -881,11 +881,10 @@ export default function CompaniesPage() {
                             </div>
                         </div>
 
-                        {!editingCompanyId && (
-                            <div className="space-y-4 border-b border-slate-50 pb-4 bg-blue-50/50 -mx-6 px-6 pt-4 mb-4">
+                        <div className="space-y-4 border-b border-slate-50 pb-4 bg-blue-50/50 -mx-6 px-6 pt-4 mb-4">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">
                                     <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
-                                    Akun Administrator Pertama
+                                    {editingCompanyId ? 'Update Akun Administrator (PIC)' : 'Akun Administrator Pertama'}
                                 </h3>
                                 <div>
                                     <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Nama Admin</label>
@@ -908,7 +907,9 @@ export default function CompaniesPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Password Awal</label>
+                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                        {editingCompanyId ? 'Ganti Password (Kosongkan jika tidak diubah)' : 'Password Awal'}
+                                    </label>
                                     <input
                                         type="password"
                                         value={adminPassword}
@@ -918,7 +919,6 @@ export default function CompaniesPage() {
                                     />
                                 </div>
                             </div>
-                        )}
 
                         <div className="space-y-4">
                             <div className="flex items-center justify-between border-b border-slate-50 pb-2">
