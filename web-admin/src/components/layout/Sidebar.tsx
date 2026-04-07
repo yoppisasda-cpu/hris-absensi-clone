@@ -25,23 +25,22 @@ export default function Sidebar() {
     const router = useRouter();
     const { t } = useLanguage();
     const { plan, openUpgradeModal, hasFeature } = useFeatures();
-    const [userRole, setUserRole] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userRole') || 'EMPLOYEE' : 'EMPLOYEE'));
+    const [userRole, setUserRole] = useState<string | null>(null);
     const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | 'INVENTORY' | null>(null);
     const [allowedModules, setAllowedModules] = useState<string>('BOTH');
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
+        const role = localStorage.getItem('userRole');
+        setUserRole(role);
+
         const fetchCompanyModules = async () => {
             try {
                 const res = await api.get('/companies/my');
                 const modules = res.data.modules || 'BOTH';
                 setAllowedModules(modules);
                 
-                // Priority order:
-                // 1. If company only has one module, force it (no choice)
-                // 2. Otherwise, respect the user's saved preference from localStorage
-                // 3. If no saved preference, default based on role (FINANCE -> FINANCE, others -> ABSENSI)
                 if (modules === 'ABSENSI') {
                     setActiveModule('ABSENSI');
                     localStorage.setItem('activeModule', 'ABSENSI');
@@ -49,12 +48,10 @@ export default function Sidebar() {
                     setActiveModule('FINANCE');
                     localStorage.setItem('activeModule', 'FINANCE');
                 } else {
-                    // Company has BOTH modules available — respect saved preference first
                     const saved = localStorage.getItem('activeModule') as 'ABSENSI' | 'FINANCE' | null;
                     if (saved === 'FINANCE' || saved === 'ABSENSI') {
                         setActiveModule(saved);
-                    } else if (userRole === 'FINANCE') {
-                        // No saved preference, user is Finance role → default to Finance
+                    } else if (role === 'FINANCE') {
                         setActiveModule('FINANCE');
                         localStorage.setItem('activeModule', 'FINANCE');
                     } else {
@@ -67,7 +64,7 @@ export default function Sidebar() {
                 if (saved === 'FINANCE' || saved === 'ABSENSI') {
                     setActiveModule(saved);
                 } else {
-                    setActiveModule(userRole === 'FINANCE' ? 'FINANCE' : 'ABSENSI');
+                    setActiveModule(role === 'FINANCE' ? 'FINANCE' : 'ABSENSI');
                 }
             }
         };

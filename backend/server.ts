@@ -1326,7 +1326,7 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
     }
 
     // Role check: Only PURCHASING/ADMIN can approve
-    if (!['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER'].includes(userRole)) {
+    if (!['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'FINANCE'].includes(userRole)) {
       return res.status(403).json({ error: 'Anda tidak memiliki hak untuk menyetujui PO ini.' });
     }
 
@@ -1447,7 +1447,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
     const userRole = (req as any).userRole;
 
     // --- STRICT ROLE CHECK ---
-    if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN') {
+    if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN' && userRole !== 'FINANCE' && userRole !== 'OWNER') {
       console.warn(`[AUTH] Unauthorized Company Update Attempt by User: ${(req as any).userId}, Role: ${userRole}`);
       return res.status(403).json({ error: 'Akses Ditolak: Hanya Admin yang dapat merubah profil perusahaan' });
     }
@@ -2125,7 +2125,7 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
     }
 
     // --- ENFORCE ADMIN LIMIT ON UPDATE ---
-    const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'PURCHASING', 'OPERATIONAL'] as any;
+    const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL'] as any;
     if (requestorRole !== 'SUPERADMIN' && role && role !== checkUser.role && backOfficeRoles.includes(role)) {
         const company = await prisma.company.findUnique({ where: { id: checkUser.companyId } });
         const currentAdminCount = await prisma.user.count({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from "@/components/layout/Header"
 import Sidebar from "@/components/layout/Sidebar"
@@ -11,15 +11,22 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     const router = useRouter();
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isMounted) return;
+
         const token = localStorage.getItem('jwt_token');
         const role = localStorage.getItem('userRole');
 
         if (!token || role === 'EMPLOYEE') {
             router.push('/');
         }
-    }, [router]);
+    }, [isMounted, router]);
 
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden" style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden' }}>
