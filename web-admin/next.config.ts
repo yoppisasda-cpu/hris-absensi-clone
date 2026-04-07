@@ -4,10 +4,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  /* Force restart to fix Tailwind v4 JIT */
   reactStrictMode: true,
-  trailingSlash: true,
-  output: 'export',
+  // Removed: output: 'export' (was causing /dashboard to show login page)
+  // Removed: trailingSlash: true (not needed for SSR mode)
 };
 
 export default nextConfig;
