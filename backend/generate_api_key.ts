@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 const prisma = new PrismaClient();
 
@@ -14,7 +14,7 @@ async function main() {
   }
 
   const target = companies[0]; // Kita ambil perusahaan pertama sebagai target
-  const newApiKey = `av_${uuidv4().replace(/-/g, '')}`;
+  const newApiKey = `av_${randomUUID().replace(/-/g, '')}`;
 
   await prisma.company.update({
     where: { id: target.id },

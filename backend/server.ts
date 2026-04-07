@@ -522,7 +522,7 @@ app.get('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respons
     const tenantId = Number((req as any).tenantId);
     if (!tenantId) return res.status(401).json({ error: 'Tenant ID required' });
     
-    const orders = await prisma.salesOrders.findMany({
+    const orders = await prisma.salesOrder.findMany({
       where: { companyId: tenantId },
       include: {
         customer: true,
@@ -2701,6 +2701,7 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         isSuspicious: fraudResult.isSuspicious,
         // @ts-ignore
         deviceId: deviceId || (attendance as any).deviceId,
+        // @ts-ignore
         earlyCheckOutMinutes: (() => {
             // @ts-ignore
             if (attendance.user?.shift?.endTime) {
