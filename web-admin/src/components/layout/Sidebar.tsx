@@ -41,7 +41,10 @@ export default function Sidebar() {
                 const modules = res.data.modules || 'BOTH';
                 setAllowedModules(modules);
                 
-                if (modules === 'ABSENSI') {
+                if (role === 'FINANCE') {
+                    setActiveModule('FINANCE');
+                    localStorage.setItem('activeModule', 'FINANCE');
+                } else if (modules === 'ABSENSI') {
                     setActiveModule('ABSENSI');
                     localStorage.setItem('activeModule', 'ABSENSI');
                 } else if (modules === 'FINANCE') {
@@ -51,20 +54,22 @@ export default function Sidebar() {
                     const saved = localStorage.getItem('activeModule') as 'ABSENSI' | 'FINANCE' | null;
                     if (saved === 'FINANCE' || saved === 'ABSENSI') {
                         setActiveModule(saved);
-                    } else if (role === 'FINANCE') {
-                        setActiveModule('FINANCE');
-                        localStorage.setItem('activeModule', 'FINANCE');
                     } else {
                         setActiveModule('ABSENSI');
                     }
                 }
             } catch (err) {
                 console.error("Failed to fetch modules", err);
-                const saved = localStorage.getItem('activeModule') as 'ABSENSI' | 'FINANCE' | null;
-                if (saved === 'FINANCE' || saved === 'ABSENSI') {
-                    setActiveModule(saved);
+                if (role === 'FINANCE') {
+                    setActiveModule('FINANCE');
+                    localStorage.setItem('activeModule', 'FINANCE');
                 } else {
-                    setActiveModule(role === 'FINANCE' ? 'FINANCE' : 'ABSENSI');
+                    const saved = localStorage.getItem('activeModule') as 'ABSENSI' | 'FINANCE' | null;
+                    if (saved === 'FINANCE' || saved === 'ABSENSI') {
+                        setActiveModule(saved);
+                    } else {
+                        setActiveModule('ABSENSI');
+                    }
                 }
             }
         };
@@ -90,37 +95,39 @@ export default function Sidebar() {
             </div>
 
             <nav className="flex-1 space-y-1 px-3 py-6">
-                {/* MODULE SWITCHER BUTTON */}
-                <div className="px-3 mb-6">
-                    <button 
-                        onClick={() => {
-                            if (activeModule === 'ABSENSI' && plan === 'STARTER') {
-                                openUpgradeModal();
-                                return;
-                            }
-                            const next = activeModule === 'ABSENSI' ? 'FINANCE' : 'ABSENSI';
-                            setActiveModule(next);
-                            localStorage.setItem('activeModule', next);
-                        }}
-                        className={`flex w-full items-center justify-between gap-3 rounded-lg p-3 text-sm font-bold transition-all border group relative overflow-hidden ${
-                            activeModule === 'ABSENSI' ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
-                        }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            {activeModule === 'ABSENSI' ? <Briefcase className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
-                            <span>Modul: {activeModule === 'ABSENSI' ? 'Absensi & HRIS' : 'Finance & Akunting'}</span>
-                        </div>
-                        {activeModule === 'ABSENSI' && plan === 'STARTER' ? (
-                            <Lock className="h-3.5 w-3.5 text-amber-500" />
-                        ) : (
-                            <TrendingUp className="h-3 w-3 opacity-50 group-hover:rotate-180 transition-transform" />
-                        )}
-                        
-                        {activeModule === 'ABSENSI' && plan === 'STARTER' && (
-                            <div className="absolute top-0 right-0 bg-amber-500 text-slate-900 text-[8px] px-1.5 py-0.5 font-black uppercase tracking-tighter">Premium</div>
-                        )}
-                    </button>
-                </div>
+                {/* MODULE SWITCHER BUTTON (Hidden for Finance role) */}
+                {isMounted && userRole !== 'FINANCE' && (
+                    <div className="px-3 mb-6">
+                        <button 
+                            onClick={() => {
+                                if (activeModule === 'ABSENSI' && plan === 'STARTER') {
+                                    openUpgradeModal();
+                                    return;
+                                }
+                                const next = activeModule === 'ABSENSI' ? 'FINANCE' : 'ABSENSI';
+                                setActiveModule(next);
+                                localStorage.setItem('activeModule', next);
+                            }}
+                            className={`flex w-full items-center justify-between gap-3 rounded-lg p-3 text-sm font-bold transition-all border group relative overflow-hidden ${
+                                activeModule === 'ABSENSI' ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                {activeModule === 'ABSENSI' ? <Briefcase className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
+                                <span>Modul: {activeModule === 'ABSENSI' ? 'Absensi & HRIS' : 'Finance & Akunting'}</span>
+                            </div>
+                            {activeModule === 'ABSENSI' && plan === 'STARTER' ? (
+                                <Lock className="h-3.5 w-3.5 text-amber-500" />
+                            ) : (
+                                <TrendingUp className="h-3 w-3 opacity-50 group-hover:rotate-180 transition-transform" />
+                            )}
+                            
+                            {activeModule === 'ABSENSI' && plan === 'STARTER' && (
+                                <div className="absolute top-0 right-0 bg-amber-500 text-slate-900 text-[8px] px-1.5 py-0.5 font-black uppercase tracking-tighter">Premium</div>
+                            )}
+                        </button>
+                    </div>
+                )}
 
 
                 <Link href="/dashboard/executive" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-black bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 text-blue-400 hover:text-white border border-blue-500/30 transition-all mb-2 animate-pulse shadow-lg shadow-blue-500/10">
