@@ -10889,6 +10889,7 @@ app.post('/api/finance/shareholders', tenantMiddleware, async (req: Request, res
 
     res.status(201).json(result);
   } catch (error: any) {
+    console.error("ADD SHAREHOLDER ERROR:", error);
     res.status(500).json({ error: 'Gagal menambah pemegang saham: ' + error.message });
   }
 });
