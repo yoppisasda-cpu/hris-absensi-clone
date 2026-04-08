@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
 import { Users, PieChart, Banknote, History, Plus, AlertCircle, TrendingUp, Wallet, CheckCircle, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface Shareholder {
     id: number;
