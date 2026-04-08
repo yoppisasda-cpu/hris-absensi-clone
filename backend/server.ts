@@ -4033,15 +4033,18 @@ app.get('/api/payroll', tenantMiddleware, async (req: Request, res: Response) =>
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
-    const { month, year } = req.query;
+    const { month, year, branchId } = req.query;
 
     const whereClause: any = userRole === 'SUPERADMIN' ? {} : { companyId: tenantId };
     if (month) whereClause.month = parseInt(month as string);
     if (year) whereClause.year = parseInt(year as string);
+    if (branchId && branchId !== 'all') {
+      whereClause.user = { branchId: parseInt(branchId as string) };
+    }
 
     const payrolls = await prisma.payroll.findMany({
       where: whereClause,
-      include: { user: { select: { name: true, email: true } } },
+      include: { user: { select: { name: true, email: true, branchId: true } } },
       orderBy: { netSalary: 'desc' }
     });
     res.json(payrolls);
@@ -4054,15 +4057,21 @@ app.get('/api/payroll', tenantMiddleware, async (req: Request, res: Response) =>
 app.get('/api/payroll/export', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { month, year } = req.query;
+    const { month, year, branchId } = req.query;
     const ExcelJS = require('exceljs');
 
+    const whereClause: any = {
+      companyId: tenantId,
+      ...(month ? { month: parseInt(month as string) } : {}),
+      ...(year ? { year: parseInt(year as string) } : {})
+    };
+
+    if (branchId && branchId !== 'all') {
+      whereClause.user = { branchId: parseInt(branchId as string) };
+    }
+
     const payrolls = await prisma.payroll.findMany({
-      where: {
-        companyId: tenantId,
-        ...(month ? { month: parseInt(month as string) } : {}),
-        ...(year ? { year: parseInt(year as string) } : {})
-      },
+      where: whereClause,
       include: {
         user: {
           select: { name: true, jobTitle: true, division: true, id: true }

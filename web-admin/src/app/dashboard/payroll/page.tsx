@@ -58,6 +58,8 @@ export default function PayrollPage() {
     // SaaS Module State
     const [isFinanceOnly, setIsFinanceOnly] = useState(false);
     const [employees, setEmployees] = useState<{ id: number, name: string }[]>([]);
+    const [branches, setBranches] = useState<{ id: number, name: string }[]>([]);
+    const [selectedBranch, setSelectedBranch] = useState<string>('all');
     
     // Manual Modal State
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -69,18 +71,18 @@ export default function PayrollPage() {
         bonusPay: ''
     });
 
-    const fetchInitialData = async () => {
-        try {
-            const [payrollRes, companyRes, userRes] = await Promise.all([
-                api.get(`/payroll?month=${selectedMonth}&year=${selectedYear}`),
+            const [payrollRes, companyRes, userRes, branchRes] = await Promise.all([
+                api.get(`/payroll?month=${selectedMonth}&year=${selectedYear}${selectedBranch !== 'all' ? `&branchId=${selectedBranch}` : ''}`),
                 api.get('/companies/my'),
-                api.get('/users?limit=1000') // Ambil daftar karyawan untuk dropdown manual
+                api.get('/users?limit=1000'), // Ambil daftar karyawan untuk dropdown manual
+                api.get('/branches')
             ]);
             
             setPayrolls(payrollRes.data);
             setIsFinanceOnly(companyRes.data.modules === 'FINANCE');
             setCompanyInfo(companyRes.data);
             setEmployees(userRes.data);
+            setBranches(branchRes.data);
             setError('');
         } catch (err: any) {
             console.error("Fetch Data Error:", err);
@@ -92,7 +94,7 @@ export default function PayrollPage() {
 
     useEffect(() => {
         fetchInitialData();
-    }, [selectedMonth, selectedYear]);
+    }, [selectedMonth, selectedYear, selectedBranch]);
 
     const handleGenerate = async () => {
         if (isFinanceOnly) {
@@ -134,10 +136,13 @@ export default function PayrollPage() {
         }
     };
 
-    const handleExportExcel = async () => {
         try {
             const response = await api.get('/payroll/export', {
-                params: { month: selectedMonth, year: selectedYear },
+                params: { 
+                    month: selectedMonth, 
+                    year: selectedYear,
+                    branchId: selectedBranch !== 'all' ? selectedBranch : undefined 
+                },
                 responseType: 'blob',
             });
             
@@ -202,6 +207,17 @@ export default function PayrollPage() {
                     >
                         <option value={2025}>2025</option>
                         <option value={2026}>2026</option>
+                    </select>
+
+                    <select
+                        value={selectedBranch}
+                        onChange={(e) => setSelectedBranch(e.target.value)}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                        <option value="all">Semua Cabang</option>
+                        {branches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
                     </select>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
