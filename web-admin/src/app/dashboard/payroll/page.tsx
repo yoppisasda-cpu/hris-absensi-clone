@@ -71,6 +71,8 @@ export default function PayrollPage() {
         bonusPay: ''
     });
 
+    const fetchInitialData = async () => {
+        try {
             const [payrollRes, companyRes, userRes, branchRes] = await Promise.all([
                 api.get(`/payroll?month=${selectedMonth}&year=${selectedYear}${selectedBranch !== 'all' ? `&branchId=${selectedBranch}` : ''}`),
                 api.get('/companies/my'),
@@ -136,6 +138,7 @@ export default function PayrollPage() {
         }
     };
 
+    const handleExportExcel = async () => {
         try {
             const response = await api.get('/payroll/export', {
                 params: { 
