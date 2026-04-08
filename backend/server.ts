@@ -10833,6 +10833,148 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
 
 
 
+// --- MODUL SHAREDHOLDERS & DIVIDENDS ---
+
+// SH1. List Shareholders
+app.get('/api/finance/shareholders', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const shareholders = await prisma.shareholder.findMany({
+      where: { companyId: tenantId },
+      include: {
+        _count: { select: { dividends: true } }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(shareholders);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil daftar pemegang saham: ' + error.message });
+  }
+});
+
+// SH5. Delete Shareholder
+app.delete('/api/finance/shareholders/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id);
+
+    await prisma.shareholder.delete({
+      where: { id, companyId: tenantId }
+    });
+
+    res.json({ message: 'Pemegang saham berhasil dihapus.' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menghapus data: ' + error.message });
+  }
+});
+
+// SH2. Create/Update Shareholder
+app.post('/api/finance/shareholders', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { name, sharePercentage, idNumber } = req.body;
+
+    if (!name || sharePercentage === undefined) {
+      return res.status(400).json({ error: 'Nama dan persentase saham wajib diisi.' });
+    }
+
+    const result = await prisma.shareholder.create({
+      data: {
+        companyId: tenantId,
+        name,
+        sharePercentage: parseFloat(sharePercentage),
+        idNumber
+      }
+    });
+
+    res.status(201).json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menambah pemegang saham: ' + error.message });
+  }
+});
+
+// SH3. Distribute Dividends (The "Magic" Logic)
+app.post('/api/finance/dividends/distribute', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { totalAmount, accountId, description, date } = req.body;
+
+    if (!totalAmount || !accountId) {
+      return res.status(400).json({ error: 'Total nominal dan Akun sumber dana wajib diisi.' });
+    }
+
+    const amount = parseFloat(totalAmount);
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Ambil semua pemegang saham
+      const shareholders = await tx.shareholder.findMany({
+        where: { companyId: tenantId }
+      });
+
+      if (shareholders.length === 0) {
+        throw new Error('Belum ada data pemegang saham. Silakan tambah pemegang saham terlebih dahulu.');
+      }
+
+      // 2. Pastikan total persentase adalah 100% (opsional, tapi bagus untuk validasi)
+      const totalShares = shareholders.reduce((sum, s) => sum + s.sharePercentage, 0);
+      if (totalShares < 1) throw new Error('Persentase saham belum diatur dengan benar.');
+
+      // 3. Kurangi Saldo Akun Finansial (Kas/Bank)
+      const account = await tx.financialAccount.findUnique({ where: { id: parseInt(accountId) } });
+      if (!account || account.balance < amount) {
+        throw new Error('Saldo akun tidak mencukupi untuk membagikan dividen ini.');
+      }
+
+      await tx.financialAccount.update({
+        where: { id: parseInt(accountId) },
+        data: { balance: { decrement: amount } }
+      });
+
+      // 4. Buat record Dividen untuk masing-masing pemegang saham
+      const dividendRecords = shareholders.map(s => ({
+        companyId: tenantId,
+        shareholderId: s.id,
+        amount: (s.sharePercentage / 100) * amount,
+        paidFromAccountId: parseInt(accountId),
+        description: description || `Pembagian Dividen Proporsional`,
+        date: date ? new Date(date) : new Date(),
+        status: 'PAID'
+      }));
+
+      await tx.dividend.createMany({
+        data: dividendRecords
+      });
+
+      return dividendRecords;
+    });
+
+    res.json({ message: 'Dividen berhasil dibagikan ke ' + result.length + ' pemegang saham.', data: result });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal membagikan dividen: ' + error.message });
+  }
+});
+
+// SH4. List Dividends History
+app.get('/api/finance/dividends', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const dividends = await prisma.dividend.findMany({
+      where: { companyId: tenantId },
+      include: {
+        shareholder: { select: { name: true } },
+        account: { select: { name: true } }
+      },
+      orderBy: { date: 'desc' },
+      take: 100
+    });
+    res.json(dividends);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil riwayat dividen.' });
+  }
+});
+
+
+
 app.listen(PORT, () => {
   console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
   console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);

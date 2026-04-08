@@ -381,6 +381,10 @@ export default function Sidebar() {
                             <PieChart className="h-5 w-5" />
                             Neraca Keuangan
                         </Link>
+                        <Link href="/dashboard/finance/equity" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <PieChart className="h-5 w-5" />
+                            Dividen & Modal
+                        </Link>
                         <Link href="/dashboard/finance/cash-flow" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <TrendingUp className="h-5 w-5 text-emerald-400" />
                             Arus Kas (Cash Flow)

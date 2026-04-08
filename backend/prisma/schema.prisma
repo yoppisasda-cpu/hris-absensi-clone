@@ -90,6 +90,8 @@ model Company {
   purchaseOrders         PurchaseOrder[]
   salesOrders            SalesOrder[]
   userAccess             UserAccess[]
+  shareholders           Shareholder[]
+  dividends              Dividend[]
 }
 
 model FinancialAccount {
@@ -107,6 +109,7 @@ model FinancialAccount {
   incomes       Income[]
   fromTransfers Transfer[]     @relation("FromAccount")
   toTransfers   Transfer[]     @relation("ToAccount")
+  dividends     Dividend[]
 }
 
 model IncomeCategory {
@@ -1198,3 +1201,30 @@ enum SOStatus {
   CANCELLED
 }
 
+model Shareholder {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  name      String
+  idNumber  String?  // KTP/Passport
+  sharePercentage Float // e.g., 70.0
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  dividends Dividend[]
+}
+
+model Dividend {
+  id            Int         @id @default(autoincrement())
+  companyId     Int
+  shareholderId Int
+  amount        Float
+  date          DateTime    @default(now())
+  description   String?
+  paidFromAccountId Int?
+  status        String      @default("PAID") // PAID, PENDING
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareholder   Shareholder @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  account       FinancialAccount? @relation(fields: [paidFromAccountId], references: [id])
+}
