@@ -10856,7 +10856,7 @@ app.get('/api/finance/shareholders', tenantMiddleware, async (req: Request, res:
 app.delete('/api/finance/shareholders/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
 
     await prisma.shareholder.delete({
       where: { id, companyId: tenantId }
