@@ -10974,6 +10974,37 @@ app.get('/api/finance/dividends', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
+// SH6. Update Authorized Capital (Modal Dasar)
+app.patch('/api/finance/capital', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { authorizedCapital } = req.body;
+    
+    const company = await prisma.company.update({
+      where: { id: tenantId },
+      data: { authorizedCapital: parseFloat(authorizedCapital) }
+    });
+
+    res.json(company);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal update modal dasar: ' + error.message });
+  }
+});
+
+// SH7. Get Company Finance Info (including Capital)
+app.get('/api/finance/company-info', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const company = await prisma.company.findUnique({
+      where: { id: tenantId },
+      select: { authorizedCapital: true, name: true }
+    });
+    res.json(company);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil info modal: ' + error.message });
+  }
+});
+
 
 
 app.listen(PORT, () => {

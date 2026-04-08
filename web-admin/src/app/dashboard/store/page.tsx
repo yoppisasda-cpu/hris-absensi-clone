@@ -4,38 +4,83 @@ import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
 import { toast } from 'react-hot-toast';
-import { CheckCircle, ArrowRight, Zap, Shield, BarChart3, Sparkles, TrendingUp, BrainCircuit, Clock, AlertTriangle, RefreshCw, Phone, Users, Box, MessageSquare, Star } from 'lucide-react';
+import { CheckCircle, ArrowRight, Zap, Shield, BarChart3, Sparkles, TrendingUp, BrainCircuit, Clock, AlertTriangle, RefreshCw, Phone, Users, Box, MessageSquare, Star, Rocket, Building2 } from 'lucide-react';
 
-const HR_PACKAGES = {
-  main: {
-    name: 'Paket HR per Karyawan',
-    description: 'Manajemen lengkap karyawan: absensi GPS/wajah, lembur, payroll, cuti, dan lebih banyak lagi.',
-    pricingMonthly: 9000,
-    pricingYearly: 7000,
+const AI_PACKAGES = [
+  {
+    id: 'STARTER',
+    name: 'Starter',
+    label: 'STARTER',
+    color: 'blue',
+    highlight: false,
+    badge: null,
+    description: 'Cocok untuk UMKM yang baru mulai digitalisasi bisnis.',
+    pricingMonthly: 150000,
+    pricingYearly: 1500000,
     features: [
-      'GPS & Face Recognition Attendance',
-      'Overtime dengan Approval',
-      'Payroll & PPh 21 Otomatis',
-      'Multi Cabang',
-      'Bonus & THR',
-      'Reimbursement',
-      'Pinjaman & Cicilan',
-      'Kelola Aset',
-      'Hari Libur & Pengumuman',
-      'Pulse of Company',
+      'Max 10 Karyawan',
+      '1 Terminal Digital POS',
+      '2 Admin Slot',
+      'Absensi Wajah & GPS',
+      'Laporan Penjualan Dasar',
     ],
   },
-  addons: [
-    { id: 'KPI', name: 'KPI & Penilaian Kinerja', icon: '🎯', price: 1500, desc: 'Buat indikator KPI kustom, pantau score, dan evaluasi performa tim.', highlight: false },
-    { id: 'LEARNING', name: 'Learning & Development', icon: '📚', price: 2000, desc: 'Buat materi pelatihan, ujian online, dan pantau perkembangan kompetensi.', highlight: false },
-    { id: 'KPI_LEARNING', name: 'Bundle KPI + Learning', icon: '🚀', price: 3000, desc: 'Paket lengkap KPI dan Learning Development. Hemat Rp 500 vs terpisah.', highlight: true },
-  ],
-};
+  {
+    id: 'PRO',
+    name: 'Pro',
+    label: 'PRO',
+    color: 'purple',
+    highlight: true,
+    badge: 'PALING POPULER',
+    description: 'Solusi lengkap untuk manajemen stok & profit bisnis.',
+    pricingMonthly: 350000,
+    pricingYearly: 3500000,
+    features: [
+      'Max 50 Karyawan',
+      '5 Terminal Digital POS',
+      '5 Admin Slot',
+      'Inventory & Stock (Termasuk)',
+      'Laba Rugi (P&L) Real-time',
+      'AI Stock Forecasting',
+    ],
+  },
+  {
+    id: 'ENTERPRISE',
+    name: 'Enterprise',
+    label: 'ENTERPRISE',
+    color: 'amber',
+    highlight: false,
+    badge: null,
+    description: 'Otomasi skala korporasi dengan batas kuota terbesar.',
+    pricingMonthly: 750000,
+    pricingYearly: 7500000,
+    features: [
+      'Max 100 Karyawan',
+      '10 Terminal Digital POS',
+      '10 Admin Slot',
+      'Warehouse Management',
+      'Audit Log & Anti Fraud Dasar',
+      'Prioritas Support 24/7',
+    ],
+  },
+];
+
+const ADDONS = [
+  // HR & Talent Management
+  { id: 'KPI', name: 'KPI & Penilaian Kinerja', icon: '🎯', pricePerUser: 1000, desc: 'Fitur pembuatan KPI, penilaian, dan laporan performa tim.', highlight: false, group: 'HR & Talent Management' },
+  { id: 'LEARNING', name: 'Learning & Development', icon: '📚', pricePerUser: 2000, desc: 'Modul pelatihan online, ujian, dan tracking kompetensi.', highlight: false, group: 'HR & Talent Management' },
+  // Finance & AI Management
+  { id: 'INVENTORY_ADDON', name: 'Inventory & Stock', icon: '📦', priceFlat: 20000, desc: 'Manajemen stok bahan. Gratis di paket PRO.', highlight: false, group: 'Finance & AI Management' },
+  { id: 'AIVOLA_MIND', name: 'Aivola Mind (AI Advisor)', icon: '🧠', priceFlat: 20000, desc: 'AI Business Advisor strategis untuk seluruh level paket Anda.', highlight: true, group: 'Finance & AI Management' },
+  { id: 'ANTI_FRAUD', name: 'Anti-Fraud Face Check', icon: '🔒', priceFlat: 10000, desc: 'Verifikasi wajah ketat saat absensi & transaksi sensitif.', highlight: false, group: 'Finance & AI Management' },
+  // Sistem Ekspansi
+  { id: 'STAFF_EXPANSION', name: 'Expansion Pack (Staff)', icon: '👥', pricePerUser: 7000, desc: 'Tambah kapasitas karyawan pada paket apapun tanpa harus ganti plan.', highlight: false, group: 'Sistem Ekspansi' },
+];
 
 const MODULES_DATA = [
-  { id: 'ABSENSI', name: 'Absensi & HRIS Pro', description: 'Kelola kehadiran karyawan, shift, lembur, dan KPI dalam satu sistem.', icon: Users, color: 'blue', features: ['GPS/Biometric Attendance', 'Shift Management', 'KPI & Performance', 'Mobile App'], price: 'Rp 9.000 / karyawan' },
-  { id: 'FINANCE', name: 'Finance & Akunting', description: 'Catat transaksi, kelola hutang-piutang, laba rugi, dan otomatisasi penggajian.', icon: BarChart3, color: 'emerald', features: ['Laporan Laba Rugi', 'Gaji Otomatis', 'Buku Kas & Bank', 'Invoice & Piutang'], price: 'Biaya Flat Bulanan' },
-  { id: 'INVENTORY', name: 'Inventory & Stok', description: 'Pantau pergerakan stok barang, gudang, dan sinkronisasi dengan penjualan.', icon: Box, color: 'orange', features: ['Multi-Warehouse', 'Stock Adjustment', 'Alert Stok Menipis', 'Barcode Scanning'], price: 'Add-on Operasional' },
+  { id: 'ABSENSI', name: 'Absensi & HRIS Pro', description: 'Kelola kehadiran karyawan, shift, lembur, dan KPI dalam satu sistem.', icon: Users, color: 'blue', features: ['GPS/Biometric Attendance', 'Shift Management', 'KPI & Performance', 'Mobile App'], price: 'Termasuk semua paket' },
+  { id: 'FINANCE', name: 'Finance & Akunting', description: 'Catat transaksi, kelola hutang-piutang, laba rugi, dan otomatisasi penggajian.', icon: BarChart3, color: 'emerald', features: ['Laporan Laba Rugi', 'Gaji Otomatis', 'Buku Kas & Bank', 'Invoice & Piutang'], price: 'Termasuk semua paket' },
+  { id: 'INVENTORY', name: 'Inventory & Stok', description: 'Pantau pergerakan stok barang, gudang, dan sinkronisasi dengan penjualan.', icon: Box, color: 'orange', features: ['Multi-Warehouse', 'Stock Adjustment', 'Alert Stok Menipis', 'Barcode Scanning'], price: 'Gratis di PRO & Enterprise' },
   { id: 'CRM', name: 'CRM & AI Chatbot', description: 'Tingkatkan penjualan dengan layanan pelanggan 24/7 menggunakan AI.', icon: MessageSquare, color: 'purple', features: ['AI Sales Assistant', 'Live Chat', 'Customer Analytics', 'Auto-Reply'], price: 'GRATIS / Selamanya' },
 ];
 
@@ -112,8 +157,6 @@ export default function StorePage() {
     return currentModules === id;
   };
 
-  const pricePerUser = billingCycle === 'monthly' ? HR_PACKAGES.main.pricingMonthly : HR_PACKAGES.main.pricingYearly;
-
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto space-y-8">
@@ -128,24 +171,24 @@ export default function StorePage() {
               <Sparkles className="h-4 w-4" /> Aivola Cloud Ecosystem
             </div>
             <h1 className="text-4xl font-extrabold tracking-tight md:text-5xl bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-              Pilih Paket yang Tepat untuk Bisnis Anda.
+              Satu Harga untuk Seluruh Bisnis Anda.
             </h1>
             <p className="mt-6 text-lg text-slate-400 leading-relaxed">
-              Harga transparan per karyawan. Tidak ada biaya tersembunyi. Batalkan kapan saja.
+              Pilih paket AI yang sesuai skala bisnis Anda. Tidak ada biaya tersembunyi. Batalkan kapan saja.
             </p>
           </div>
           <div className="absolute top-0 right-0 -mr-20 -mt-20 h-80 w-80 rounded-full bg-blue-600/20 blur-[100px]" />
           <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-purple-600/10 blur-[80px]" />
         </div>
 
-        {/* === PAKET HR === */}
-        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        {/* === PAKET AI (3 Tiers) === */}
+        <div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Users className="h-6 w-6 text-blue-600" /> Paket HR — Per Karyawan
+                <Zap className="h-6 w-6 text-blue-600" /> Paket AI Aivola
               </h2>
-              <p className="text-slate-500 text-sm mt-1">Bayar sesuai jumlah karyawan aktif Anda.</p>
+              <p className="text-slate-500 text-sm mt-1">Satu harga flat — semua fitur HR, POS, & AI termasuk.</p>
             </div>
             <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-xl p-1 self-start">
               <button onClick={() => setBillingCycle('monthly')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${billingCycle === 'monthly' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}>Bulanan</button>
@@ -156,84 +199,167 @@ export default function StorePage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 items-start">
-            <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 p-8 text-white shadow-xl shadow-blue-500/20">
-              <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-5xl font-extrabold">{formatRupiah(pricePerUser)}</span>
-                <span className="text-blue-200 text-sm">/karyawan/bln</span>
-              </div>
-              {billingCycle === 'yearly' && (
-                <div className="inline-flex items-center gap-1 bg-green-400/20 border border-green-400/40 rounded-full px-3 py-1 text-xs font-bold text-green-200 mb-4">
-                  <Star className="h-3 w-3" /> Hemat Rp 2.000 vs bulanan
-                </div>
-              )}
-              <p className="text-blue-200 text-sm mb-6">
-                {billingCycle === 'yearly' ? 'Tagihan sekali bayar per tahun.' : 'Tagihan tiap bulan. Batalkan kapan saja.'}
-              </p>
-              <a
-                href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(`Halo Admin Aivola, saya tertarik berlangganan Paket HR ${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'} @${formatRupiah(pricePerUser)}/karyawan/bulan.`)}`}
-                target="_blank"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-white text-blue-700 font-bold py-3 text-sm hover:bg-blue-50 transition-all"
-              >
-                <Phone className="h-4 w-4" /> Hubungi via WhatsApp
-              </a>
-            </div>
-
-            <div>
-              <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Sudah termasuk:</p>
-              <div className="space-y-2.5">
-                {HR_PACKAGES.main.features.map((f, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
-                    <div className="rounded-full bg-blue-100 dark:bg-blue-900/30 p-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-blue-600" />
-                    </div>
-                    {f}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* === ADD-ON HR === */}
-        <div>
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Add-On HR</h2>
-            <p className="text-slate-500 mt-1 text-sm">Fitur spesialis per karyawan, aktif selama trial.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {HR_PACKAGES.addons.map((addon) => {
-              const isActive = purchasedInsights.includes(addon.id) || purchasedInsights.includes('KPI') || purchasedInsights.includes('LEARNING');
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {AI_PACKAGES.map((pkg) => {
+              const price = billingCycle === 'monthly' ? pkg.pricingMonthly : pkg.pricingYearly;
+              const savingLabel = billingCycle === 'yearly' ? `Hemat ${formatRupiah(pkg.pricingMonthly * 12 - pkg.pricingYearly)} vs bulanan` : null;
+              const colorMap: Record<string, string> = {
+                blue: 'from-blue-600 to-blue-800 shadow-blue-500/20',
+                purple: 'from-violet-600 to-purple-800 shadow-purple-500/30',
+                amber: 'from-amber-500 to-orange-600 shadow-amber-500/20',
+              };
+              const borderMap: Record<string, string> = {
+                blue: 'border-blue-200 dark:border-blue-700',
+                purple: 'border-violet-400 dark:border-violet-600',
+                amber: 'border-amber-200 dark:border-amber-700',
+              };
               return (
-                <div key={addon.id} className={`relative flex flex-col rounded-2xl border p-6 transition-all hover:shadow-xl ${addon.highlight ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/10' : 'border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700'}`}>
-                  {addon.highlight && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold uppercase rounded-full px-3 py-1 shadow">Best Value</div>
+                <div key={pkg.id} className={`relative flex flex-col rounded-2xl border-2 overflow-hidden transition-all hover:shadow-2xl ${
+                  pkg.highlight ? borderMap[pkg.color] + ' scale-[1.02]' : 'border-slate-200 dark:border-slate-700'
+                }`}>
+                  {pkg.badge && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-violet-600 text-white text-[10px] font-bold uppercase rounded-full px-3 py-1 shadow z-10">{pkg.badge}</div>
                   )}
-                  <div className="text-3xl mb-4">{addon.icon}</div>
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">{addon.name}</h3>
-                  <p className="text-xs text-slate-500 mb-4 leading-relaxed flex-1">{addon.desc}</p>
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{formatRupiah(addon.price)}</span>
-                    <span className="text-xs text-slate-400">/karyawan/bln</span>
-                  </div>
-                  {isActive ? (
-                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2 border border-emerald-200">
-                      <CheckCircle className="h-4 w-4" /> Aktif dalam Trial
+                  <div className={`bg-gradient-to-br ${colorMap[pkg.color]} p-6 text-white shadow-xl`}>
+                    <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-1">{pkg.label}</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-extrabold">{formatRupiah(price)}</span>
+                      <span className="text-white/60 text-sm">/{billingCycle === 'yearly' ? 'thn' : 'bln'}</span>
                     </div>
-                  ) : (
+                    {savingLabel && (
+                      <div className="mt-2 inline-flex items-center gap-1 bg-white/20 border border-white/30 rounded-full px-3 py-0.5 text-xs font-bold">
+                        <Star className="h-3 w-3" /> {savingLabel}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col flex-1 p-6 bg-white dark:bg-slate-800">
+                    <p className="text-sm text-slate-500 mb-4 leading-relaxed">{pkg.description}</p>
+                    <div className="space-y-2.5 flex-1 mb-6">
+                      {pkg.features.map((f, i) => (
+                        <div key={i} className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
+                          <CheckCircle className={`h-4 w-4 flex-shrink-0 ${
+                            pkg.color === 'blue' ? 'text-blue-500' : pkg.color === 'purple' ? 'text-violet-500' : 'text-amber-500'
+                          }`} />
+                          {f}
+                        </div>
+                      ))}
+                    </div>
                     <a
-                      href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(`Halo Admin Aivola, saya tertarik mengaktifkan Add-on ${addon.name} @${formatRupiah(addon.price)}/karyawan.`)}`}
+                      href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(`Halo Admin Aivola, saya tertarik berlangganan Paket ${pkg.name} (${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}) seharga ${formatRupiah(price)}.`)}`}
                       target="_blank"
-                      className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition-all ${addon.highlight ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-900 hover:bg-slate-800'}`}
+                      className={`flex w-full items-center justify-center gap-2 rounded-xl font-bold py-3 text-sm transition-all text-white ${
+                        pkg.color === 'blue' ? 'bg-blue-600 hover:bg-blue-700' :
+                        pkg.color === 'purple' ? 'bg-violet-600 hover:bg-violet-700' :
+                        'bg-amber-500 hover:bg-amber-600'
+                      }`}
                     >
-                      Aktifkan <ArrowRight className="h-4 w-4" />
+                      <Phone className="h-4 w-4" /> Hubungi via WhatsApp
                     </a>
-                  )}
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* === ADD-ONS === */}
+        <div>
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">⚡ Power-ups</h2>
+            <p className="text-slate-500 mt-1 text-sm">Gunakan Add-on untuk menambah fitur spesifik sesuai kebutuhan tanpa harus berpindah paket.</p>
+          </div>
+
+          {/* Grouped layout */}
+          {(() => {
+            const groups = ['HR & Talent Management', 'Finance & AI Management', 'Sistem Ekspansi'];
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {groups.map((group) => {
+                  const groupAddons = ADDONS.filter((a) => (a as any).group === group);
+                  const isExpansion = group === 'Sistem Ekspansi';
+                  const expansionAddon = isExpansion ? groupAddons[0] : null;
+
+                  /* Expansion Pack — special wide card */
+                  if (isExpansion && expansionAddon) {
+                    const priceLabel = `${formatRupiah((expansionAddon as any).pricePerUser)}/kar/bln`;
+                    const isActive = purchasedInsights.includes(expansionAddon.id);
+                    return (
+                      <div key={group} className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 dark:bg-emerald-900/10 p-6 flex flex-col">
+                        <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 mb-4">Sistem Ekspansi</p>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">{expansionAddon.name}</h3>
+                        <div className="flex items-baseline gap-1 my-3">
+                          <span className="text-3xl font-extrabold text-slate-900 dark:text-white">{formatRupiah((expansionAddon as any).pricePerUser)}</span>
+                          <span className="text-slate-400 text-sm">/kar/bln</span>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-4 flex-1 leading-relaxed">{expansionAddon.desc}</p>
+                        {isActive ? (
+                          <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-100 rounded-lg px-3 py-2 border border-emerald-200">
+                            <CheckCircle className="h-4 w-4" /> Aktif
+                          </div>
+                        ) : (
+                          <a
+                            href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(`Halo Admin Aivola, saya ingin menambah Expansion Pack (Staff) @${formatRupiah((expansionAddon as any).pricePerUser)}/karyawan.`)}`}
+                            target="_blank"
+                            className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-emerald-700 bg-white border-2 border-emerald-400 hover:bg-emerald-50 transition-all"
+                          >
+                            Tambah Kapasitas <ArrowRight className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  /* HR & Finance groups */
+                  const groupColor = group === 'HR & Talent Management' ? 'blue' : 'violet';
+                  return (
+                    <div key={group} className={`rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex flex-col gap-4`}>
+                      <p className={`text-xs font-bold uppercase tracking-widest ${groupColor === 'blue' ? 'text-blue-500' : 'text-violet-500'} mb-1`}>{group}</p>
+                      {groupAddons.map((addon) => {
+                        const isActive = purchasedInsights.includes(addon.id);
+                        const priceLabel = (addon as any).priceFlat
+                          ? `${formatRupiah((addon as any).priceFlat)}/bln`
+                          : `${formatRupiah((addon as any).pricePerUser)}/kar`;
+                        return (
+                          <div key={addon.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all hover:shadow-md ${
+                            addon.highlight ? 'border-violet-300 bg-violet-50 dark:bg-violet-900/10' : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'
+                          }`}>
+                            {addon.highlight && (
+                              <span className="self-start text-[10px] font-bold bg-violet-600 text-white rounded-full px-2 py-0.5 uppercase">AI Powered</span>
+                            )}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">{addon.icon}</span>
+                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{addon.name}</h4>
+                              </div>
+                              <span className={`text-xs font-extrabold whitespace-nowrap ${groupColor === 'blue' ? 'text-blue-600' : 'text-violet-600'}`}>{priceLabel}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">{addon.desc}</p>
+                            {isActive ? (
+                              <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+                                <CheckCircle className="h-3.5 w-3.5" /> Aktif
+                              </div>
+                            ) : (
+                              <a
+                                href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(`Halo Admin Aivola, saya tertarik mengaktifkan Add-on ${addon.name}.`)}`}
+                                target="_blank"
+                                className={`text-xs font-bold transition-all ${
+                                  addon.highlight ? 'text-violet-600 hover:text-violet-700' : `text-${groupColor}-600 hover:text-${groupColor}-700`
+                                }`}
+                              >
+                                Aktifkan →
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+
 
         {/* Konfigurasi Modul */}
         <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-slate-200 dark:border-slate-700 shadow-sm">

@@ -28,8 +28,11 @@ export default function EquityPage() {
     const [accounts, setAccounts] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [authorizedCapital, setAuthorizedCapital] = useState(0);
 
     // Form States
+    const [isEditCapitalOpen, setIsEditCapitalOpen] = useState(false);
+    const [tempCapital, setTempCapital] = useState('');
     const [isAddOwnerOpen, setIsAddOwnerOpen] = useState(false);
     const [newOwner, setNewOwner] = useState({ name: '', sharePercentage: '', idNumber: '' });
     
@@ -39,14 +42,17 @@ export default function EquityPage() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [shRes, divRes, accRes] = await Promise.all([
+            const [shRes, divRes, accRes, capRes] = await Promise.all([
                 api.get('/finance/shareholders'),
                 api.get('/finance/dividends'),
-                api.get('/finance/accounts')
+                api.get('/finance/accounts'),
+                api.get('/finance/company-info')
             ]);
             setShareholders(shRes.data);
             setHistory(divRes.data);
             setAccounts(accRes.data);
+            setAuthorizedCapital(capRes.data.authorizedCapital || 0);
+            setTempCapital(capRes.data.authorizedCapital?.toString() || '0');
         } catch (error) {
             console.error("Error fetching equity data", error);
         } finally {
@@ -78,6 +84,21 @@ export default function EquityPage() {
             fetchData();
         } catch (error: any) {
             alert(error.response?.data?.error || 'Gagal menghapus');
+        }
+    };
+
+    const handleUpdateCapital = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsProcessing(true);
+        try {
+            await api.patch('/finance/capital', { authorizedCapital: tempCapital });
+            toast.success('Modal Dasar berhasil diperbarui!');
+            setIsEditCapitalOpen(false);
+            fetchData();
+        } catch (error: any) {
+            alert(error.response?.data?.error || 'Gagal update modal dasar');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -127,27 +148,37 @@ export default function EquityPage() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:border-blue-400 transition-all group" onClick={() => setIsEditCapitalOpen(true)}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                            <Wallet className="h-6 w-6" />
+                        </div>
+                        <Plus className="h-4 w-4 text-slate-300 group-hover:text-blue-500" />
+                    </div>
+                    <p className="text-sm font-medium text-slate-500">Modal Dasar (PT)</p>
+                    <p className="text-xl font-bold text-slate-900">{formatCurrency(authorizedCapital)}</p>
+                </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
+                    <div className="h-10 w-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-4">
                         <Users className="h-6 w-6" />
                     </div>
-                    <p className="text-sm font-medium text-slate-500">Total Pemegang Saham</p>
-                    <p className="text-2xl font-bold text-slate-900">{shareholders.length} Orang</p>
+                    <p className="text-sm font-medium text-slate-500">Pemegang Saham</p>
+                    <p className="text-xl font-bold text-slate-900">{shareholders.length} Orang</p>
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                     <div className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-4">
                         <TrendingUp className="h-6 w-6" />
                     </div>
-                    <p className="text-sm font-medium text-slate-500">Total Dividen Dibagikan</p>
-                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(history.reduce((a, b) => a + b.amount, 0))}</p>
+                    <p className="text-sm font-medium text-slate-500">Dividen Dibagikan</p>
+                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(history.reduce((a, b) => a + b.amount, 0))}</p>
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                     <div className="h-10 w-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-4">
-                        <PieChart className="h-6 w-6" />
+                        <Banknote className="h-6 w-6" />
                     </div>
-                    <p className="text-sm font-medium text-slate-500">Total Saham Terdaftar</p>
-                    <p className="text-2xl font-bold text-slate-900">
+                    <p className="text-sm font-medium text-slate-500">Modal Disetor (%)</p>
+                    <p className="text-xl font-bold text-slate-900">
                         {shareholders.reduce((a, b) => a + b.sharePercentage, 0)}%
                     </p>
                 </div>
@@ -248,6 +279,45 @@ export default function EquityPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal: Edit Capital */}
+            {isEditCapitalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <Wallet className="h-5 w-5 text-blue-600" /> Modal Dasar PT
+                            </h2>
+                            <button onClick={() => setIsEditCapitalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                                <Plus className="h-5 w-5 text-slate-500 rotate-45" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleUpdateCapital} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Nominal Modal Dasar (Rp)</label>
+                                <input 
+                                    required
+                                    type="number"
+                                    value={tempCapital}
+                                    onChange={(e) => setTempCapital(e.target.value)}
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-3 text-lg font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                    placeholder="0"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-2 italic leading-relaxed">
+                                    Modal dasar adalah seluruh nilai nominal saham perseroan yang disebut dalam anggaran dasar (AKTA).
+                                </p>
+                            </div>
+                            <button 
+                                type="submit" 
+                                disabled={isProcessing}
+                                className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                            >
+                                {isProcessing ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : 'Simpan Modal Dasar'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Modal: Add Owner */}
             {isAddOwnerOpen && (
