@@ -92,7 +92,7 @@ export default function EquityPage() {
         setIsProcessing(true);
         try {
             await api.patch('/finance/capital', { authorizedCapital: tempCapital });
-            toast.success('Modal Dasar berhasil diperbarui!');
+            alert('Modal Dasar berhasil diperbarui!');
             setIsEditCapitalOpen(false);
             fetchData();
         } catch (error: any) {
