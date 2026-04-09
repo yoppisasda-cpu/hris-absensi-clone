@@ -239,6 +239,7 @@ model User {
   jobTitle                String?
   joinDate                DateTime?
   overtimeRate            Float               @default(0)
+  mealAllowance           Float               @default(0)
   bpjsKesehatan           Boolean             @default(false)
   bpjsKetenagakerjaan     Boolean             @default(false)
   contractEndDate         DateTime?
@@ -383,6 +384,7 @@ model Payroll {
   createdAt                    DateTime     @default(now())
   updatedAt                    DateTime     @updatedAt
   allowance                    Float        @default(0)
+  mealAllowance                Float        @default(0)
   loanDeduction                Float        @default(0)
   overtimeHours                Float        @default(0)
   overtimePay                  Float        @default(0)

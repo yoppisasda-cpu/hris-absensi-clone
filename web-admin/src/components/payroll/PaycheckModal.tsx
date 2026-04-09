@@ -153,6 +153,12 @@ export default function PaycheckModal({ isOpen, onClose, payroll, company }: Pay
                                         <span className="font-bold text-slate-500 italic">Upah Lembur ({payroll.overtimeHours}j)</span>
                                         <span className="font-black text-blue-600">+ {formatCurrency(payroll.overtimePay)}</span>
                                     </div>
+                                    {payroll.mealAllowance > 0 && (
+                                        <div className="flex justify-between items-center text-sm pt-4">
+                                            <span className="font-bold text-slate-500 italic">Uang Makan</span>
+                                            <span className="font-black text-orange-600">+ {formatCurrency(payroll.mealAllowance)}</span>
+                                        </div>
+                                    )}
                                     {payroll.reimbursementPay > 0 && (
                                         <div className="flex justify-between items-center text-sm pt-4">
                                             <span className="font-bold text-slate-500 italic">Klaim Reimbursement</span>

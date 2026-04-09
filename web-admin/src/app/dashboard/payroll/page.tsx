@@ -20,6 +20,7 @@ interface PayrollRecord {
     year: number;
     basicSalary: number;
     allowance: number;
+    mealAllowance: number;
     overtimeHours: number;
     overtimePay: number;
     attendanceCount: number;
@@ -67,6 +68,7 @@ export default function PayrollPage() {
         userId: '',
         basicSalary: '',
         allowance: '',
+        mealAllowance: '',
         deductions: '',
         bonusPay: ''
     });
@@ -129,7 +131,7 @@ export default function PayrollPage() {
             });
             alert('Payroll Manual Berhasil Disimpan!');
             setIsManualModalOpen(false);
-            setManualForm({ userId: '', basicSalary: '', allowance: '', deductions: '', bonusPay: '' });
+            setManualForm({ userId: '', basicSalary: '', allowance: '', mealAllowance: '', deductions: '', bonusPay: '' });
             fetchInitialData();
         } catch (err: any) {
             alert('Gagal simpan payroll manual: ' + (err.response?.data?.error || 'Kesalahan Server'));
@@ -348,6 +350,9 @@ export default function PayrollPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-1">
                                                 <span className="text-green-600 font-medium">Tunj: + {formatCurrency(p.allowance)}</span>
+                                                {p.mealAllowance > 0 && (
+                                                    <span className="text-orange-600 font-medium text-xs">Makan: + {formatCurrency(p.mealAllowance)}</span>
+                                                )}
                                                 {p.overtimeHours > 0 && (
                                                     <span className="text-blue-600 font-medium text-xs">
                                                         Lembur ({p.overtimeHours}j): + {formatCurrency(p.overtimePay)}
@@ -501,6 +506,16 @@ export default function PayrollPage() {
                                         type="number"
                                         value={manualForm.allowance}
                                         onChange={(e) => setManualForm({...manualForm, allowance: e.target.value})}
+                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Uang Makan</label>
+                                    <input 
+                                        type="number"
+                                        value={manualForm.mealAllowance}
+                                        onChange={(e) => setManualForm({...manualForm, mealAllowance: e.target.value})}
                                         className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
                                         placeholder="0"
                                     />

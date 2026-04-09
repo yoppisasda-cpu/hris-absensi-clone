@@ -1332,30 +1332,7 @@ app.get('/api/companies/my', tenantMiddleware, async (req: Request, res: Respons
 });
 
 // A2.3. Update Data Perusahaan Sendiri (Tenant - My Company)
-app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Response) => {
-  try {
-    const tenantId = Number((req as any).tenantId);
-    const { name, latitude, longitude, radius, modules, picName, picPhone } = req.body;
-
-    const updated = await prisma.company.update({
-      where: { id: tenantId },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
-        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
-        ...(radius !== undefined && { radius: parseInt(radius, 10) }),
-        ...(modules !== undefined && { modules }),
-        // @ts-ignore
-        ...(picName !== undefined && { picName }),
-        ...(picPhone !== undefined && { picPhone }),
-      }
-    });
-
-    res.json({ message: 'Data perusahaan berhasil diperbarui' });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Gagal memperbarui perusahaan: ' + error.message });
-  }
-});
+// NOTE: The full implementation is below (line ~1564) which handles address and all fields.
 
 // --- MODUL PURCHASE ORDER (PO) ---
 
@@ -2086,7 +2063,8 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
     const { 
       name, email, password, role, companyId, branchId, shiftId,
       basicSalary, allowance, overtimeRate, jobTitle, division, 
-      grade, joinDate, contractEndDate, reportToId
+      grade, joinDate, contractEndDate, reportToId,
+      bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance
     } = req.body;
 
     const requestorRole = (req as any).userRole;
@@ -2199,7 +2177,10 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
         grade: grade || null,
         joinDate: parseDate(joinDate),
         contractEndDate: parseDate(contractEndDate),
-        reportToId: reportToId ? parseInt(reportToId) : null
+        reportToId: reportToId ? parseInt(reportToId) : null,
+        bpjsKesehatan: !!bpjsKesehatan,
+        bpjsKetenagakerjaan: !!bpjsKetenagakerjaan,
+        mealAllowance: mealAllowance ? parseFloat(mealAllowance.toString()) : 0
       }
     });
 
@@ -2238,7 +2219,8 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
     const { 
       name, email, role, basicSalary, allowance, overtimeRate, 
       jobTitle, division, grade, joinDate, contractEndDate, 
-      reportToId, isActive, resignDate 
+      reportToId, isActive, resignDate,
+      bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance
     } = req.body;
 
     // 3. Proteksi Role SUPERADMIN
@@ -2297,7 +2279,10 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
         contractEndDate: contractEndDate ? new Date(contractEndDate) : null,
         reportToId: reportToId ? parseInt(reportToId) : null,
         isActive: isActive !== undefined ? !!isActive : undefined,
-        resignDate: resignDate ? new Date(resignDate) : undefined
+        resignDate: resignDate ? new Date(resignDate) : undefined,
+        bpjsKesehatan: bpjsKesehatan !== undefined ? !!bpjsKesehatan : undefined,
+        bpjsKetenagakerjaan: bpjsKetenagakerjaan !== undefined ? !!bpjsKetenagakerjaan : undefined,
+        mealAllowance: mealAllowance !== undefined ? parseFloat(mealAllowance.toString()) : undefined
       }
     });
 
@@ -3963,7 +3948,7 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
 
       // 6. Final Calculation
       // Gaji Bersih = (Pendapatan Kotor) - (Potongan Absensi + Pinjaman + BPJS Karyawan + PPh 21 + Potongan Sakit)
-      const totalEarnings = (user.basicSalary + (user.allowance || 0) + overtimePay + reimbursementPay + bonusPayTotal);
+      const totalEarnings = (user.basicSalary + (user.allowance || 0) + (user.mealAllowance || 0) + overtimePay + reimbursementPay + bonusPayTotal);
       const totalDeductionsAll = totalDeductions + loanDeduction + bpjs.employeeDeduction + pph21 + sickLeaveDeduction;
       
       const netSalary = totalEarnings - totalDeductionsAll;
@@ -3976,6 +3961,7 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
         update: {
           basicSalary: user.basicSalary,
           allowance: user.allowance || 0,
+          mealAllowance: user.mealAllowance || 0,
           attendanceCount,
           lateCount,
           deductions: totalDeductions,
@@ -4000,6 +3986,7 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
           year,
           basicSalary: user.basicSalary,
           allowance: user.allowance || 0,
+          mealAllowance: user.mealAllowance || 0,
           attendanceCount,
           lateCount,
           deductions: totalDeductions,
@@ -4092,6 +4079,7 @@ app.get('/api/payroll/export', tenantMiddleware, async (req: Request, res: Respo
       { header: 'Tahun', key: 'year', width: 10 },
       { header: 'Gaji Pokok', key: 'basicSalary', width: 15 },
       { header: 'Tunjangan', key: 'allowance', width: 15 },
+      { header: 'Uang Makan', key: 'mealAllowance', width: 15 },
       { header: 'Bonus/THR', key: 'bonus', width: 15 },
       { header: 'Lembur', key: 'overtime', width: 15 },
       { header: 'Potongan', key: 'deductions', width: 15 },
@@ -4112,6 +4100,7 @@ app.get('/api/payroll/export', tenantMiddleware, async (req: Request, res: Respo
         year: p.year,
         basicSalary: p.basicSalary,
         allowance: p.allowance,
+        mealAllowance: p.mealAllowance || 0,
         bonus: p.bonusPay,
         overtime: p.overtimePay,
         deductions: p.deductions,
@@ -4120,7 +4109,7 @@ app.get('/api/payroll/export', tenantMiddleware, async (req: Request, res: Respo
       });
 
       // Format currency
-      ['basicSalary', 'allowance', 'bonus', 'overtime', 'deductions', 'netSalary'].forEach(col => {
+      ['basicSalary', 'allowance', 'mealAllowance', 'bonus', 'overtime', 'deductions', 'netSalary'].forEach(col => {
         row.getCell(col).numFmt = '#,##0';
       });
     });
@@ -4243,7 +4232,7 @@ app.post('/api/payroll/manual', tenantMiddleware, async (req: Request, res: Resp
        return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat mencatat gaji manual pada periode ini.' });
     }
 
-    const netSalary = (Number(basicSalary) || 0) + (Number(allowance) || 0) + (Number(bonusPay) || 0) - (Number(deductions) || 0);
+    const netSalary = (Number(basicSalary) || 0) + (Number(allowance) || 0) + (Number(mealAllowance) || 0) + (Number(bonusPay) || 0) - (Number(deductions) || 0);
 
     const payroll = await prisma.payroll.upsert({
       where: {
@@ -4256,6 +4245,7 @@ app.post('/api/payroll/manual', tenantMiddleware, async (req: Request, res: Resp
       update: {
         basicSalary: Number(basicSalary) || 0,
         allowance: Number(allowance) || 0,
+        mealAllowance: Number(mealAllowance) || 0,
         deductions: Number(deductions) || 0,
         bonusPay: Number(bonusPay) || 0,
         netSalary: netSalary,
@@ -4268,6 +4258,7 @@ app.post('/api/payroll/manual', tenantMiddleware, async (req: Request, res: Resp
         year: Number(year),
         basicSalary: Number(basicSalary) || 0,
         allowance: Number(allowance) || 0,
+        mealAllowance: Number(mealAllowance) || 0,
         deductions: Number(deductions) || 0,
         bonusPay: Number(bonusPay) || 0,
         netSalary: netSalary,
