@@ -4222,7 +4222,7 @@ app.patch('/api/payroll/:id', tenantMiddleware, async (req: Request, res: Respon
 app.post('/api/payroll/manual', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const { userId, month, year, basicSalary, allowance, deductions, bonusPay, status } = req.body;
+    const { userId, month, year, basicSalary, allowance, mealAllowance, deductions, bonusPay, status } = req.body;
 
     if (!userId || !month || !year) return res.status(400).json({ error: 'User ID, Bulan, dan Tahun wajib diisi.' });
 
