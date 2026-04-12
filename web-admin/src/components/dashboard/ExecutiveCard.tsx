@@ -3,12 +3,17 @@
 import React from 'react';
 
 interface ExecutiveCardProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   title?: string;
   subtitle?: string;
   icon?: React.ReactNode;
   variant?: 'blue' | 'emerald' | 'indigo' | 'slate';
+  trend?: {
+    value: number;
+    isUp: boolean;
+  };
+  value?: string | number;
 }
 
 const ExecutiveCard: React.FC<ExecutiveCardProps> = ({ 
@@ -16,55 +21,51 @@ const ExecutiveCard: React.FC<ExecutiveCardProps> = ({
   className = '', 
   title, 
   subtitle, 
-  icon,
-  variant = 'slate'
+  icon: Icon,
+  variant = 'slate',
+  trend,
+  value
 }) => {
   const getGradient = () => {
     switch (variant) {
-      case 'blue': return 'from-blue-500/10 to-transparent';
-      case 'emerald': return 'from-emerald-500/10 to-transparent';
-      case 'indigo': return 'from-indigo-500/10 to-transparent';
-      default: return 'from-slate-500/5 to-transparent';
+      case 'blue': return 'from-blue-500 to-indigo-600';
+      case 'emerald': return 'from-emerald-500 to-teal-600';
+      case 'indigo': return 'from-indigo-500 to-violet-600';
+      default: return 'from-slate-500 to-slate-700';
     }
   };
 
-  const getBorder = () => {
-    switch (variant) {
-      case 'blue': return 'border-blue-500/20';
-      case 'emerald': return 'border-emerald-500/20';
-      case 'indigo': return 'border-indigo-500/20';
-      default: return 'border-white/20';
-    }
-  };
+  const gradient = getGradient();
 
   return (
-    <div className={`relative overflow-hidden rounded-[2rem] border ${getBorder()} bg-white/40 backdrop-blur-3xl p-6 shadow-2xl transition-all hover:scale-[1.01] hover:shadow-[0_20px_60px_rgba(0,0,0,0.05)] ${className}`}>
-      {/* Background Gradient Glow */}
-      <div className={`absolute -inset-24 bg-gradient-to-tr ${getGradient()} blur-3xl opacity-50`} />
-      
-      <div className="relative z-10 h-full flex flex-col">
-        {(title || icon) && (
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              {title && <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">{title}</h3>}
-              {subtitle && <p className="text-xs font-medium text-slate-400 mt-0.5">{subtitle}</p>}
+    <div className={`glass relative overflow-hidden rounded-[2.5rem] p-8 border border-white/10 shadow-2xl transition-all duration-500 hover:scale-[1.02] hover:shadow-indigo-500/10 group ${className}`}>
+        {/* Background Accent Gradient */}
+        <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${gradient} opacity-10 blur-3xl -translate-y-1/2 translate-x-1/2 transition-all duration-700 group-hover:scale-150`} />
+        
+        <div className="flex items-center justify-between mb-8 relative z-10">
+            <div className={`p-4 rounded-2xl bg-white/5 border border-white/10 text-white shadow-xl transition-all duration-500 group-hover:bg-gradient-to-br group-hover:${gradient}`}>
+                {Icon && React.cloneElement(Icon as React.ReactElement, { className: "h-6 w-6" })}
             </div>
-            {icon && (
-                <div className={`p-3 rounded-2xl ${
-                    variant === 'blue' ? 'bg-blue-500/10 text-blue-600' :
-                    variant === 'emerald' ? 'bg-emerald-500/10 text-emerald-600' :
-                    variant === 'indigo' ? 'bg-indigo-500/10 text-indigo-600' :
-                    'bg-slate-500/10 text-slate-600'
+            {trend && (
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${
+                    trend.isUp ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                 }`}>
-                    {icon}
+                    {trend.isUp ? '▲' : '▼'} {trend.value}%
                 </div>
             )}
-          </div>
-        )}
-        <div className="flex-1">
+        </div>
+
+        <div className="space-y-1 relative z-10">
+            {title && <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{title}</h3>}
+            <div className="flex items-baseline gap-2">
+                {value && <p className="text-4xl font-black text-white tracking-tighter italic">{value}</p>}
+                {subtitle && <p className="text-[10px] font-bold text-slate-500 uppercase italic transition-all duration-500 translate-y-1">{subtitle}</p>}
+            </div>
             {children}
         </div>
-      </div>
+
+        {/* Bottom Progress Indicator */}
+        <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent w-full opacity-0 group-hover:opacity-100 transition-all duration-700" />
     </div>
   );
 };

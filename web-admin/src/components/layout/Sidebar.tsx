@@ -132,19 +132,49 @@ export default function Sidebar() {
         }
     };
     return (
-        <div className="flex h-screen w-64 flex-col bg-slate-900 text-white shadow-xl transition-all overflow-y-auto" style={{ display: 'flex', height: '100vh', width: '16rem', flexDirection: 'column', backgroundColor: '#0f172a', color: 'white', overflowY: 'auto' }}>
+        <div className="flex h-screen w-64 flex-col bg-[#050505] border-r border-white/5 text-white transition-all overflow-y-auto no-scrollbar relative z-30 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
             <style jsx>{`
-                .nav-link { display: flex; items-center: center; gap: 0.75rem; border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; transition: all 0.2s; color: #cbd5e1; text-decoration: none; }
-                .nav-link:hover { background-color: #1e293b; color: white; }
-                .nav-link.active { background-color: #2563eb; color: white; }
+                .nav-link { 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 0.875rem; 
+                    border-radius: 1.25rem; 
+                    padding: 0.75rem 1rem; 
+                    font-size: 0.813rem; 
+                    font-weight: 600;
+                    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); 
+                    color: rgba(255, 255, 255, 0.4); 
+                    text-decoration: none;
+                    margin-bottom: 0.25rem;
+                    border: 1px solid transparent;
+                }
+                .nav-link:hover { 
+                    background-color: rgba(255, 255, 255, 0.03); 
+                    color: white; 
+                    border-color: rgba(255, 255, 255, 0.05);
+                    transform: translateX(4px);
+                }
+                .nav-link.active { 
+                    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+                    color: white; 
+                    border-color: rgba(99, 102, 241, 0.2);
+                    box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.3);
+                }
+                .nav-link.active .icon-container {
+                    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+                    color: white;
+                    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+                }
             `}</style>
             
-            <div className="flex flex-col items-center justify-center border-b border-slate-700 mt-4 pb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #334155', marginTop: '1rem', paddingBottom: '1rem' }}>
-                <div className="flex items-center gap-2 mb-2" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <img src="/logo.png" alt="aivola Logo" className="h-8 w-8 rounded-lg object-contain bg-white p-1" style={{ height: '2rem', width: '2rem', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'white', padding: '0.25rem' }} />
+            <div className="flex flex-col items-center justify-center border-b border-white/5 mt-6 pb-6 px-4">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 p-2">
+                         <img src="/logo.png" alt="Logo" className="w-full h-full object-contain invert brightness-0" />
+                    </div>
                     <div className="flex flex-col">
-                        <span className="text-xl font-bold tracking-tight text-slate-100 font-primary" style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f1f5f9' }}>aivola <span style={{ color: '#3b82f6' }}>Admin</span></span>
-                        <span className="text-[10px] text-slate-500 font-mono">v1.0.7-Holding-Live</span>
+                        <span className="text-xl font-black tracking-tighter text-white uppercase italic">aivola <span className="text-indigo-500">PRO</span></span>
+                        <span className="text-[9px] text-white/20 font-bold uppercase tracking-widest">v1.0.8-SaaS</span>
                     </div>
                 </div>
 
@@ -193,8 +223,10 @@ export default function Sidebar() {
                                 setActiveModule(next);
                                 localStorage.setItem('activeModule', next);
                             }}
-                            className={`flex w-full items-center justify-between gap-3 rounded-lg p-3 text-sm font-bold transition-all border group relative overflow-hidden ${
-                                activeModule === 'ABSENSI' ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
+                            className={`flex w-full items-center justify-between gap-3 rounded-xl p-3 text-[13px] font-bold transition-all border group relative overflow-hidden backdrop-blur-sm shadow-lg ${
+                                activeModule === 'ABSENSI' 
+                                ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/30' 
+                                : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
                             }`}
                         >
                             <div className="flex items-center gap-2">
@@ -205,10 +237,6 @@ export default function Sidebar() {
                                 <Lock className="h-3.5 w-3.5 text-amber-500" />
                             ) : (
                                 <TrendingUp className="h-3 w-3 opacity-50 group-hover:rotate-180 transition-transform" />
-                            )}
-                            
-                            {activeModule === 'ABSENSI' && plan === 'STARTER' && (
-                                <div className="absolute top-0 right-0 bg-amber-500 text-slate-900 text-[8px] px-1.5 py-0.5 font-black uppercase tracking-tighter">Premium</div>
                             )}
                         </button>
                     </div>
