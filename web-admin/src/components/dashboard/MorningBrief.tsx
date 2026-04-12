@@ -55,7 +55,7 @@ const MorningBrief: React.FC<MorningBriefProps> = ({ stats, insights, loading, a
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 via-purple-600/5 to-transparent rounded-2xl -z-10 group-hover:from-indigo-600/15 transition-all duration-500"></div>
             <div className="absolute top-0 right-0 p-8 -mr-16 -mt-16 bg-indigo-500/10 blur-3xl h-64 w-64 rounded-full -z-10"></div>
             
-            <div className="rounded-2xl border border-indigo-100/50 bg-white/40 backdrop-blur-md p-6 shadow-xl shadow-indigo-500/5 transition-all hover:shadow-2xl hover:shadow-indigo-500/10 active:scale-[0.99] border-l-4 border-l-indigo-500">
+            <div className="rounded-[2rem] border border-white/10 bg-[#050505]/40 backdrop-blur-md p-8 shadow-2xl transition-all hover:shadow-indigo-500/10 active:scale-[0.99] border-l-4 border-l-indigo-500">
                 <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
                     <div className="flex-shrink-0 relative">
                         <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform duration-500">
@@ -72,41 +72,41 @@ const MorningBrief: React.FC<MorningBriefProps> = ({ stats, insights, loading, a
                             <span className="h-1 w-1 rounded-full bg-slate-300"></span>
                             <span className="text-[10px] font-bold text-slate-400">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                         </div>
-                        <h2 className="text-xl font-bold text-slate-900 mb-2">Morning Brief: Ringkasan Bisnis {!loading && stats?.companyName ? stats.companyName : ''}</h2>
-                        <p className="text-slate-600 leading-relaxed font-medium">
-                            <span className="text-indigo-600 font-bold italic">"</span>
+                        <h2 className="text-2xl font-black text-white mb-2 tracking-tight uppercase">Morning Brief: Ringkasan Bisnis {!loading && stats?.companyName ? stats.companyName : ''}</h2>
+                        <p className="text-white/70 leading-relaxed font-bold italic text-sm">
+                            <span className="text-indigo-400">"</span>
                             {getSummaryText()}
-                            <span className="text-indigo-600 font-bold italic"> "</span>
+                            <span className="text-indigo-400"> "</span>
                         </p>
                     </div>
 
                     <div className="flex flex-wrap gap-3 md:flex-col md:items-end">
-                        <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-xl border border-indigo-50 shadow-sm">
-                            <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
-                            <span className="text-xs font-bold text-slate-700">Profit: {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(stats?.monthlyProfit || 0)}</span>
+                        <div className="flex items-center gap-2 px-6 py-3 bg-white/5 rounded-2xl border border-white/10 shadow-xl">
+                            <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                            <span className="text-xs font-black text-white uppercase tracking-wider italic">Profit: {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(stats?.monthlyProfit || 0)}</span>
                         </div>
-                        <div className={`flex items-center gap-2 px-4 py-2 bg-white/80 rounded-xl border shadow-sm ${hasUrgentInsights ? 'border-red-100 text-red-600' : 'border-indigo-50 text-indigo-600'}`}>
+                        <div className={`flex items-center gap-2 px-6 py-3 bg-white/5 rounded-2xl border shadow-xl ${hasUrgentInsights ? 'border-red-500/20 text-red-400' : 'border-white/10 text-indigo-400'}`}>
                             {hasUrgentInsights ? <AlertCircle className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                            <span className="text-xs font-bold">{hasUrgentInsights ? 'Butuh Perhatian' : 'Performa Stabil'}</span>
+                            <span className="text-xs font-black uppercase tracking-wider italic">{hasUrgentInsights ? 'Butuh Perhatian' : 'Performa Stabil'}</span>
                         </div>
                     </div>
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-indigo-100/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex gap-4">
+                    <div className="flex gap-8">
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kehadiran</span>
-                            <span className="text-sm font-bold text-slate-900">{stats?.presentCount || 0} / {stats?.totalEmployees || 0}</span>
+                            <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-1 italic">Kehadiran</span>
+                            <span className="text-base font-black text-white italic tracking-widest">{stats?.presentCount || 0} / {stats?.totalEmployees || 0}</span>
                         </div>
-                        <div className="h-8 w-px bg-slate-200"></div>
+                        <div className="h-10 w-px bg-white/5"></div>
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Kas</span>
-                            <span className="text-sm font-bold text-emerald-600">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(stats?.totalBalance || 0)}</span>
+                            <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-1 italic">Saldo Kas</span>
+                            <span className="text-base font-black text-emerald-400 italic tracking-tighter">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(stats?.totalBalance || 0)}</span>
                         </div>
-                         <div className="h-8 w-px bg-slate-200"></div>
+                         <div className="h-10 w-px bg-white/5"></div>
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Kritis</span>
-                            <span className={`text-sm font-bold ${insights.filter(i => i.type === 'danger').length > 0 ? 'text-red-500' : 'text-slate-900'}`}>
+                            <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-1 italic">Stok Kritis</span>
+                            <span className={`text-base font-black italic ${insights.filter(i => i.type === 'danger').length > 0 ? 'text-red-500 transition-pulse' : 'text-white'}`}>
                                 {insights.filter(i => i.type === 'danger' && i.message.includes('Stok')).length > 0 ? 'Segera Cek!' : 'Aman'}
                             </span>
                         </div>

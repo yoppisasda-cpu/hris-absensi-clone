@@ -94,8 +94,8 @@ export default function DashboardPage() {
         return (
             <DashboardLayout>
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-900">Dashboard Keuangan & Stok 👋</h1>
-                    <p className="mt-1 text-sm text-slate-500">Ringkasan kondisi finansial dan inventori <span className="font-semibold">{companyName}</span> saat ini.</p>
+                    <h1 className="text-3xl font-black text-white tracking-tight uppercase">Dashboard Keuangan & Stok 👋</h1>
+                    <p className="mt-1 text-sm text-white/40 font-medium">Ringkasan kondisi finansial dan inventori <span className="text-indigo-400 font-bold italic">{companyName}</span> saat ini.</p>
                 </div>
                 
                 {/* AI SMART DASHBOARD SUMMARY (MORNING BRIEF) */}
@@ -114,31 +114,31 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="rounded-[2rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl transition-all hover:shadow-blue-500/10 group">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-slate-500">Total Saldo Kas & Bank</p>
-                                <p className="mt-2 text-2xl font-black text-slate-900 leading-tight">
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic mb-3">Total Saldo Kas & Bank</p>
+                                <p className="text-3xl font-black text-white leading-tight italic tracking-tighter">
                                     {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.totalBalance || 0)}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-blue-50 p-3"><WalletIcon className="h-6 w-6 text-blue-600" /></div>
+                            <div className="rounded-2xl bg-blue-500/10 p-4 border border-blue-500/20 shadow-lg group-hover:bg-blue-600 transition-all group-hover:text-white"><WalletIcon className="h-6 w-6 text-blue-400 group-hover:text-white" /></div>
                         </div>
-                        <div className="mt-4 flex items-center text-xs text-blue-600 font-bold">
+                        <div className="mt-6 flex items-center text-[10px] text-blue-400 font-black uppercase tracking-widest italic pt-4 border-t border-white/5">
                             Akun Keuangan Aktif
                         </div>
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="rounded-[2rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl transition-all hover:shadow-emerald-500/10 group">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-slate-500">Laba Bersih (Bulan Ini)</p>
-                                <p className={`mt-2 text-2xl font-black leading-tight ${(summaryStats?.monthlyProfit || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic mb-3">Laba Bersih (Bulan Ini)</p>
+                                <p className={`text-3xl font-black leading-tight italic tracking-tighter ${(summaryStats?.monthlyProfit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                     {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.monthlyProfit || 0)}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-emerald-50 p-3"><TrendingUp className="h-6 w-6 text-emerald-600" /></div>
+                            <div className="rounded-2xl bg-emerald-500/10 p-4 border border-emerald-500/20 shadow-lg group-hover:bg-emerald-600 transition-all group-hover:text-white"><TrendingUp className="h-6 w-6 text-emerald-400 group-hover:text-white" /></div>
                         </div>
-                        <div className="mt-4 flex items-center text-xs text-emerald-600 font-bold">
+                        <div className={`mt-6 flex items-center text-[10px] font-black uppercase tracking-widest italic pt-4 border-t border-white/5 ${(summaryStats?.monthlyProfit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                              { (summaryStats?.monthlyProfit || 0) >= 0 ? 'Surplus (Profit)' : 'Defisit (Loss)' }
                         </div>
                     </div>
@@ -146,18 +146,18 @@ export default function DashboardPage() {
                     {/* HUTANG CARD */}
                     <div 
                         onClick={() => router.push('/dashboard/finance/payables')}
-                        className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm cursor-pointer hover:border-red-500 transition-all group"
+                        className="rounded-[2rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl cursor-pointer hover:border-red-500/50 transition-all group"
                     >
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-slate-500 group-hover:text-red-500 transition-colors">Total Hutang (Payables)</p>
-                                <p className="mt-2 text-2xl font-black text-red-600 leading-tight">
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic mb-3 group-hover:text-red-400 transition-colors">Total Hutang (Payables)</p>
+                                <p className="text-3xl font-black text-red-500 leading-tight italic tracking-tighter">
                                     {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.totalPayable || 0)}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-red-50 p-3 group-hover:bg-red-600 group-hover:text-white transition-all"><Coins className="h-6 w-6 text-red-600 group-hover:text-white" /></div>
+                            <div className="rounded-2xl bg-red-500/10 p-4 border border-red-500/20 shadow-lg group-hover:bg-red-600 group-hover:text-white transition-all"><Coins className="h-6 w-6 text-red-400 group-hover:text-white" /></div>
                         </div>
-                        <div className="mt-4 flex items-center text-xs text-red-500 font-bold">
+                        <div className="mt-6 flex items-center text-[10px] text-red-400 font-black uppercase tracking-widest italic pt-4 border-t border-white/5">
                             Klik untuk Detail Hutang
                         </div>
                     </div>
@@ -165,56 +165,57 @@ export default function DashboardPage() {
                     {/* PIUTANG CARD */}
                     <div 
                         onClick={() => router.push('/dashboard/finance/receivables')}
-                        className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm cursor-pointer hover:border-blue-500 transition-all group"
+                        className="rounded-[2rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl cursor-pointer hover:border-blue-500/50 transition-all group"
                     >
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-slate-500 group-hover:text-blue-500 transition-colors">Total Piutang (Receivables)</p>
-                                <p className="mt-2 text-2xl font-black text-blue-600 leading-tight">
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic mb-3 group-hover:text-blue-400 transition-colors">Total Piutang (Receivables)</p>
+                                <p className="text-3xl font-black text-blue-500 leading-tight italic tracking-tighter">
                                     {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.totalReceivable || 0)}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-blue-50 p-3 group-hover:bg-blue-600 group-hover:text-white transition-all"><BarChart3 className="h-6 w-6 text-blue-600 group-hover:text-white" /></div>
+                            <div className="rounded-2xl bg-blue-500/10 p-4 border border-blue-500/20 shadow-lg group-hover:bg-blue-600 group-hover:text-white transition-all"><BarChart3 className="h-6 w-6 text-blue-400 group-hover:text-white" /></div>
                         </div>
-                        <div className="mt-4 flex items-center text-xs text-blue-600 font-bold">
+                        <div className="mt-6 flex items-center text-[10px] text-blue-400 font-black uppercase tracking-widest italic pt-4 border-t border-white/5">
                             Klik untuk Detail Piutang
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="rounded-[2rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl transition-all hover:shadow-orange-500/10 group">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-slate-500">Nilai Inventori (Asset)</p>
-                                <p className="mt-2 text-2xl font-black text-orange-600 leading-tight">
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic mb-3">Nilai Inventori (Asset)</p>
+                                <p className="text-3xl font-black text-orange-500 leading-tight italic tracking-tighter">
                                     {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(summaryStats?.inventoryValue || 0)}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-orange-50 p-3"><Box className="h-6 w-6 text-orange-600" /></div>
+                            <div className="rounded-2xl bg-orange-500/10 p-4 border border-orange-500/20 shadow-lg group-hover:bg-orange-600 transition-all group-hover:text-white"><Box className="h-6 w-6 text-orange-400 group-hover:text-white" /></div>
                         </div>
-                        <div className="mt-4 flex items-center text-xs text-orange-500 font-medium">
+                        <div className="mt-6 flex items-center text-[10px] text-orange-400 font-black uppercase tracking-widest italic pt-4 border-t border-white/5">
                             Asset Lancar Barang
                         </div>
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="rounded-[2rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl transition-all hover:shadow-amber-500/10 group">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-slate-500">Kesehatan Stok</p>
-                                <p className="mt-2 text-2xl font-black text-slate-900 leading-tight">
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic mb-3">Kesehatan Stok</p>
+                                <p className="text-3xl font-black text-white leading-tight italic tracking-tighter">
                                     {visualInventory?.health?.find((h:any) => h.name === 'Menipis')?.value || 0}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-amber-50 p-3"><AlertTriangle className="h-6 w-6 text-amber-600" /></div>
+                            <div className="rounded-2xl bg-amber-500/10 p-4 border border-amber-500/20 shadow-lg group-hover:bg-amber-600 transition-all group-hover:text-white"><AlertTriangle className="h-6 w-6 text-amber-400 group-hover:text-white" /></div>
                         </div>
-                        <div className="mt-4 flex items-center text-xs text-slate-400">
+                        <div className="mt-6 flex items-center text-[10px] text-white/20 font-black uppercase tracking-widest italic pt-4 border-t border-white/5">
                             Produk Perlu Restock
                         </div>
                     </div>
                 </div>
 
                 <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                             <BarChart3 className="h-5 w-5 text-blue-500" /> Arus Kas Bulanan (Revenue vs Expense)
+                    <div className="rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl transition-all">
+                        <h3 className="font-black text-white mb-8 flex items-center gap-3 uppercase tracking-tight italic">
+                             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20"><BarChart3 className="h-5 w-5 text-blue-400" /></div>
+                             Arus Kas Bulanan (Revenue vs Expense)
                         </h3>
                         {loading ? (
                             <div className="h-64 flex items-center justify-center animate-pulse bg-slate-50 rounded-lg">
@@ -224,9 +225,10 @@ export default function DashboardPage() {
                             <FinanceVisualChart data={visualFinance} />
                         )}
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                             <Box className="h-5 w-5 text-orange-500" /> Kesehatan & Performa Stok
+                    <div className="rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl transition-all">
+                        <h3 className="font-black text-white mb-8 flex items-center gap-3 uppercase tracking-tight italic">
+                             <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20"><Box className="h-5 w-5 text-orange-400" /></div>
+                             Kesehatan & Performa Stok
                         </h3>
                         {loading ? (
                             <div className="h-64 flex items-center justify-center animate-pulse bg-slate-50 rounded-lg">
@@ -248,8 +250,8 @@ export default function DashboardPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Halo, {!isMounted ? 'Admin' : adminName}! 👋</h1>
-                    <p className="mt-1 text-sm text-slate-500">Berikut adalah ringkasan absensi harian untuk <span className="font-semibold">{companyName}</span>.</p>
+                    <h1 className="text-3xl font-black text-white tracking-tight uppercase italic">Halo, {!isMounted ? 'Admin' : adminName}! 👋</h1>
+                    <p className="mt-1 text-sm text-white/40 font-medium italic">Berikut adalah ringkasan absensi harian untuk <span className="text-blue-400 font-bold">{companyName}</span>.</p>
                 </div>
                 {companyContract && (
                     <div className={`p-4 rounded-xl border flex items-center gap-4 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500 ${
@@ -297,19 +299,19 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
                 {stats.map((stat, i) => (
-                    <div key={i} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-                        <div className="flex items-center justify-between">
+                    <div key={i} className="rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-2xl p-8 shadow-2xl transition-all hover:scale-[1.02] group">
+                        <div className="flex items-center justify-between mb-4">
                             <div>
-                                <p className="text-sm font-medium text-slate-500">{stat.title}</p>
-                                <p className="mt-2 text-3xl font-bold text-slate-900">{stat.value}</p>
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic mb-2">{stat.title}</p>
+                                <p className="text-4xl font-black text-white italic tracking-tighter">{stat.value}</p>
                             </div>
-                            <div className="rounded-lg bg-slate-50 p-3">{stat.icon}</div>
+                            <div className="rounded-2xl bg-white/5 p-4 border border-white/10 shadow-xl group-hover:bg-indigo-600 transition-all group-hover:text-white">{stat.icon}</div>
                         </div>
-                        <div className="mt-4 flex items-center text-sm">
-                            <span className="font-medium text-green-600">
+                        <div className="mt-6 flex items-center text-[10px] pt-4 border-t border-white/5">
+                            <span className="font-black text-emerald-400 uppercase tracking-widest italic">
                                 {stat.trend}
                             </span>
-                            <span className="ml-2 text-slate-400">status saat ini</span>
+                            <span className="ml-2 text-white/20 font-bold italic">Status Saat Ini</span>
                         </div>
                     </div>
                 ))}
@@ -409,8 +411,8 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-slate-900 mb-4">Aktivitas Terbaru</h2>
+            <div className="mt-8 rounded-[2rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl">
+                <h2 className="text-xl font-black text-white mb-6 uppercase tracking-tight italic">Aktivitas Terbaru</h2>
 
                 {loading ? (
                     <div className="flex h-40 items-center justify-center">
@@ -420,24 +422,24 @@ export default function DashboardPage() {
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200">
                             <thead>
-                                <tr className="bg-slate-50">
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Karyawan</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Waktu In</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Waktu Out</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Status</th>
+                                <tr className="bg-white/5">
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-white/40 italic">Karyawan</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-white/40 italic">Waktu In</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-white/40 italic">Waktu Out</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-white/40 italic">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 bg-white">
+                            <tbody className="divide-y divide-white/5 bg-transparent">
                                 {activities.map((act) => (
-                                    <tr key={act.id}>
+                                    <tr key={act.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="whitespace-nowrap px-6 py-4">
-                                            <div className="text-sm font-medium text-slate-900">{act.user.name}</div>
-                                            <div className="text-xs text-slate-500">{act.user.email}</div>
+                                            <div className="text-sm font-black text-white italic">{act.user.name}</div>
+                                            <div className="text-[10px] text-white/30 font-bold uppercase tracking-tighter">{act.user.email}</div>
                                         </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm font-bold text-white/60">
                                             {new Date(act.clockIn).toLocaleTimeString()}
                                         </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm font-bold text-white/60">
                                             {act.clockOut ? new Date(act.clockOut).toLocaleTimeString() : '-'}
                                         </td>
                                         <td className="whitespace-nowrap px-6 py-4">

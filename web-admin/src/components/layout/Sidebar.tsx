@@ -169,11 +169,11 @@ export default function Sidebar() {
             
             <div className="flex flex-col items-center justify-center border-b border-white/5 mt-6 pb-6 px-4">
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 p-2">
-                         <img src="/logo.png" alt="Logo" className="w-full h-full object-contain invert brightness-0" />
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                         <Sparkles className="h-6 w-6 text-white animate-pulse" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-xl font-black tracking-tighter text-white uppercase italic">aivola <span className="text-indigo-500">PRO</span></span>
+                        <span className="text-2xl font-black tracking-tighter text-white uppercase italic">aivola</span>
                         <span className="text-[9px] text-white/20 font-bold uppercase tracking-widest">v1.0.8-SaaS</span>
                     </div>
                 </div>

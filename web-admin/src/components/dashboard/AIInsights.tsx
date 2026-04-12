@@ -100,7 +100,7 @@ const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/60 backdrop-blur-2xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.05)] transition-all hover:shadow-[0_25px_60px_rgba(0,0,0,0.08)]">
+    <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-2xl p-8 shadow-2xl transition-all hover:shadow-indigo-500/10">
       {/* Background Decoration */}
       <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-400/10 blur-[80px]" />
       <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-400/10 blur-[80px]" />
@@ -115,16 +115,16 @@ const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
               </div>
             </div>
             <div>
-              <h2 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+              <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2 uppercase italic">
                 Aivola Mind
-                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700">AI Beta</span>
+                <span className="inline-flex items-center rounded-full bg-blue-500/10 px-3 py-1 text-[10px] font-black uppercase text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/5">AI Beta</span>
               </h2>
-              <p className="text-slate-500 text-sm font-medium">Asisten cerdas analisis bisnis Anda.</p>
+              <p className="text-white/40 text-sm font-bold italic">Asisten cerdas analisis bisnis Anda.</p>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100/50 rounded-full border border-slate-200/50">
-             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistem Aktif & Menganalisis</span>
+          <div className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-white/5 rounded-full border border-white/10">
+             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+             <span className="text-[10px] font-black text-white/40 uppercase tracking-[.2em] italic">Sistem Aktif & Menganalisis</span>
           </div>
         </div>
 
@@ -134,40 +134,30 @@ const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
               <div 
                 key={idx} 
                 onClick={() => !insight.isLocked && setSelectedInsight(insight)}
-                className={`group relative flex items-start gap-5 p-5 rounded-2xl border transition-all duration-300 cursor-pointer ${
-                  insight.isLocked ? 'grayscale opacity-75' : 'hover:scale-[1.02] hover:bg-white/80 active:scale-95'
+                className={`group relative flex items-start gap-5 p-6 rounded-[2rem] border transition-all duration-300 cursor-pointer ${
+                  insight.isLocked ? 'grayscale opacity-50' : 'hover:scale-[1.02] hover:bg-white/5 hover:border-white/20 active:scale-95'
                 } ${
-                  insight.type === 'success' ? 'bg-emerald-50/50 border-emerald-100' :
-                  insight.type === 'warning' ? 'bg-amber-50/50 border-amber-100' :
-                  insight.type === 'danger' ? 'bg-red-50/50 border-red-100' :
-                  'bg-blue-50/50 border-blue-100'
+                  insight.type === 'success' ? 'bg-emerald-500/5 border-emerald-500/10' :
+                  insight.type === 'warning' ? 'bg-amber-500/5 border-amber-500/10' :
+                  insight.type === 'danger' ? 'bg-red-500/5 border-red-500/10' :
+                  'bg-blue-500/5 border-blue-500/10'
                 }`}
               >
                 {/* Premium Badge */}
                 {insight.isPremium && (
                   <div className="absolute -top-2 -right-2 z-20">
-                    <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 uppercase tracking-tighter">
+                    <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-[#050505] text-[9px] font-black px-3 py-1 rounded-full shadow-lg flex items-center gap-1 uppercase tracking-tighter">
                       <Sparkles className="h-2 w-2" />
                       Premium
                     </div>
                   </div>
                 )}
 
-                {/* Locked Overlay */}
-                {insight.isLocked && (
-                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/20 backdrop-blur-[2px] rounded-2xl">
-                    <div className="bg-slate-900/80 p-2 rounded-full mb-1">
-                      <Shield className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="text-[8px] font-black text-slate-900 uppercase tracking-widest">Klik untuk Upgrade</span>
-                  </div>
-                )}
-
-                <div className={`mt-1 p-2.5 rounded-xl shadow-sm ${
-                  insight.type === 'success' ? 'bg-emerald-100 text-emerald-600' :
-                  insight.type === 'warning' ? 'bg-amber-100 text-amber-600' :
-                  insight.type === 'danger' ? 'bg-red-100 text-red-600' :
-                  'bg-blue-100 text-blue-600'
+                <div className={`mt-1 p-3 rounded-2xl shadow-xl ${
+                  insight.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                  insight.type === 'warning' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                  insight.type === 'danger' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                  'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                 }`}>
                   {insight.isLocked ? <Shield className="h-5 w-5" /> : (
                    insight.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> :
@@ -177,10 +167,10 @@ const AIInsights: React.FC<AIInsightsProps> = ({ insights, loading }) => {
                   )}
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight text-sm mb-1">{insight.message}</h4>
-                  <p className="text-xs text-slate-600 leading-relaxed font-medium line-clamp-2">{insight.detail}</p>
+                  <h4 className="font-black text-white group-hover:text-blue-400 transition-colors uppercase tracking-tight text-sm mb-1 italic">{insight.message}</h4>
+                  <p className="text-xs text-white/60 leading-relaxed font-bold italic line-clamp-2">{insight.detail}</p>
                 </div>
-                {!insight.isLocked && <ArrowRight className="h-4 w-4 text-slate-300 opacity-30 group-hover:opacity-100 group-hover:translate-x-1 transition-all mt-1" />}
+                {!insight.isLocked && <ArrowRight className="h-4 w-4 text-white/20 group-hover:text-white group-hover:translate-x-1 transition-all mt-1" />}
               </div>
             ))
           ) : (
