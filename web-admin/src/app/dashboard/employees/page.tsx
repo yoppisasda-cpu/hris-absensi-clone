@@ -617,21 +617,21 @@ export default function EmployeesPage() {
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Gaji Pokok</label>
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-2.5 text-sm font-semibold text-slate-400">Rp</span>
-                                            <input required type="number" value={formData.basicSalary} onChange={e => setFormData({ ...formData, basicSalary: parseFloat(e.target.value) || 0 })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. 5000000" />
+                                            <input required type="number" value={formData.basicSalary || ''} onChange={e => setFormData({ ...formData, basicSalary: parseFloat(e.target.value) || 0 })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. 5000000" />
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Tunjangan Lain</label>
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-2.5 text-sm font-semibold text-slate-400">Rp</span>
-                                            <input type="number" value={formData.allowance} onChange={e => setFormData({ ...formData, allowance: parseFloat(e.target.value) || 0 })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. 500000" />
+                                            <input type="number" value={formData.allowance || ''} onChange={e => setFormData({ ...formData, allowance: parseFloat(e.target.value) || 0 })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. 500000" />
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Uang Makan</label>
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-2.5 text-sm font-semibold text-slate-400">Rp</span>
-                                            <input type="number" value={formData.mealAllowance} onChange={e => setFormData({ ...formData, mealAllowance: parseFloat(e.target.value) || 0 })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. 20000" />
+                                            <input type="number" value={formData.mealAllowance || ''} onChange={e => setFormData({ ...formData, mealAllowance: parseFloat(e.target.value) || 0 })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. 20000" />
                                         </div>
                                     </div>
                                 </div>
@@ -641,7 +641,7 @@ export default function EmployeesPage() {
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Tarif Lembur (per Jam)</label>
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-2.5 text-sm font-semibold text-slate-400">Rp</span>
-                                            <input type="number" value={formData.overtimeRate} onChange={e => setFormData({ ...formData, overtimeRate: parseFloat(e.target.value) || 0 })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. 25000" />
+                                            <input type="number" value={formData.overtimeRate || ''} onChange={e => setFormData({ ...formData, overtimeRate: parseFloat(e.target.value) || 0 })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Cth. 25000" />
                                         </div>
                                     </div>
                                 </div>
