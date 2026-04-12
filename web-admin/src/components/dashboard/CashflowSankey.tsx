@@ -83,7 +83,7 @@ export default function CashflowSankey() {
                                     fontWeight: '900',
                                     color: '#fff'
                                 }}
-                                formatter={(value: number) => formatCurrency(value)}
+                                formatter={(value: any) => formatCurrency(Number(value || 0))}
                             />
                         </Sankey>
                     </ResponsiveContainer>
