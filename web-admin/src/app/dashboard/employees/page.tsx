@@ -696,7 +696,7 @@ export default function EmployeesPage() {
                                         <select value={formData.reportToId} onChange={e => setFormData({ ...formData, reportToId: e.target.value })} className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm outline-none bg-white">
                                             <option value="">-- Tidak Ada (Lapor ke Admin) --</option>
                                             {users
-                                                .filter(u => u.id !== formData.id && (u.role === 'ADMIN' || u.role === 'MANAGER'))
+                                                .filter(u => u.id !== formData.id && (u.role === 'ADMIN' || u.role === 'MANAGER' || u.role === 'OWNER'))
                                                 .map(u => (
                                                     <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                                 ))}
