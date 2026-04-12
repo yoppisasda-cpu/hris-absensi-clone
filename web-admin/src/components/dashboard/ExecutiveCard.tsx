@@ -44,7 +44,7 @@ const ExecutiveCard: React.FC<ExecutiveCardProps> = ({
         
         <div className="flex items-center justify-between mb-8 relative z-10">
             <div className={`p-4 rounded-2xl bg-white/5 border border-white/10 text-white shadow-xl transition-all duration-500 group-hover:bg-gradient-to-br group-hover:${gradient}`}>
-                {Icon && React.cloneElement(Icon as React.ReactElement, { className: "h-6 w-6" })}
+                {Icon}
             </div>
             {trend && (
                 <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${
