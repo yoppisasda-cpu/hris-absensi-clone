@@ -14,7 +14,7 @@ import { compareFaces } from './faceAI';
 import { getAIChatResponse, generateSubscriptionResponse } from './chatAI';
 import { sendWhatsAppMessage } from './whatsappAPI';
 import aiRoutes from './src/routes/ai.routes';
-
+import { getFinancialForecast, getFinancialFlow, getPayrollProductivityInsights, getFinancialHealthScore } from './financeAI';
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 console.log('🚀 [BOOT] Aivola Backend v1.0.6-Final-Live starting...');
@@ -5996,6 +5996,50 @@ app.get('/api/stats/ai-insights', tenantMiddleware, async (req: Request, res: Re
   } catch (error) {
     console.error('[AI Insight Error]:', error);
     res.status(500).json({ error: 'Gagal menganalisis data.' });
+  }
+});
+
+app.get('/api/stats/financial-flow', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const flow = await getFinancialFlow(tenantId);
+    res.json(flow);
+  } catch (error) {
+    console.error('[Flow Error]:', error);
+    res.status(500).json({ error: 'Gagal memproses alur keuangan.' });
+  }
+});
+
+app.get('/api/stats/predictive-insights', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const forecast = await getFinancialForecast(tenantId);
+    res.json(forecast);
+  } catch (error) {
+    console.error('[Predictive Error]:', error);
+    res.status(500).json({ error: 'AI gagal memproses prediksi keuangan.' });
+  }
+});
+
+app.get('/api/stats/payroll-productivity', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const insights = await getPayrollProductivityInsights(tenantId);
+    res.json(insights);
+  } catch (error) {
+    console.error('[Payroll Impact Error]:', error);
+    res.status(500).json({ error: 'AI gagal memproses korelasi produktivitas gaji.' });
+  }
+});
+
+app.get('/api/stats/financial-health', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const health = await getFinancialHealthScore(tenantId);
+    res.json(health);
+  } catch (error) {
+    console.error('[Financial Health Error]:', error);
+    res.status(500).json({ error: 'AI gagal memproses skor kesehatan keuangan.' });
   }
 });
 

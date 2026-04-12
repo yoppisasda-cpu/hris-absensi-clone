@@ -47,11 +47,19 @@ body {
   box-shadow: var(--shadow-glass);
 }
 
-@utility primary-btn {
+.primary-btn {
   background: var(--primary-gradient);
   color: white;
   transition: all 0.2s ease;
   box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);
+  border-radius: 1rem;
+  padding: 0.75rem 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 
   &:hover {
     transform: translateY(-1px);

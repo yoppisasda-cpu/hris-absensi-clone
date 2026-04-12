@@ -242,8 +242,12 @@ export default function Header() {
 
                     <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-white/10 py-1">
                         <div className="text-right hidden sm:block">
-                            <p className="text-[11px] font-black tracking-tight dark:text-white leading-none capitalize italic">{profileName.toLowerCase()}</p>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">{roleLabel}</p>
+                            <p className="text-[11px] font-black tracking-tight dark:text-white leading-none capitalize italic">
+                                {isMounted ? profileName.toLowerCase() : 'memuat...'}
+                            </p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">
+                                {isMounted ? roleLabel : '-'}
+                            </p>
                         </div>
                         <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 ring-2 ring-white/10">
                             <UserCircle className="h-5 w-5" />

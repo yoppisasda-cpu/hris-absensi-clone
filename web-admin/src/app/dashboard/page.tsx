@@ -10,6 +10,10 @@ import FinanceVisualChart from "@/components/dashboard/FinanceVisualChart";
 import InventoryVisualStats from "@/components/dashboard/InventoryVisualStats";
 import AIInsights from "@/components/dashboard/AIInsights";
 import MorningBrief from "@/components/dashboard/MorningBrief";
+import ExecutiveForecast from "@/components/dashboard/ExecutiveForecast";
+import CashflowSankey from "@/components/dashboard/CashflowSankey";
+import PayrollProductivityInsight from "@/components/dashboard/PayrollProductivityInsight";
+import FinancialHealthScore from "@/components/dashboard/FinancialHealthScore";
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -106,6 +110,21 @@ export default function DashboardPage() {
                         loading={loading} 
                         adminName={adminName} 
                     />
+                </div>
+
+                {/* AI PREDICTIVE RADAR (FORECASTING) */}
+                <div className="mb-8">
+                    <ExecutiveForecast />
+                </div>
+
+                {/* AI FINANCIAL HEALTH SCORE */}
+                <div className="mb-8">
+                    <FinancialHealthScore />
+                </div>
+
+                {/* AI PAYROLL PRODUCTIVITY INSIGHT */}
+                <div className="mb-8">
+                    <PayrollProductivityInsight />
                 </div>
 
                 {/* AI INSIGHTS SECTION */}
@@ -210,6 +229,9 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* VISUAL FINANCIAL FLOW (SANKEY) */}
+                <CashflowSankey />
 
                 <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div className="rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl transition-all">

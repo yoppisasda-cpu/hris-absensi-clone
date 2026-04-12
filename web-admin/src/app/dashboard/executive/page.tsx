@@ -35,6 +35,7 @@ import {
   Legend
 } from 'recharts';
 import ExecutiveCard from '@/components/dashboard/ExecutiveCard';
+import ExecutiveForecast from '@/components/dashboard/ExecutiveForecast';
 
 export default function ExecutiveDashboard() {
   const router = useRouter();
@@ -151,6 +152,9 @@ export default function ExecutiveDashboard() {
             </button>
         </div>
       </div>
+
+      {/* NEW: AI PREDICTIVE RADAR */}
+      {!isTVMode && <ExecutiveForecast />}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
