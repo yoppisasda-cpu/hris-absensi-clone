@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, CalendarCheck, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit, Sparkles, Database, Upload } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useFeatures } from '@/lib/FeatureContext';
 import api from '@/lib/api';
@@ -24,8 +24,64 @@ const menuItems = [
 export default function Sidebar() {
     const router = useRouter();
     const pathname = usePathname();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { t } = useLanguage();
     const { plan, openUpgradeModal, hasFeature } = useFeatures();
+
+    const handleBackup = () => {
+        const token = localStorage.getItem('jwt_token');
+        const baseUrl = api.defaults.baseURL;
+        window.open(`${baseUrl}/admin/backup?token=${token}`, '_blank');
+    };
+
+    const handleRestoreClick = () => {
+        const confirmRestore = window.confirm(
+            "⚠️ PERINGATAN KRUSIAL!\n\nProses RESTORE akan menghapus seluruh data database saat ini dan menggantinya dengan data dari file backup.\n\nTindakan ini TIDAK DAPAT DIBATALKAN.\n\nApakah Anda yakin ingin melanjutkan?"
+        );
+        if (confirmRestore) {
+            fileInputRef.current?.click();
+        }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.name.endsWith('.sql.gz')) {
+            alert("Format file tidak valid. Harap unggah file .sql.gz");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('backup', file);
+
+        try {
+            const token = localStorage.getItem('jwt_token');
+            if (!token) throw new Error('Token not found');
+            const baseUrl = api.defaults.baseURL;
+
+            const response = await fetch(`${baseUrl}/admin/restore`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                alert("✅ BERHASIL: Database telah dipulihkan sepenuhnya. Halaman akan dimuat ulang.");
+                window.location.reload();
+            } else {
+                alert("❌ GAGAL: " + (result.details || result.error));
+            }
+        } catch (error: any) {
+            alert("❌ ERROR: Gagal menghubungi server: " + error.message);
+        } finally {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
     const [userRole, setUserRole] = useState<string | null>(null);
     const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | null>(null);
     const [allowedModules, setAllowedModules] = useState<string>('BOTH');
@@ -276,7 +332,7 @@ export default function Sidebar() {
                 </Link>
 
                 {/* MODUL ABSENSI & HRIS */}
-                {activeModule === 'ABSENSI' && (
+                {activeModule === 'ABSENSI' && userRole !== 'POS_VIEWER' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
                         <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manajemen SDM</div>
                         <Link href="/dashboard/employees" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
@@ -294,6 +350,10 @@ export default function Sidebar() {
                         <Link href="/dashboard/attendance" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <FileSpreadsheet className="h-5 w-5" />
                             Laporan Absensi
+                        </Link>
+                        <Link href="/dashboard/attendance/schedule" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <CalendarCheck className="h-5 w-5 text-indigo-400" />
+                            Penjadwalan Karyawan
                         </Link>
                         <Link href="/dashboard/leaves" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <CalendarDays className="h-5 w-5" />
@@ -350,8 +410,8 @@ export default function Sidebar() {
                     </div>
                 )}
 
-                {/* MODUL FINANCE & AKUNTING */}
-                {activeModule === 'FINANCE' && (
+                {/* MODUL FINANCE & AKUNTING (HANYA UNTUK STAFF FINANCE / OWNER) */}
+                {activeModule === 'FINANCE' && userRole !== 'POS_VIEWER' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
                         <div className="px-3 py-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Penjualan & Operasional</div>
                         <Link href="/dashboard/sales" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors">
@@ -454,6 +514,16 @@ export default function Sidebar() {
                     </div>
                 )}
 
+                {/* POS VIEWER SPECIFIC MENU */}
+                {userRole === 'POS_VIEWER' && (
+                    <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                        <div className="px-3 py-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest italic">Monitoring POS</div>
+                        <Link href="/dashboard/pos/reports" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
+                            <Monitor className="h-5 w-5" />
+                            Laporan Kasir (POS)
+                        </Link>
+                    </div>
+                )}
 
                 {/* UMUM / COMMON */}
                 <div className="px-3 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lainnya</div>
@@ -482,6 +552,34 @@ export default function Sidebar() {
                             <Laptop className="h-5 w-5" />
                             Integrasi API
                         </Link>
+                        <div className="flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium bg-slate-800/30 text-slate-500 cursor-not-allowed border border-slate-700/50">
+                            <div className="flex items-center gap-3">
+                                <FileText className="h-5 w-5" />
+                                Audit Logs
+                            </div>
+                            <span className="text-[9px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">Soon</span>
+                        </div>
+                        <button 
+                            onClick={handleBackup}
+                            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors border border-emerald-500/20 shadow-lg shadow-emerald-500/5 mt-1"
+                        >
+                            <Database className="h-5 w-5" />
+                            Backup Database (.gz)
+                        </button>
+                        <button 
+                            onClick={handleRestoreClick}
+                            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-rose-600/10 text-rose-400 hover:bg-slate-800 transition-colors border border-rose-500/20 shadow-lg shadow-rose-500/5 mt-1"
+                        >
+                            <Upload className="h-5 w-5" />
+                            Restore Database
+                        </button>
+                        <input 
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            className="hidden"
+                            accept=".sql.gz"
+                        />
                     </div>
                 )}
             </nav>

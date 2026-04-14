@@ -109,10 +109,24 @@ export async function compareFaces(referencePath: string, capturePath: string): 
             const capPart = fileToGenerativePart(capturePath, "image/jpeg");
 
             const prompt = `
-                Analyze these two images and determine if they show the same person.
-                Focus on permanent facial structures. Ignore age, facial hair, or accessories if possible.
-                Return ONLY a JSON object: {"isSamePerson": boolean, "confidenceScore": number (0 to 1)}.
+                Perform a rigorous biometric facial comparison between these two images.
+                
+                Analyze the following features:
+                1. Eye shape and inter-ocular distance.
+                2. Nasal bridge structure and width.
+                3. Jawline contour and chin shape.
+                4. Distinctive facial markers or bone structure.
+                
+                Ignore temporary variations like: expression, lighting, background, facial hair, or accessories.
+                
+                Scoring Rule:
+                - Provide a highly granular confidenceScore between 0.0 and 1.0. 
+                - Avoid rounding to 0.95. A real-world match should naturally vary (e.g., 0.88, 0.93, 0.97).
+                - Identical images should be 1.0.
+                
+                Return ONLY a JSON object: {"isSamePerson": boolean, "confidenceScore": number}.
             `;
+
 
             const result = await model.generateContent([prompt, refPart, capPart]);
             const response = await result.response;

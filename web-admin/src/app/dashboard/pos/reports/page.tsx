@@ -14,6 +14,17 @@ export default function POSReportsPage() {
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [branches, setBranches] = useState<any[]>([]);
     const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
+    const [isRestricted, setIsRestricted] = useState(false);
+
+    useEffect(() => {
+        const role = localStorage.getItem('userRole');
+        const branchId = localStorage.getItem('userBranchId');
+        
+        if (role === 'POS_VIEWER' && branchId && branchId !== '') {
+            setSelectedBranchId(branchId);
+            setIsRestricted(true);
+        }
+    }, []);
 
     const fetchBranches = async () => {
         try {
@@ -122,10 +133,15 @@ export default function POSReportsPage() {
                             <select
                                 value={selectedBranchId}
                                 onChange={(e) => setSelectedBranchId(e.target.value)}
-                                className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm focus:border-emerald-500 focus:outline-none transition-all font-bold text-slate-700 cursor-pointer shadow-sm"
+                                disabled={isRestricted}
+                                className={`w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm focus:border-emerald-500 focus:outline-none transition-all font-bold text-slate-700 shadow-sm ${isRestricted ? 'cursor-not-allowed bg-slate-50' : 'cursor-pointer'}`}
                             >
-                                <option value="all">Semua Cabang</option>
-                                <option value="null">Kantor Pusat</option>
+                                {!isRestricted && (
+                                    <>
+                                        <option value="all">Semua Cabang</option>
+                                        <option value="null">Kantor Pusat</option>
+                                    </>
+                                )}
                                 {branches.map((branch) => (
                                     <option key={branch.id} value={branch.id}>
                                         {branch.name}

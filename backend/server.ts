@@ -9,6 +9,8 @@ import path from 'path';
 import fs from 'fs';
 import { uploadToSupabase } from './supabase_storage';
 import dotenv from 'dotenv';
+import { spawn } from 'child_process';
+import zlib from 'zlib';
 import { initCleanupCron, runCleanup } from './cron_jobs';
 import { compareFaces } from './faceAI';
 import { getAIChatResponse, generateSubscriptionResponse } from './chatAI';
@@ -443,6 +445,19 @@ const assetStorage = multer.diskStorage({
 });
 const uploadAsset = multer({ storage: assetStorage });
 
+// --- CONFIG MULTER UNTUK RESTORE DATABASE ---
+const restoreStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = 'uploads/restores';
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, 'restore-' + Date.now() + '.sql.gz');
+  }
+});
+const uploadRestore = multer({ storage: restoreStorage });
+
 // --- STORAGE CONFIGURATION (Unified & Absolute) ---
 const uploadAttendance = multer({ dest: path.join(process.cwd(), 'uploads/attendance/') });
 const uploadFaceReference = multer({ dest: path.join(process.cwd(), 'uploads/face_references/') });
@@ -457,8 +472,14 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
   const apiKey = req.headers['x-api-key'];
 
   // 1. JWT PATH (Login Aplikasi Standar)
+  let token = '';
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token as string;
+  }
+
+  if (token) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       (req as any).tenantId = Number(decoded.companyId);
@@ -1016,6 +1037,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         companyId: user.companyId,
+        branchId: user.branchId,
         role: user.role,
         language: user.language,
         plan: (user as any).company?.plan,
@@ -1304,6 +1326,169 @@ app.get('/api/companies', async (req: Request, res: Response) => {
     res.json(mappedCompanies);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil daftar klien' });
+  }
+});
+
+// A2.1. Endpoint Database Backup (Super Admin Only)
+app.get('/api/admin/backup', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).userRole;
+    if (userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Akses Ditolak: Hanya Super Admin yang dapat mencadangkan sistem' });
+    }
+
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) return res.status(500).json({ error: 'Konfigurasi database tidak ditemukan' });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `aivola_backup_${timestamp}.sql.gz`;
+
+    console.log(`[BACKUP] Starting database backup: ${filename}`);
+
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Extract connection string for pg_dump
+    const pgDumpBinary = process.env.PG_DUMP_PATH || 'pg_dump';
+    
+    // Improved password handling for Windows: extract it and use PGPASSWORD env var
+    let pgPassword = '';
+    try {
+        const urlObj = new URL(dbUrl);
+        pgPassword = decodeURIComponent(urlObj.password);
+    } catch (e) {
+        console.warn("[BACKUP] Failed to parse DATABASE_URL for password extraction");
+    }
+
+    console.log(`[BACKUP] Executing backup using: ${pgDumpBinary}`);
+
+    const pgDump = spawn(pgDumpBinary, ["-d", dbUrl], { 
+      env: { ...process.env, PGPASSWORD: pgPassword }
+    });
+    
+    const gzip = zlib.createGzip();
+
+    pgDump.stdout.pipe(gzip).pipe(res);
+
+    pgDump.stderr.on('data', (data) => {
+      console.error(`[BACKUP ERROR STDOUT] ${data}`);
+    });
+
+    pgDump.on('error', (err: any) => {
+      console.error(`[BACKUP CRITICAL] Failed to start pg_dump: ${err.message}`);
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: 'Utilitas backup (pg_dump) tidak ditemukan di server. Silakan hubungi admin sistem untuk instalasi PostgreSQL Client Tools.' 
+        });
+      }
+    });
+
+    pgDump.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`[BACKUP] pg_dump process exited with code ${code}`);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Proses pencadangan gagal di tengah jalan.' });
+        }
+      } else {
+        console.log(`[BACKUP SUCCESS] ${filename} sent to user.`);
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Backup Crash:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Terjadi kesalahan sistem saat pencadangan' });
+    }
+  }
+});
+
+// --- RESTORE DATABASE (SUPERADMIN ONLY) ---
+app.post('/api/admin/restore', tenantMiddleware, uploadRestore.single('backup'), async (req: Request, res: Response) => {
+  const filePath = req.file?.path;
+  
+  try {
+    const userRole = (req as any).userRole;
+    if (userRole !== 'SUPERADMIN') {
+      cleanupLocalFile(filePath || null);
+      return res.status(403).json({ error: 'Akses Ditolak: Hanya Super Admin yang dapat memulihkan sistem' });
+    }
+
+    if (!filePath) {
+      return res.status(400).json({ error: 'File backup tidak ditemukan atau gagal diunggah.' });
+    }
+
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
+      cleanupLocalFile(filePath);
+      return res.status(500).json({ error: 'Konfigurasi database tidak ditemukan' });
+    }
+
+    // Extract password for PGPASSWORD
+    let pgPassword = '';
+    try {
+        const urlObj = new URL(dbUrl);
+        pgPassword = decodeURIComponent(urlObj.password);
+    } catch (e) {
+        console.warn("[RESTORE] Failed to parse DATABASE_URL for password extraction");
+    }
+
+    // Derive PSQL path from PG_DUMP_PATH
+    const pgDumpPath = process.env.PG_DUMP_PATH || 'pg_dump';
+    const psqlBinary = pgDumpPath.includes('pg_dump') 
+      ? pgDumpPath.replace('pg_dump', 'psql') 
+      : 'psql';
+
+    console.log(`[RESTORE] Starting restoration from: ${filePath}`);
+    console.log(`[RESTORE] Using binary: ${psqlBinary}`);
+
+    // Spawn psql
+    const psql = spawn(`"${psqlBinary}"`, ["-d", dbUrl], { 
+      shell: true,
+      env: { ...process.env, PGPASSWORD: pgPassword }
+    });
+
+    const gunzip = zlib.createGunzip();
+    const fileStream = fs.createReadStream(filePath);
+
+    // Pipe: File -> Gunzip -> PSQL Stdin
+    fileStream.pipe(gunzip).pipe(psql.stdin);
+
+    let errorData = '';
+    psql.stderr.on('data', (data) => {
+      errorData += data.toString();
+      console.error(`[RESTORE PSQL ERROR] ${data}`);
+    });
+
+    psql.on('error', (err: any) => {
+      console.error(`[RESTORE CRITICAL] Failed to start psql: ${err.message}`);
+      cleanupLocalFile(filePath);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Gagal menjalankan utilitas restore: ' + err.message });
+      }
+    });
+
+    psql.on('close', (code) => {
+      console.log(`[RESTORE] psql process exited with code ${code}`);
+      cleanupLocalFile(filePath);
+      
+      if (code === 0) {
+        res.json({ success: true, message: 'Database berhasil dipulihkan sepenuhnya.' });
+      } else {
+        if (!res.headersSent) {
+          res.status(500).json({ 
+            error: 'Proses restore selesai dengan kesalahan.', 
+            details: errorData || 'Cek console server untuk detail lebih lanjut.' 
+          });
+        }
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Restore API Error:', error);
+    cleanupLocalFile(filePath || null);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Gagal melakukan restore: ' + error.message });
+    }
   }
 });
 
@@ -1940,6 +2125,19 @@ app.patch('/api/companies/my/payroll-settings', tenantMiddleware, async (req: Re
 app.get('/api/branches', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+    const userId = (req as any).userId;
+
+    // --- POS_VIEWER BRANCH ISOLATION ---
+    if (userRole === 'POS_VIEWER') {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
+      if (user?.branchId) {
+        // Return only the assigned branch
+        const branches = await prisma.branch.findMany({ where: { id: user.branchId, companyId: tenantId } });
+        return res.json(branches);
+      }
+    }
+
     // @ts-ignore
     const branches = await prisma.branch.findMany({ where: { companyId: tenantId } });
     res.json(branches);
@@ -2103,7 +2301,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
       }
 
       // 3. Check Admin/Back-office Limit
-      const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING'] as any;
+      const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING', 'POS_VIEWER'] as any;
       if (backOfficeRoles.includes(role)) {
           // Gunakan raw query untuk melewati validasi enum Prisma yang terkadang cache
           const adminCountResult: any = await prisma.$queryRawUnsafe(
@@ -2166,7 +2364,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
         email,
         password: hashedPassword,
         role: role || 'EMPLOYEE',
-        companyId: tenantId,
+        companyId: targetTenantId,
         branchId: isNaN(parsedBranchId as number) ? null : parsedBranchId,
         shiftId: isNaN(parsedShiftId as number) ? null : parsedShiftId,
         basicSalary: isNaN(salary) ? 0 : salary,
@@ -2219,7 +2417,7 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
     const { 
       name, email, role, basicSalary, allowance, overtimeRate, 
       jobTitle, division, grade, joinDate, contractEndDate, 
-      reportToId, isActive, resignDate,
+      reportToId, branchId, isActive, resignDate,
       bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance
     } = req.body;
 
@@ -2278,6 +2476,7 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
         joinDate: joinDate ? new Date(joinDate) : null,
         contractEndDate: contractEndDate ? new Date(contractEndDate) : null,
         reportToId: reportToId ? parseInt(reportToId) : null,
+        branchId: branchId ? parseInt(branchId) : null,
         isActive: isActive !== undefined ? !!isActive : undefined,
         resignDate: resignDate ? new Date(resignDate) : undefined,
         bpjsKesehatan: bpjsKesehatan !== undefined ? !!bpjsKesehatan : undefined,
@@ -2372,12 +2571,15 @@ app.patch('/api/users/:id/deactivate', tenantMiddleware, async (req: Request, re
 // B2. Endpoint Mendapatkan Daftar Karyawan (Menggunakan Tenant Middleware)
 app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).tenantId; // Diambil dari middleware
+    const tenantId = (req as any).tenantId; 
     const userRole = (req as any).userRole;
-    const { status } = req.query; // 'active' atau 'inactive'
+    const { status } = req.query;
 
-    // WAJIB: Selalu gunakan klausa `where: { companyId: tenantId }`!
-    // Ini memastikan PT. A tidak bisa melihat karyawan PT. B
+    // SECURITY: POS_VIEWER is strictly for turnover monitoring, NO HR access.
+    if (userRole === 'POS_VIEWER') {
+      return res.status(403).json({ error: 'Akses Ditolak: Role Anda tidak memiliki izin untuk melihat data SDM.' });
+    }
+
     const users = await (prisma.user as any).findMany({
       where: {
         ...(userRole === 'SUPERADMIN' 
@@ -2388,18 +2590,168 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
               name: { not: 'Aivola Owner' }
             }
         ),
-        ...(status === 'inactive' ? { isActive: false } : { isActive: true }) // Default active
+        ...(status === 'inactive' ? { isActive: false } : { isActive: true })
       },
       include: {
         shift: true,
         branch: true,
-        reportTo: { select: { id: true, name: true } } // Phase 42
+        reportTo: { select: { id: true, name: true } }
       }
     });
 
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil data karyawan' });
+  }
+});
+
+// B2.1 Endpoint Mendapatkan Daftar Jadwal Shift (Kalender)
+app.get('/api/schedules', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { month, year } = req.query;
+
+    const schedules = await (prisma as any).shiftSchedule.findMany({
+      where: {
+        companyId: tenantId,
+        ...(month && year ? {
+          date: {
+            gte: new Date(parseInt(year as string), parseInt(month as string) - 1, 1),
+            lt: new Date(parseInt(year as string), parseInt(month as string), 1)
+          }
+        } : {})
+      },
+      include: {
+        user: { select: { id: true, name: true, jobTitle: true } },
+        shift: true
+      },
+      orderBy: { date: 'asc' }
+    });
+
+    res.json(schedules);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal mengambil data jadwal' });
+  }
+});
+
+// B2.2 Endpoint Penugasan Jadwal Massal (Bulk Assignment)
+app.post('/api/schedules/bulk', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { userIds, startDate, endDate, shiftId, isOff } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || !startDate || !endDate) {
+      return res.status(400).json({ error: 'Data tidak lengkap (userIds, startDate, endDate wajib ada).' });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const results = [];
+
+    for (const userId of userIds) {
+      let current = new Date(start);
+      while (current <= end) {
+        const schedule = await (prisma as any).shiftSchedule.upsert({
+          where: {
+            userId_date: {
+              userId: userId,
+              date: new Date(current.toISOString().split('T')[0])
+            }
+          },
+          update: {
+            shiftId: isOff ? null : (shiftId ? parseInt(shiftId) : null),
+            isOff: !!isOff,
+            companyId: tenantId
+          },
+          create: {
+            companyId: tenantId,
+            userId: userId,
+            shiftId: isOff ? null : (shiftId ? parseInt(shiftId) : null),
+            isOff: !!isOff,
+            date: new Date(current.toISOString().split('T')[0])
+          }
+        });
+        results.push(schedule);
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    res.json({ message: `Berhasil merencanakan ${results.length} penugasan jadwal.`, count: results.length });
+  } catch (error: any) {
+    console.error('Bulk Schedule Error:', error);
+    res.status(500).json({ error: 'Gagal menyimpan jadwal massal: ' + error.message });
+  }
+});
+
+// B2.2.5 Endpoint Penyesuaian Jadwal Matrix
+app.post('/api/schedules/matrix', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { changes } = req.body; // Array of { userId, date, shiftId, isOff, isDefault }
+
+    if (!changes || !Array.isArray(changes)) {
+      return res.status(400).json({ error: 'Data perubahan tidak valid.' });
+    }
+
+    let updatedCount = 0;
+    for (const change of changes) {
+      const dateTarget = new Date(change.date);
+      dateTarget.setHours(0, 0, 0, 0);
+
+      if (change.isDefault) {
+        // Hapus jika kembali ke default
+        await (prisma as any).shiftSchedule.deleteMany({
+          where: { userId: change.userId, date: dateTarget }
+        });
+      } else {
+        // Upsert untuk penugasan spesifik
+        await (prisma as any).shiftSchedule.upsert({
+          where: {
+            userId_date: {
+              userId: change.userId,
+              date: dateTarget
+            }
+          },
+          update: {
+            shiftId: change.isOff ? null : parseInt(change.shiftId),
+            isOff: !!change.isOff,
+            companyId: tenantId
+          },
+          create: {
+            companyId: tenantId,
+            userId: change.userId,
+            shiftId: change.isOff ? null : parseInt(change.shiftId),
+            isOff: !!change.isOff,
+            date: dateTarget
+          }
+        });
+      }
+      updatedCount++;
+    }
+
+    res.json({ message: `Berhasil menyimpan ${updatedCount} perubahan jadwal.`, count: updatedCount });
+  } catch (error: any) {
+    console.error('Matrix Schedule Error:', error);
+    res.status(500).json({ error: 'Gagal menyimpan perubahan jadwal: ' + error.message });
+  }
+});
+
+// B2.3 Endpoint Hapus Jadwal Spesifik
+app.delete('/api/schedules/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const scheduleId = parseInt(req.params.id);
+
+    const schedule = await (prisma as any).shiftSchedule.findFirst({
+      where: { id: scheduleId, companyId: tenantId }
+    });
+
+    if (!schedule) return res.status(404).json({ error: 'Jadwal tidak ditemukan' });
+
+    await (prisma as any).shiftSchedule.delete({ where: { id: scheduleId } });
+    res.json({ message: 'Jadwal berhasil dihapus (Sistem akan menggunakan fallback shift profil)' });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menghapus jadwal' });
   }
 });
 
@@ -2418,14 +2770,32 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
     }
 
     // 1. Tarik Data Karyawan beserta Cabang & Perusahaannya
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      // @ts-ignore
-      include: { company: true, branch: true, shift: true }
-    });
+    const todayStr = new Date().toISOString().split('T')[0];
+    const [user, manualSchedule] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        // @ts-ignore
+        include: { company: true, branch: true, shift: true }
+      }),
+      (prisma as any).shiftSchedule.findFirst({
+        where: { 
+          userId: userId, 
+          date: new Date(todayStr) 
+        },
+        include: { shift: true }
+      })
+    ]);
 
     // @ts-ignore
     if (!user || !user.company) return res.status(404).json({ error: 'Data karyawan atau perusahaan tidak ditemukan' });
+
+    // Determine target shift for today
+    const effectiveShift = manualSchedule ? (manualSchedule.isOff ? null : manualSchedule.shift) : user.shift;
+    const isScheduledOff = manualSchedule?.isOff;
+
+    if (isScheduledOff) {
+      return res.status(400).json({ error: 'Hari ini Anda dijadwalkan LIBUR (OFF) di kalender kerja.' });
+    }
 
     // --- FACE VERIFICATION (Phase 50/52) ---
     let faceSimilarityScore = null;
@@ -2526,11 +2896,9 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
         lng: parseFloat(lng),
         photoUrl: finalPhotoUrl,
         ...(() => {
-            // @ts-ignore
-            if (user?.shift?.startTime) {
+            if (effectiveShift?.startTime) {
                 const now = new Date();
-                // @ts-ignore
-                const [sh, sm] = user.shift.startTime.split(':').map(Number);
+                const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
                 const shiftStartTime = new Date(now);
                 shiftStartTime.setHours(sh, sm, 0, 0);
                 
@@ -2659,6 +3027,12 @@ app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response)
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
+
+    // SECURITY: POS_VIEWER cannot see attendance logs
+    if (userRole === 'POS_VIEWER') {
+       return res.json([]); // Return empty list instead of 403 to avoid UI crashes on dashboard
+    }
+
     const attendances = await prisma.attendance.findMany({
       where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
       include: { user: { select: { name: true, email: true } } },
@@ -4015,12 +4389,16 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
-// F2. Melihat daftar payroll perusahaan
 app.get('/api/payroll', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
     const { month, year, branchId } = req.query;
+
+    // SECURITY: POS_VIEWER cannot see payroll data
+    if (userRole === 'POS_VIEWER') {
+      return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki izin untuk melihat data penggajian.' });
+    }
 
     const whereClause: any = userRole === 'SUPERADMIN' ? {} : { companyId: tenantId };
     if (month) whereClause.month = parseInt(month as string);
@@ -4044,6 +4422,13 @@ app.get('/api/payroll', tenantMiddleware, async (req: Request, res: Response) =>
 app.get('/api/payroll/export', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const userRole = (req as any).userRole;
+
+    // SECURITY: POS_VIEWER cannot export payroll
+    if (userRole === 'POS_VIEWER') {
+        return res.status(403).json({ error: 'Akses Ditolak.' });
+    }
+
     const { month, year, branchId } = req.query;
     const ExcelJS = require('exceljs');
 
@@ -4388,6 +4773,12 @@ app.get('/api/loans', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
+
+    // SECURITY: POS_VIEWER cannot see loan data
+    if (userRole === 'POS_VIEWER') {
+        return res.json([]);
+    }
+
     const loans = await prisma.loan.findMany({
       where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
       include: { user: { select: { name: true, email: true } } },
@@ -4514,6 +4905,11 @@ app.get('/api/reimbursements', tenantMiddleware, async (req: Request, res: Respo
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
 
+    // SECURITY: POS_VIEWER cannot see reimbursements
+    if (userRole === 'POS_VIEWER') {
+        return res.json([]);
+    }
+
     const reimbursements = await prisma.reimbursement.findMany({
       where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
       include: {
@@ -4633,6 +5029,11 @@ app.get('/api/leaves', tenantMiddleware, async (req: Request, res: Response) => 
     const userRole = (req as any).userRole;
     const userId = (req as any).userId;
 
+    // SECURITY: POS_VIEWER cannot see leave requests
+    if (userRole === 'POS_VIEWER') {
+        return res.json([]);
+    }
+
     let whereClause: any = { companyId: tenantId };
     
     // Hirarki: Manager hanya lihat yang dia harus approve
@@ -4733,6 +5134,12 @@ app.get('/api/vents', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
+
+    // SECURITY: POS_VIEWER cannot see internal feedback
+    if (userRole === 'POS_VIEWER') {
+        return res.json([]);
+    }
+
     const vents = await (prisma as any).employeeVent.findMany({
       where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
       include: { 
@@ -4761,6 +5168,12 @@ app.get('/api/learning/objectives', tenantMiddleware, async (req: Request, res: 
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
     const userRole = (req as any).userRole;
+
+    // SECURITY: POS_VIEWER cannot access LMS
+    if (userRole === 'POS_VIEWER') {
+        return res.json([]);
+    }
+
     const objectives = await (prisma as any).learningObjective.findMany({
       where: userRole === 'SUPERADMIN' ? { userId: userId } : { companyId: tenantId, userId: userId },
       include: { material: true },
@@ -5721,55 +6134,57 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     const inventoryValue = Number(inventoryValRes[0]?.value || 0);
 
     // 7. NEW: Rincian Gaji Karyawan (Untuk Dashboard Coffee)
-    const activeStaff = await prisma.user.findMany({
-        where: { companyId: tenantId, isActive: true },
-        select: { id: true, name: true, jobTitle: true, basicSalary: true, allowance: true }
-    });
-
-    const staff_list = await Promise.all(activeStaff.map(async (st) => {
-        const attendances = await prisma.attendance.findMany({
-            where: { userId: st.id, clockIn: { gte: firstDayOfMonth } }
+    let staff_list: any[] = [];
+    if (userRole !== 'POS_VIEWER') {
+        const activeStaff = await prisma.user.findMany({
+            where: { companyId: tenantId, isActive: true },
+            select: { id: true, name: true, jobTitle: true, basicSalary: true, allowance: true }
         });
 
-        let totalSeconds = 0;
-        attendances.forEach(a => {
-            if (a.clockIn && a.clockOut) {
-                totalSeconds += (new Date(a.clockOut).getTime() - new Date(a.clockIn).getTime()) / 1000;
-            }
-        });
+        staff_list = await Promise.all(activeStaff.map(async (st) => {
+            const attendances = await prisma.attendance.findMany({
+                where: { userId: st.id, clockIn: { gte: firstDayOfMonth } }
+            });
 
-        const lateCount = attendances.filter(a => a.status === 'LATE').length;
-        const deductions = lateCount * (company?.lateDeductionRate || 0);
+            let totalSeconds = 0;
+            attendances.forEach(a => {
+                if (a.clockIn && a.clockOut) {
+                    totalSeconds += (new Date(a.clockOut).getTime() - new Date(a.clockIn).getTime()) / 1000;
+                }
+            });
 
-        return {
-            id: st.id,
-            name: st.name,
-            job_title: st.jobTitle,
-            worked_hours: Math.round((totalSeconds / 3600) * 10) / 10, // 1 decimal place
-            basic_salary: st.basicSalary,
-            allowance: st.allowance,
-            estimated_payroll: Math.max(0, (st.basicSalary + st.allowance) - deductions)
-        };
-    }));
+            const lateCount = attendances.filter(a => a.status === 'LATE').length;
+            const deductions = lateCount * (company?.lateDeductionRate || 0);
+
+            return {
+                id: st.id,
+                name: st.name,
+                job_title: st.jobTitle,
+                worked_hours: Math.round((totalSeconds / 3600) * 10) / 10, // 1 decimal place
+                basic_salary: st.basicSalary,
+                allowance: st.allowance,
+                late_deductions: deductions,
+                total_salary: (st.basicSalary || 0) + (st.allowance || 0) - deductions
+            };
+        }));
+    }
 
     res.json({
-      totalEmployees,
-      total_staff: totalEmployees, // Alias for Dashboard Compatibility
-      presentCount,
-      lateCount: lateCountCurrentDay,
-      leaveCount,
-      totalBalance,
-      monthlyProfit,
-      totalPayable,
-      totalReceivable,
-      inventoryValue,
-      companyName: company?.name || 'Perusahaan Anda',
-      companyContract: company,
-      staff_list // Detailed data for Gaji Page sync
+        companyName: company?.name,
+        totalEmployees: userRole === 'POS_VIEWER' ? 0 : totalEmployees,
+        presentCount: userRole === 'POS_VIEWER' ? 0 : presentCount,
+        lateCount: userRole === 'POS_VIEWER' ? 0 : lateCountCurrentDay,
+        leaveCount: userRole === 'POS_VIEWER' ? 0 : leaveCount,
+        totalBalance: userRole === 'POS_VIEWER' ? 0 : totalBalance,
+        monthlyProfit: userRole === 'POS_VIEWER' ? (incomesMonth._sum.amount || 0) : monthlyProfit, // Profit for POS_VIEWER is just Gross Income
+        totalPayable: userRole === 'POS_VIEWER' ? 0 : totalPayable,
+        totalReceivable: userRole === 'POS_VIEWER' ? 0 : totalReceivable,
+        inventoryValue: inventoryValue,
+        staff_list
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Gagal mengambil statistik dashboard.' });
+  } catch (error: any) {
+    console.error('[Summary Error]:', error);
+    res.status(500).json({ error: 'Gagal mengambil ringkasan data.' });
   }
 });
 
@@ -5778,13 +6193,20 @@ app.get('/api/stats/contract-alerts', tenantMiddleware, async (req: Request, res
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
+
+    // SECURITY: POS_VIEWER has no business with employee contracts
+    if (userRole === 'POS_VIEWER') {
+        return res.json([]);
+    }
+
     const today = new Date();
     const thirtyDaysLater = new Date();
     thirtyDaysLater.setDate(today.getDate() + 30);
 
     const expiringSoon = await prisma.user.findMany({
       where: {
-        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        companyId: tenantId,
+        isActive: true,
         contractEndDate: {
           gte: today,
           lte: thirtyDaysLater
@@ -5793,7 +6215,6 @@ app.get('/api/stats/contract-alerts', tenantMiddleware, async (req: Request, res
       select: {
         id: true,
         name: true,
-        email: true,
         contractEndDate: true,
         jobTitle: true
       },
@@ -5811,6 +6232,7 @@ app.get('/api/stats/contract-alerts', tenantMiddleware, async (req: Request, res
 app.get('/api/stats/ai-insights', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
     
     // Fetch Company to check purchasedInsights & addons
     const company = await prisma.company.findUnique({
@@ -5898,16 +6320,20 @@ app.get('/api/stats/ai-insights', tenantMiddleware, async (req: Request, res: Re
         where: { companyId: tenantId, stock: { lte: 5 } },
         take: 1
     });
-    const lowStockCount = await prisma.product.count({
-        where: { companyId: tenantId, stock: { lte: 5 } }
-    });
 
-    if (lowStockCount > 0) {
+    if (lowStockItems.length > 0) {
         insights.push({ 
-            type: 'danger', 
-            message: `${lowStockCount} Stok Kritis`, 
-            detail: `Item '${lowStockItems[0]?.name}' dan ${lowStockCount - 1} lainnya hampir habis. Segera restock!` 
+            type: 'warning', 
+            message: 'Stok Item Menipis', 
+            detail: `Item '${lowStockItems[0].name}' tersisa sedikit (${lowStockItems[0].stock}). Segera lakukan restok.` 
         });
+    }
+
+    // SECURITY FILTER: Limit AI Insights for POS_VIEWER
+    if (userRole === 'POS_VIEWER') {
+        // Remove attendance/HR insights, only keep Sales/Stock
+        const filtered = insights.filter(ins => !ins.message.includes('Terlambat') && !ins.message.includes('Kedisiplinan'));
+        return res.json(filtered);
     }
 
     // 4. Contract Insight (HR Risk)
@@ -6435,6 +6861,12 @@ app.get('/api/stats/trends', tenantMiddleware, async (req: Request, res: Respons
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
+
+    // SECURITY: POS_VIEWER cannot see attendance trends
+    if (userRole === 'POS_VIEWER') {
+        return res.json([]);
+    }
+
     const trends = [];
 
     for (let i = 6; i >= 0; i--) {
@@ -9918,18 +10350,28 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
     const { branchId } = req.query;
 
     // 2. Build query based on branch and role
-    let sales;
-    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE') {
+    let sales: any[];
+    const isPosViewer = (user?.role as string) === 'POS_VIEWER';
+    const invoiceFilter = isPosViewer ? `AND s."invoiceNumber" LIKE 'POS-%'` : '';
+
+    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE' || isPosViewer) {
       // Admins and owners see everything for the company, but can filter by branchId if provided
-      if (branchId && branchId !== 'all') {
-        const bId = branchId === 'null' ? null : parseInt(branchId as string);
+      let effectiveBranchId = branchId;
+
+      // FORCED ISOLATION: POS_VIEWER with assigned branch cannot see others
+      if (isPosViewer && user?.branchId) {
+          effectiveBranchId = user.branchId.toString();
+      }
+
+      if (effectiveBranchId && effectiveBranchId !== 'all') {
+        const bId = effectiveBranchId === 'null' ? null : parseInt(effectiveBranchId as string);
         
         if (bId === null) {
           sales = await prisma.$queryRawUnsafe(`
             SELECT s.*, c.name as "customerName"
             FROM "Sale" s
             LEFT JOIN "Customer" c ON s."customerId" = c.id
-            WHERE s."companyId" = $1 AND s."branchId" IS NULL
+            WHERE s."companyId" = $1 AND s."branchId" IS NULL ${invoiceFilter}
             ORDER BY s."date" DESC
           `, tenantId);
         } else {
@@ -9937,7 +10379,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
             SELECT s.*, c.name as "customerName"
             FROM "Sale" s
             LEFT JOIN "Customer" c ON s."customerId" = c.id
-            WHERE s."companyId" = $1 AND s."branchId" = $2
+            WHERE s."companyId" = $1 AND s."branchId" = $2 ${invoiceFilter}
             ORDER BY s."date" DESC
           `, tenantId, bId);
         }
@@ -9946,7 +10388,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
           SELECT s.*, c.name as "customerName"
           FROM "Sale" s
           LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 
+          WHERE s."companyId" = $1 ${invoiceFilter}
           ORDER BY s."date" DESC
         `, tenantId);
       }
@@ -9958,7 +10400,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
           FROM "Sale" s
           JOIN "User" u ON s."cashierId" = u.id
           LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 AND u."branchId" IS NULL
+          WHERE s."companyId" = $1 AND u."branchId" IS NULL ${invoiceFilter}
           ORDER BY s."date" DESC
         `, tenantId);
       } else {
@@ -9967,7 +10409,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
           FROM "Sale" s
           JOIN "User" u ON s."cashierId" = u.id
           LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 AND u."branchId" = $2
+          WHERE s."companyId" = $1 AND u."branchId" = $2 ${invoiceFilter}
           ORDER BY s."date" DESC
         `, tenantId, user?.branchId);
       }
@@ -9991,16 +10433,29 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     
     const { branchId } = req.query;
     
+    // 2b. Build query based on branch and role
     let sales: any[];
-    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE') {
-      if (branchId && branchId !== 'all') {
-        const bId = branchId === 'null' ? null : parseInt(branchId as string);
+    const isPosViewer = (user?.role as string) === 'POS_VIEWER';
+    const invoiceFilter = isPosViewer ? `AND s."invoiceNumber" LIKE 'POS-%'` : '';
+
+    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE' || isPosViewer) {
+      // Admins and owners see everything for the company, but can filter by branchId if provided
+      let effectiveBranchId = branchId;
+
+      // FORCED ISOLATION: POS_VIEWER with assigned branch cannot see others
+      if (isPosViewer && user?.branchId) {
+          effectiveBranchId = user.branchId.toString();
+      }
+
+      if (effectiveBranchId && effectiveBranchId !== 'all') {
+        const bId = effectiveBranchId === 'null' ? null : parseInt(effectiveBranchId as string);
+        
         if (bId === null) {
           sales = await prisma.$queryRawUnsafe(`
             SELECT s.*, c.name as "customerName"
             FROM "Sale" s
             LEFT JOIN "Customer" c ON s."customerId" = c.id
-            WHERE s."companyId" = $1 AND s."branchId" IS NULL
+            WHERE s."companyId" = $1 AND s."branchId" IS NULL ${invoiceFilter}
             ORDER BY s."date" DESC
           `, tenantId);
         } else {
@@ -10008,7 +10463,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
             SELECT s.*, c.name as "customerName"
             FROM "Sale" s
             LEFT JOIN "Customer" c ON s."customerId" = c.id
-            WHERE s."companyId" = $1 AND s."branchId" = $2
+            WHERE s."companyId" = $1 AND s."branchId" = $2 ${invoiceFilter}
             ORDER BY s."date" DESC
           `, tenantId, bId);
         }
@@ -10017,18 +10472,19 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
           SELECT s.*, c.name as "customerName"
           FROM "Sale" s
           LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 
+          WHERE s."companyId" = $1 ${invoiceFilter}
           ORDER BY s."date" DESC
         `, tenantId);
       }
     } else {
+      // Cashiers/Staff see only their branch's sales
       if (user?.branchId === null) {
         sales = await prisma.$queryRawUnsafe(`
           SELECT s.*, c.name as "customerName"
           FROM "Sale" s
           JOIN "User" u ON s."cashierId" = u.id
           LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 AND u."branchId" IS NULL
+          WHERE s."companyId" = $1 AND u."branchId" IS NULL ${invoiceFilter}
           ORDER BY s."date" DESC
         `, tenantId);
       } else {
@@ -10037,7 +10493,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
           FROM "Sale" s
           JOIN "User" u ON s."cashierId" = u.id
           LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 AND u."branchId" = $2
+          WHERE s."companyId" = $1 AND u."branchId" = $2 ${invoiceFilter}
           ORDER BY s."date" DESC
         `, tenantId, user?.branchId);
       }
@@ -10100,6 +10556,13 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
 
     const sales: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Sale" WHERE id = $1 AND "companyId" = $2`, saleId, tenantId);
     if (sales.length === 0) return res.status(404).json({ error: 'Penjualan tidak ditemukan' });
+    const sale = sales[0];
+
+    // SECURITY: POS_VIEWER can only see POS transactions
+    const userRole = (req as any).userRole;
+    if (userRole === 'POS_VIEWER' && !sale.invoiceNumber?.startsWith('POS-')) {
+       return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki izin untuk melihat detail transaksi non-POS.' });
+    }
 
     const items = await prisma.$queryRawUnsafe(`
       SELECT si.*, p.name as product_name, p.sku as product_sku, p.unit as product_unit
@@ -10747,11 +11210,11 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
     let user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
     
     // Robustness for Admins/SuperAdmins who might not be tied to a specific branch
-    if (!user?.branchId && (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE')) {
+    if (!user?.branchId && (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE' || (user?.role as string) === 'POS_VIEWER')) {
       const firstBranch = await prisma.branch.findFirst({ where: { companyId: tenantId } });
       if (firstBranch) {
         user = { ...user!, branchId: firstBranch.id };
-        console.log(`[POS] Admin viewing summary for Branch ${firstBranch.id} (Auto-fallback)`);
+        console.log(`[POS] Admin/Viewer viewing summary for Branch ${firstBranch.id} (Auto-fallback)`);
       }
     }
 

@@ -688,6 +688,7 @@ export default function EmployeesPage() {
                                             <option value="PURCHASING">Purchasing (Pembelian)</option>
                                             <option value="OPERATIONAL">Operational (Gudang/Toko)</option>
                                             <option value="CASHIER">Cashier (Kasir)</option>
+                                            <option value="POS_VIEWER">POS Viewer (Monitoring Omset)</option>
                                             <option value="EMPLOYEE">Karyawan Biasa</option>
                                         </select>
                                     </div>

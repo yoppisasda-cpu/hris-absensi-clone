@@ -25,8 +25,10 @@ export default function LoginPage() {
       const res = await api.post('/auth/login', { email, password });
       const { token, user } = res.data;
       
-      if (user.role === 'EMPLOYEE') {
-        setErrorMsg('Akses Web Admin Ditolak: Hanya Admin yang dapat masuk ke panel ini.');
+      // Only allow roles that should have access to the Web Admin
+      const allowedRoles = ['OWNER', 'ADMIN', 'SUPERADMIN', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL', 'POS_VIEWER'];
+      if (!allowedRoles.includes(user.role)) {
+        setErrorMsg('Akses Web Admin Ditolak: Anda tidak memiliki izin untuk masuk ke panel ini.');
         setIsLoading(false);
         return;
       }
@@ -36,6 +38,7 @@ export default function LoginPage() {
       localStorage.setItem('currentTenantId', user.companyId.toString()); // Initialize for company switcher
       localStorage.setItem('userName', user.name);
       localStorage.setItem('userRole', user.role);
+      localStorage.setItem('userBranchId', user.branchId ? user.branchId.toString() : '');
       localStorage.setItem('userPlan', user.plan || 'STARTER');
       localStorage.setItem('userAddons', JSON.stringify(user.addons || []));
       
