@@ -1337,8 +1337,14 @@ app.get('/api/admin/backup', tenantMiddleware, async (req: Request, res: Respons
       return res.status(403).json({ error: 'Akses Ditolak: Hanya Super Admin yang dapat mencadangkan sistem' });
     }
 
-    const dbUrl = process.env.DATABASE_URL;
+    let dbUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
     if (!dbUrl) return res.status(500).json({ error: 'Konfigurasi database tidak ditemukan' });
+
+    // PENTING UNTUK SUPABASE: pg_dump TIDAK BISA lewat PgBouncer (Port 6543). Harus via Direct Connection (5432).
+    if (dbUrl.includes(':6543')) {
+        dbUrl = dbUrl.replace(':6543', ':5432');
+        console.log(`[BACKUP] Auto-switched Supabase pooled port 6543 to direct port 5432 for pg_dump.`);
+    }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `aivola_backup_${timestamp}.sql.gz`;
