@@ -314,7 +314,8 @@ export default function SchedulingMatrixPage() {
                                             dynamicStyle = { backgroundColor: '#fef2f2', color: '#ef4444' };
                                         } else if (cellVal !== 'DEFAULT') {
                                             const sId = parseInt(cellVal) || 0;
-                                            dynamicStyle = SHIFT_COLORS[sId % SHIFT_COLORS.length];
+                                            const shiftColor = SHIFT_COLORS[sId % SHIFT_COLORS.length];
+                                            dynamicStyle = { backgroundColor: shiftColor.bg, color: shiftColor.text };
                                         }
 
                                         const cellClass = `matrix-cell ${isModified ? 'cell-MODIFIED' : ''}`;
@@ -326,7 +327,7 @@ export default function SchedulingMatrixPage() {
                                                     value={cellVal}
                                                     onChange={(e) => handleCellChange(user.id, day, e.target.value)}
                                                     title={isModified ? 'Telah diubah (Belum disimpan)' : ''}
-                                                    style={{ color: dynamicStyle.text }}
+                                                    style={{ color: dynamicStyle.color }}
                                                 >
                                                     <option value="DEFAULT">--</option>
                                                     <option value="OFF">OFF</option>
