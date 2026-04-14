@@ -69,18 +69,25 @@ export default function SchedulingMatrixPage() {
         setIsLoading(true);
         setDirtyCells({}); // reset dirt
         try {
-            const [usersRes, branchesRes, shiftsRes, schedulesRes] = await Promise.all([
-                api.get('/users'),
-                api.get('/branches'),
-                api.get('/shifts'),
-                api.get('/schedules', { params: { month: filterMonth, year: filterYear } })
-            ]);
-            setUsers(usersRes.data);
-            setBranches(branchesRes.data);
-            setShifts(shiftsRes.data);
-            setSchedules(schedulesRes.data);
-        } catch (err) {
-            console.error('Failed to fetch data.', err);
+            try {
+                const usersRes = await api.get('/users');
+                setUsers(usersRes.data);
+            } catch (err) { console.error('Failed to fetch users', err); }
+
+            try {
+                const branchesRes = await api.get('/branches');
+                setBranches(branchesRes.data);
+            } catch (err) { console.error('Failed to fetch branches', err); }
+
+            try {
+                const shiftsRes = await api.get('/shifts');
+                setShifts(shiftsRes.data);
+            } catch (err) { console.error('Failed to fetch shifts', err); }
+
+            try {
+                const schedulesRes = await api.get('/schedules', { params: { month: filterMonth, year: filterYear } });
+                setSchedules(schedulesRes.data);
+            } catch (err) { console.error('Failed to fetch schedules', err); }
         } finally {
             setIsLoading(false);
         }
