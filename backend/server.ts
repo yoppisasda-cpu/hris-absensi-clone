@@ -1337,73 +1337,41 @@ app.get('/api/admin/backup', tenantMiddleware, async (req: Request, res: Respons
       return res.status(403).json({ error: 'Akses Ditolak: Hanya Super Admin yang dapat mencadangkan sistem' });
     }
 
-    let dbUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
-    if (!dbUrl) return res.status(500).json({ error: 'Konfigurasi database tidak ditemukan' });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `aivola_backup_${timestamp}.json.gz`;
 
-    // PENTING UNTUK SUPABASE: pg_dump TIDAK BISA lewat PgBouncer (Port 6543). Harus via Direct Connection (5432).
-    if (dbUrl.includes(':6543')) {
-        dbUrl = dbUrl.replace(':6543', ':5432');
-        console.log(`[BACKUP] Auto-switched Supabase pooled port 6543 to direct port 5432 for pg_dump.`);
+    console.log(`[BACKUP] Starting pure Node.js JSON database backup: ${filename}`);
+
+    // Dapatkan semua nama tabel (model) secara dinamis dari Prisma
+    const models = require('@prisma/client').Prisma.dmmf.datamodel.models;
+    const backupData: any = {};
+
+    for (const model of models) {
+      const modelName = model.name.charAt(0).toLowerCase() + model.name.slice(1);
+      try {
+        backupData[modelName] = await (prisma as any)[modelName].findMany();
+      } catch (e) {
+        console.warn(`[BACKUP] Skipping model ${modelName} due to error`);
+      }
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `aivola_backup_${timestamp}.sql.gz`;
-
-    console.log(`[BACKUP] Starting database backup: ${filename}`);
+    const jsonString = JSON.stringify(backupData);
 
     res.setHeader('Content-Type', 'application/gzip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    // Extract connection string for pg_dump
-    const pgDumpBinary = process.env.PG_DUMP_PATH || 'pg_dump';
-    
-    // Improved password handling for Windows: extract it and use PGPASSWORD env var
-    let pgPassword = '';
-    try {
-        const urlObj = new URL(dbUrl);
-        pgPassword = decodeURIComponent(urlObj.password);
-    } catch (e) {
-        console.warn("[BACKUP] Failed to parse DATABASE_URL for password extraction");
-    }
-
-    console.log(`[BACKUP] Executing backup using: ${pgDumpBinary}`);
-
-    const pgDump = spawn(pgDumpBinary, ["-d", dbUrl], { 
-      env: { ...process.env, PGPASSWORD: pgPassword }
-    });
-    
     const gzip = zlib.createGzip();
+    gzip.pipe(res);
+    gzip.write(jsonString);
+    gzip.end();
 
-    pgDump.stdout.pipe(gzip).pipe(res);
-
-    pgDump.stderr.on('data', (data) => {
-      console.error(`[BACKUP ERROR STDOUT] ${data}`);
-    });
-
-    pgDump.on('error', (err: any) => {
-      console.error(`[BACKUP CRITICAL] Failed to start pg_dump: ${err.message}`);
-      if (!res.headersSent) {
-        res.status(500).json({ 
-          error: 'Utilitas backup (pg_dump) tidak ditemukan di server. Silakan hubungi admin sistem untuk instalasi PostgreSQL Client Tools.' 
-        });
-      }
-    });
-
-    pgDump.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`[BACKUP] pg_dump process exited with code ${code}`);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Proses pencadangan gagal di tengah jalan.' });
-        }
-      } else {
-        console.log(`[BACKUP SUCCESS] ${filename} sent to user.`);
-      }
-    });
-
+    console.log(`[BACKUP SUCCESS] ${filename} stream finished.`);
   } catch (error: any) {
     console.error('Backup Crash:', error);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Terjadi kesalahan sistem saat pencadangan' });
+      res.status(500).json({ error: 'Terjadi kesalahan sistem saat memproses backup JSON' });
+    } else {
+      res.end(); // Akhiri stream jika terlanjur crash di tengah jalan
     }
   }
 });
