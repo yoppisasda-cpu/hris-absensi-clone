@@ -2740,7 +2740,7 @@ app.post('/api/schedules/matrix', tenantMiddleware, async (req: Request, res: Re
 app.delete('/api/schedules/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const scheduleId = parseInt(req.params.id);
+    const scheduleId = parseInt(req.params.id as string);
 
     const schedule = await (prisma as any).shiftSchedule.findFirst({
       where: { id: scheduleId, companyId: tenantId }
