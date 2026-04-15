@@ -2730,7 +2730,17 @@ app.delete('/api/schedules/:id', tenantMiddleware, async (req: Request, res: Res
 });
 
 // C. Endpoint Karyawan Melakukan Absensi (Clock-In) dengan Validasi Pagar Virtual per Cabang
-app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('photo'), async (req: Request, res: Response) => {
+app.post('/api/attendance/clock-in', tenantMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  uploadAttendance.single('photo')(req, res, (multerErr) => {
+    if (multerErr) {
+      console.error('[CLOCK-IN] Multer Error:', multerErr);
+      return res.status(500).json({ error: 'Gagal memproses upload foto: ' + multerErr.message });
+    }
+    clockInHandler(req, res).catch(next);
+  });
+});
+
+async function clockInHandler(req: Request, res: Response) {
   try {
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
@@ -2774,15 +2784,17 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
     // --- FACE VERIFICATION (Phase 50/52) ---
     let faceSimilarityScore = null;
     let isFaceVerified = false;
-
     // @ts-ignore
-    if (!user.faceReferenceUrl) {
-      return res.status(400).json({ error: 'Verifikasi Wajah Gagal: Anda belum mendaftarkan Master Photo (Referensi Wajah). Silakan hubungi HRD.' });
-    }
+    const hasReferencePhoto = !!user.faceReferenceUrl;
 
-    if (req.file) {
+    if (!hasReferencePhoto) {
+      // Soft warning: foto referensi belum ada, absensi tetap diizinkan tapi dicatat tidak terverifikasi
+      console.warn(`[Face AI] Clock-In: User ${userId} belum punya faceReferenceUrl. Absensi diizinkan tanpa verifikasi.`);
+      isFaceVerified = false;
+      faceSimilarityScore = null;
+    } else if (req.file) {
       try {
-        const capturePath = path.join(process.cwd(), photoUrl!.replace(/^\/+/, ""));
+        const capturePath = path.join(process.cwd(), photoUrl!.replace(/^\\/+/, ""));
         // @ts-ignore
         const refUrl = user.faceReferenceUrl;
         
@@ -2937,10 +2949,11 @@ app.post('/api/attendance/clock-in', tenantMiddleware, uploadAttendance.single('
     await notifyAdmins(tenantId, 'Clock-In Baru', `${targetUser?.name || 'Seorang karyawan'} melakukan clock-in.`);
 
     res.json({ message: 'Absent Berhasil (Clock In)', attendance });
-  } catch (error) {
-    res.status(500).json({ error: 'Gagal melakukan absensi' });
+  } catch (error: any) {
+    console.error('[CLOCK-IN ERROR] Detail:', error?.message, error?.code, error?.meta);
+    res.status(500).json({ error: 'Gagal melakukan absensi', detail: error?.message });
   }
-});
+}
 
 // C1. Register Face Reference (Admin/HR Only)
 app.patch('/api/users/:id/face-reference', tenantMiddleware, uploadFaceReference.single('photo'), async (req: Request, res: Response) => {
@@ -11485,3 +11498,13 @@ app.listen(PORT, () => {
   initCleanupCron(); // Start the background cleanup job
 });
 // Trigger reload
+
+// ==========================================
+// GLOBAL ERROR HANDLER (Express 5 Compatible)
+// ==========================================
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error('[GLOBAL ERROR HANDLER]', req.method, req.url, '\nError:', err?.message, err?.stack?.substring(0, 300));
+  if (!res.headersSent) {
+    res.status(500).json({ error: err?.message || 'Internal Server Error' });
+  }
+});
