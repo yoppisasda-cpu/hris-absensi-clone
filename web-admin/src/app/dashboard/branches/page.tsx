@@ -105,10 +105,10 @@ export default function BranchesPage() {
         <DashboardLayout>
             <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                        <MapPin className="h-6 w-6 text-blue-600" /> Lokasi Cabang
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <MapPin className="h-6 w-6 text-blue-500" /> Lokasi Cabang
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">Kelola titik lokasi absensi (Geo-Fence) untuk setiap cabang perusahaan.</p>
+                    <p className="text-sm text-slate-400 mt-1">Kelola titik lokasi absensi (Geo-Fence) untuk setiap cabang perusahaan.</p>
                 </div>
                 {!isAdding && (
                     <button

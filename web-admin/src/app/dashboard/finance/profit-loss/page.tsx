@@ -71,10 +71,10 @@ export default function ProfitLossPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                    <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
                         Laporan Laba / Rugi
                     </h1>
-                    <p className="mt-1 text-sm text-slate-500 font-medium">Ringkasan performa keuangan perusahaan periode {months[month-1]} {year}.</p>
+                    <p className="mt-1 text-sm text-slate-400 font-medium">Ringkasan performa keuangan perusahaan periode {months[month-1]} {year}.</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                     <button 
@@ -121,21 +121,21 @@ export default function ProfitLossPage() {
             <div className="printable-content">
                 {/* Summary Grid */}
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-4 mb-8">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-emerald-500">
+                    <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-emerald-500">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pendapatan</p>
-                        <p className="text-xl font-black text-slate-900 italic">Rp {data?.revenue.total.toLocaleString()}</p>
+                        <p className="text-xl font-black text-white italic">Rp {data?.revenue.total.toLocaleString()}</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-red-500">
+                    <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-red-500">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total HPP (Bahan)</p>
-                        <p className="text-xl font-black text-red-600 italic">Rp {data?.cogs.total.toLocaleString()}</p>
+                        <p className="text-xl font-black text-red-500 italic">Rp {data?.cogs.total.toLocaleString()}</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-blue-500">
+                    <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-blue-500">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Beban Operasional</p>
-                        <p className="text-xl font-black text-blue-600 italic">Rp {data?.opex.total.toLocaleString()}</p>
+                        <p className="text-xl font-black text-blue-500 italic">Rp {data?.opex.total.toLocaleString()}</p>
                     </div>
-                    <div className={`rounded-2xl border border-slate-200 p-5 shadow-sm border-l-4 ${data?.netProfit >= 0 ? 'bg-emerald-50 border-l-emerald-600' : 'bg-red-50 border-l-red-600'}`}>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Laba Bersih</p>
-                        <p className={`text-xl font-black italic ${data?.netProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    <div className={`rounded-2xl border border-slate-700 p-5 shadow-sm border-l-4 ${data?.netProfit >= 0 ? 'bg-emerald-900/30 border-l-emerald-600' : 'bg-red-900/30 border-l-red-600'}`}>
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">Laba Bersih</p>
+                        <p className={`text-xl font-black italic ${data?.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                             Rp {data?.netProfit.toLocaleString()}
                         </p>
                     </div>

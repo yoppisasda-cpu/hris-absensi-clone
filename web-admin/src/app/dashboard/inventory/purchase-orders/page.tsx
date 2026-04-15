@@ -229,214 +229,261 @@ export default function PurchaseOrdersPage() {
 
     return (
         <DashboardLayout>
-            <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="mb-10 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3 italic">
-                        Purchase Orders (PO)
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-500 font-medium italic">Kelola pemesanan barang ke supplier dan approvals dari tim operasional.</p>
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
+                            <ShoppingBag className="h-6 w-6 stroke-[2.5px]" />
+                        </div>
+                        <h1 className="text-4xl font-black text-white tracking-tighter italic uppercase text-glow-sm">
+                            Procurement <span className="text-indigo-500">Pipeline</span>
+                        </h1>
+                    </div>
+                    <p className="text-[11px] font-black text-slate-500 tracking-[0.2em] uppercase italic max-w-2xl leading-relaxed">
+                        End-to-end supply chain orchestration. Manage vendor requisitions, authorization workflows, and distribution logistics with surgical precision.
+                    </p>
                 </div>
                 {canCreatePO && (
                     <button 
                         onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-xl hover:bg-slate-800 transition-all active:scale-95"
+                        className="group flex items-center gap-4 rounded-2xl bg-indigo-600 px-8 py-4 text-[11px] font-black text-white shadow-2xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-[0.2em] italic border border-white/10"
                     >
-                        <Plus className="h-4 w-4" /> Order Barang Baru
+                        <Plus className="h-4 w-4 stroke-[3px] group-hover:rotate-90 transition-transform duration-300" /> Initiate Requisition
                     </button>
                 )}
-
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><ShoppingBag className="h-6 w-6" /></div>
-                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest bg-blue-50 px-2 py-1 rounded">Total PO</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                <div className="relative group overflow-hidden rounded-[32px] border border-white/5 bg-slate-900 p-8 transition-all hover:bg-slate-800 shadow-2xl">
+                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <ShoppingBag className="h-20 w-20 text-indigo-500" />
                     </div>
-                    <p className="text-2xl font-black italic text-slate-900">{pos.length}</p>
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="h-10 w-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                                <ShoppingBag className="h-5 w-5 stroke-[2.5px]" />
+                            </div>
+                            <span className="text-[9px] font-black uppercase text-indigo-500 tracking-[0.2em] bg-indigo-500/5 px-3 py-1.5 rounded-full border border-indigo-500/10 italic">Total Manifests</span>
+                        </div>
+                        <p className="text-4xl font-black italic text-white tracking-tighter mb-1">{pos.length}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Global Procurement Record</p>
+                    </div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm border-l-4 border-l-yellow-400">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-yellow-50 rounded-xl text-yellow-600"><Clock className="h-6 w-6" /></div>
-                        <span className="text-[10px] font-black uppercase text-yellow-500 tracking-widest bg-yellow-50 px-2 py-1 rounded">Pending</span>
+
+                <div className="relative group overflow-hidden rounded-[32px] border border-white/5 bg-slate-900 p-8 transition-all hover:bg-slate-800 shadow-2xl border-l-4 border-l-amber-500/50">
+                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <Clock className="h-20 w-20 text-amber-500" />
                     </div>
-                    <p className="text-2xl font-black italic text-slate-900">{pos.filter(p => p.status === 'PENDING').length}</p>
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="h-10 w-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
+                                <Clock className="h-5 w-5 stroke-[2.5px]" />
+                            </div>
+                            <span className="text-[9px] font-black uppercase text-amber-500 tracking-[0.2em] bg-amber-500/5 px-3 py-1.5 rounded-full border border-amber-500/10 italic">Auth Pending</span>
+                        </div>
+                        <p className="text-4xl font-black italic text-white tracking-tighter mb-1">{pos.filter(p => p.status === 'PENDING').length}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Awaiting Hierarchy Approval</p>
+                    </div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm border-l-4 border-l-emerald-400">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600"><CheckCircle2 className="h-6 w-6" /></div>
-                        <span className="text-[10px] font-black uppercase text-emerald-500 tracking-widest bg-emerald-50 px-2 py-1 rounded">Approved</span>
+
+                <div className="relative group overflow-hidden rounded-[32px] border border-white/5 bg-slate-900 p-8 transition-all hover:bg-slate-800 shadow-2xl border-l-4 border-l-emerald-500/50">
+                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <CheckCircle2 className="h-20 w-20 text-emerald-500" />
                     </div>
-                    <p className="text-2xl font-black italic text-slate-900">{pos.filter(p => p.status === 'APPROVED').length}</p>
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="h-10 w-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                                <CheckCircle2 className="h-5 w-5 stroke-[2.5px]" />
+                            </div>
+                            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-[0.2em] bg-emerald-500/5 px-3 py-1.5 rounded-full border border-emerald-500/10 italic">Validated</span>
+                        </div>
+                        <p className="text-4xl font-black italic text-white tracking-tighter mb-1">{pos.filter(p => p.status === 'APPROVED').length}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Orders Transmitted to Vendors</p>
+                    </div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm border-l-4 border-l-red-400">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-red-50 rounded-xl text-red-600"><XCircle className="h-6 w-6" /></div>
-                        <span className="text-[10px] font-black uppercase text-red-500 tracking-widest bg-red-50 px-2 py-1 rounded">Rejected</span>
+
+                <div className="relative group overflow-hidden rounded-[32px] border border-white/5 bg-slate-900 p-8 transition-all hover:bg-slate-800 shadow-2xl border-l-4 border-l-red-500/50">
+                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <XCircle className="h-20 w-20 text-red-500" />
                     </div>
-                    <p className="text-2xl font-black italic text-slate-900">{pos.filter(p => p.status === 'REJECTED').length}</p>
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="h-10 w-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform">
+                                <XCircle className="h-5 w-5 stroke-[2.5px]" />
+                            </div>
+                            <span className="text-[9px] font-black uppercase text-red-500 tracking-[0.2em] bg-red-500/5 px-3 py-1.5 rounded-full border border-red-500/10 italic">Red-Flagged</span>
+                        </div>
+                        <p className="text-4xl font-black italic text-white tracking-tighter mb-1">{pos.filter(p => p.status === 'REJECTED').length}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Requisition Refused</p>
+                    </div>
                 </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-12">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 p-6">
-                    <div className="relative w-full sm:w-96 group">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <div className="rounded-[40px] border border-white/5 bg-slate-900/50 shadow-2xl overflow-hidden mb-20 backdrop-blur-xl">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-6 border-b border-white/5 p-8 bg-slate-950/30">
+                    <div className="relative w-full lg:w-[450px] group">
+                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400 transition-colors z-10" />
                         <input
                             type="text"
-                            placeholder="Cari nomor PO atau supplier..."
+                            placeholder="SEARCH MANIFEST # OR VENDOR..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:bg-white focus:outline-none transition-all font-medium"
+                            className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-6 text-[10px] font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800 shadow-inner"
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <select 
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all outline-none"
-                            value={selectedStatus}
-                            onChange={(e) => setSelectedStatus(e.target.value)}
-                        >
-                            <option value="all">Semua Status</option>
-                            <option value="PENDING">Pending Approval</option>
-                            <option value="APPROVED">Disetujui</option>
-                            <option value="REJECTED">Ditolak</option>
-                        </select>
+                    <div className="flex items-center gap-4 w-full lg:w-auto">
+                        <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-slate-950 border border-slate-800 group focus-within:border-indigo-500/50 transition-all">
+                            <Filter className="h-3.5 w-3.5 text-slate-600" />
+                            <select 
+                                className="bg-transparent text-[10px] font-black text-slate-400 focus:text-white outline-none uppercase tracking-widest italic cursor-pointer py-1"
+                                value={selectedStatus}
+                                onChange={(e) => setSelectedStatus(e.target.value)}
+                            >
+                                <option value="all">ALL STATUS PROTOCOLS</option>
+                                <option value="PENDING">PENDING AUTHORIZATION</option>
+                                <option value="APPROVED">VEND_APPROVED</option>
+                                <option value="REJECTED">VEND_REJECTED</option>
+                            </select>
+                        </div>
+                        <button className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-600 hover:text-white hover:bg-slate-800 transition-all">
+                            <Download className="h-4 w-4" />
+                        </button>
                     </div>
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500">
-                            <tr className="border-b border-slate-100">
-                                <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest">Detail PO</th>
-                                <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest">Supplier</th>
-                                <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-right">Total Tagihan</th>
-                                <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-center">Status</th>
-                                <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest">Pembuat</th>
-                                <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-right">Aksi</th>
+                        <thead>
+                            <tr className="bg-slate-950/50">
+                                <th className="px-8 py-5 font-black uppercase text-[9px] tracking-[0.2em] text-slate-500 italic border-b border-white/5">Manifest Identity</th>
+                                <th className="px-8 py-5 font-black uppercase text-[9px] tracking-[0.2em] text-slate-500 italic border-b border-white/5">Supply Node</th>
+                                <th className="px-8 py-5 font-black uppercase text-[9px] tracking-[0.2em] text-slate-500 italic border-b border-white/5 text-right">Procurement Value</th>
+                                <th className="px-8 py-5 font-black uppercase text-[9px] tracking-[0.2em] text-slate-500 italic border-b border-white/5 text-center">Protocol State</th>
+                                <th className="px-8 py-5 font-black uppercase text-[9px] tracking-[0.2em] text-slate-500 italic border-b border-white/5">Originator Node</th>
+                                <th className="px-8 py-5 font-black uppercase text-[9px] tracking-[0.2em] text-slate-500 italic border-b border-white/5 text-right">Data Directives</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 italic">
+                        <tbody className="divide-y divide-slate-800 italic">
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan={6} className="px-6 py-4"><div className="h-10 w-full rounded bg-slate-50"></div></td>
+                                        <td colSpan={6} className="px-8 py-6"><div className="h-12 w-full rounded-2xl bg-white/5"></div></td>
                                     </tr>
                                 ))
                             ) : filteredPos.length > 0 ? (
                                 filteredPos.map((po) => (
-                                    <tr key={po.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-6 py-4">
+                                    <tr key={po.id} className="group hover:bg-white/[0.02] transition-colors">
+                                        <td className="px-8 py-6">
                                             <div className="flex flex-col">
-                                                <p className="font-black text-slate-900 italic text-base">#{po.orderNumber}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                                        <Clock className="h-3 w-3" /> {new Date(po.date).toLocaleDateString()}
+                                                <p className="font-black text-white italic text-base tracking-tighter uppercase group-hover:text-indigo-400 transition-colors">#{po.orderNumber}</p>
+                                                <div className="flex items-center gap-3 mt-2">
+                                                    <span className="text-[9px] font-black text-slate-500 flex items-center gap-1.5 uppercase tracking-widest italic">
+                                                        <Clock className="h-3 w-3 text-indigo-500" /> {new Date(po.date).toLocaleDateString()}
                                                     </span>
-                                                    <span className="h-1 w-1 bg-slate-200 rounded-full"></span>
-                                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1 rounded">
-                                                        {po.items?.length || 0} Barang
+                                                    <span className="h-1 w-1 bg-slate-800 rounded-full"></span>
+                                                    <span className="text-[9px] font-black text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-lg uppercase tracking-widest italic border border-indigo-500/20">
+                                                        {po.items?.length || 0} UNITS
                                                     </span>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                                                    <Truck className="h-4 w-4 text-slate-400" />
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="h-10 w-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-600 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all shadow-inner">
+                                                    <Truck className="h-5 w-5 stroke-[1.5px]" />
                                                 </div>
-                                                <p className="font-bold text-slate-700">{po.supplier?.name}</p>
+                                                <p className="font-black text-slate-400 uppercase tracking-tight text-xs italic group-hover:text-white transition-colors">{po.supplier?.name}</p>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <p className="font-black text-slate-900 text-base">Rp {po.totalAmount.toLocaleString()}</p>
+                                        <td className="px-8 py-6 text-right">
+                                            <p className="font-black text-white text-base tracking-tighter text-glow-sm italic">Rp {po.totalAmount.toLocaleString()}</p>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                         <td className="px-8 py-6 text-center">
                                             {po.status === 'PENDING' && (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-3 py-1 text-[10px] font-black text-yellow-600 border border-yellow-100 uppercase tracking-tighter">
-                                                    Approval Diperlukan
+                                                <span className="inline-flex items-center gap-2 rounded-xl bg-amber-500/10 px-4 py-1.5 text-[9px] font-black text-amber-500 border border-amber-500/20 uppercase tracking-[0.2em] italic">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></div> REQ_REVIEW
                                                 </span>
                                             )}
                                             {po.status === 'APPROVED' && (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-600 border border-emerald-100 uppercase tracking-tighter">
-                                                    Disetujui
+                                                <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-1.5 text-[9px] font-black text-emerald-400 border border-emerald-500/20 uppercase tracking-[0.2em] italic">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400"></div> AUTH_VALID
                                                 </span>
                                             )}
                                             {po.status === 'REJECTED' && (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-[10px] font-black text-red-600 border border-red-100 uppercase tracking-tighter">
-                                                    Ditolak
+                                                <span className="inline-flex items-center gap-2 rounded-xl bg-red-500/10 px-4 py-1.5 text-[9px] font-black text-red-500 border border-red-500/20 uppercase tracking-[0.2em] italic">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-red-500"></div> AUTH_DENIED
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-8 py-6">
                                             <div className="flex flex-col">
-                                                <p className="font-bold text-slate-700 flex items-center gap-1">
-                                                    <User className="h-3 w-3" /> {po.createdBy?.name}
+                                                <p className="text-[11px] font-black text-slate-400 uppercase italic tracking-widest flex items-center gap-2">
+                                                    <User className="h-3 w-3 text-indigo-400" /> {po.createdBy?.name || 'ROOT'}
                                                 </p>
                                                 {po.approvedBy && (
-                                                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">APRV: {po.approvedBy.name}</p>
+                                                    <p className="text-[8px] text-slate-600 font-black uppercase mt-1.5 tracking-widest italic border-l border-indigo-500/30 pl-2">AUTH: {po.approvedBy.name}</p>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                        <td className="px-8 py-6 text-right">
+                                            <div className="flex items-center justify-end gap-3 translate-x-4 group-hover:translate-x-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
                                                 {po.status === 'PENDING' && isPurchasingOrAdmin ? (
                                                     <>
                                                         <button 
                                                             onClick={() => handleUpdateStatus(po.id, 'APPROVED')}
-                                                            title="Setujui PO"
-                                                            className="p-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                                                            title="AUTHORIZE REQUISITION"
+                                                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 active:scale-95 border border-white/10"
                                                         >
-                                                            <CheckCircle2 className="h-4 w-4" />
+                                                            <CheckCircle2 className="h-5 w-5 stroke-[2.5px]" />
                                                         </button>
                                                         <button 
                                                             onClick={() => handleUpdateStatus(po.id, 'REJECTED')}
-                                                            title="Tolak PO"
-                                                            className="p-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 transition-all shadow-md active:scale-95"
+                                                            title="DENY REQUISITION"
+                                                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 border border-white/10"
                                                         >
-                                                            <XCircle className="h-4 w-4" />
+                                                            <XCircle className="h-5 w-5 stroke-[2.5px]" />
                                                         </button>
                                                     </>
                                                 ) : (
-                                                    <div className="flex items-center gap-1">
+                                                    <div className="flex items-center gap-2">
                                                         {po.status !== 'REJECTED' && (
                                                             <>
                                                                 <button 
-                                                                    className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm"
-                                                                    title="Kirim ke WhatsApp"
+                                                                    className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-950 border border-slate-800 text-slate-500 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
+                                                                    title="TRANSMIT VIA WHATSAPP"
                                                                     onClick={() => handleSendWhatsApp(po)}
                                                                 >
-                                                                    <MessageCircle className="h-4 w-4" />
+                                                                    <MessageCircle className="h-5 w-5" />
                                                                 </button>
                                                                 <button 
-                                                                    className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all shadow-sm"
-                                                                    title="Kirim ke Email"
+                                                                    className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-950 border border-slate-800 text-slate-500 hover:text-indigo-400 hover:border-indigo-500/30 transition-all"
+                                                                    title="TRANSMIT VIA EMAIL"
                                                                     onClick={() => handleSendEmail(po)}
                                                                 >
-                                                                    <Mail className="h-4 w-4" />
+                                                                    <Mail className="h-5 w-5" />
                                                                 </button>
                                                             </>
                                                         )}
                                                          <button 
-                                                             className="p-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all shadow-sm"
-                                                             title="Cetak Purchase Order"
+                                                             className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-950 border border-slate-800 text-slate-500 hover:text-white hover:border-white/20 transition-all"
+                                                             title="GENERATE ANALYTICS PDF"
                                                              onClick={() => {
                                                                  setSelectedPo(po);
                                                                  setIsDetailModalOpen(true);
                                                              }}
                                                          >
-                                                             <Printer className="h-4 w-4" />
+                                                             <Printer className="h-5 w-5" />
                                                          </button>
                                                         <button 
-                                                            className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-slate-600 transition-all"
-                                                            title="Lihat Detail"
+                                                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 border border-white/10"
+                                                            title="INSPECT MANIFEST"
                                                             onClick={() => {
                                                                 setSelectedPo(po);
                                                                 setIsDetailModalOpen(true);
                                                             }}
                                                         >
-                                                            <FileText className="h-4 w-4" />
+                                                            <FileText className="h-5 w-5 stroke-[2.5px]" />
                                                         </button>
                                                     </div>
                                                 )}
@@ -446,10 +493,12 @@ export default function PurchaseOrdersPage() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-20 text-center">
-                                        <div className="flex flex-col items-center gap-3">
-                                            <div className="rounded-full bg-slate-50 p-6"><ShoppingBag className="h-10 w-10 text-slate-200" /></div>
-                                            <p className="text-sm font-bold text-slate-400 italic">Belum ada Purchase Order (PO) yang tercatat.</p>
+                                    <td colSpan={6} className="px-8 py-32 text-center text-slate-600 uppercase tracking-[0.2em] font-black italic text-xs">
+                                        <div className="flex flex-col items-center gap-6">
+                                            <div className="h-20 w-20 rounded-[32px] bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-800">
+                                                <ShoppingBag className="h-10 w-10" />
+                                            </div>
+                                            NO PROCUREMENT MANIFESTS DETECTED IN STORAGE
                                         </div>
                                     </td>
                                 </tr>

@@ -67,15 +67,15 @@ export default function BalanceSheetPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                    <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
                         Neraca Keuangan
                     </h1>
-                    <p className="mt-1 text-sm text-slate-500 font-medium italic">Posisi keuangan perusahaan per tanggal {today}.</p>
+                    <p className="mt-1 text-sm text-slate-400 font-medium italic">Posisi keuangan perusahaan per tanggal {today}.</p>
                 </div>
                 <div className="flex gap-2">
                     <button 
                         onClick={() => window.print()}
-                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+                        className="flex items-center gap-2 rounded-xl bg-slate-900/50 border border-slate-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm"
                     >
                         <Printer className="h-4 w-4" /> Cetak
                     </button>

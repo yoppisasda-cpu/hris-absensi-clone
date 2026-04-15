@@ -180,27 +180,27 @@ export default function SchedulingMatrixPage() {
         <DashboardLayout>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 px-2">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                        <CalendarCheck className="h-7 w-7 text-indigo-600" />
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <CalendarCheck className="h-7 w-7 text-indigo-500" />
                         Matrix Penjadwalan Shift
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">
+                    <p className="text-sm text-slate-400 mt-1">
                         Atur shift spesifik harian. Pilih [-- Default --] untuk ikuti shift bawaan profil.
                     </p>
                 </div>
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-4 mb-6 mx-2">
+            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 shadow-sm flex flex-wrap items-center gap-4 mb-6 mx-2">
                 <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm font-semibold text-slate-700">Filter:</span>
+                    <Filter className="h-4 w-4 text-slate-500" />
+                    <span className="text-sm font-semibold text-slate-300">Filter:</span>
                 </div>
                 
                 <select 
                     value={filterMonth} 
                     onChange={e => setFilterMonth(parseInt(e.target.value))}
-                    className="bg-slate-50 border border-slate-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
                 >
                     {Array.from({length: 12}, (_, i) => (
                         <option key={i+1} value={i+1}>{new Date(2000, i).toLocaleString('id-ID', {month: 'long'})}</option>
@@ -210,7 +210,7 @@ export default function SchedulingMatrixPage() {
                 <select 
                     value={filterYear} 
                     onChange={e => setFilterYear(parseInt(e.target.value))}
-                    className="bg-slate-50 border border-slate-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
                 >
                     <option value={2026}>2026</option>
                     <option value={2025}>2025</option>

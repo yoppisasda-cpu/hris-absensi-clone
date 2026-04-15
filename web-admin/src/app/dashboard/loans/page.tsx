@@ -109,18 +109,18 @@ export default function LoanPage() {
             <div className="p-8">
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800">Manajemen Pinjaman</h1>
-                        <p className="text-slate-500">Kelola pinjaman karyawan dan potongan otomatis.</p>
+                        <h1 className="text-2xl font-bold text-white">Manajemen Pinjaman</h1>
+                        <p className="text-slate-400">Kelola pinjaman karyawan dan potongan otomatis.</p>
                     </div>
                     <div className="flex items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
                         <div className="relative flex-grow sm:flex-grow-0">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                             <input
                                 type="text"
                                 placeholder="Cari nama, email, atau alasan..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm border border-slate-700 bg-slate-900/50 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-500"
                             />
                         </div>
                         <button
@@ -134,27 +134,27 @@ export default function LoanPage() {
                 </div>
 
                 <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-                    <div className="rounded-xl border bg-white p-6 shadow-sm">
+                    <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6 shadow-sm">
                         <div className="flex items-center gap-4">
-                            <div className="rounded-full bg-blue-100 p-3 text-blue-600">
+                            <div className="rounded-full bg-blue-900/30 p-3 text-blue-400">
                                 <CreditCard className="h-6 w-6" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-slate-500">Total Pinjaman Aktif</p>
-                                <h3 className="text-2xl font-bold text-slate-800">
+                                <p className="text-sm font-medium text-slate-400">Total Pinjaman Aktif</p>
+                                <h3 className="text-2xl font-bold text-white">
                                     {loans.filter(l => l.status === 'ACTIVE').length}
                                 </h3>
                             </div>
                         </div>
                     </div>
-                    <div className="rounded-xl border bg-white p-6 shadow-sm">
+                    <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6 shadow-sm">
                         <div className="flex items-center gap-4">
-                            <div className="rounded-full bg-orange-100 p-3 text-orange-600">
+                            <div className="rounded-full bg-orange-900/30 p-3 text-orange-400">
                                 <Clock className="h-6 w-6" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-slate-500">Total Sisa Saldo</p>
-                                <h3 className="text-2xl font-bold text-slate-800 text-orange-600">
+                                <p className="text-sm font-medium text-slate-400">Total Sisa Saldo</p>
+                                <h3 className="text-2xl font-bold text-orange-400">
                                     {formatCurrency(loans.reduce((acc, curr) => acc + (curr.status === 'ACTIVE' ? curr.remainingAmount : 0), 0))}
                                 </h3>
                             </div>

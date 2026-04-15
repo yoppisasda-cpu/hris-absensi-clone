@@ -191,15 +191,15 @@ export default function PayrollPage() {
         <DashboardLayout>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Penggajian (Payroll)</h1>
-                    <p className="text-sm text-slate-500">Otomasi kalkulasi gaji berdasarkan kehadiran & keterlambatan.</p>
+                    <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white">Penggajian (Payroll)</h1>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1 italic">Otomasi kalkulasi gaji berdasarkan kehadiran & keterlambatan.</p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
                     <select
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="rounded-xl border border-slate-700 bg-slate-950 text-indigo-400 font-black italic uppercase text-xs px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
                     >
                         {Array.from({ length: 12 }, (_, i) => (
                             <option key={i + 1} value={i + 1}>Bulan {i + 1}</option>
@@ -208,7 +208,7 @@ export default function PayrollPage() {
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="rounded-xl border border-slate-700 bg-slate-950 text-indigo-400 font-black italic uppercase text-xs px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
                     >
                         <option value={2025}>2025</option>
                         <option value={2026}>2026</option>
@@ -217,7 +217,7 @@ export default function PayrollPage() {
                     <select
                         value={selectedBranch}
                         onChange={(e) => setSelectedBranch(e.target.value)}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        className="rounded-xl border border-slate-700 bg-slate-950 text-white font-bold text-xs px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
                     >
                         <option value="all">Semua Cabang</option>
                         {branches.map(b => (
@@ -225,195 +225,176 @@ export default function PayrollPage() {
                         ))}
                     </select>
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                         <input
                             type="text"
                             placeholder="Cari nama atau email..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-slate-950 border border-slate-800 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-500"
                         />
                     </div>
                     <button
                         onClick={handleExportExcel}
                         disabled={isLoading || payrolls.length === 0}
-                        className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-xs font-black italic uppercase tracking-widest text-white hover:bg-slate-700 transition-all disabled:opacity-50 border border-white/5"
                     >
-                        <Download className="h-4 w-4" />
-                        Export Excel
+                        <Download className="h-4 w-4 text-emerald-400" />
+                        Export
                     </button>
                     <button
                         onClick={handleGenerate}
                         disabled={isGenerating}
-                        className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-black italic uppercase tracking-widest text-white hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20 border border-indigo-500/20"
                     >
                         {isGenerating ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                         ) : (
                             isFinanceOnly ? <Plus className="h-4 w-4" /> : <Calculator className="h-4 w-4" />
                         )}
-                        {isFinanceOnly ? 'Input Gaji Manual' : 'Hitung Gaji'}
+                        {isFinanceOnly ? 'Manual Entry' : 'Hitung Gaji'}
                     </button>
                 </div>
             </div>
 
-            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+            <div className="mb-8 p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-[28px] flex items-center gap-4 shadow-[0_0_30px_rgba(16,185,129,0.02)]">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
                     <Banknote className="h-6 w-6" />
                 </div>
                 <div>
-                    <h3 className="text-sm font-bold text-emerald-900">Terintegrasi dengan Keuangan</h3>
-                    <p className="text-xs text-emerald-700">Setiap gaji yang Anda tandai sebagai <b>"Bayar"</b> akan otomatis tercatat sebagai Pengeluaran (Expense) di Modul Finance.</p>
+                    <h3 className="text-xs font-black italic uppercase tracking-widest text-emerald-100">Konektivitas Finance Aktif</h3>
+                    <p className="text-[10px] font-bold text-emerald-500/60 uppercase tracking-widest leading-relaxed mt-1">Status <b>"Bayar"</b> akan otomatis memicu jurnal pengeluaran (Expense) pada sistem akuntansi perusahaan.</p>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Total Pengeluaran Gaji</p>
-                    <p className="text-2xl font-bold text-slate-900">
+                <div className="p-8 bg-slate-900/50 rounded-[32px] border border-slate-700 shadow-2xl backdrop-blur-xl group hover:border-indigo-500/30 transition-all">
+                    <p className="text-[10px] font-black italic text-slate-500 uppercase tracking-[0.2em] mb-3">Total Disbursement</p>
+                    <p className="text-3xl font-black italic tracking-tighter text-white group-hover:text-indigo-400 transition-colors">
                         {formatCurrency(payrolls.reduce((acc, curr) => acc + curr.netSalary, 0))}
                     </p>
-                    <div className="mt-2 flex items-center text-xs text-green-600">
+                    <div className="mt-4 flex items-center text-[9px] font-black uppercase tracking-widest text-emerald-500">
                         <CheckCircle className="h-3 w-3 mr-1" />
-                        Periode terpilih
+                        Periode Dinamis Berjalan
                     </div>
                 </div>
-                <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Total Potongan (Lates)</p>
-                    <p className="text-2xl font-bold text-red-600">
+                <div className="p-8 bg-slate-900/50 rounded-[32px] border border-slate-700 shadow-2xl backdrop-blur-xl group hover:border-red-500/30 transition-all">
+                    <p className="text-[10px] font-black italic text-slate-500 uppercase tracking-[0.2em] mb-3">Total Penalty Deductions</p>
+                    <p className="text-3xl font-black italic tracking-tighter text-red-500">
                         {formatCurrency(payrolls.reduce((acc, curr) => acc + curr.deductions, 0))}
                     </p>
-                    <p className="mt-2 text-xs text-slate-400">Rp 50.000 / keterlambatan</p>
+                    <p className="mt-4 text-[9px] font-black uppercase tracking-widest text-slate-600 italic">Rate: Rp 50.000 / Keterlambatan</p>
                 </div>
-                <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Status Pembayaran</p>
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className="text-2xl font-bold text-slate-900">
-                            {payrolls.filter(p => p.status === 'PAID').length} / {payrolls.length}
+                <div className="p-8 bg-slate-900/50 rounded-[32px] border border-slate-700 shadow-2xl backdrop-blur-xl group hover:border-emerald-500/30 transition-all">
+                    <p className="text-[10px] font-black italic text-slate-500 uppercase tracking-[0.2em] mb-3">Payment Fulfilment</p>
+                    <div className="flex items-center gap-3 mt-1">
+                        <span className="text-3xl font-black italic tracking-tighter text-white">
+                            {payrolls.filter(p => p.status === 'PAID').length} <span className="text-slate-700 text-xl">/</span> {payrolls.length}
                         </span>
-                        <span className="text-sm text-slate-500">Tuntas</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 italic">Status Tuntas</span>
                     </div>
                 </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="bg-slate-900/50 rounded-[32px] border border-slate-700 shadow-2xl overflow-hidden backdrop-blur-xl">
                 {isLoading ? (
                     <div className="flex h-64 items-center justify-center">
-                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
                     </div>
                 ) : error ? (
-                    <div className="p-12 text-center text-red-500">{error}</div>
+                    <div className="p-12 text-center text-red-400 font-black italic uppercase tracking-widest">{error}</div>
                 ) : payrolls.filter(p =>
                     p.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     p.user.email.toLowerCase().includes(searchQuery.toLowerCase())
                 ).length === 0 ? (
                     <div className="flex h-64 flex-col items-center justify-center p-6 text-center text-slate-500">
-                        <Search className="h-12 w-12 text-slate-200 mb-4" />
-                        <p className="font-medium text-lg mb-1">Tidak ada hasil ditemukan</p>
-                        <p className="text-sm">Tidak ada data payroll yang cocok dengan "{searchQuery}"</p>
+                        <Search className="h-12 w-12 text-slate-800 mb-4" />
+                        <p className="text-xl font-black italic tracking-tighter text-slate-300 uppercase mb-1">Tidak ada hasil ditemukan</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest">Tidak ada data payroll yang cocok dengan "{searchQuery}"</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-semibold">
+                            <thead className="bg-[#050505] border-b border-slate-800 text-slate-500 uppercase text-[10px] font-black tracking-[0.2em]">
                                 <tr>
-                                    <th className="px-6 py-4">Karyawan</th>
-                                    <th className="px-6 py-4">Gaji Pokok</th>
-                                    <th className="px-6 py-4">Tambahan<br />(Tunj/Lembur/Klaim/Bonus)</th>
-                                    <th className="px-6 py-4">Hadir / Terlambat</th>
-                                    <th className="px-6 py-4">Potongan / Pinjaman</th>
-                                    <th className="px-6 py-4">Gaji Bersih</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4 text-right">Aksi</th>
+                                    <th className="px-6 py-5 italic">Karyawan</th>
+                                    <th className="px-6 py-5 italic">Gaji Pokok</th>
+                                    <th className="px-6 py-5 italic">Tambahan</th>
+                                    <th className="px-6 py-5 italic">Kehadiran</th>
+                                    <th className="px-6 py-5 italic">Total Potongan</th>
+                                    <th className="px-6 py-5 italic">Take-Home Pay</th>
+                                    <th className="px-6 py-5 italic text-center">Status</th>
+                                    <th className="px-6 py-5 text-right italic">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-800 transition-all">
                                 {payrolls.filter(p =>
                                     p.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                     p.user.email.toLowerCase().includes(searchQuery.toLowerCase())
                                 ).map((p) => (
-                                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-6 py-4">
+                                    <tr key={p.id} className="hover:bg-slate-800/50 transition-colors group">
+                                        <td className="px-6 py-5">
                                             <div className="flex items-center gap-3">
-                                                <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
+                                                <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform font-black italic">
                                                     {p.user.name.charAt(0)}
                                                 </div>
                                                 <div>
-                                                    <p className="font-medium text-slate-900">{p.user.name}</p>
-                                                    <p className="text-xs text-slate-400">{p.user.email}</p>
+                                                    <p className="font-black italic text-white uppercase tracking-tighter">{p.user.name}</p>
+                                                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest leading-none mt-1">{p.user.email}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-medium text-slate-700">
+                                        <td className="px-6 py-5 font-black italic text-slate-100 uppercase tracking-tighter">
                                             {formatCurrency(p.basicSalary)}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-green-600 font-medium">Tunj: + {formatCurrency(p.allowance)}</span>
-                                                {p.mealAllowance > 0 && (
-                                                    <span className="text-orange-600 font-medium text-xs">Makan: + {formatCurrency(p.mealAllowance)}</span>
-                                                )}
-                                                {p.overtimeHours > 0 && (
-                                                    <span className="text-blue-600 font-medium text-xs">
-                                                        Lembur ({p.overtimeHours}j): + {formatCurrency(p.overtimePay)}
-                                                    </span>
-                                                )}
-                                                {p.reimbursementPay > 0 && (
-                                                    <span className="text-teal-600 font-medium text-xs">
-                                                        Klaim: + {formatCurrency(p.reimbursementPay)}
-                                                    </span>
-                                                )}
-                                                {p.bonusPay > 0 && (
-                                                    <span className="text-orange-600 font-medium text-xs font-bold">
-                                                        Bonus/THR: + {formatCurrency(p.bonusPay)}
-                                                    </span>
+                                        <td className="px-6 py-5">
+                                            <div className="flex flex-col gap-1.5">
+                                                <span className="text-emerald-400 font-black italic text-[10px] uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/10 w-fit">+ {formatCurrency(p.allowance)}</span>
+                                                {(p.mealAllowance > 0 || p.overtimePay > 0 || p.reimbursementPay > 0 || p.bonusPay > 0) && (
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {p.mealAllowance > 0 && <span className="text-orange-400/80 font-bold text-[9px] uppercase tracking-tighter">Makan+</span>}
+                                                        {p.overtimePay > 0 && <span className="text-indigo-400/80 font-bold text-[9px] uppercase tracking-tighter">Lembur+</span>}
+                                                        {p.reimbursementPay > 0 && <span className="text-teal-400/80 font-bold text-[9px] uppercase tracking-tighter">Klaim+</span>}
+                                                        {p.bonusPay > 0 && <span className="text-orange-500 font-black text-[9px] uppercase tracking-tighter">Bonus+</span>}
+                                                    </div>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-5">
                                             <div className="flex flex-col">
-                                                <span className="text-slate-700">{p.attendanceCount} Hari</span>
-                                                <span className={`text-xs ${p.lateCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
-                                                    {p.lateCount}x Terlambat
+                                                <span className="text-white font-black italic text-xs uppercase tracking-tight">{p.attendanceCount} HARI</span>
+                                                <span className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${p.lateCount > 0 ? 'text-red-500' : 'text-slate-600'}`}>
+                                                    {p.lateCount}x TERLAMBAT
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-medium">
+                                        <td className="px-6 py-5">
                                             <div className="flex flex-col gap-1">
-                                                {p.deductions > 0 && (
-                                                    <span className="text-red-500 font-medium">- {formatCurrency(p.deductions)} (Absen)</span>
-                                                )}
-                                                {p.loanDeduction > 0 && (
-                                                    <span className="text-orange-600 font-medium">- {formatCurrency(p.loanDeduction)} (Pinjaman)</span>
-                                                )}
-                                                {p.bpjsKesehatanDeduction > 0 && (
-                                                    <span className="text-red-500 text-xs">BPJS Kes (1%): - {formatCurrency(p.bpjsKesehatanDeduction)}</span>
-                                                )}
-                                                {p.bpjsKetenagakerjaanDeduction > 0 && (
-                                                    <span className="text-red-500 text-xs">BPJS Ket: - {formatCurrency(p.bpjsKetenagakerjaanDeduction)}</span>
-                                                )}
-                                                {p.pph21Deduction > 0 && (
-                                                    <span className="text-blue-600 font-bold text-xs underline decoration-blue-200">PPh 21: - {formatCurrency(p.pph21Deduction)}</span>
-                                                )}
-                                                {p.loanDeduction === 0 && p.deductions === 0 && p.pph21Deduction === 0 && (
-                                                    <span className="text-slate-400">Rp 0</span>
+                                                {(p.deductions > 0 || p.loanDeduction > 0 || p.bpjsKesehatanDeduction > 0 || p.bpjsKetenagakerjaanDeduction > 0 || p.pph21Deduction > 0) ? (
+                                                    <>
+                                                        {p.deductions > 0 && <span className="text-red-400/80 font-bold text-[9px] uppercase tracking-tighter">Absen: -{p.deductions}</span>}
+                                                        {p.loanDeduction > 0 && <span className="text-orange-400/80 font-bold text-[9px] uppercase tracking-tighter">Loan: -{p.loanDeduction}</span>}
+                                                        {(p.bpjsKesehatanDeduction > 0 || p.bpjsKetenagakerjaanDeduction > 0) && <span className="text-indigo-400/80 font-bold text-[9px] uppercase tracking-tighter">BPJS Active</span>}
+                                                        {p.pph21Deduction > 0 && <span className="text-white/50 font-bold text-[9px] uppercase tracking-tighter">Tax Incl.</span>}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-slate-700 text-[10px] font-black italic uppercase tracking-widest italic">Bersih</span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-bold text-emerald-600 bg-emerald-50/30">
+                                        <td className="px-6 py-5 font-black italic text-emerald-400 text-base uppercase tracking-tighter bg-emerald-500/[0.02]">
                                             {formatCurrency(p.netSalary)}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${p.status === 'PAID' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'
-                                                }`}>
+                                        <td className="px-6 py-5 text-center">
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black italic uppercase tracking-[0.15em] border ${p.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>
                                                 {p.status === 'PAID' ? 'Tuntas' : 'Draft'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                        <td className="px-6 py-5 text-right">
+                                            <div className="flex items-center justify-end gap-3">
                                                 <button
                                                     onClick={() => { setSelectedPayroll(p); setIsPaycheckOpen(true); }}
-                                                    className="p-1 px-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                    className="p-2 text-indigo-400 hover:text-white hover:bg-white/5 rounded-xl transition-all border border-white/5"
                                                     title="Cetak Slip PDF"
                                                 >
                                                     <Printer className="h-4 w-4" />
@@ -421,12 +402,12 @@ export default function PayrollPage() {
                                                  {p.status === 'DRAFT' ? (
                                                      <button
                                                          onClick={() => handlePay(p.id)}
-                                                         className="inline-flex items-center gap-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded transition-all shadow-sm"
+                                                         className="px-4 py-2 text-[10px] font-black italic uppercase tracking-widest text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-lg shadow-indigo-500/20 border border-indigo-500/20 active:scale-95"
                                                      >
                                                          Bayar
                                                      </button>
                                                  ) : (
-                                                     <span className="text-xs text-slate-400 font-medium">Selesai</span>
+                                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 italic">Selesai</span>
                                                  )}
                                             </div>
                                         </td>
@@ -438,17 +419,15 @@ export default function PayrollPage() {
                 )}
             </div>
 
-            <div className="mt-6 flex items-start gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                <div className="text-xs text-blue-800 leading-relaxed">
-                    <p className="font-bold mb-1">Catatan Penting (Gaji Proporsional):</p>
-                    <ul className="list-disc ml-4 space-y-1">
-                        <li><strong>Hari Kerja Aktif</strong> = Total hari Senin-Jumat dikurangi <strong>Hari Libur Nasional</strong>.</li>
-                        <li><strong>Gaji Harian</strong> = (Gaji Pokok + Tunjangan) dibagi Hari Kerja Aktif.</li>
-                        <li><strong>Gaji Terkumpul</strong> = (Gaji Harian × (Kehadiran + Cuti Disetujui)) + <strong>Lembur</strong> + <strong>Reimbursement</strong>.</li>
-                        <li><strong>Uang Lembur</strong> = Total jam lembur disetujui × Tarif Lembur/Jam.</li>
-                        <li><strong>Gaji Bersih</strong> = Gaji Terkumpul - (Potongan Terlambat + Pinjaman + BPJS).</li>
-                        <li>Karyawan yang <strong>Alpha</strong> (tidak masuk tanpa cuti) otomatis memotong target hari kerja.</li>
+            <div className="mt-8 flex items-start gap-4 p-6 bg-slate-900/50 rounded-[32px] border border-white/5 backdrop-blur-xl">
+                <AlertCircle className="h-5 w-5 text-indigo-400 flex-shrink-0 mt-1" />
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-relaxed">
+                    <p className="text-white mb-2 italic tracking-[0.2em]">Logika Kalkulasi Pro-rata :</p>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 italic">
+                        <li><span className="text-slate-400">•</span> Hari Aktif = Total Hari Kerja - Libur Nasional</li>
+                        <li><span className="text-slate-400">•</span> Gaji Harian = (GP + Tunj) / Hari Aktif</li>
+                        <li><span className="text-slate-400">•</span> Net Pay = (Harian × Kehadiran) + Lembur - Potongan</li>
+                        <li><span className="text-slate-400">•</span> Alpha/Unpaid Leave memotong target hari kerja</li>
                     </ul>
                 </div>
             </div>
@@ -462,101 +441,98 @@ export default function PayrollPage() {
 
             {/* MODAL INPUT MANUAL (Khusus Finance-Only) */}
             {isManualModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
-                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#050505]/80 backdrop-blur-xl animate-in fade-in duration-200">
+                    <div className="bg-slate-900 rounded-[32px] border border-slate-700 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
                             <div>
-                                <h2 className="text-xl font-bold text-slate-900">Input Gaji Manual</h2>
-                                <p className="text-xs text-slate-500">Periode {selectedMonth} / {selectedYear}</p>
+                                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 italic">Input Gaji Manual</h2>
+                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Periode {selectedMonth} / {selectedYear}</p>
                             </div>
-                            <button onClick={() => setIsManualModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                                <X className="h-5 w-5 text-slate-500" />
+                            <button onClick={() => setIsManualModalOpen(false)} className="h-8 w-8 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                                <X className="h-4 w-4" />
                             </button>
                         </div>
                         
-                        <form onSubmit={handleManualSubmit} className="p-6 space-y-4">
+                        <form onSubmit={handleManualSubmit} className="p-8 space-y-6">
                             <div>
-                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Pilih Karyawan</label>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Daftar Karyawan</label>
                                 <select 
                                     required
                                     value={manualForm.userId}
                                     onChange={(e) => setManualForm({...manualForm, userId: e.target.value})}
-                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all cursor-pointer"
                                 >
                                     <option value="">-- Pilih --</option>
                                     {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
                                 </select>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Gaji Pokok</label>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Gaji Pokok</label>
                                     <input 
                                         type="number"
                                         required
                                         value={manualForm.basicSalary}
                                         onChange={(e) => setManualForm({...manualForm, basicSalary: e.target.value})}
-                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                                         placeholder="0"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Tunjangan</label>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Tunjangan</label>
                                     <input 
                                         type="number"
                                         value={manualForm.allowance}
                                         onChange={(e) => setManualForm({...manualForm, allowance: e.target.value})}
-                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                                         placeholder="0"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Uang Makan</label>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Uang Makan</label>
                                     <input 
                                         type="number"
                                         value={manualForm.mealAllowance}
                                         onChange={(e) => setManualForm({...manualForm, mealAllowance: e.target.value})}
-                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                                         placeholder="0"
                                     />
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Bonus / THR</label>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Bonus / THR</label>
                                     <input 
                                         type="number"
                                         value={manualForm.bonusPay}
                                         onChange={(e) => setManualForm({...manualForm, bonusPay: e.target.value})}
-                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                                         placeholder="0"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Total Potongan</label>
+                                <div className="col-span-2">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Total Potongan (Absen/Pinjaman)</label>
                                     <input 
                                         type="number"
                                         value={manualForm.deductions}
                                         onChange={(e) => setManualForm({...manualForm, deductions: e.target.value})}
-                                        className="w-full rounded-lg border border-red-200 px-3 py-2 text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none"
+                                        className="w-full bg-slate-950 border border-red-500/30 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-red-500 outline-none transition-all"
                                         placeholder="0"
                                     />
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-slate-100 flex gap-3">
+                            <div className="pt-8 flex gap-4 border-t border-white/5">
                                 <button
                                     type="button"
                                     onClick={() => setIsManualModalOpen(false)}
-                                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                                    className="flex-1 px-6 py-2.5 bg-white/5 border border-white/5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.2)]"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isGenerating}
-                                    className="flex-2 px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                    className="flex-1 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 border border-indigo-500/20 disabled:opacity-50 active:scale-95"
                                 >
                                     {isGenerating ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : 'Simpan Payroll'}
                                 </button>

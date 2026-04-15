@@ -81,32 +81,32 @@ export default function ClosingPage() {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
               <ShieldCheck className="h-8 w-8 text-blue-500" />
               Penutupan Buku <span className="text-blue-500">(Closing)</span>
             </h1>
-            <p className="text-slate-500 mt-2">Finalisasi laporan bulanan untuk pencatatan ringkasan kinerja keuangan.</p>
+            <p className="text-slate-400 mt-2">Finalisasi laporan bulanan untuk pencatatan ringkasan kinerja keuangan.</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Closing Action Card */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+            <div className="bg-slate-900/50 rounded-2xl p-6 shadow-sm border border-slate-700">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 bg-blue-900/20 rounded-lg">
+                  <Lock className="h-5 w-5 text-blue-400" />
                 </div>
-                <h2 className="text-lg font-bold text-slate-800">Tutup Periode Baru</h2>
+                <h2 className="text-lg font-bold text-white">Tutup Periode Baru</h2>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-tight">Pilih Bulan Berjalan</label>
+                  <label className="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-tight">Pilih Bulan Berjalan</label>
                   <select 
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                    className="w-full rounded-xl border-2 border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-black text-slate-800"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 p-2.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-black text-white"
                   >
                     {months.map(m => (
                       <option key={m.id} value={m.id}>{m.name}</option>
@@ -115,11 +115,11 @@ export default function ClosingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-tight">Pilih Tahun Berjalan</label>
+                  <label className="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-tight">Pilih Tahun Berjalan</label>
                   <select 
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                    className="w-full rounded-xl border-2 border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-black text-slate-800"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 p-2.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-black text-white"
                   >
                     {years.map(y => (
                       <option key={y} value={y}>{y}</option>
@@ -160,13 +160,13 @@ export default function ClosingPage() {
 
           {/* History Table */}
           <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <div className="bg-slate-900/50 rounded-2xl shadow-sm border border-slate-700 overflow-hidden">
+              <div className="p-6 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                    <History className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                  <div className="p-2 bg-slate-800 rounded-lg">
+                    <History className="h-5 w-5 text-slate-400" />
                   </div>
-                  <h2 className="text-lg font-semibold">Riwayat Penutupan</h2>
+                  <h2 className="text-lg font-semibold text-white">Riwayat Penutupan</h2>
                 </div>
               </div>
 

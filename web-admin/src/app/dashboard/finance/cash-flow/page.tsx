@@ -71,15 +71,15 @@ export default function CashFlowPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                    <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
                         Laporan Arus Kas
                     </h1>
-                    <p className="mt-1 text-sm text-slate-500 font-medium">Lacak setiap Rupiah yang masuk dan keluar periode {months[month-1]} {year}.</p>
+                    <p className="mt-1 text-sm text-slate-400 font-medium">Lacak setiap Rupiah yang masuk dan keluar periode {months[month-1]} {year}.</p>
                 </div>
                 <div className="flex gap-2">
                     <button 
                         onClick={() => window.print()}
-                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                        className="flex items-center gap-2 rounded-xl bg-slate-900/50 border border-slate-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm active:scale-95"
                     >
                         <Printer className="h-4 w-4" /> Cetak
                     </button>
@@ -92,15 +92,15 @@ export default function CashFlowPage() {
                 </div>
             </div>
 
-            <div className="mb-8 flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 p-4 shadow-sm">
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+            <div className="mb-8 flex flex-wrap items-center gap-4 rounded-2xl border border-slate-700 bg-slate-900/50 p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-emerald-400">
                     <Calendar className="h-4 w-4" />
-                    <span className="text-sm font-black uppercase tracking-tight text-slate-900 dark:text-white">Pilih Periode:</span>
+                    <span className="text-sm font-black uppercase tracking-tight text-white">Pilih Periode:</span>
                 </div>
                 <select 
                     value={month} 
                     onChange={(e) => setMonth(parseInt(e.target.value))}
-                    className="rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="rounded-lg border-2 border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-black text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                     {months.map((m, i) => (
                         <option key={i} value={i + 1}>{m}</option>
@@ -109,7 +109,7 @@ export default function CashFlowPage() {
                 <select 
                     value={year} 
                     onChange={(e) => setYear(parseInt(e.target.value))}
-                    className="rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="rounded-lg border-2 border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-black text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                     {years.map(y => (
                         <option key={y} value={y}>{y}</option>

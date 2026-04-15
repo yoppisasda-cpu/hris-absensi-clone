@@ -205,131 +205,153 @@ export default function AssetsPage() {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                        <Laptop className="h-6 w-6 text-blue-600" /> Manajemen Aset
-                    </h1>
-                    <p className="text-sm text-slate-500 mt-1">Lacak inventaris perusahaan dan penugasan ke karyawan.</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+                <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-2xl shadow-indigo-500/10 transition-transform hover:scale-105">
+                        <Laptop className="h-7 w-7 text-indigo-400" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase leading-none">Manajemen Aset</h1>
+                        <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-2 italic">Corporate Inventory & Asset Assignment System</p>
+                    </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
                     <div className="relative flex-grow">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 transition-colors group-focus-within:text-indigo-500" />
                         <input
                             type="text"
                             placeholder="Cari aset atau pemegang..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                            className="w-full md:w-80 pl-12 pr-4 py-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-sm font-bold text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all outline-none placeholder:text-slate-700 shadow-inner group"
                         />
                     </div>
                     <button
                         onClick={handleOpenAdd}
-                        className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20"
+                        className="flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/20 active:scale-95 transition-all border border-indigo-400/20 italic"
                     >
-                        <Plus className="h-4 w-4" /> Tambah Aset
+                        <Plus className="h-4 w-4 stroke-[3px]" /> Registrasi Aset
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+            <div className="bg-slate-900/50 rounded-[32px] border border-slate-700 shadow-2xl overflow-hidden backdrop-blur-xl min-h-[400px]">
                 {isLoading ? (
-                    <div className="flex h-64 items-center justify-center">
-                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+                    <div className="flex h-96 items-center justify-center">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent shadow-2xl shadow-indigo-500/20"></div>
                     </div>
                 ) : error ? (
-                    <div className="flex h-64 flex-col items-center justify-center p-6 text-center text-red-500">
-                        <AlertCircle className="h-10 w-10 mb-2 opacity-50" />
-                        <p className="font-semibold">{error}</p>
+                    <div className="flex h-96 flex-col items-center justify-center p-8 text-center">
+                        <div className="h-16 w-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 border border-red-500/20">
+                            <AlertCircle className="h-8 w-8 text-red-500" />
+                        </div>
+                        <p className="font-black text-white italic uppercase tracking-tighter text-lg">{error}</p>
                     </div>
                 ) : filteredAssets.length === 0 ? (
-                    <div className="flex h-64 flex-col items-center justify-center p-6 text-center text-slate-400">
-                        <Laptop className="h-12 w-12 mb-2 opacity-20" />
-                        <p className="text-lg font-medium">Belum ada aset terdaftar</p>
-                        <p className="text-sm">Klik "Tambah Aset" untuk memulai inventarisir.</p>
+                    <div className="flex h-96 flex-col items-center justify-center p-8 text-center space-y-4">
+                        <div className="h-20 w-20 bg-white/5 rounded-3xl flex items-center justify-center border border-white/5 shadow-inner">
+                            <Laptop className="h-10 w-10 text-slate-500 opacity-20" />
+                        </div>
+                        <div>
+                            <p className="text-xl font-black italic text-white uppercase tracking-tighter">Inventaris Kosong</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Mulai tambahkan aset tetap perusahaan untuk pelacakan yang lebih baik.</p>
+                        </div>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-slate-50/50 border-b border-slate-200">
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Aset & Kategori</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status & Kondisi</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Pemegang (User)</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Depresiasi</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
+                                <tr className="bg-[#050505] border-b border-slate-800">
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Identitas Aset & Spek</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Status Utilisasi</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Penanggung Jawab</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Model Depresiasi</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic text-right">Menu</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-800/50 transition-all">
                                 {filteredAssets.map((asset) => (
-                                    <tr key={asset.id} className="hover:bg-slate-50/80 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-12 w-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                                    <tr key={asset.id} className="hover:bg-slate-800/30 transition-colors group">
+                                        <td className="px-6 py-6">
+                                            <div className="flex items-center gap-5">
+                                                <div className="h-16 w-20 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform">
                                                     {asset.imageUrl ? (
                                                         <img src={asset.imageUrl} alt={asset.name} className="h-full w-full object-cover" />
                                                     ) : (
-                                                        <Laptop className="h-6 w-6 text-slate-300" />
+                                                        <Laptop className="h-7 w-7 text-slate-700" />
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <div className="font-semibold text-slate-900">{asset.name}</div>
-                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase mt-0.5 tracking-wider bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 w-fit">
+                                                    <div className="font-black text-sm italic text-white uppercase tracking-tighter leading-none mb-2">{asset.name}</div>
+                                                    <div className="flex items-center gap-1.5 text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-1 rounded-lg border border-indigo-500/20 w-fit italic">
                                                         {getCategoryIcon(asset.category)} {asset.category?.replace('_', ' ')}
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1.5">
-                                                <span className={`inline-flex items-center w-fit px-2 py-0.5 rounded-full text-[10px] font-bold ${asset.userId
-                                                    ? 'bg-blue-100 text-blue-700'
-                                                    : 'bg-emerald-100 text-emerald-700'
+                                        <td className="px-6 py-6">
+                                            <div className="flex flex-col gap-2.5">
+                                                <span className={`inline-flex items-center w-fit px-3 py-1 rounded-xl text-[9px] font-black border uppercase tracking-[0.2em] italic ${asset.userId
+                                                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-lg shadow-emerald-500/10'
                                                     }`}>
-                                                    {asset.userId ? 'DIPAKAI' : 'TERSEDIA'}
+                                                    {asset.userId ? '🔴 SEDANG DIGUNAKAN' : '🟢 READY'}
                                                 </span>
-                                                <div className={`text-xs font-medium flex items-center gap-1 ${asset.condition === 'GOOD' ? 'text-emerald-600' :
-                                                    asset.condition === 'FAIR' ? 'text-amber-600' : 'text-red-600'
+                                                <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 italic ${asset.condition === 'GOOD' ? 'text-emerald-500/80' :
+                                                    asset.condition === 'FAIR' ? 'text-amber-500/80' : 'text-red-500/80'
                                                     }`}>
-                                                    <div className={`h-1.5 w-1.5 rounded-full ${asset.condition === 'GOOD' ? 'bg-emerald-500' :
-                                                        asset.condition === 'FAIR' ? 'bg-amber-500' : 'bg-red-500'
+                                                    <div className={`h-1.5 w-1.5 rounded-full ${asset.condition === 'GOOD' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' :
+                                                        asset.condition === 'FAIR' ? 'bg-amber-500' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
                                                         }`} />
                                                     {asset.condition === 'GOOD' ? 'Sangat Baik' :
-                                                        asset.condition === 'FAIR' ? 'Cukup (Ada Lecet)' : 'Rusak / Perlu Servis'}
+                                                        asset.condition === 'FAIR' ? 'Cukup (Ada Lecet)' : 'Kondisi Kritis'}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-6">
                                             {asset.user ? (
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                                                        <User className="h-4 w-4" />
+                                                <div className="flex items-center gap-3.5">
+                                                    <div className="h-10 w-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                                                        <User className="h-5 w-5" />
                                                     </div>
                                                     <div>
-                                                        <div className="text-sm font-semibold text-slate-800">{asset.user.name}</div>
-                                                        <div className="text-[11px] text-slate-400">{asset.user.email}</div>
+                                                        <div className="text-sm font-black italic text-white uppercase tracking-tighter leading-none mb-1">{asset.user.name}</div>
+                                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{asset.user.email}</div>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <span className="text-xs italic text-slate-300">Belum diserahkan</span>
+                                                <div className="flex items-center gap-2 text-[10px] italic font-black text-slate-600 uppercase tracking-widest">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-800" />
+                                                    Belum diserahkan
+                                                </div>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-6">
                                             {asset.isDepreciating ? (
                                                 <div className="flex flex-col">
-                                                    <div className="text-xs font-bold text-emerald-600">Aktif</div>
-                                                    <div className="text-[10px] text-slate-400">Rp {((asset.purchasePrice - asset.residualValue) / (asset.usefulLife || 1)).toLocaleString()}/bln</div>
+                                                    <div className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] italic mb-1">AUTOMATED</div>
+                                                    <div className="text-sm font-black text-white italic tracking-tighter">
+                                                        Rp {((asset.purchasePrice - asset.residualValue) / (asset.usefulLife || 1)).toLocaleString()}
+                                                        <span className="text-slate-700 text-[10px] font-bold ml-1 uppercase not-italic">/mo</span>
+                                                    </div>
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-slate-300">Non-Aktif</span>
+                                                <span className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] italic">NON-CALC</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleOpenEdit(asset)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Edit Aset">
+                                        <td className="px-6 py-6 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button 
+                                                    onClick={() => handleOpenEdit(asset)} 
+                                                    className="h-10 w-10 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 rounded-xl border border-transparent hover:border-white/5 transition-all"
+                                                >
                                                     <Edit2 className="h-4 w-4" />
                                                 </button>
-                                                <button onClick={() => handleDelete(asset.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Hapus Aset">
+                                                <button 
+                                                    onClick={() => handleDelete(asset.id)} 
+                                                    className="h-10 w-10 flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-transparent hover:border-red-500/20 transition-all"
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>
@@ -344,23 +366,37 @@ export default function AssetsPage() {
 
             {/* Modal Add/Edit Aset */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 h-[85vh] flex flex-col">
-                        <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex justify-between items-center shrink-0">
-                            <h3 className="font-bold text-slate-800">{isEditMode ? 'Edit Informasi Aset' : 'Registrasi Aset Baru'}</h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050505]/90 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+                    <div className="w-full max-w-xl bg-slate-900 rounded-[40px] shadow-[0_0_100px_rgba(79,70,229,0.1)] overflow-hidden animate-in fade-in zoom-in duration-300 h-[90vh] flex flex-col border border-slate-700/50">
+                        <div className="bg-slate-950/50 border-b border-white/5 px-8 py-6 flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
+                                    <Laptop className="h-6 w-6 stroke-[2.5px]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">
+                                        {isEditMode ? 'Update Dataset Aset' : 'Registrasi Aset Baru'}
+                                    </h3>
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Fill detailed information about company asset</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsModalOpen(false)} className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                                <X className="h-5 w-5" />
+                            </button>
                         </div>
-                        <form onSubmit={handleSave} className="p-6 space-y-4 overflow-y-auto flex-grow custom-scrollbar">
+                        <form onSubmit={handleSave} className="p-8 space-y-8 overflow-y-auto flex-grow custom-scrollbar bg-slate-950/20">
                             {/* Image Upload & Preview */}
-                            <div className="flex justify-center mb-4">
+                            <div className="flex justify-center">
                                 <div className="relative group">
-                                    <div className="h-32 w-48 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center transition-all group-hover:border-blue-400">
+                                    <div className="h-44 w-72 rounded-[32px] bg-slate-950 border-2 border-dashed border-slate-800 overflow-hidden flex items-center justify-center transition-all group-hover:border-indigo-500/50 shadow-inner">
                                         {imagePreview ? (
-                                            <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                                            <img src={imagePreview} alt="Preview" className="h-full w-full object-cover transition-transform group-hover:scale-110 duration-500" />
                                         ) : (
-                                            <div className="text-center p-4">
-                                                <Laptop className="h-8 w-8 text-slate-300 mx-auto mb-1" />
-                                                <p className="text-[10px] text-slate-400 font-medium">Klik untuk upload foto aset</p>
+                                            <div className="text-center p-6 space-y-3">
+                                                <div className="h-16 w-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto border border-white/5">
+                                                    <Laptop className="h-8 w-8 text-slate-700" />
+                                                </div>
+                                                <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.2em] italic leading-relaxed">Release to upload<br />photo documentation</p>
                                             </div>
                                         )}
                                         <input
@@ -374,180 +410,205 @@ export default function AssetsPage() {
                                         <button
                                             type="button"
                                             onClick={() => { setImagePreview(null); setSelectedFile(null); }}
-                                            className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                                            className="absolute -top-3 -right-3 h-10 w-10 bg-red-600 text-white rounded-2xl shadow-2xl hover:bg-red-700 transition-all border border-red-500/20 flex items-center justify-center vibrate"
                                         >
-                                            <X className="h-3 w-3" />
+                                            <X className="h-5 w-5 stroke-[3px]" />
                                         </button>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2 sm:col-span-1">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Perangkat</label>
+                             <div className="grid grid-cols-2 gap-6">
+                                <div className="col-span-2 sm:col-span-1 space-y-2">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Identitas Perangkat</label>
                                     <input
                                         required
                                         type="text"
                                         value={formData.name}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full rounded-lg border border-slate-200 py-2.5 px-4 text-sm focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
-                                        placeholder="Cth: MacBook Pro 14 M3"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-5 text-sm font-bold text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-700 shadow-inner"
+                                        placeholder="CTH: MACBOOK PRO 14 M3 MAX"
                                     />
                                 </div>
-                                <div className="col-span-2 sm:col-span-1">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kategori Aset</label>
+                                <div className="col-span-2 sm:col-span-1 space-y-2">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Kategori Aset tetap</label>
                                     <select
                                         value={formData.category}
                                         onChange={e => setFormData({ ...formData, category: e.target.value })}
-                                        className="w-full rounded-lg border border-slate-200 py-2.5 px-3 text-sm focus:border-blue-500 outline-none bg-white"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-4 text-sm font-bold text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all"
                                     >
-                                        <option value="ELECTRONIC">Elektronik / Gadget</option>
-                                        <option value="VEHICLE">Kendaraan</option>
-                                        <option value="PROPERTY">Bangunan / Properti</option>
-                                        <option value="MACHINERY">Mesin / Peralatan</option>
-                                        <option value="FURNITURE">Mebel / Furniture</option>
-                                        <option value="OTHER">Lainnya</option>
+                                        <option value="ELECTRONIC">ELECTRONIC / GADGET</option>
+                                        <option value="VEHICLE">VEHICLE / FLEET</option>
+                                        <option value="PROPERTY">PROPERTY / INFRA</option>
+                                        <option value="MACHINERY">HEAVY MACHINERY</option>
+                                        <option value="FURNITURE">CABINET / FURNITURE</option>
+                                        <option value="OTHER">MISC ASSETS</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2 sm:col-span-1">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kategori Pajak (Opsional)</label>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="col-span-2 sm:col-span-1 space-y-2">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Kategori Pajak (PPH 21/23)</label>
                                     <select
                                         value={formData.taxCategory || 'NON_TAXABLE'}
                                         onChange={e => setFormData({ ...formData, taxCategory: e.target.value })}
-                                        className="w-full rounded-lg border border-slate-200 py-2.5 px-3 text-sm focus:border-blue-500 outline-none bg-white"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-4 text-sm font-bold text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all"
                                     >
-                                        <option value="NON_TAXABLE">Non-Pajak</option>
-                                        <option value="KELOMPOK_1">Kelompok 1 (4 Thn)</option>
-                                        <option value="KELOMPOK_2">Kelompok 2 (8 Thn)</option>
-                                        <option value="KELOMPOK_3">Kelompok 3 (16 Thn)</option>
-                                        <option value="KELOMPOK_4">Kelompok 4 (20 Thn)</option>
-                                        <option value="PERMANENT_BUILDING">Bangunan Permanen (20 Thn)</option>
-                                        <option value="SEMI_PERMANENT_BUILDING">Semi-Permanen (10 Thn)</option>
+                                        <option value="NON_TAXABLE">NON-TAXABLE ASSET</option>
+                                        <option value="KELOMPOK_1">KELOMPOK 1 (4 YEARS)</option>
+                                        <option value="KELOMPOK_2">KELOMPOK 2 (8 YEARS)</option>
+                                        <option value="KELOMPOK_3">KELOMPOK 3 (16 YEARS)</option>
+                                        <option value="KELOMPOK_4">KELOMPOK 4 (20 YEARS)</option>
+                                        <option value="PERMANENT_BUILDING">PERMANENT BLDG (20Y)</option>
+                                        <option value="SEMI_PERMANENT_BUILDING">SEMI-PERM BLDG (10Y)</option>
                                     </select>
                                 </div>
-                                <div className="col-span-2 sm:col-span-1">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nomor Seri / Dokumen</label>
+                                <div className="col-span-2 sm:col-span-1 space-y-2">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Serial Number / Unique ID</label>
                                     <input
                                         type="text"
                                         value={formData.serialNumber}
                                         onChange={e => setFormData({ ...formData, serialNumber: e.target.value })}
-                                        className="w-full rounded-lg border border-slate-200 py-2.5 px-4 text-sm focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-mono"
-                                        placeholder="Cth: SN12345 / No IMB"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-5 text-sm font-bold text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-800 font-mono italic"
+                                        placeholder="SN-XXXX-XXXX-XXXX"
                                     />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kondisi</label>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Kondisi Asset</label>
                                     <select
                                         value={formData.condition}
                                         onChange={e => setFormData({ ...formData, condition: e.target.value as any })}
-                                        className="w-full rounded-lg border border-slate-200 py-2.5 px-3 text-sm focus:border-blue-500 outline-none bg-white"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-4 text-sm font-bold text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all"
                                     >
-                                        <option value="GOOD">Sangat Baik</option>
-                                        <option value="FAIR">Cukup (Lecet)</option>
-                                        <option value="BROKEN">Rusak / Servis</option>
+                                        <option value="GOOD">Sangat Baik (Ready)</option>
+                                        <option value="FAIR">Cukup (Used)</option>
+                                        <option value="BROKEN">Rusak (Service Needed)</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tgl Pembelian</label>
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Tanggal Akuisisi</label>
                                     <input
                                         type="date"
                                         value={formData.purchaseDate}
                                         onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })}
-                                        className="w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-blue-500 outline-none shadow-inner"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-5 text-sm font-bold text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all shadow-inner uppercase"
                                     />
                                 </div>
                             </div>
 
                             {/* Finance Automation Section */}
-                            <div className="bg-slate-50/80 p-4 rounded-2xl space-y-3 border border-slate-200 shadow-sm">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-[11px] font-black text-slate-700 uppercase tracking-tight flex items-center gap-2 italic">
-                                        <Calculator className="h-4 w-4 text-emerald-600" /> Otomasi Depresiasi / Amortisasi
-                                    </label>
-                                    <div className="relative inline-block w-10 align-middle select-none transition duration-200 ease-in font-bold text-xs pr-1">
-                                        {formData.isDepreciating ? 'ON' : 'OFF'}
+                            {/* Finance Automation Section */}
+                            <div className="bg-slate-950 border border-slate-800 rounded-[32px] p-8 space-y-6 shadow-inner">
+                                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                                            <Calculator className="h-5 w-5 stroke-[2.5px]" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] italic leading-none">
+                                                Financial Automation System
+                                            </label>
+                                            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mt-1 italic">Calculated Depreciation & Amortization</p>
+                                        </div>
+                                    </div>
+                                    <div className="scale-75">
                                         <input 
                                             type="checkbox" 
-                                            name="isDepreciating" 
-                                            id="isDepreciating" 
                                             checked={formData.isDepreciating}
                                             onChange={(e) => setFormData({...formData, isDepreciating: e.target.checked})}
-                                            className="ml-2 h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500"
+                                            className="h-6 w-6 rounded-lg text-emerald-600 focus:ring-emerald-500 bg-slate-900 border-slate-700"
                                         />
                                     </div>
                                 </div>
                                 
                                 {formData.isDepreciating && (
-                                    <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-2 duration-300">
-                                        <div className="col-span-2 sm:col-span-1">
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Harga Beli (Rp)</label>
+                                    <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-4 duration-500">
+                                        <div className="col-span-2 sm:col-span-1 space-y-2">
+                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Capital Expenditure (CAPEX)</label>
                                             <input 
                                                 type="number"
                                                 value={formData.purchasePrice}
                                                 onChange={e => setFormData({...formData, purchasePrice: e.target.value })}
-                                                className="w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 font-bold text-slate-800 outline-none"
+                                                className="w-full rounded-2xl bg-slate-900 border border-slate-800 py-3.5 px-5 text-sm font-bold text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner"
+                                                placeholder="RP. 0"
                                             />
                                         </div>
-                                        <div className="sm:col-span-1">
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nilai Residu (Rp)</label>
+                                        <div className="sm:col-span-1 space-y-2">
+                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Residual Value / Salvage</label>
                                             <input 
                                                 type="number"
                                                 value={formData.residualValue}
                                                 onChange={e => setFormData({...formData, residualValue: e.target.value})}
-                                                className="w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-emerald-500 outline-none"
+                                                className="w-full rounded-2xl bg-slate-900 border border-slate-800 py-3.5 px-5 text-sm font-bold text-white focus:border-emerald-500/50 outline-none"
+                                                placeholder="RP. 0"
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Umur (Bulan)</label>
+                                        <div className="space-y-2">
+                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Service Life (Months)</label>
                                             <input 
                                                 type="number"
                                                 value={formData.usefulLife}
                                                 onChange={e => setFormData({...formData, usefulLife: e.target.value})}
-                                                className="w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-emerald-500 outline-none"
+                                                className="w-full rounded-2xl bg-slate-900 border border-slate-800 py-3.5 px-5 text-sm font-bold text-white focus:border-emerald-500/50 outline-none"
                                             />
                                         </div>
-                                        <div className="col-span-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
-                                            <p className="text-[10px] font-bold text-emerald-800 flex items-center gap-1.5">
-                                                <CheckCircle2 className="h-3.5 w-3.5" /> 
-                                                Beban Otomatis: Rp {((parseFloat(formData.purchasePrice || '0') - parseFloat(formData.residualValue || '0')) / (parseInt(formData.usefulLife || '1') || 1)).toLocaleString()}/bulan
+                                        <div className="col-span-2 bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
+                                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-3 italic">
+                                                <CheckCircle2 className="h-4 w-4 stroke-[3px]" /> 
+                                                Automatic monthly Expense: <span className="text-white text-sm not-italic ml-2 tracking-tighter">Rp {((parseFloat(formData.purchasePrice || '0') - parseFloat(formData.residualValue || '0')) / (parseInt(formData.usefulLife || '1') || 1)).toLocaleString()}</span>
                                             </p>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center justify-between">
-                                    Penugasan Karyawan
+                            <div className="space-y-3">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1 flex items-center justify-between">
+                                    Operator / User Assignment
                                     {formData.userId && (
-                                        <button type="button" onClick={() => setFormData({ ...formData, userId: '' })} className="text-[10px] text-red-500 hover:underline">Lepas Tugas</button>
+                                        <button type="button" onClick={() => setFormData({ ...formData, userId: '' })} className="text-[9px] text-red-500 hover:text-red-400 font-black tracking-widest uppercase italic">🔴 Unlink current holder</button>
                                     )}
                                 </label>
-                                <div className="relative">
-                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-600 group-focus-within:text-indigo-400 transition-colors">
+                                        <User className="h-full w-full" />
+                                    </div>
                                     <select
                                         value={formData.userId}
                                         onChange={e => setFormData({ ...formData, userId: e.target.value })}
-                                        className="w-full pl-10 pr-4 rounded-lg border border-slate-200 py-2.5 text-sm outline-none bg-white focus:border-blue-500"
+                                        className="w-full pl-12 pr-4 rounded-2xl bg-slate-950 border border-slate-800 py-3.5 text-sm font-bold text-white outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
                                     >
-                                        <option value="">-- Tersedia (Belum Diserahkan) --</option>
+                                        <option value="">-- UNASSIGNED (AVAILABLE IN STORAGE) --</option>
                                         {employees.map(emp => (
-                                            <option key={emp.id} value={emp.id.toString()}>{emp.name}</option>
+                                            <option key={emp.id} value={emp.id.toString()}>{emp.name.toUpperCase()}</option>
                                         ))}
                                     </select>
                                 </div>
                             </div>
                         </form>
-                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 text-sm font-bold text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors">Batal</button>
-                            <button type="submit" onClick={handleSave} disabled={isSaving} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-all shadow-lg shadow-blue-500/25">
-                                <Save className="h-4 w-4" /> {isSaving ? 'Menproses...' : (isEditMode ? 'Simpan Perubahan' : 'Daftarkan Aset')}
+                        <div className="p-8 bg-slate-950/50 border-t border-white/5 flex gap-4 shrink-0 backdrop-blur-3xl">
+                            <button 
+                                type="button" 
+                                onClick={() => setIsModalOpen(false)} 
+                                className="flex-1 py-4 text-[10px] font-black text-slate-500 bg-white/5 border border-white/5 hover:text-white hover:bg-white/10 rounded-2xl transition-all uppercase tracking-[0.2em] italic"
+                            >
+                                Batal
+                            </button>
+                            <button 
+                                type="submit" 
+                                onClick={handleSave} 
+                                disabled={isSaving} 
+                                className="flex-[2] flex items-center justify-center gap-3 py-4 text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl disabled:opacity-50 transition-all shadow-2xl shadow-indigo-500/20 uppercase tracking-[0.2em] border border-white/10 italic"
+                            >
+                                {isSaving ? (
+                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                                ) : (
+                                    <><Save className="h-4 w-4 stroke-[3px]" /> {isEditMode ? 'Sync Dataset Changes' : 'Execute Asset Registry'}</>
+                                )}
                             </button>
                         </div>
                     </div>

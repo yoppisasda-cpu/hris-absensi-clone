@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -37,6 +39,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchAnnouncements();
   }
 
+  // --- ANTI FRAUD (Phase 51) ---
+  Future<String?> _getDeviceId() async {
+    final deviceInfo = DeviceInfoPlugin();
+    if (Platform.isAndroid) {
+      final androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.id; // unique ID on Android
+    } else if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      return iosInfo.identifierForVendor; // unique ID on iOS
+    }
+    return null;
+  }
+
   Future<void> _checkStatus() async {
     setState(() => _isLoading = true);
     try {
@@ -48,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('Status error: $e');
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isLoading = true);
     }
   }
 
@@ -123,12 +138,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // 5. Tarik user id dan Kirim ke API Node.js
       final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+      final deviceId = await _getDeviceId();
 
       final response = await _apiService.clockIn(
         userId!,
         position.latitude,
         position.longitude,
         imagePath: photo.path,
+        deviceId: deviceId,
       );
 
       final String mood = response['attendance']['mood'] ?? 'Netral';
@@ -212,10 +229,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (photo == null) throw Exception('Anda membatalkan foto selfie.');
 
+      final deviceId = await _getDeviceId();
       final success = await _apiService.clockOut(
         position.latitude,
         position.longitude,
         imagePath: photo.path,
+        deviceId: deviceId,
       );
 
       if (success) {

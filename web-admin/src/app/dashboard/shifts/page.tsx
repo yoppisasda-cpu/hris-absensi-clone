@@ -58,26 +58,26 @@ export default function ShiftsPage() {
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                        <Clock className="h-6 w-6 text-blue-600" /> Pengaturan Shift Pegawai
+                    <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
+                        <Clock className="h-6 w-6 text-indigo-500" /> Operasional Shift
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">Buat _Master_ jadwal operasional perusahaan Anda (Mis. Shift Reguler, Shift Malam).</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1 italic">Konfigurasi master jadwal kerja tim (Reguler, Overtime, Seasonal).</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="relative flex-grow">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                         <input
                             type="text"
                             placeholder="Cari nama shift..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-500"
                         />
                     </div>
                     {!showForm && (
                         <button
                             onClick={() => setShowForm(true)}
-                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition whitespace-nowrap"
+                            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black italic uppercase tracking-widest text-white hover:bg-indigo-700 transition whitespace-nowrap shadow-lg shadow-indigo-500/20 border border-indigo-500/20"
                         >
                             <Plus className="h-4 w-4" /> Tambah Shift
                         </button>
@@ -86,38 +86,38 @@ export default function ShiftsPage() {
             </div>
 
             {showForm && (
-                <div className="mb-8 rounded-xl border border-blue-100 bg-blue-50 p-6 shadow-sm">
-                    <h2 className="mb-4 text-lg font-semibold text-slate-800">Form Pendaftaran Master Shift</h2>
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="mb-8 rounded-[32px] border border-white/5 bg-slate-900/50 p-8 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-300">
+                    <h2 className="mb-6 text-xs font-black uppercase tracking-[0.2em] text-indigo-400 italic">Form Pendaftaran Master Shift</h2>
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <div className="md:col-span-2">
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Nama Penjadwalan</label>
+                            <label className="mb-2 block text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Nama Penjadwalan</label>
                             <input
                                 type="text" required
                                 value={formObj.title} onChange={e => setFormObj({ ...formObj, title: e.target.value })}
-                                className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="Contoh: Shift Gudang Siang"
+                                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Contoh: Shift Gudang Siang"
                             />
                         </div>
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Jam Masuk (Clock-In)</label>
+                            <label className="mb-2 block text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Jam Masuk</label>
                             <input
                                 type="time" required
                                 value={formObj.startTime} onChange={e => setFormObj({ ...formObj, startTime: e.target.value })}
-                                className="w-full rounded-lg border px-3 py-2 text-sm"
+                                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                             />
                         </div>
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700">Jam Pulang (Clock-Out)</label>
+                            <label className="mb-2 block text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Jam Pulang</label>
                             <input
                                 type="time" required
                                 value={formObj.endTime} onChange={e => setFormObj({ ...formObj, endTime: e.target.value })}
-                                className="w-full rounded-lg border px-3 py-2 text-sm"
+                                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                             />
                         </div>
-                        <div className="md:col-span-4 flex justify-end gap-3 mt-4">
-                            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium">
+                        <div className="md:col-span-4 flex justify-end gap-4 mt-4">
+                            <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2.5 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all bg-white/5 hover:bg-white/10 rounded-xl border border-white/5">
                                 Batal
                             </button>
-                            <button type="submit" disabled={isSubmitting} className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-300">
+                            <button type="submit" disabled={isSubmitting} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-2.5 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-500/20 border border-indigo-500/20">
                                 {isSubmitting ? 'Menyimpan...' : <><Save className="h-4 w-4" /> Simpan</>}
                             </button>
                         </div>
@@ -125,19 +125,19 @@ export default function ShiftsPage() {
                 </div>
             )}
 
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="bg-slate-900/50 rounded-[32px] border border-slate-700 overflow-hidden shadow-sm backdrop-blur-xl">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-slate-600">
-                        <thead className="bg-slate-50 text-slate-800 uppercase text-xs font-semibold">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-[#050505] border-b border-slate-800 text-slate-500 uppercase text-[10px] font-black tracking-[0.2em]">
                             <tr>
-                                <th className="px-6 py-4">ID Shift</th>
-                                <th className="px-6 py-4">Nama Template Shift</th>
-                                <th className="px-6 py-4">Sesi Jam Masuk</th>
-                                <th className="px-6 py-4">Sesi Jam Keluar</th>
-                                <th className="px-6 py-4 text-center">Durasi Operasional</th>
+                                <th className="px-6 py-5 italic text-center">ID</th>
+                                <th className="px-6 py-5 italic">Nama Template Shift</th>
+                                <th className="px-6 py-5 italic text-center">Sesi Masuk</th>
+                                <th className="px-6 py-5 italic text-center">Sesi Pulang</th>
+                                <th className="px-6 py-5 text-center italic">Durasi</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-slate-800 transition-all">
                             {isLoading ? (
                                 <tr><td colSpan={5} className="py-8 text-center text-slate-400">Memuat data dari server...</td></tr>
                             ) : shifts.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
@@ -150,20 +150,20 @@ export default function ShiftsPage() {
                                 </tr>
                             ) : (
                                 shifts.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase())).map(shift => (
-                                    <tr key={shift.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-slate-900"># {shift.id}</td>
-                                        <td className="px-6 py-4 font-semibold text-blue-700">{shift.title}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                                                {shift.startTime} WIB
+                                    <tr key={shift.id} className="hover:bg-slate-800/50 transition-colors group">
+                                        <td className="px-6 py-5 text-center font-black italic text-slate-500 group-hover:text-indigo-400"># {shift.id}</td>
+                                        <td className="px-6 py-5 font-black italic text-white uppercase tracking-tighter text-base">{shift.title}</td>
+                                        <td className="px-6 py-5 text-center">
+                                            <span className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-[10px] font-black italic uppercase tracking-widest text-emerald-400 border border-emerald-500/20">
+                                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> {shift.startTime} WIB
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center gap-1.5 rounded-md bg-orange-50 px-2 py-1 text-xs font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20">
-                                                {shift.endTime} WIB
+                                        <td className="px-6 py-5 text-center">
+                                            <span className="inline-flex items-center gap-2 rounded-lg bg-orange-500/10 px-3 py-1.5 text-[10px] font-black italic uppercase tracking-widest text-orange-400 border border-orange-500/20">
+                                                <div className="h-1.5 w-1.5 rounded-full bg-orange-500" /> {shift.endTime} WIB
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-center text-slate-500 font-mono">
+                                        <td className="px-6 py-5 text-center text-indigo-400 font-black italic uppercase tracking-tighter text-lg">
                                             {/* Simplified Duration Calc Logics purely for display */}
                                             {(() => {
                                                 const s = parseInt(shift.startTime.split(':')[0]);

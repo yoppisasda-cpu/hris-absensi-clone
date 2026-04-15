@@ -83,9 +83,9 @@ export default function SalesOrdersPage() {
   if (!hasFeature("CRM") && !hasFeature("INVENTORY")) {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center">
-        <Package className="h-16 w-16 text-gray-300 mb-4" />
-        <h2 className="text-xl font-bold text-gray-800">Akses Ditolak</h2>
-        <p className="text-gray-500 mt-2 max-w-sm">Anda membutuhkan modul Penjualan & Inventaris untuk mengakses B2B Sales Orders.</p>
+        <Package className="h-16 w-16 text-slate-700 mb-4" />
+        <h2 className="text-xl font-bold text-white">Akses Ditolak</h2>
+        <p className="text-slate-400 mt-2 max-w-sm">Anda membutuhkan modul Penjualan & Inventaris untuk mengakses B2B Sales Orders.</p>
       </div>
     );
   }
@@ -94,14 +94,14 @@ export default function SalesOrdersPage() {
     <DashboardLayout>
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/50 p-6 rounded-2xl shadow-sm border border-slate-700">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">B2B Sales Orders (PO)</h1>
-          <p className="text-gray-500 mt-1">Kelola pesanan dari pelanggan bisnis secara efisien.</p>
+          <h1 className="text-2xl font-bold text-white">B2B Sales Orders (PO)</h1>
+          <p className="text-slate-400 mt-1">Kelola pesanan dari pelanggan bisnis secara efisien.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-black hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
         >
           <Plus className="h-5 w-5" />
           <span>Buat Pesanan (PO)</span>

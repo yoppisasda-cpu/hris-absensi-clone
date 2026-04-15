@@ -109,31 +109,31 @@ export default function ReceivablesPage() {
     return (
         <DashboardLayout>
             <div className="p-0 space-y-6 animate-in fade-in duration-500 overflow-y-auto max-h-[90vh]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/50 p-6 rounded-3xl shadow-sm border border-slate-700">
                     <div className="flex items-center gap-4">
                         <div className="h-14 w-14 rounded-2xl bg-blue-500/10 flex items-center justify-center">
                             <ArrowUpCircle className="h-8 w-8 text-blue-500" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-black italic tracking-tight text-slate-900 uppercase">Buku Piutang (Receivables)</h1>
-                            <p className="text-sm text-slate-500 font-medium">Lacak semua penjualan yang belum dibayar oleh Pelanggan.</p>
+                            <h1 className="text-2xl font-black italic tracking-tight text-white uppercase">Buku Piutang (Receivables)</h1>
+                            <p className="text-sm text-slate-400 font-medium">Lacak semua penjualan yang belum dibayar oleh Pelanggan.</p>
                         </div>
                     </div>
-                    <div className="bg-blue-50 px-6 py-3 rounded-2xl border border-blue-100 text-right">
+                    <div className="bg-blue-900/30 px-6 py-3 rounded-2xl border border-blue-800 text-right">
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Total Piutang Outstanding</p>
-                        <p className="text-2xl font-black text-blue-600">Rp {totalPiutang.toLocaleString()}</p>
+                        <p className="text-2xl font-black text-blue-500">Rp {totalPiutang.toLocaleString()}</p>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2 relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
                         <input 
                             type="text"
                             placeholder="Cari berdasarkan Pelanggan atau No. Invoice..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-200 focus:border-blue-500 outline-none transition-all shadow-sm font-medium"
+                            className="w-full pl-12 pr-4 py-4 bg-slate-900/50 rounded-2xl border border-slate-700 text-white focus:border-blue-500 outline-none transition-all shadow-sm font-medium placeholder:text-slate-500"
                         />
                     </div>
                     <div className="flex gap-2">

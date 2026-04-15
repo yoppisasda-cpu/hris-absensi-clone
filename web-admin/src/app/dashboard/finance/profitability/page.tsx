@@ -102,27 +102,27 @@ export default function ProfitabilityPage() {
     <DashboardLayout>
       <div className="space-y-6 pb-12">
         {/* Header & Filter */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-slate-900/50 p-6 rounded-xl shadow-sm border border-slate-700">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 font-primary tracking-tight">Analisis Margin & Profitabilitas</h1>
-            <p className="text-slate-500 text-sm">Pantau performa keuntungan per item dan efisiensi HPP</p>
+            <h1 className="text-2xl font-bold text-white font-primary tracking-tight">Analisis Margin & Profitabilitas</h1>
+            <p className="text-slate-400 text-sm">Pantau performa keuntungan per item dan efisiensi HPP</p>
           </div>
           
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-sm">
               <Calendar className="h-4 w-4 text-slate-400" />
               <input 
                 type="date" 
                 value={dateRange.startDate}
                 onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
-                className="bg-transparent border-none text-sm focus:ring-0 text-slate-700 outline-none"
+                className="bg-transparent border-none text-sm focus:ring-0 text-white outline-none [color-scheme:dark]"
               />
-              <span className="text-slate-400 text-xs font-bold">SD</span>
+              <span className="text-slate-500 text-xs font-bold">SD</span>
               <input 
                 type="date" 
                 value={dateRange.endDate}
                 onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
-                className="bg-transparent border-none text-sm focus:ring-0 text-slate-700 outline-none"
+                className="bg-transparent border-none text-sm focus:ring-0 text-white outline-none [color-scheme:dark]"
               />
             </div>
             <button 
@@ -136,33 +136,33 @@ export default function ProfitabilityPage() {
 
         {/* ... (Summary Cards and Charts stay the same) ... */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4 transition-all hover:shadow-md cursor-default group">
-            <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+          <div className="bg-slate-900/50 p-6 rounded-xl shadow-sm border border-slate-700 flex items-center gap-4 transition-all hover:bg-slate-800 cursor-default group">
+            <div className="h-12 w-12 bg-blue-900/30 text-blue-400 rounded-xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
               <TrendingUp className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Omzet</p>
-              <p className="text-2xl font-black text-slate-900 tracking-tight">{formatCurrency(data?.summary.totalRevenue || 0)}</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Omzet</p>
+              <p className="text-2xl font-black text-white tracking-tight">{formatCurrency(data?.summary.totalRevenue || 0)}</p>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4 transition-all hover:shadow-md cursor-default group">
-            <div className="h-12 w-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+          <div className="bg-slate-900/50 p-6 rounded-xl shadow-sm border border-slate-700 flex items-center gap-4 transition-all hover:bg-slate-800 cursor-default group">
+            <div className="h-12 w-12 bg-emerald-900/30 text-emerald-400 rounded-xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
               <DollarSign className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Profit Kotor</p>
-              <p className="text-2xl font-black text-slate-900 tracking-tight">{formatCurrency(data?.summary.totalProfit || 0)}</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Profit Kotor</p>
+              <p className="text-2xl font-black text-white tracking-tight">{formatCurrency(data?.summary.totalProfit || 0)}</p>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4 transition-all hover:shadow-md cursor-default group">
-            <div className="h-12 w-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
+          <div className="bg-slate-900/50 p-6 rounded-xl shadow-sm border border-slate-700 flex items-center gap-4 transition-all hover:bg-slate-800 cursor-default group">
+            <div className="h-12 w-12 bg-amber-900/30 text-amber-400 rounded-xl flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
               <Percent className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rata-rata Margin</p>
-              <p className="text-2xl font-black text-slate-900 tracking-tight">{(data?.summary.avgMargin || 0).toFixed(1)}%</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rata-rata Margin</p>
+              <p className="text-2xl font-black text-white tracking-tight">{(data?.summary.avgMargin || 0).toFixed(1)}%</p>
             </div>
           </div>
         </div>
@@ -247,33 +247,33 @@ export default function ProfitabilityPage() {
         </div>
 
         {/* Main Data Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="bg-slate-900/50 rounded-xl shadow-sm border border-slate-700 overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             <div>
-              <h3 className="font-black text-slate-900 tracking-tight uppercase text-sm">Rincian Performa Produk</h3>
-              <p className="text-[10px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold">Data Real-time dari Modul Sales & Inventory</p>
+              <h3 className="font-black text-white tracking-tight uppercase text-sm">Rincian Performa Produk</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-widest font-bold">Data Real-time dari Modul Sales & Inventory</p>
             </div>
             
             <div className="flex flex-col sm:flex-row items-center gap-3">
               {/* Search Field */}
               <div className="relative w-full sm:w-64 group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
                 <input 
                   type="text"
                   placeholder="Cari Produk / SKU..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-500"
                 />
               </div>
 
               {/* Category Filter */}
               <div className="relative w-full sm:w-48">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
                 <select 
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer transition-all text-slate-600 font-medium"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer transition-all font-medium"
                 >
                   <option value="all">Semua Kategori</option>
                   {categories.map(cat => (
@@ -282,7 +282,7 @@ export default function ProfitabilityPage() {
                 </select>
               </div>
 
-              <div className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-2 rounded-lg uppercase tracking-widest whitespace-nowrap">
+              <div className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800 px-3 py-2 rounded-lg uppercase tracking-widest whitespace-nowrap">
                 <Info className="h-3 w-3" />
                 HPP Berdasarkan Resep/BOM
               </div>

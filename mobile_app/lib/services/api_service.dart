@@ -5,9 +5,10 @@ class ApiService {
   // PENTING: Jika menggunakan HP asli, ganti 'localhost' dengan IP komputer Anda (cek pakai ipconfig)
   // Contoh: static const String baseUrl = 'http://192.168.1.15:5000/api';
   // Gunakan API Server Live yang sudah dideploy ke Railway
-  // static const String baseUrl = 'https://api.aivola.id/api'; // V1 Live Production
-  static const String baseUrl = 'http://10.0.2.2:5001/api'; // Targeting V2 Backend (Android Emulator)
-  // static const String baseUrl = 'http://192.168.1.15:5001/api'; // Targeting V2 Backend (Physical Device)
+  static const String baseUrl = 'https://api.aivola.id/api'; // V1 Live Production
+  // static const String baseUrl = 'http://localhost:5000/api'; // ADB Reverse (adb reverse tcp:5000 tcp:5000)
+  // static const String baseUrl = 'http://192.168.1.157:5000/api'; // HP Fisik via WiFi (butuh router non-isolated)
+  // static const String baseUrl = 'http://10.0.2.2:5000/api'; // Android Emulator saja
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   ApiService() {
@@ -88,9 +89,15 @@ class ApiService {
     double lat,
     double lng, {
     String? imagePath,
+    String? deviceId,
   }) async {
     try {
-      Map<String, dynamic> data = {'userId': userId, 'lat': lat, 'lng': lng};
+      Map<String, dynamic> data = {
+        'userId': userId, 
+        'lat': lat, 
+        'lng': lng,
+        'deviceId': deviceId
+      };
 
       if (imagePath != null) {
         data['photo'] = await MultipartFile.fromFile(
@@ -114,11 +121,12 @@ class ApiService {
   }
 
   // Hit endpoint Absen Keluar (Clock-Out)
-  Future<bool> clockOut(double lat, double lng, {required String imagePath}) async {
+  Future<bool> clockOut(double lat, double lng, {required String imagePath, String? deviceId}) async {
     try {
       final formData = FormData.fromMap({
         'lat': lat,
         'lng': lng,
+        'deviceId': deviceId,
         'photo': await MultipartFile.fromFile(imagePath, filename: 'clockout.jpg'),
       });
 

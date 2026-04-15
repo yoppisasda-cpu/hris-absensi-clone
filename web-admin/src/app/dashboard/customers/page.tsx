@@ -60,7 +60,7 @@ export default function CustomersPage() {
                                 <Users className="h-6 w-6 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-black italic tracking-tighter text-slate-900 uppercase">Manajemen Pelanggan</h1>
+                                <h1 className="text-2xl font-black italic tracking-tighter text-white uppercase">Manajemen Pelanggan</h1>
                                 <p className="text-xs font-bold text-slate-400 tracking-widest uppercase">Kelola database member & riwayat loyalitas</p>
                             </div>
                         </div>
@@ -79,33 +79,33 @@ export default function CustomersPage() {
 
                 {/* Stats Summary */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-black">
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
-                            <Users className="h-6 w-6 text-indigo-600" />
+                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-700 shadow-sm flex items-center gap-4 hover:bg-slate-800 transition-all">
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
+                            <Users className="h-6 w-6 text-indigo-400" />
                         </div>
                         <div>
                             <p className="text-[10px] text-slate-400 uppercase tracking-widest">Total Pelanggan</p>
-                            <p className="text-2xl text-slate-900">{customers.length}</p>
+                            <p className="text-2xl text-white">{customers.length}</p>
                         </div>
                     </div>
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                            <CreditCard className="h-6 w-6 text-emerald-600" />
+                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-700 shadow-sm flex items-center gap-4 hover:bg-slate-800 transition-all">
+                        <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                            <CreditCard className="h-6 w-6 text-emerald-400" />
                         </div>
                         <div>
                             <p className="text-[10px] text-slate-400 uppercase tracking-widest">Total Belanja (All)</p>
-                            <p className="text-2xl text-slate-900">
+                            <p className="text-2xl text-white">
                                 Rp {customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0).toLocaleString()}
                             </p>
                         </div>
                     </div>
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center">
-                            <Star className="h-6 w-6 text-amber-600" />
+                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-700 shadow-sm flex items-center gap-4 hover:bg-slate-800 transition-all">
+                        <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                            <Star className="h-6 w-6 text-amber-400" />
                         </div>
                         <div>
                             <p className="text-[10px] text-slate-400 uppercase tracking-widest">Loyalty Points</p>
-                            <p className="text-2xl text-slate-900">
+                            <p className="text-2xl text-white">
                                 {customers.reduce((sum, c) => sum + (c.points || 0), 0).toLocaleString()} Pts
                             </p>
                         </div>
@@ -113,20 +113,20 @@ export default function CustomersPage() {
                 </div>
 
                 {/* Table Section */}
-                <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="bg-slate-900/50 rounded-[32px] border border-slate-700 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="relative flex-1 max-w-md">
                             <input
                                 type="text"
                                 placeholder="Cari nama, email, atau nomor telepon..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold focus:border-indigo-500 transition-all outline-none"
+                                className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-2xl text-sm font-bold text-white focus:border-indigo-500 transition-all outline-none"
                             />
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
                         </div>
                         <div className="flex gap-2">
-                            <button className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 transition-colors">
+                            <button className="p-3 bg-slate-800 text-slate-400 rounded-xl hover:bg-slate-700 transition-colors">
                                 <Filter className="h-5 w-5" />
                             </button>
                         </div>
@@ -135,15 +135,15 @@ export default function CustomersPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-slate-50/50">
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Pelanggan</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Kontak</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-right">Total Belanja</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-right">Poin</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Aksi</th>
+                                <tr className="bg-slate-900/30">
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">Pelanggan</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">Kontak</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 text-right">Total Belanja</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 text-right">Poin</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 text-center">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-800">
                                 {loading ? (
                                     Array(5).fill(0).map((_, i) => (
                                         <tr key={i} className="animate-pulse">
@@ -163,15 +163,15 @@ export default function CustomersPage() {
                                     </tr>
                                 ) : (
                                     filteredCustomers.map((customer) => (
-                                        <tr key={customer.id} className="hover:bg-indigo-50/30 transition-colors group">
+                                        <tr key={customer.id} className="hover:bg-slate-800/50 transition-colors group">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-black text-xs">
+                                                    <div className="h-10 w-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs">
                                                         {customer.name.substring(0, 2).toUpperCase()}
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm font-black text-slate-900 leading-none">{customer.name}</p>
-                                                        <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase truncate max-w-[150px]">{customer.address || "No Address"}</p>
+                                                        <p className="text-sm font-black text-white leading-none">{customer.name}</p>
+                                                        <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase truncate max-w-[150px]">{customer.address || "No Address"}</p>
                                                     </div>
                                                 </div>
                                             </td>
@@ -188,7 +188,7 @@ export default function CustomersPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <p className="text-sm font-black text-slate-900 italic">Rp {(customer.totalSpent || 0).toLocaleString()}</p>
+                                                <p className="text-sm font-black text-white italic">Rp {(customer.totalSpent || 0).toLocaleString()}</p>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-black">
@@ -228,11 +228,11 @@ export default function CustomersPage() {
                         </table>
                     </div>
                     
-                    <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <div className="p-6 bg-slate-900/50 border-t border-slate-800 flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
                         <p>Menampilkan {filteredCustomers.length} Pelanggan</p>
                         <div className="flex gap-2">
                              {/* Pagination Mockup */}
-                             <button className="h-8 w-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50">1</button>
+                             <button className="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 text-white flex items-center justify-center hover:bg-slate-700">1</button>
                         </div>
                     </div>
                 </div>

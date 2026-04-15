@@ -112,18 +112,18 @@ export default function AccountsPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Kas & Bank</h1>
-                    <p className="mt-1 text-sm text-slate-500">Kelola semua rekening bank dan kas tunai perusahaan Anda.</p>
+                    <h1 className="text-3xl font-bold text-white tracking-tight">Kas & Bank</h1>
+                    <p className="mt-1 text-sm text-slate-400">Kelola semua rekening bank dan kas tunai perusahaan Anda.</p>
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                     {/* Branch Filter */}
-                    <div className="flex items-center gap-3 bg-white border border-slate-200 p-2 rounded-2xl shadow-sm">
-                        <span className="text-xs font-bold text-slate-400 pl-2 uppercase">Cabang:</span>
+                    <div className="flex items-center gap-3 bg-slate-900/50 border border-slate-700 p-2 rounded-2xl shadow-sm">
+                        <span className="text-xs font-bold text-slate-500 pl-2 uppercase">Cabang:</span>
                         <select 
                             value={selectedBranchId}
                             onChange={(e) => setSelectedBranchId(e.target.value)}
-                            className="bg-transparent border-none text-sm font-bold text-slate-700 focus:ring-0 cursor-pointer pr-8"
+                            className="bg-transparent border-none text-sm font-bold text-white focus:ring-0 cursor-pointer pr-8"
                         >
                             <option value="all">Semua Cabang</option>
                             {branches.map(branch => (

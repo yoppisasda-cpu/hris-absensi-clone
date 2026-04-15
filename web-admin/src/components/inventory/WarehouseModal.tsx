@@ -89,111 +89,126 @@ export default function WarehouseModal({ isOpen, onClose, onSuccess }: any) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-4xl max-h-[90vh] rounded-3xl bg-white shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300">
-                <div className="bg-slate-900 px-6 py-5 flex items-center justify-between text-white border-b border-orange-500/30 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <Warehouse className="h-5 w-5 text-orange-400" />
-                        <h2 className="text-lg font-black italic uppercase tracking-tight">Manajemen Lokasi & Stok</h2>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 animate-in fade-in duration-300">
+            <div className="w-full max-w-5xl max-h-[90vh] bg-slate-900 rounded-[40px] shadow-[0_0_100px_rgba(79,70,229,0.1)] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300 border border-slate-700/50">
+                <div className="bg-slate-950/50 border-b border-white/5 px-8 py-6 flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
+                            <Warehouse className="h-6 w-6 stroke-[2.5px]" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Facility Infrastructure Matrix</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Supply Chain Logistics & Global Stock Anchors</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="rounded-full p-2 hover:bg-white/10 transition-colors">
+                    <button onClick={onClose} className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-auto p-8 lg:flex lg:gap-8">
+                <div className="flex-1 overflow-auto p-8 lg:flex lg:gap-10 bg-slate-950/20">
                     {/* Form Side */}
-                    <div className="lg:w-1/3 mb-8 lg:mb-0">
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            {editingId ? <Edit2 className="h-3.5 w-3.5 text-blue-500" /> : <Plus className="h-3.5 w-3.5 text-orange-500" />}
-                            {editingId ? "Edit Lokasi" : "Tambah Lokasi"}
-                        </h3>
-                        <form onSubmit={handleSubmit} className="space-y-4 p-5 rounded-2xl bg-slate-50 border border-slate-200">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 px-1">Nama Lokasi</label>
+                    <div className="lg:w-[38%] mb-10 lg:mb-0">
+                        <div className="mb-6 flex items-center gap-3">
+                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${editingId ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                                {editingId ? <Edit2 className="h-4 w-4 stroke-[2.5px]" /> : <Plus className="h-4 w-4 stroke-[3px]" />}
+                            </div>
+                            <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] italic">
+                                {editingId ? "Update Facility Specs" : "Register New Facility"}
+                            </h3>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-6 p-8 rounded-[32px] bg-slate-900 border border-white/5 shadow-2xl relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <Building2 className="h-20 w-20 text-indigo-500" />
+                            </div>
+                            <div className="space-y-2 relative z-10">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Facility Descriptor</label>
                                 <input
                                     required
-                                    className="w-full rounded-xl border border-slate-200 py-2.5 px-4 text-sm font-bold focus:border-orange-500 focus:outline-none transition-all"
-                                    placeholder="Contoh: Toko Cabang Sudirman"
+                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-6 text-[11px] font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800 shadow-inner"
+                                    placeholder="E.G. MAIN CENTRAL HUB"
                                     value={formData.name}
                                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 px-1">Tipe Lokasi</label>
-                                <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-2 relative z-10">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Operational Protocol</label>
+                                <div className="grid grid-cols-2 gap-3">
                                     <button 
                                         type="button" 
                                         onClick={() => setFormData({...formData, type: 'STORE'})}
-                                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${formData.type === 'STORE' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300'}`}
+                                        className={`flex items-center justify-center gap-3 py-3 rounded-2xl border transition-all ${formData.type === 'STORE' ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400 font-bold shadow-lg shadow-indigo-500/5' : 'border-slate-800 bg-slate-950 text-slate-600 hover:border-slate-700'}`}
                                     >
                                         <Store className="h-4 w-4" />
-                                        <span className="text-xs font-black uppercase italic">Toko</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest italic">Store</span>
                                     </button>
                                     <button 
                                         type="button" 
                                         onClick={() => setFormData({...formData, type: 'WAREHOUSE'})}
-                                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${formData.type === 'WAREHOUSE' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300'}`}
+                                        className={`flex items-center justify-center gap-3 py-3 rounded-2xl border transition-all ${formData.type === 'WAREHOUSE' ? 'border-amber-500 bg-amber-500/10 text-amber-400 font-bold shadow-lg shadow-amber-500/5' : 'border-slate-800 bg-slate-950 text-slate-600 hover:border-slate-700'}`}
                                     >
                                         <Building2 className="h-4 w-4" />
-                                        <span className="text-xs font-black uppercase italic">Gudang</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest italic">Hub</span>
                                     </button>
                                 </div>
                             </div>
 
                             {formData.type === 'STORE' && (
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 px-1 flex items-center gap-1">
-                                        <Link className="h-3 w-3" /> Hubungkan Cabang Absensi
+                                <div className="space-y-2 relative z-10 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1 flex items-center gap-2">
+                                        <Link className="h-3 w-3 text-indigo-400" /> Terminal Sync Integration
                                     </label>
-                                    <select
-                                        className="w-full rounded-xl border border-slate-200 py-2.5 px-4 text-sm font-bold focus:border-orange-500 focus:outline-none transition-all"
-                                        value={formData.branchId}
-                                        onChange={(e) => setFormData({...formData, branchId: e.target.value})}
-                                    >
-                                        <option value="">-- Pilih Cabang --</option>
-                                        {branches.map(b => (
-                                            <option key={b.id} value={b.id}>{b.name}</option>
-                                        ))}
-                                    </select>
-                                    <p className="mt-1 text-[9px] text-slate-400 italic font-medium px-1 leading-tight">
-                                        Penting: Agar stok otomatis terpotong saat user login di cabang ini.
+                                    <div className="relative group">
+                                        <select
+                                            className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-6 text-[10px] font-black text-slate-400 group-focus-within:text-white outline-none transition-all italic tracking-widest uppercase appearance-none"
+                                            value={formData.branchId}
+                                            onChange={(e) => setFormData({...formData, branchId: e.target.value})}
+                                        >
+                                            <option value="">SELECT BRANCH SYNC...</option>
+                                            {branches.map(b => (
+                                                <option key={b.id} value={b.id}>{b.name.toUpperCase()}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[8px] pointer-events-none">▼</div>
+                                    </div>
+                                    <p className="mt-2 text-[8px] text-slate-600 font-bold italic px-1 leading-tight uppercase tracking-widest">
+                                        CRITICAL: REQUIRED FOR AUTOMATED STOCK DEPLETION AT LOCAL TERMINALS.
                                     </p>
                                 </div>
                             )}
 
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 px-1">Alamat/Lokasi</label>
+                            <div className="space-y-2 relative z-10">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Geospatial Coordinates</label>
                                 <textarea
-                                    className="w-full rounded-xl border border-slate-200 py-2.5 px-4 text-sm font-bold focus:border-orange-500 focus:outline-none transition-all resize-none"
+                                    className="w-full rounded-[28px] bg-slate-950 border border-slate-800 py-4 px-6 text-sm font-bold text-white focus:border-indigo-500/50 outline-none transition-all resize-none italic placeholder:text-slate-800 shadow-inner"
                                     rows={2}
-                                    placeholder="Alamat lengkap..."
+                                    placeholder="DETAILED LOCATION DATA..."
                                     value={formData.location}
                                     onChange={(e) => setFormData({...formData, location: e.target.value})}
                                 />
                             </div>
 
-                            <label className="flex items-center gap-3 cursor-pointer group">
-                                <input
-                                    type="checkbox"
-                                    className="hidden"
-                                    checked={formData.isMain}
-                                    onChange={(e) => setFormData({...formData, isMain: e.target.checked})}
-                                />
-                                <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${formData.isMain ? 'bg-orange-600 border-orange-600' : 'border-slate-300 bg-white'}`}>
-                                    {formData.isMain && <Check className="h-4 w-4 text-white" />}
+                            <label className="flex items-center gap-4 cursor-pointer group relative z-10">
+                                <div className="relative">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={formData.isMain}
+                                        onChange={(e) => setFormData({...formData, isMain: e.target.checked})}
+                                    />
+                                    <div className="w-12 h-6 bg-slate-800 border border-white/5 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600 after:shadow-lg"></div>
                                 </div>
-                                <span className="text-xs font-black text-slate-700 uppercase italic">Gudang Utama</span>
+                                <span className="text-[10px] font-black text-slate-500 uppercase italic tracking-[0.2em] group-hover:text-amber-500 transition-colors">Core Fulfillment Node</span>
                             </label>
 
-                            <div className="flex gap-2 pt-2">
+                            <div className="flex gap-4 pt-4 relative z-10">
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="flex-1 bg-slate-900 text-white py-3 rounded-xl text-xs font-black uppercase italic tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                    className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase italic tracking-widest hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-500/20 active:scale-95 disabled:opacity-50 border border-white/10"
                                 >
-                                    {editingId ? "Update" : "Simpan"}
+                                    {editingId ? "Sync Updates" : "Commit Facility"}
                                 </button>
                                 {editingId && (
                                     <button
@@ -202,9 +217,9 @@ export default function WarehouseModal({ isOpen, onClose, onSuccess }: any) {
                                             setEditingId(null);
                                             setFormData({ name: "", location: "", type: "STORE", branchId: "", isMain: false });
                                         }}
-                                        className="px-4 bg-slate-200 text-slate-600 rounded-xl hover:bg-slate-300 transition-all font-black text-xs uppercase"
+                                        className="flex-1 px-4 bg-white/5 text-slate-500 border border-white/5 rounded-2xl hover:text-white hover:bg-white/10 transition-all font-black text-[10px] uppercase italic tracking-widest"
                                     >
-                                        Batal
+                                        Abort
                                     </button>
                                 )}
                             </div>
@@ -212,43 +227,50 @@ export default function WarehouseModal({ isOpen, onClose, onSuccess }: any) {
                     </div>
 
                     {/* List Side */}
-                    <div className="lg:w-2/3">
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Daftar Lokasi Aktif</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="lg:w-[62%]">
+                        <div className="mb-6 flex items-center justify-between">
+                            <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] italic">Active Infrastructure Topology</h3>
+                            <div className="px-5 py-2 rounded-full bg-slate-800 border border-white/5 text-[9px] font-black text-slate-500 uppercase tracking-widest italic flex items-center gap-2">
+                                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div> Network Optimal
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pr-2 custom-scrollbar overflow-y-auto max-h-[60vh]">
                             {warehouses.map((w) => {
                                 const branch = branches.find(b => b.id === w.branchId);
                                 return (
-                                    <div key={w.id} className="relative p-5 rounded-2xl border-2 border-slate-100 bg-white hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/5 transition-all group overflow-hidden">
-                                        <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                            <button onClick={() => handleEdit(w)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl transition-all"><Edit2 className="h-4 w-4" /></button>
-                                            <button onClick={() => handleDelete(w.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-all"><Trash2 className="h-4 w-4" /></button>
+                                    <div key={w.id} className="relative p-6 rounded-[32px] border border-white/5 bg-slate-900 hover:border-indigo-500/30 hover:bg-slate-800 transition-all group overflow-hidden shadow-2xl">
+                                        <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 flex gap-2 z-20">
+                                            <button onClick={() => handleEdit(w)} className="p-2.5 bg-white/5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-xl transition-all border border-white/5"><Edit2 className="h-4 w-4" /></button>
+                                            <button onClick={() => handleDelete(w.id)} className="p-2.5 bg-white/5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all border border-white/5"><Trash2 className="h-4 w-4" /></button>
                                         </div>
                                         
-                                        <div className="flex items-start gap-4">
-                                            <div className={`p-3 rounded-2xl transform transition-transform group-hover:scale-110 duration-300 ${w.type === 'STORE' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>
-                                                {w.type === 'STORE' ? <Store className="h-6 w-6" /> : <Building2 className="h-6 w-6" />}
+                                        <div className="flex items-start gap-5 relative z-10">
+                                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transform transition-transform group-hover:scale-110 duration-500 shadow-xl ${w.type === 'STORE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-emerald-500/5' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-amber-500/5'}`}>
+                                                {w.type === 'STORE' ? <Store className="h-7 w-7 stroke-[1.5px]" /> : <Building2 className="h-7 w-7 stroke-[1.5px]" />}
                                             </div>
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h4 className="font-black text-slate-900 leading-tight">{w.name}</h4>
-                                                    {w.isMain && <span className="bg-orange-600 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider">Utama</span>}
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <h4 className="text-sm font-black text-white leading-tight uppercase tracking-tight italic">{w.name}</h4>
+                                                    {w.isMain && <span className="bg-amber-600/20 text-amber-500 text-[8px] font-black uppercase px-2 py-0.5 rounded-lg tracking-widest border border-amber-500/20 italic">Core</span>}
                                                 </div>
-                                                <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1 uppercase mb-2">
-                                                    <MapPin className="h-3 w-3" /> {w.location || "Tanpa Alamat"}
+                                                <p className="text-[10px] text-slate-500 font-bold flex items-center gap-2 uppercase tracking-tight mb-4 group-hover:text-slate-300 transition-colors">
+                                                    <MapPin className="h-3 w-3 text-indigo-500" /> {w.location || "UNIDENTIFIED COORDINATES"}
                                                 </p>
                                                 
                                                 <div className="flex flex-wrap gap-2">
-                                                    <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg border ${w.type === 'STORE' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                                                        {w.type === 'STORE' ? 'Cabang Toko' : 'Gudang Pusat'}
+                                                    <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border tracking-widest italic ${w.type === 'STORE' ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400' : 'bg-slate-800 border-white/5 text-slate-500'}`}>
+                                                        {w.type === 'STORE' ? 'POS Terminal Node' : 'Logistics Hub'}
                                                     </span>
                                                     {w.branchId && (
-                                                        <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg border bg-blue-50 border-blue-100 text-blue-700 flex items-center gap-1">
-                                                            <Link className="h-2.5 w-2.5" /> {branch?.name || "ID " + w.branchId}
+                                                        <span className="text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border bg-indigo-500/5 border-indigo-500/20 text-indigo-400 flex items-center gap-2 tracking-widest italic">
+                                                            <Link className="h-3 w-3" /> {branch?.name?.toUpperCase() || "SYNC ACTIVE"}
                                                         </span>
                                                     )}
                                                 </div>
                                             </div>
                                         </div>
+                                        {/* Decorative Grid Pattern */}
+                                        <div className="absolute inset-0 opacity-[0.02] pointer-events-none group-hover:opacity-[0.05] transition-opacity duration-700" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '20px 20px' }}></div>
                                     </div>
                                 );
                             })}

@@ -75,10 +75,10 @@ export default function SettingsPage() {
     return (
         <DashboardLayout>
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <Settings className="h-6 w-6 text-slate-600" /> Pengaturan Akun
+                <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Settings className="h-6 w-6 text-slate-400" /> Pengaturan Akun
                 </h1>
-                <p className="text-sm text-slate-500 mt-1">Konfigurasi preferensi keamanan dan notifikasi akun personal Anda.</p>
+                <p className="text-sm text-slate-400 mt-1">Konfigurasi preferensi keamanan dan notifikasi akun personal Anda.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -86,19 +86,19 @@ export default function SettingsPage() {
                 <div className="md:col-span-1 space-y-2">
                     <button
                         onClick={() => setActiveSection('security')}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-all ${activeSection === 'security' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-100 text-slate-600'}`}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-all ${activeSection === 'security' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800 text-slate-400'}`}
                     >
                         <div className="flex items-center gap-3"><Shield className="h-5 w-5" /> Keamanan Akun</div>
                     </button>
                     <button
                         onClick={() => setActiveSection('notifications')}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-all ${activeSection === 'notifications' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-100 text-slate-600'}`}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-all ${activeSection === 'notifications' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800 text-slate-400'}`}
                     >
                         <div className="flex items-center gap-3"><BellRing className="h-5 w-5" /> Notifikasi Email</div>
                     </button>
                     <button
                         onClick={() => setActiveSection('password')}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-all ${activeSection === 'password' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-100 text-slate-600'}`}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-all ${activeSection === 'password' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800 text-slate-400'}`}
                     >
                         <div className="flex items-center gap-3"><Key className="h-5 w-5" /> Ubah Kata Sandi</div>
                     </button>
@@ -131,9 +131,9 @@ export default function SettingsPage() {
                                                     {user?.name?.[0]}
                                                 </div>
                                                 <div>
-                                                    <h2 className="text-xl font-bold text-slate-900">{user?.name}</h2>
-                                                    <p className="text-slate-500 flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> {user?.email}</p>
-                                                    <span className="mt-2 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 uppercase">
+                                                    <h2 className="text-xl font-bold text-white">{user?.name}</h2>
+                                                    <p className="text-slate-400 flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> {user?.email}</p>
+                                                    <span className="mt-2 inline-flex items-center rounded-full bg-blue-900/30 px-2.5 py-0.5 text-xs font-bold text-blue-400 border border-blue-800 uppercase">
                                                         {user?.role}
                                                     </span>
                                                 </div>

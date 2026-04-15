@@ -72,8 +72,8 @@ export default function SalesPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Penjualan (Sales)</h1>
-                    <p className="mt-1 text-sm text-slate-500">Kelola transaksi penjualan dan cetak invoice pelanggan.</p>
+                    <h1 className="text-3xl font-bold text-white tracking-tight">Penjualan (Sales)</h1>
+                    <p className="mt-1 text-sm text-slate-400">Kelola transaksi penjualan dan cetak invoice pelanggan.</p>
                 </div>
                 <div className="flex gap-3">
                     <button 
@@ -92,30 +92,30 @@ export default function SalesPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 mb-8">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-blue-500">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-blue-500">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Penjualan</p>
-                    <p className="text-xl font-black text-slate-900">Rp {stats.total.toLocaleString()}</p>
+                    <p className="text-xl font-black text-white">Rp {stats.total.toLocaleString()}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-emerald-500">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-emerald-500">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Sudah Dibayar</p>
-                    <p className="text-xl font-black text-emerald-600">Rp {stats.paid.toLocaleString()}</p>
+                    <p className="text-xl font-black text-emerald-400">Rp {stats.paid.toLocaleString()}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-amber-500">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-amber-500">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Belum Bayar (Piutang)</p>
-                    <p className="text-xl font-black text-amber-600">Rp {stats.pending.toLocaleString()}</p>
+                    <p className="text-xl font-black text-amber-400">Rp {stats.pending.toLocaleString()}</p>
                 </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 p-6">
-                    <div className="relative w-full sm:w-96 group text-slate-900">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 p-6">
+                    <div className="relative w-full sm:w-96 group text-white">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
                         <input
                             type="text"
                             placeholder="Cari nomor invoice atau catatan..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:bg-white focus:outline-none transition-all font-medium"
+                            className="w-full rounded-xl border border-slate-700 bg-slate-900/50 py-2.5 pl-10 pr-4 text-sm text-white focus:border-blue-500 focus:bg-slate-900 focus:outline-none transition-all font-medium placeholder:text-slate-500"
                         />
                     </div>
                 </div>

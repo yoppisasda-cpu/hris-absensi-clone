@@ -106,52 +106,53 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-3xl rounded-3xl bg-white shadow-2xl overflow-hidden animate-in zoom-in duration-300 max-h-[90vh] flex flex-col">
-                <div className="bg-slate-900 px-6 py-5 flex items-center justify-between text-white border-b border-blue-500/30 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                            <ShoppingBag className="h-6 w-6 text-blue-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 animate-in fade-in duration-300">
+            <div className="w-full max-w-4xl bg-slate-900 rounded-[40px] shadow-[0_0_100px_rgba(79,70,229,0.1)] overflow-hidden animate-in fade-in zoom-in duration-300 border border-slate-700/50 flex flex-col max-h-[95vh]">
+                <div className="bg-slate-950/50 border-b border-white/5 px-8 py-6 flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
+                            <ShoppingBag className="h-6 w-6 stroke-[2.5px]" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black italic tracking-tight uppercase">Order Barang (PO)</h2>
-                            <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Pengajuan Operational</p>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Procurement Pipeline</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Official Purchase Order Requisition</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="rounded-full p-2 hover:bg-white/10 transition-colors">
+                    <button onClick={onClose} className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-8 overflow-y-auto flex-1">
+                <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto flex-1 custom-scrollbar bg-slate-950/20">
                     <div className="space-y-6">
                         {/* Section 1: Header Info */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Supplier</label>
+                        <div className="grid grid-cols-2 gap-8">
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Fulfillment Source (Vendor)</label>
                                 <div className="relative group">
-                                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors z-10" />
                                     <select
                                         required
-                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm font-bold focus:border-blue-500 focus:bg-white focus:outline-none transition-all appearance-none cursor-pointer"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-4 text-[10px] font-black text-slate-400 group-focus-within:text-white outline-none transition-all italic tracking-widest uppercase appearance-none"
                                         value={formData.supplierId}
                                         onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
                                     >
-                                        <option value="">-- Pilih Supplier --</option>
+                                        <option value="">SELECT VENDOR...</option>
                                         {suppliers.map((s) => (
-                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                            <option key={s.id} value={s.id}>{s.name.toUpperCase()} – {s.category?.toUpperCase() || 'GENERAL'}</option>
                                         ))}
                                     </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[8px] pointer-events-none">▼</div>
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Tanggal Order</label>
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Emission Date</label>
                                 <div className="relative group">
-                                    <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors z-10" />
                                     <input
                                         required
                                         type="date"
-                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm font-bold focus:border-blue-500 focus:bg-white focus:outline-none transition-all"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-6 text-[10px] font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none"
                                         value={formData.date}
                                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                                     />
@@ -160,43 +161,48 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                         </div>
 
                         {/* Section 2: Items List */}
-                        <div className="bg-slate-50 -mx-8 px-8 py-6 border-y border-slate-200">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <Package className="h-5 w-5 text-blue-600" />
-                                    <h3 className="text-sm font-black uppercase text-slate-700 tracking-tight">Daftar Barang</h3>
+                        <div className="bg-slate-950/40 -mx-8 px-10 py-8 border-y border-white/5 relative overflow-hidden">
+                            <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
+                            
+                            <div className="flex items-center justify-between mb-6 relative z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                        <Package className="h-4 w-4 stroke-[2.5px]" />
+                                    </div>
+                                    <h3 className="text-[11px] font-black uppercase text-white tracking-[0.2em] italic">Itemization Matrix</h3>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={addItem}
-                                    className="px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg hover:bg-blue-700 transition-all flex items-center gap-1.5"
+                                    className="px-5 py-2.5 bg-indigo-600 text-white text-[9px] font-black uppercase rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 tracking-widest italic border border-white/10 shadow-lg shadow-indigo-500/20"
                                 >
-                                    <Plus className="h-3 w-3" /> Tambah Barang
+                                    <Plus className="h-3.5 w-3.5 stroke-[3px]" /> Inject Item
                                 </button>
                             </div>
 
-                            <div className="flex gap-2 mb-2 px-1 text-[9px] font-black uppercase text-slate-400 tracking-wider">
-                                <div className="flex-[3]">Produk / Bahan</div>
-                                <div className="flex-1">Jumlah</div>
-                                <div className="flex-[1.5]">Harga Satuan (Rp)</div>
-                                <div className="w-[36px]"></div>
+                            <div className="flex gap-4 mb-4 px-4 text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] italic relative z-10">
+                                <div className="flex-[4]">SKU Descriptor / Material</div>
+                                <div className="flex-1 text-center">Quantity</div>
+                                <div className="flex-[1.8] text-right">Unit Price (IDR)</div>
+                                <div className="w-10"></div>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4 relative z-10">
                                 {formData.items.map((item, index) => (
-                                    <div key={index} className="flex gap-2 animate-in slide-in-from-left-2 duration-200 group">
-                                        <div className="flex-[3] relative">
+                                    <div key={index} className="flex gap-4 animate-in slide-in-from-left-4 duration-300 group items-center bg-slate-900/50 p-2 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all">
+                                        <div className="flex-[4] relative group/select">
                                             <select
                                                 required
-                                                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs font-bold focus:border-blue-500 focus:outline-none transition-all appearance-none"
+                                                className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 px-4 text-[10px] font-black text-slate-400 group-focus-within/select:text-white outline-none transition-all appearance-none italic uppercase tracking-widest"
                                                 value={item.productId}
                                                 onChange={(e) => updateItem(index, 'productId', e.target.value)}
                                             >
-                                                <option value="">Pilih Produk...</option>
+                                                <option value="">SELECT SKU...</option>
                                                 {products.map((p) => (
-                                                    <option key={p.id} value={p.id}>{p.name} ({p.unit}) - Rp {p.costPrice?.toLocaleString()}</option>
+                                                    <option key={p.id} value={p.id}>{p.name.toUpperCase()} – RP {p.costPrice?.toLocaleString()}</option>
                                                 ))}
                                             </select>
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[6px] pointer-events-none">▼</div>
                                         </div>
                                         <div className="flex-1">
                                             <input
@@ -204,17 +210,17 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                                 type="number"
                                                 step="any"
                                                 placeholder="0"
-                                                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs font-bold focus:border-blue-500 focus:outline-none transition-all"
+                                                className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 px-4 text-[10px] font-black text-white text-center focus:border-indigo-500/50 outline-none transition-all shadow-inner tracking-widest"
                                                 value={item.quantity}
                                                 onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                                             />
                                         </div>
-                                        <div className="flex-[1.5]">
+                                        <div className="flex-[1.8]">
                                             <input
                                                 required
                                                 type="number"
                                                 placeholder="0"
-                                                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs font-bold focus:border-blue-500 focus:outline-none transition-all"
+                                                className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 px-4 text-[10px] font-black text-indigo-400 text-right focus:border-indigo-500/50 outline-none transition-all shadow-inner tracking-widest"
                                                 value={item.price}
                                                 onChange={(e) => updateItem(index, 'price', e.target.value)}
                                             />
@@ -223,7 +229,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                             type="button"
                                             onClick={() => removeItem(index)}
                                             disabled={formData.items.length === 1}
-                                            className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 disabled:opacity-0"
+                                            className="h-10 w-10 flex items-center justify-center text-slate-700 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all border border-transparent hover:border-red-400/20 shrink-0 disabled:opacity-0"
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </button>
@@ -232,20 +238,23 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                             </div>
 
                             {/* Total Calculation */}
-                            <div className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center text-slate-900">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Estimasi Total Tagihan</p>
-                                <p className="text-2xl font-black italic">Rp {calculateTotal().toLocaleString()}</p>
+                            <div className="mt-10 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Net Procurement Value</p>
+                                    <p className="text-[9px] font-bold uppercase text-slate-700 mt-1">Estimasi Total Tagihan Terkalkulasi</p>
+                                </div>
+                                <p className="text-3xl font-black italic text-white tracking-tighter text-glow-lg">Rp {calculateTotal().toLocaleString()}</p>
                             </div>
                         </div>
 
                         {/* Section 3: Notes */}
-                        <div>
-                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Catatan Tambahan</label>
+                        <div className="space-y-2">
+                            <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Logistics / Delivery Directive</label>
                             <div className="relative group">
-                                <FileText className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                <FileText className="absolute left-4 top-4 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors pointer-events-none z-10" />
                                 <textarea
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm font-bold focus:border-blue-500 focus:bg-white focus:outline-none transition-all h-24 resize-none"
-                                    placeholder="Harap dikirim sebelum jam 10 pagi..."
+                                    className="w-full rounded-[32px] bg-slate-950 border border-slate-800 py-4 pl-12 pr-6 text-[11px] font-black text-white focus:border-indigo-500/50 outline-none transition-all h-28 resize-none italic placeholder:text-slate-800 shadow-inner"
+                                    placeholder="E.G. PRIORITY DELIVERY BEFORE 10:00 AM..."
                                     value={formData.notes}
                                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                                 />
@@ -253,23 +262,23 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                         </div>
                     </div>
 
-                    <div className="mt-8 flex gap-3 shrink-0">
+                    <div className="mt-10 flex gap-4 shrink-0">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 rounded-xl border border-slate-200 bg-white py-4 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all active:scale-95"
+                            className="flex-1 py-4 text-[10px] font-black text-slate-500 bg-white/5 border border-white/5 hover:text-white hover:bg-white/10 rounded-2xl transition-all uppercase tracking-[0.2em] italic"
                         >
-                            Batal
+                            Abort Requisition
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-[2] rounded-xl bg-slate-900 py-4 text-sm font-bold text-white shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2"
+                            className="flex-[2] flex items-center justify-center gap-3 py-4 text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl disabled:opacity-50 transition-all shadow-2xl shadow-indigo-500/20 uppercase tracking-[0.2em] border border-white/10 italic"
                         >
-                            {loading ? "Memproses..." : (
-                                <>
-                                    <ShoppingBag className="h-4 w-4" /> Ajukan Pesanan PO
-                                </>
+                            {loading ? (
+                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                            ) : (
+                                <><ShoppingBag className="h-4 w-4 stroke-[3px]" /> TRANSMIT PURCHASE ORDER</>
                             )}
                         </button>
                     </div>

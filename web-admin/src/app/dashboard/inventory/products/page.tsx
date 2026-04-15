@@ -120,160 +120,182 @@ export default function ProductsPage() {
 
     return (
         <DashboardLayout>
-            <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        Produk & Stok
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-500 font-medium">Kelola katalog barang dan pantau ketersediaan stok secara real-time.</p>
+            <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-2xl shadow-indigo-500/10">
+                        <Box className="h-7 w-7 text-indigo-500" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase leading-none">Produk & Stok</h1>
+                        <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-2 italic">Real-time Inventory & Catalog Control System</p>
+                    </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-3 w-full md:w-auto">
                     <button 
                         onClick={() => setIsWarehouseModalOpen(true)}
-                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-slate-400 hover:bg-slate-800 hover:text-white transition-all uppercase tracking-widest italic"
                     >
-                        <MapPin className="h-4 w-4" /> Kelola Lokasi
+                        <MapPin className="h-4 w-4" /> Lokasi
                     </button>
                     <button 
                         onClick={() => setIsCategoryModalOpen(true)}
-                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-slate-400 hover:bg-slate-800 hover:text-white transition-all uppercase tracking-widest italic"
                     >
-                        <Tag className="h-4 w-4" /> Kelola Kategori
+                        <Tag className="h-4 w-4" /> Kategori
                     </button>
                     <button 
                         onClick={() => {
                             setSelectedProduct(null);
                             setIsAddModalOpen(true);
                         }}
-                        className="flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-100 hover:bg-orange-700 active:scale-95 transition-all"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/20 active:scale-95 transition-all border border-indigo-400/20 italic"
                     >
-                        <Plus className="h-4 w-4" /> Tambah Produk Baru
+                        <Plus className="h-4 w-4 stroke-[3px]" /> Product Baru
                     </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-white">
-                <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Total Produk</p>
-                        <p className="text-3xl font-black italic">{products.length} Items</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <div className="bg-slate-900/50 p-8 rounded-[32px] border border-slate-700/50 shadow-2xl backdrop-blur-xl group hover:border-indigo-500/30 transition-all">
+                    <div className="flex items-center gap-5">
+                        <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-transform">
+                            <Box className="h-7 w-7 text-indigo-500" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Total SKU</p>
+                            <p className="text-3xl font-black italic tracking-tighter text-white">{products.length} <span className="text-slate-700 text-xl">Items</span></p>
+                        </div>
                     </div>
-                    <div className="p-3 bg-slate-800 rounded-xl "><Box className="h-6 w-6 text-orange-400" /></div>
                 </div>
-                <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Stok Menipis</p>
-                        <p className="text-3xl font-black italic text-red-400">{products.filter(p => p.trackStock && p.stock <= p.minStock).length}</p>
+                <div className="bg-slate-900/50 p-8 rounded-[32px] border border-slate-700/50 shadow-2xl backdrop-blur-xl group hover:border-red-500/30 transition-all">
+                    <div className="flex items-center gap-5">
+                        <div className="h-14 w-14 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform">
+                            <AlertTriangle className="h-7 w-7 text-red-500" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Low Stock Warning</p>
+                            <p className="text-3xl font-black italic tracking-tighter text-red-500">
+                                {products.filter(p => p.trackStock && p.stock <= p.minStock).length} <span className="text-slate-700 text-xl uppercase">Critical</span>
+                            </p>
+                        </div>
                     </div>
-                    <div className="p-3 bg-slate-800 rounded-xl "><AlertTriangle className="h-6 w-6 text-red-400" /></div>
                 </div>
-                <div className="rounded-2xl bg-orange-600 p-6 shadow-xl shadow-orange-100 flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">Nilai Inventori</p>
-                        <p className="text-3xl font-black italic">Rp {products.reduce((sum, p) => sum + (p.stock * (p.recipeCogs > 0 ? p.recipeCogs : p.costPrice)), 0).toLocaleString()}</p>
+                <div className="bg-amber-600 p-8 rounded-[32px] border border-amber-400/20 shadow-2xl shadow-amber-500/20 group hover:scale-[1.02] transition-all overflow-hidden relative">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-150 transition-transform duration-700">
+                        <TrendingUp className="h-32 w-32 text-white" />
                     </div>
-                    <div className="p-3 bg-white/20 rounded-xl "><TrendingUp className="h-6 w-6 text-white" /></div>
+                    <div className="relative z-10 flex items-center gap-5">
+                        <div className="h-14 w-14 rounded-2xl bg-white/20 flex items-center justify-center border border-white/30">
+                            <TrendingUp className="h-7 w-7 text-white" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] mb-1">Inventory Valuation</p>
+                            <p className="text-3xl font-black italic tracking-tighter text-white">
+                                Rp {products.reduce((sum, p) => sum + (p.stock * (p.recipeCogs > 0 ? p.recipeCogs : p.costPrice)), 0).toLocaleString()}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-12">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 p-6">
-                    <div className="relative w-full sm:w-96 group flex gap-2">
+            <div className="rounded-[40px] border border-slate-700 shadow-2xl bg-slate-900/50 backdrop-blur-xl overflow-hidden mb-12">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-6 border-b border-slate-800/50 p-8 bg-slate-950/20">
+                    <div className="relative w-full lg:w-[450px] group flex gap-3">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-600 group-focus-within:text-indigo-500 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Cari SKU atau nama produk..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-4 text-sm focus:border-orange-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 transition-all font-medium"
+                                className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-3.5 pl-12 pr-4 text-sm text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all outline-none placeholder:text-slate-700 shadow-inner font-bold"
                             />
                         </div>
                         <button 
-                            className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-all"
+                            className="h-12 w-12 flex items-center justify-center rounded-xl bg-slate-800 border border-white/5 text-slate-400 hover:text-white hover:bg-slate-700 transition-all shadow-xl"
                             title="Scan Barcode untuk Cari"
-                            onClick={() => alert("Barcode Scanner Siap! (Simulasi)")}
+                            onClick={() => alert("Barcode Scanner Ready!")}
                         >
                             <ScanLine className="h-5 w-5" />
                         </button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        <div className="relative group">
-                            <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 pointer-events-none z-10" />
+                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                         <div className="relative group min-w-[160px]">
+                            <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400 pointer-events-none z-10" />
                             <select 
-                                className="appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-10 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:border-orange-500"
+                                className="w-full appearance-none rounded-2xl border border-slate-800 bg-slate-950 pl-10 pr-10 py-3 text-[10px] font-black text-slate-400 hover:bg-slate-800 transition-all shadow-inner outline-none focus:border-indigo-500 uppercase tracking-widest italic"
                                 value={selectedBranchId}
                                 onChange={(e) => {
                                     setSelectedBranchId(e.target.value);
                                     setSelectedWarehouseId("all");
                                 }}
                             >
-                                <option value="all">Semua Cabang</option>
-                                <option value="null">Kantor Pusat</option>
+                                <option value="all">SEMUA CABANG</option>
+                                <option value="null">KANTOR PUSAT</option>
                                 {branches.map((b: any) => (
-                                    <option key={b.id} value={b.id.toString()}>{b.name}</option>
+                                    <option key={b.id} value={b.id.toString()}>{b.name.toUpperCase()}</option>
                                 ))}
                             </select>
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-bold text-[10px]">▼</div>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-700 font-bold text-[8px]">▼</div>
                         </div>
 
-                        <div className="relative group">
-                            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 pointer-events-none z-10" />
+                        <div className="relative group min-w-[160px]">
+                            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400 pointer-events-none z-10" />
                             <select 
-                                className="appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-10 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:border-orange-500"
+                                className="w-full appearance-none rounded-2xl border border-slate-800 bg-slate-950 pl-10 pr-10 py-3 text-[10px] font-black text-slate-400 hover:bg-slate-800 transition-all shadow-inner outline-none focus:border-indigo-500 uppercase tracking-widest italic"
                                 value={selectedWarehouseId}
                                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
                             >
-                                <option value="all">Semua Gudang</option>
+                                <option value="all">SEMUA GUDANG</option>
                                 {warehouses
                                     .filter(w => selectedBranchId === "all" || (selectedBranchId === "null" ? w.branchId === null : w.branchId === Number(selectedBranchId)))
                                     .map((w: any) => (
-                                        <option key={w.id} value={w.id.toString()}>{w.name}</option>
+                                        <option key={w.id} value={w.id.toString()}>{w.name.toUpperCase()}</option>
                                     ))
                                 }
                             </select>
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-bold text-[10px]">▼</div>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-700 font-bold text-[8px]">▼</div>
                         </div>
 
                         <select 
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:border-orange-500"
+                            className="rounded-2xl border border-slate-800 bg-slate-950 px-5 py-3 text-[10px] font-black text-slate-400 hover:bg-slate-800 transition-all shadow-inner outline-none focus:border-indigo-500 uppercase tracking-widest italic"
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
                         >
-                            <option value="all">Semua Kategori</option>
+                            <option value="all">FILTER KATEGORI</option>
                             {categories.map((cat: any) => (
-                                <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
+                                <option key={cat.id} value={cat.id.toString()}>{cat.name.toUpperCase()}</option>
                             ))}
                         </select>
                         <select 
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:border-orange-500"
+                            className="rounded-2xl border border-slate-800 bg-slate-950 px-5 py-3 text-[10px] font-black text-slate-400 hover:bg-slate-800 transition-all shadow-inner outline-none focus:border-indigo-500 uppercase tracking-widest italic"
                             value={selectedType}
                             onChange={(e) => setSelectedType(e.target.value)}
                         >
-                            <option value="all">Semua Tipe</option>
-                            <option value="FINISHED_GOOD">Produk Jadi / Menu</option>
-                            <option value="WIP">Setengah Jadi (WIP)</option>
-                            <option value="RAW_MATERIAL">Bahan Baku</option>
+                            <option value="all">SEMUA TIPE</option>
+                            <option value="FINISHED_GOOD">PRODUCTS / MENU</option>
+                            <option value="WIP">SETENGAH JADI (WIP)</option>
+                            <option value="RAW_MATERIAL">BAHAN BAKU (RAW)</option>
                         </select>
                     </div>
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500">
-                            <tr className="border-b border-slate-100">
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px]">Info Produk</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px]">SKU</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-right">Harga Beli</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">POS</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-right">Harga Jual</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">% Margin</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">Sisa Stok</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-center">Status</th>
-                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-right">Aksi</th>
+                    <table className="w-full border-collapse text-left">
+                        <thead>
+                            <tr className="bg-[#050505]">
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic">Identitas & Deskripsi</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic">Global SKU</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">CAPEX / HPP</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">POS</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Market Price</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Margin</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Stock Level</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Integrity</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Menu</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-slate-800/50 transition-all">
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
@@ -282,134 +304,132 @@ export default function ProductsPage() {
                                 ))
                             ) : filteredProducts.length > 0 ? (
                                 filteredProducts.map((product) => (
-                                    <tr key={product.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-orange-100 flex items-center justify-center">
-                                                    <Package className="h-5 w-5 text-orange-600" />
+                                    <tr key={product.id} className="hover:bg-slate-800/30 transition-colors group">
+                                        <td className="px-6 py-6">
+                                            <div className="flex items-center gap-5">
+                                                <div className="h-14 w-14 flex-shrink-0 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                                                    <Package className="h-6 w-6 text-indigo-500" />
                                                 </div>
                                                 <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="font-bold text-slate-900 line-clamp-1">{product.name}</p>
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <p className="font-black text-sm italic text-white uppercase tracking-tighter leading-none">{product.name}</p>
                                                         {product.type === 'WIP' && (
-                                                            <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                                                            <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 italic">
                                                                 WIP
                                                             </span>
                                                         )}
                                                         {product.type === 'RAW_MATERIAL' && (
-                                                            <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                                                                BAHAN
+                                                            <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg bg-slate-800 text-slate-500 border border-white/5 italic">
+                                                                RAW
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                    <div className="flex items-center gap-2">
                                                         {product.category && (
-                                                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200">
+                                                            <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 italic tracking-widest">
                                                                 {product.category.name}
                                                             </span>
                                                         )}
-                                                        <p className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]">{product.description || 'Tidak ada deskripsi'}</p>
+                                                        <p className="text-[10px] text-slate-600 font-bold truncate max-w-[200px] uppercase tracking-widest italic">{product.description || 'GENERIC ITEM DATA'}</p>
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-mono text-[11px] text-slate-500 font-bold">{product.sku || '-'}</td>
-                                        <td className="px-6 py-4 text-right font-medium text-slate-500 italic">
+                                        <td className="px-6 py-6 font-mono text-[11px] text-slate-600 font-black italic tracking-widest">{product.sku || '-----------'}</td>
+                                        <td className="px-6 py-6 text-right">
                                             <div className="flex flex-col items-end">
-                                                 <span>{ (product.recipeCogs > 0 || product.costPrice > 0) ? `Rp ${(product.recipeCogs > 0 ? product.recipeCogs : product.costPrice).toLocaleString()}` : <span className="text-slate-300">Belum diatur</span> }</span>
+                                                 <span className="text-xs font-black text-slate-500 italic tracking-tighter">
+                                                    { (product.recipeCogs > 0 || product.costPrice > 0) ? `Rp ${(product.recipeCogs > 0 ? product.recipeCogs : product.costPrice).toLocaleString()}` : 'N/A' }
+                                                 </span>
                                                 {product.recipeCogs > 0 && (
-                                                    <span className="text-[10px] text-orange-500 flex items-center gap-0.5 font-bold uppercase tracking-tighter not-italic">
-                                                        <ChefHat className="h-3 w-3" /> Resep
+                                                    <span className="text-[8px] text-amber-500 flex items-center gap-1 font-black uppercase tracking-[0.2em] mt-1 italic">
+                                                        <ChefHat className="h-3 w-3" /> Formula-Base
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="px-6 py-6 text-center">
                                             {product.showInPos ? (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 border border-blue-100 uppercase tracking-tighter">
-                                                    Aktif
-                                                </span>
+                                                <div className="h-2 w-2 rounded-full bg-indigo-500 mx-auto shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-400 border border-slate-100 uppercase tracking-tighter">
-                                                    OFF
-                                                </span>
+                                                <div className="h-2 w-2 rounded-full bg-slate-800 mx-auto" />
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-right font-black text-slate-900">Rp {product.price.toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="px-6 py-6 text-right font-black text-white italic tracking-tighter text-sm uppercase">Rp {product.price.toLocaleString()}</td>
+                                        <td className="px-6 py-6 text-center">
                                             {(() => {
                                                 const hpp = product.recipeCogs > 0 ? product.recipeCogs : product.costPrice;
-                                                if (product.price <= 0 || hpp <= 0) return <span className="text-slate-300">-</span>;
+                                                if (product.price <= 0 || hpp <= 0) return <span className="text-slate-800 font-black text-[10px]">--</span>;
                                                 const margin = ((product.price - hpp) / product.price) * 100;
                                                 return (
-                                                    <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-md ${margin > 20 ? 'bg-emerald-100 text-emerald-700' : margin > 0 ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                                                        {margin.toFixed(1)}%
+                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg italic tracking-widest ${margin > 30 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : margin > 15 ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                                                        {margin.toFixed(0)}%
                                                     </span>
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="px-6 py-6 text-center">
                                             {product.trackStock ? (
                                                 <div className="flex flex-col items-center group/tooltip relative text-center">
-                                                     <span className={`text-lg font-black italic ${product.stock <= 0 ? 'text-red-600' : product.stock <= product.minStock ? 'text-orange-500' : 'text-slate-900'}`}>
-                                                        <span className="text-sm not-italic opacity-50 mr-1">Sisa:</span> {product.stock} <span className="text-[10px] not-italic text-slate-400 font-bold uppercase">{product.unit}</span>
+                                                     <span className={`text-lg font-black italic tracking-tighter ${product.stock <= 0 ? 'text-red-500' : product.stock <= product.minStock ? 'text-amber-500' : 'text-white'}`}>
+                                                        {product.stock} <span className="text-[9px] not-italic text-slate-600 font-black uppercase tracking-widest ml-1">{product.unit}</span>
                                                      </span>
                                                     {product.stock < 0 && (
-                                                        <span className="text-[8px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md font-black uppercase mt-1 animate-pulse">
-                                                            Out of Sync
+                                                        <span className="text-[7px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-lg font-black uppercase mt-2 tracking-widest border border-red-500/20 animate-pulse">
+                                                            SYNC ERR
                                                         </span>
                                                     )}
                                                     {product.stock === 0 && (
-                                                        <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md font-black uppercase mt-1">
-                                                            Habis
+                                                        <span className="text-[7px] bg-white/5 text-slate-600 px-2 py-0.5 rounded-lg font-black uppercase mt-2 tracking-widest border border-white/5 italic">
+                                                            DEPLETED
                                                         </span>
                                                     )}
                                                     {product.WarehouseStock && product.WarehouseStock.length > 0 && (
                                                         <>
-                                                            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter flex items-center gap-0.5 justify-center mt-1">
-                                                                <MapPin className="h-2 w-2" /> {product.WarehouseStock.length} Lokasi
+                                                            <div className="text-[8px] text-slate-600 font-black uppercase tracking-[0.2em] flex items-center gap-1 justify-center mt-2 italic hover:text-indigo-400 transition-colors cursor-help">
+                                                                <MapPin className="h-2 w-2" /> LOC: {product.WarehouseStock.length}
                                                             </div>
-                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block z-20 w-48 bg-slate-900 text-white p-3 rounded-xl shadow-2xl animate-in fade-in zoom-in duration-200">
-                                                                <p className="text-[10px] font-black uppercase tracking-widest border-b border-white/10 pb-1.5 mb-2 text-center">Rincian Gudang</p>
-                                                                <div className="space-y-1.5">
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 hidden group-hover/tooltip:block z-20 w-56 bg-[#050505] text-white p-5 rounded-[24px] shadow-2xl animate-in fade-in zoom-in duration-300 border border-white/10 backdrop-blur-3xl">
+                                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] border-b border-white/5 pb-3 mb-4 text-center italic text-indigo-400 text-glow">Warehouse Matrix</p>
+                                                                <div className="space-y-3">
                                                                     {product.WarehouseStock.map((ws: any) => (
                                                                         <div key={ws.warehouseId} className="flex justify-between items-center text-[10px]">
-                                                                            <span className="text-slate-400 truncate pr-2">{ws.warehouse.name}</span>
-                                                                            <span className="font-bold text-white">{ws.quantity} {product.unit}</span>
+                                                                            <span className="text-slate-500 font-black uppercase tracking-widest truncate pr-3 italic">{ws.warehouse.name}</span>
+                                                                            <span className="font-black text-white italic tracking-tighter">{ws.quantity} {product.unit}</span>
                                                                         </div>
                                                                     ))}
                                                                 </div>
-                                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+                                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-[#050505]"></div>
                                                             </div>
                                                         </>
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="text-[10px] font-black uppercase text-slate-300 italic tracking-widest">
-                                                    MTO (Sesuai Pesanan)
+                                                <span className="text-[9px] font-black uppercase text-slate-700 italic tracking-[0.2em] block text-center">
+                                                    ON-DEMAND
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="px-6 py-6 text-center">
                                             {!product.trackStock ? (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-600 border border-blue-100 uppercase tracking-tighter">
-                                                    Made to Order
-                                                </span>
+                                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest italic border-b border-indigo-500/20 pb-1">MTO SYSTEM</span>
                                             ) : product.stock <= product.minStock ? (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-600">
-                                                    <AlertTriangle className="h-3 w-3" /> Stok Rendah
-                                                </span>
+                                                <div className="flex items-center justify-center gap-2 text-red-500 animate-pulse">
+                                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                                    <span className="text-[9px] font-black uppercase tracking-widest italic">CRITICAL</span>
+                                                </div>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600">
-                                                    Aman
-                                                </span>
+                                                <div className="flex items-center justify-center gap-2 text-emerald-500/50">
+                                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                                    <span className="text-[9px] font-black uppercase tracking-widest italic">HEALTHY</span>
+                                                </div>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-right relative">
+                                        <td className="px-6 py-6 text-right relative">
                                             <div className="flex items-center justify-end">
                                                 <button 
                                                     onClick={() => setOpenMenuId(openMenuId === product.id ? null : product.id)}
-                                                    className={`p-2 rounded-lg transition-all hover:bg-slate-100 ${openMenuId === product.id ? 'bg-slate-100 text-orange-600' : 'text-slate-400'}`}
+                                                    className={`h-10 w-10 flex items-center justify-center rounded-xl transition-all border ${openMenuId === product.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-slate-500 hover:text-white'}`}
                                                 >
                                                     <MoreVertical className="h-5 w-5" />
                                                 </button>
@@ -420,52 +440,52 @@ export default function ProductsPage() {
                                                             className="fixed inset-0 z-30" 
                                                             onClick={() => setOpenMenuId(null)}
                                                         ></div>
-                                                        <div className="absolute right-6 top-12 z-40 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 animate-in fade-in zoom-in duration-200 overflow-hidden">
-                                                            <p className="px-4 py-2 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-50 mb-1">Menu Aksi</p>
+                                                        <div className="absolute right-6 top-12 z-40 w-64 bg-[#050505] rounded-[24px] shadow-2xl border border-white/10 py-3 animate-in fade-in zoom-in duration-300 overflow-hidden backdrop-blur-3xl">
+                                                            <p className="px-5 py-3 text-[9px] font-black uppercase text-slate-600 tracking-[0.3em] border-b border-white/5 mb-2 italic">Product Operations</p>
                                                             <button 
                                                                 onClick={() => {
                                                                     handleEditProduct(product);
                                                                     setOpenMenuId(null);
                                                                 }}
-                                                                className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-3 transition-colors"
+                                                                className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
                                                             >
-                                                                <Edit2 className="h-4 w-4" /> Edit Info
+                                                                <Edit2 className="h-4 w-4 text-indigo-500" /> Profil Produk
                                                             </button>
                                                             <button 
                                                                 onClick={() => {
                                                                     handleAdjustStock(product);
                                                                     setOpenMenuId(null);
                                                                 }}
-                                                                className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-3 transition-colors"
+                                                                className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
                                                             >
-                                                                <Edit3 className="h-4 w-4" /> Sesuaikan Stok
+                                                                <Edit3 className="h-4 w-4 text-amber-500" /> Stock Koreksi
                                                             </button>
 
                                                             {(product.type === 'FINISHED_GOOD' || product.type === 'WIP') && (
                                                                 <button 
                                                                     onClick={() => {
                                                                         if (!product.Recipes || product.Recipes.length === 0) {
-                                                                            toast.error("Atur resep (BOM) terlebih dahulu untuk produk ini.");
+                                                                            toast.error("Atur BOM resep terlebih dahulu!");
                                                                             return;
                                                                         }
                                                                         setSelectedProduct(product);
                                                                         setIsProductionModalOpen(true);
                                                                         setOpenMenuId(null);
                                                                     }}
-                                                                    className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-3 transition-colors"
+                                                                    className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
                                                                 >
-                                                                    <ChefHat className="h-4 w-4" /> Catat Produksi
+                                                                    <ChefHat className="h-4 w-4 text-emerald-500" /> Execute Batch
                                                                 </button>
                                                             )}
-                                                            <div className="h-px bg-slate-50 my-1"></div>
+                                                            <div className="h-px bg-white/5 my-2 mx-5"></div>
                                                             <button 
                                                                 onClick={() => {
                                                                     handleDeleteProduct(product.id, product.name);
                                                                     setOpenMenuId(null);
                                                                 }}
-                                                                className="w-full px-4 py-2.5 text-left text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
+                                                                className="w-full px-5 py-3 text-left text-[10px] font-black text-red-900 hover:bg-red-500/10 hover:text-red-500 flex items-center gap-3 transition-all uppercase tracking-widest italic"
                                                             >
-                                                                <Trash2 className="h-4 w-4" /> Hapus Produk
+                                                                <Trash2 className="h-4 w-4" /> Terminate SKU
                                                             </button>
                                                         </div>
                                                     </>

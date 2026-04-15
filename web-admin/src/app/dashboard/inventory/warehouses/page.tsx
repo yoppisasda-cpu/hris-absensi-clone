@@ -73,74 +73,85 @@ export default function WarehousesPage() {
 
     return (
         <DashboardLayout>
-            <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="mb-12 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        <MapPin className="h-8 w-8 text-blue-600" /> Manajemen Gudang
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-500 font-medium">Kelola lokasi penyimpanan barang dan inventori perusahaan.</p>
+                    <div className="flex items-center gap-4 mb-5">
+                        <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
+                            <MapPin className="h-7 w-7 stroke-[2.5px]" />
+                        </div>
+                        <h1 className="text-4xl font-black italic tracking-tighter text-white uppercase text-glow-sm">
+                            Facility <span className="text-indigo-500">Orchestration</span>
+                        </h1>
+                    </div>
+                    <p className="text-[11px] font-black text-slate-500 tracking-[0.2em] uppercase italic max-w-2xl leading-relaxed">
+                        Control the structural nodes of the supply chain. Define global storage facilities, logistical hubs, and localized distribution centers.
+                    </p>
                 </div>
                 <button 
                     onClick={() => handleOpenModal()}
-                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all"
+                    className="group flex items-center gap-4 rounded-2xl bg-indigo-600 px-8 py-4 text-[11px] font-black text-white shadow-2xl shadow-indigo-500/20 hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-[0.2em] italic border border-white/10"
                 >
-                    <Plus className="h-4 w-4" /> Tambah Gudang Baru
+                    <Plus className="h-4 w-4 stroke-[3.2px] group-hover:rotate-90 transition-transform duration-300" /> Register New Node
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
                 {loading ? (
                     Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="animate-pulse bg-white rounded-3xl p-6 border border-slate-100 h-48"></div>
+                        <div key={i} className="animate-pulse bg-slate-900 border border-white/5 rounded-[40px] p-10 h-64 shadow-2xl"></div>
                     ))
                 ) : warehouses.length > 0 ? (
                     warehouses.map((w) => (
-                        <div key={w.id} className={`group relative bg-white rounded-3xl p-6 border-2 transition-all hover:shadow-xl ${w.isMain ? 'border-blue-500 bg-blue-50/10' : 'border-slate-100'}`}>
+                        <div key={w.id} className={`group relative bg-slate-900 rounded-[40px] p-10 border transition-all hover:bg-slate-800 shadow-2xl overflow-hidden ${w.isMain ? 'border-indigo-500/40 shadow-[0_0_50px_rgba(79,70,229,0.1)]' : 'border-white/5 hover:border-white/10'}`}>
                             {w.isMain && (
-                                <div className="absolute top-4 right-4 bg-blue-600 text-white text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shadow-md shadow-blue-500/20">
-                                    <Home className="h-3 w-3" /> Gudang Utama
+                                <div className="absolute top-8 right-8 bg-indigo-600 text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-[0.2em] flex items-center gap-2 shadow-lg shadow-indigo-500/30 italic z-10">
+                                    <Home className="h-3 w-3" /> HUB_MASTER
                                 </div>
                             )}
                             
-                            <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
-                                <Building2 className="h-6 w-6 text-slate-500 group-hover:text-white" />
+                            <div className="h-16 w-16 rounded-[24px] bg-slate-950 border border-white/5 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:border-indigo-500 transition-all duration-500 shadow-inner group-hover:shadow-indigo-500/50">
+                                <Building2 className="h-8 w-8 text-slate-600 group-hover:text-white transition-colors" />
                             </div>
                             
-                            <h3 className="text-xl font-bold text-slate-900 mb-2">{w.name}</h3>
-                            <p className="text-sm text-slate-500 mb-6 flex items-start gap-2 h-10 line-clamp-2">
-                                <MapPin className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
-                                {w.location || 'Lokasi tidak diatur'}
-                            </p>
+                            <h3 className="text-2xl font-black italic tracking-tighter text-white uppercase mb-4 text-glow-sm">{w.name}</h3>
+                            <div className="flex items-start gap-3 h-14">
+                                <MapPin className="h-4 w-4 text-indigo-500 mt-1 shrink-0 stroke-[2.5px]" />
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic leading-relaxed group-hover:text-slate-300 transition-colors">
+                                    {w.location || 'GEOLOCATION_NOT_EXTRACTED'}
+                                </p>
+                            </div>
                             
-                            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-50">
+                            <div className="flex items-center justify-end gap-3 pt-8 mt-4 border-t border-white/5">
                                 <button 
                                     onClick={() => handleOpenModal(w)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                                    className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-950 border border-white/5 text-slate-600 hover:text-white hover:bg-slate-800 transition-all"
                                 >
-                                    <Edit3 className="h-4 w-4" />
+                                    <Edit3 className="h-4.5 w-4.5" />
                                 </button>
                                 <button 
                                     onClick={() => handleDelete(w.id)}
-                                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                                    className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-950 border border-white/5 text-slate-600 hover:text-red-500 hover:bg-red-500/10 transition-all"
                                 >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-4.5 w-4.5" />
                                 </button>
                             </div>
                         </div>
                     ))
                 ) : (
-                    <div className="col-span-full py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="p-4 bg-slate-50 rounded-full text-slate-300">
-                                <Building2 className="h-12 w-12" />
+                    <div className="col-span-full py-32 text-center bg-slate-900 rounded-[48px] border-2 border-dashed border-white/5">
+                        <div className="flex flex-col items-center gap-8">
+                            <div className="p-8 bg-slate-950 rounded-full text-slate-800 border border-white/5 shadow-inner">
+                                <Building2 className="h-20 w-20" />
                             </div>
-                            <p className="text-slate-400 font-bold italic">Belum ada gudang yang terdaftar.</p>
-                            <button 
-                                onClick={() => handleOpenModal()}
-                                className="text-blue-600 font-bold text-sm hover:underline"
-                            >
-                                Tambah Gudang Pertama Anda
-                            </button>
+                            <div>
+                                <p className="text-slate-500 font-black italic uppercase tracking-[0.2em] text-[11px] mb-4">LOGISTICS INFRASTRUCTURE NOT DETECTED</p>
+                                <button 
+                                    onClick={() => handleOpenModal()}
+                                    className="text-indigo-400 font-black uppercase italic tracking-[0.2em] text-xs hover:text-white transition-colors underline decoration-2 underline-offset-8"
+                                >
+                                    Initialize First Supply Node
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -148,53 +159,55 @@ export default function WarehousesPage() {
 
             {/* Modal Tambah/Edit */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                        <div className="bg-slate-900 px-6 py-5 flex items-center justify-between text-white border-b border-blue-500/30">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                                    <Building2 className="h-6 w-6 text-blue-400" />
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 animate-in fade-in duration-300">
+                    <div className="w-full max-w-lg rounded-[48px] bg-slate-900 border border-white/5 shadow-[0_0_100px_rgba(79,70,229,0.1)] overflow-hidden animate-in zoom-in duration-300">
+                        <div className="bg-slate-950/50 px-10 py-8 flex items-center justify-between text-white border-b border-white/5">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                    <Building2 className="h-6 w-6 stroke-[2.5px]" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-black italic tracking-tight uppercase">
-                                        {editingWarehouse ? "Edit Gudang" : "Tambah Gudang"}
+                                    <h2 className="text-xl font-black italic tracking-tighter uppercase text-glow-sm">
+                                        {editingWarehouse ? "MOD_FACILITY" : "NEW_FACILITY"}
                                     </h2>
-                                    <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase italic">Master Data Lokasi</p>
+                                    <p className="text-[10px] text-slate-500 font-black tracking-[0.2em] uppercase italic opacity-70 mt-1">Infrastructure Schema Directive</p>
                                 </div>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="rounded-full p-2 hover:bg-white/10 transition-colors">
-                                <X className="h-5 w-5" />
+                            <button onClick={() => setIsModalOpen(false)} className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                                <X className="h-6 w-6" />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="p-8">
-                            <div className="space-y-6">
+                        <form onSubmit={handleSubmit} className="p-10">
+                            <div className="space-y-8">
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Nama Gudang</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-3 ml-2 italic">Faculty Nomenclature</label>
                                     <input
                                         required
                                         type="text"
-                                        placeholder="Contoh: Gudang Utama Jakarta"
-                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-blue-500 focus:bg-white focus:outline-none transition-all"
+                                        placeholder="INPUT NODE IDENTIFIER..."
+                                        className="w-full rounded-[24px] border border-white/5 bg-slate-950 py-5 px-7 text-[11px] font-black text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-800 italic uppercase tracking-[0.1em]"
                                         value={formData.name}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-1">Lokasi / Alamat</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-3 ml-2 italic">Geolocation Directives</label>
                                     <textarea
-                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-bold focus:border-blue-500 focus:bg-white focus:outline-none transition-all h-24 resize-none"
-                                        placeholder="Alamat lengkap lokasi gudang..."
+                                        className="w-full rounded-[24px] border border-white/5 bg-slate-950 py-5 px-7 text-[11px] font-black text-white focus:border-indigo-500/50 outline-none transition-all h-32 resize-none placeholder:text-slate-800 italic uppercase tracking-[0.1em] leading-relaxed"
+                                        placeholder="INPUT FULL LOGISTICS ADDRESS..."
                                         value={formData.location}
                                         onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                                     />
                                 </div>
-                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <div className="flex items-center gap-3">
-                                        <Home className={`h-5 w-5 ${formData.isMain ? 'text-blue-600' : 'text-slate-400'}`} />
+                                <div className="flex items-center justify-between p-7 bg-slate-950/50 rounded-[28px] border border-white/5 shadow-inner">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`h-10 w-10 h rounded-xl flex items-center justify-center border transition-all shadow-lg ${formData.isMain ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-slate-900 border-white/5 text-slate-600'}`}>
+                                            <Home className="h-5 w-5 stroke-[2.5px]" />
+                                        </div>
                                         <div>
-                                            <p className="text-xs font-black text-slate-900 uppercase">Gudang Utama</p>
-                                            <p className="text-[9px] text-slate-500 font-medium">Banyak transaksi akan default ke gudang ini.</p>
+                                            <p className="text-[11px] font-black text-white uppercase tracking-widest italic">Hub Master Protocol</p>
+                                            <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest mt-1 italic">Default Logistical Target</p>
                                         </div>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
@@ -204,24 +217,24 @@ export default function WarehousesPage() {
                                             checked={formData.isMain}
                                             onChange={(e) => setFormData({ ...formData, isMain: e.target.checked })}
                                         />
-                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        <div className="w-14 h-7 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 shadow-inner"></div>
                                     </label>
                                 </div>
                             </div>
 
-                            <div className="mt-8 flex gap-3">
+                            <div className="mt-10 flex gap-4">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 rounded-xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all font-mono"
+                                    className="flex-1 rounded-[24px] border border-white/5 bg-slate-950/50 py-5 text-[10px] font-black text-slate-500 hover:text-white hover:bg-slate-950 transition-all uppercase tracking-[0.2em] italic border-b-4 border-b-white/5"
                                 >
-                                    CLOSE
+                                    Abort
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-[2] rounded-xl bg-slate-900 py-3.5 text-sm font-bold text-white shadow-xl hover:bg-slate-800 transition-all active:scale-95"
+                                    className="flex-[2] rounded-[24px] bg-indigo-600 py-5 text-[10px] font-black text-white shadow-2xl shadow-indigo-500/30 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-[0.2em] italic border-b-4 border-b-indigo-900"
                                 >
-                                    {editingWarehouse ? "UPDATE DATABASE" : "SIMPAN GUDANG"}
+                                    {editingWarehouse ? "UPDATE_VECTORS" : "INITIALIZE_NODE"}
                                 </button>
                             </div>
                         </form>

@@ -45,6 +45,7 @@ dependencies:
   printing: ^5.14.2
   # Path Provider
   path_provider: ^2.1.5
+  device_info_plus: ^11.1.0
 
   # Printer
   print_bluetooth_thermal: ^1.1.0

@@ -65,8 +65,8 @@ export default function ExpensesPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 font-primary tracking-tight">Pengeluaran (Expense)</h1>
-                    <p className="mt-1 text-sm text-slate-500">Kelola dan pantau semua pengeluaran operasional perusahaan.</p>
+                    <h1 className="text-3xl font-bold text-white font-primary tracking-tight">Pengeluaran (Expense)</h1>
+                    <p className="mt-1 text-sm text-slate-400">Kelola dan pantau semua pengeluaran operasional perusahaan.</p>
                 </div>
                 <div className="flex gap-3">
                     <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
@@ -85,20 +85,20 @@ export default function ExpensesPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 mb-8">
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
-                        <div className="rounded-lg bg-red-50 p-2"><ArrowDownLeft className="h-5 w-5 text-red-600" /></div>
-                        <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full uppercase tracking-widest">Bulan Ini</span>
+                        <div className="rounded-lg bg-red-900/30 p-2"><ArrowDownLeft className="h-5 w-5 text-red-400" /></div>
+                        <span className="text-[10px] font-bold text-red-400 bg-red-900/30 px-2 py-1 rounded-full uppercase tracking-widest">Bulan Ini</span>
                     </div>
-                    <p className="text-sm font-medium text-slate-500">Total Pengeluaran</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">Rp {totalExpenseThisMonth.toLocaleString()}</p>
+                    <p className="text-sm font-medium text-slate-400">Total Pengeluaran</p>
+                    <p className="mt-1 text-2xl font-bold text-white">Rp {totalExpenseThisMonth.toLocaleString()}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
-                        <div className="rounded-lg bg-blue-50 p-2"><Wallet className="h-5 w-5 text-blue-600" /></div>
+                        <div className="rounded-lg bg-blue-900/30 p-2"><Wallet className="h-5 w-5 text-blue-400" /></div>
                     </div>
-                    <p className="text-sm font-medium text-slate-500">Jumlah Transaksi</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{expenses.length}</p>
+                    <p className="text-sm font-medium text-slate-400">Jumlah Transaksi</p>
+                    <p className="mt-1 text-2xl font-bold text-white">{expenses.length}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm bg-gradient-to-br from-red-600 to-red-700 text-white border-none shadow-red-200">
                     <div className="flex items-center justify-between mb-4">
@@ -112,15 +112,15 @@ export default function ExpensesPage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 p-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 p-6">
                     <div className="relative w-full sm:w-96 group">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors" />
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 group-focus-within:text-red-500 transition-colors" />
                         <input
                             type="text"
                             placeholder="Cari transaksi, kategori, atau penerima..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-4 text-sm focus:border-red-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-red-500 transition-all font-medium"
+                            className="w-full rounded-xl border border-slate-700 bg-slate-900/50 py-2.5 pl-10 pr-4 text-sm text-white focus:border-red-500 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-red-500 transition-all font-medium placeholder:text-slate-500"
                         />
                     </div>
                 </div>

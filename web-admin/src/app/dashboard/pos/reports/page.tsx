@@ -83,16 +83,16 @@ export default function POSReportsPage() {
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
-                        <Monitor className="h-8 w-8 text-emerald-600" />
+                    <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                        <Monitor className="h-8 w-8 text-emerald-400" />
                         Laporan Kasir (POS)
                     </h1>
-                    <p className="mt-1 text-sm text-slate-500 font-medium">Monitoring transaksi retail harian dan komisi pihak ketiga.</p>
+                    <p className="mt-1 text-sm text-slate-400 font-medium">Monitoring transaksi retail harian dan komisi pihak ketiga.</p>
                 </div>
                 <div className="flex gap-3">
                     <button 
                         onClick={handleExport}
-                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+                        className="flex items-center gap-2 rounded-xl bg-slate-900/50 border border-slate-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm"
                     >
                         <Download className="h-4 w-4" /> Export Laporan
                     </button>
@@ -100,41 +100,41 @@ export default function POSReportsPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 mb-8">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-blue-500 hover:shadow-md transition-all">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-blue-500 hover:bg-slate-800 transition-all">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Omzet (Gross)</p>
-                    <p className="text-xl font-black text-slate-900">Rp {stats.gross.toLocaleString()}</p>
+                    <p className="text-xl font-black text-white">Rp {stats.gross.toLocaleString()}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-red-500 hover:shadow-md transition-all">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-red-500 hover:bg-slate-800 transition-all">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Potongan Platform</p>
-                    <p className="text-xl font-black text-red-600">Rp {stats.commission.toLocaleString()}</p>
+                    <p className="text-xl font-black text-red-400">Rp {stats.commission.toLocaleString()}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 border-l-emerald-500 hover:shadow-lg transition-all bg-emerald-50/30">
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Net Settlement (Cair)</p>
-                    <p className="text-2xl font-black text-emerald-700">Rp {stats.net.toLocaleString()}</p>
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-emerald-500 hover:bg-slate-800 transition-all">
+                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Net Settlement (Cair)</p>
+                    <p className="text-2xl font-black text-emerald-400">Rp {stats.net.toLocaleString()}</p>
                 </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 p-6">
+            <div className="rounded-2xl border border-slate-700 bg-slate-900/50 shadow-sm overflow-hidden">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 p-6">
                     <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                        <div className="relative w-full sm:w-80 group text-slate-900">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                        <div className="relative w-full sm:w-80 group text-white">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-500 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Cari nomor invoice..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-4 text-sm focus:border-emerald-500 focus:bg-white focus:outline-none transition-all font-medium"
+                                className="w-full rounded-xl border border-slate-700 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none transition-all font-medium"
                             />
                         </div>
 
-                        <div className="relative w-full sm:w-64 group">
-                            <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none z-10" />
+                        <div className="relative w-full sm:w-64 group text-white">
+                            <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-500 transition-colors pointer-events-none z-10" />
                             <select
                                 value={selectedBranchId}
                                 onChange={(e) => setSelectedBranchId(e.target.value)}
                                 disabled={isRestricted}
-                                className={`w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm focus:border-emerald-500 focus:outline-none transition-all font-bold text-slate-700 shadow-sm ${isRestricted ? 'cursor-not-allowed bg-slate-50' : 'cursor-pointer'}`}
+                                className={`w-full appearance-none rounded-xl border border-slate-700 bg-slate-900 py-2.5 pl-10 pr-10 text-sm text-white focus:border-emerald-500 focus:outline-none transition-all font-bold shadow-sm ${isRestricted ? 'cursor-not-allowed bg-slate-800 text-slate-500' : 'cursor-pointer'}`}
                             >
                                 {!isRestricted && (
                                     <>
@@ -148,7 +148,7 @@ export default function POSReportsPage() {
                                     </option>
                                 ))}
                             </select>
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-bold text-[10px]">▼</div>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 font-bold text-[10px]">▼</div>
                         </div>
                     </div>
                 </div>
