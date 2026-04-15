@@ -2767,6 +2767,10 @@ async function clockInHandler(req: Request, res: Response) {
           date: new Date(todayStr) 
         },
         include: { shift: true }
+      }).catch((e: any) => {
+        // Tabel ShiftSchedule belum ada di DB (belum migrate) — skip manual schedule
+        if (e?.code === 'P2021') console.warn('[Clock-In] ShiftSchedule table not found, skipping manual schedule check.');
+        return null;
       })
     ]);
 
