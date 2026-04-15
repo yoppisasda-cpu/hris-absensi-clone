@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { FileSpreadsheet, Download, Calendar, User, Clock, Search, Smile, Meh, Frown, AlertCircle, TrendingUp, ShieldCheck, ShieldAlert, Shield, Printer } from 'lucide-react';
+import { FileSpreadsheet, Download, Calendar, User, Clock, Search, Smile, Meh, Frown, AlertCircle, TrendingUp, ShieldCheck, ShieldAlert, Shield, Printer, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface Attendance {
