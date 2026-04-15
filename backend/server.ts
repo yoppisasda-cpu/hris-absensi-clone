@@ -2794,7 +2794,7 @@ async function clockInHandler(req: Request, res: Response) {
       faceSimilarityScore = null;
     } else if (req.file) {
       try {
-        const capturePath = path.join(process.cwd(), photoUrl!.replace(/^\\/+/, ""));
+        const capturePath = path.join(process.cwd(), photoUrl!.replace(/^\/+/, ""));
         // @ts-ignore
         const refUrl = user.faceReferenceUrl;
         
