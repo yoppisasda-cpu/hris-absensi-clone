@@ -3069,15 +3069,17 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
     let isFaceVerified = false;
 
     // @ts-ignore
-    if (!attendance.user.faceReferenceUrl) {
-      return res.status(400).json({ error: 'Verifikasi Wajah Gagal: Anda belum memiliki Master Photo. Hubungi HRD.' });
-    }
+    const hasReferencePhoto = !!attendance.user.faceReferenceUrl;
 
-    if (req.file) {
+    if (!hasReferencePhoto) {
+      console.warn(`[Face AI] Clock-Out: User ${userId} belum punya faceReferenceUrl. Absensi diizinkan tanpa verifikasi.`);
+      isFaceVerified = false;
+      faceSimilarityScore = null;
+    } else if (req.file) {
       try {
         const capturePath = path.join(process.cwd(), photoUrl!.replace(/^\/+/, ""));
         // @ts-ignore
-        const refUrl = attendance.user.faceReferenceUrl;
+        const refUrl = attendance.user.faceReferenceUrl as string;
         const faceResult = await compareFaces(refUrl, capturePath);
         faceSimilarityScore = faceResult.score;
         isFaceVerified = faceResult.verified;
