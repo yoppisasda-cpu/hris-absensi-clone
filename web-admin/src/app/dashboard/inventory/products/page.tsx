@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, Filter, MoreVertical, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit3, Trash2, Box, Info, TrendingUp, ScanLine, MapPin, Edit2, Tag, ChefHat, Building2 } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit3, Trash2, Box, Info, TrendingUp, ScanLine, MapPin, Edit2, Tag, ChefHat, Building2, CheckCircle2 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import AddProductModal from "@/components/inventory/AddProductModal";
