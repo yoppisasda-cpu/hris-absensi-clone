@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2, Camera, ShieldCheck } from 'lucide-react';
+import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2, Camera, ShieldCheck, Smartphone } from 'lucide-react';
 import EmployeeDocumentsModal from '@/components/dashboard/EmployeeDocumentsModal';
 import EmployeeAssetsModal from '@/components/dashboard/EmployeeAssetsModal';
 
@@ -239,6 +239,18 @@ export default function EmployeesPage() {
         }
     };
 
+    const handleResetDevice = async (user: User) => {
+        if (!confirm(`Reset Device ID untuk ${user.name}?\n\nSetelah direset, karyawan bisa mendaftarkan HP baru pada absensi berikutnya.`)) return;
+        try {
+            const res = await api.patch(`/users/${user.id}/reset-device`);
+            alert(res.data.message || 'Device ID berhasil direset.');
+            fetchUsers();
+        } catch (error) {
+            const err = error as { response?: { data?: { error?: string } } };
+            alert(err.response?.data?.error || 'Gagal mereset Device ID.');
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="mb-12 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
@@ -248,11 +260,11 @@ export default function EmployeesPage() {
                             <Briefcase className="h-8 w-8 stroke-[2.5px]" />
                         </div>
                         <h1 className="text-4xl font-black italic tracking-tighter text-white uppercase text-glow-sm">
-                            Personnel <span className="text-blue-500">Registry</span>
+                            Manajemen <span className="text-blue-500">Karyawan</span>
                         </h1>
                     </div>
                     <p className="text-[11px] font-black text-slate-500 tracking-[0.2em] uppercase italic max-w-2xl leading-relaxed">
-                        Full-spectrum workforce orchestration for <span className="text-blue-400 font-bold border-b border-blue-500/30 pb-0.5">{activeTab === 'active' ? 'ACTIVE_NODES' : 'EX_PERSONNEL_ARCHIVE'}</span>. Synchronizing biographic data and operational access.
+                        Manajemen data karyawan secara lengkap untuk <span className="text-blue-400 font-bold border-b border-blue-500/30 pb-0.5">{activeTab === 'active' ? 'NODE_AKTIF' : 'ARSIP_EX_KARYAWAN'}</span>. Sinkronisasi data biometrik dan akses operasional.
                     </p>
                 </div>
                 {userRole !== 'FINANCE' && (
@@ -269,7 +281,7 @@ export default function EmployeesPage() {
                         className="group flex items-center justify-center gap-4 rounded-2xl bg-blue-600 px-8 py-4 text-sm font-black italic uppercase tracking-widest text-white hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 border border-blue-400/30 active:scale-95"
                     >
                         <UserPlus className="h-5 w-5 group-hover:rotate-12 transition-transform" />
-                        Recruit Personnel
+                        Tambah Karyawan
                     </button>
                 )}
             </div>
@@ -277,19 +289,19 @@ export default function EmployeesPage() {
             {/* QUICK STATS MATRIX */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                 <div className="rounded-[40px] border border-white/5 bg-slate-900/40 backdrop-blur-2xl p-10 shadow-2xl transition-all hover:bg-slate-900/60 group relative overflow-hidden">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] italic mb-3">Total Personnel</p>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] italic mb-3">Total Karyawan</p>
                     <p className="text-4xl font-black text-white italic tracking-tighter text-glow-md">{users.length}</p>
                     <div className="absolute -bottom-10 -right-10 h-32 w-32 bg-blue-500/5 blur-3xl rounded-full"></div>
                 </div>
                 <div className="rounded-[40px] border border-white/5 bg-slate-900/40 backdrop-blur-2xl p-10 shadow-2xl transition-all hover:bg-slate-900/60 group relative overflow-hidden">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] italic mb-3">Active Contract</p>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] italic mb-3">Kontrak Aktif</p>
                     <p className="text-4xl font-black text-emerald-500 italic tracking-tighter text-glow-md">
                         {users.filter(u => !u.contractEndDate || new Date(u.contractEndDate) > new Date()).length}
                     </p>
                     <div className="absolute -bottom-10 -right-10 h-32 w-32 bg-emerald-500/5 blur-3xl rounded-full"></div>
                 </div>
                 <div className="rounded-[40px] border border-white/5 bg-slate-900/40 backdrop-blur-2xl p-10 shadow-2xl transition-all hover:bg-slate-900/60 group relative overflow-hidden">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] italic mb-3">Expiring Soon</p>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] italic mb-3">Segera Berakhir</p>
                     <p className="text-4xl font-black text-amber-500 italic tracking-tighter text-glow-md">
                         {users.filter(u => {
                             if (!u.contractEndDate) return false;
@@ -303,7 +315,7 @@ export default function EmployeesPage() {
                     <div className="absolute -bottom-10 -right-10 h-32 w-32 bg-amber-500/5 blur-3xl rounded-full"></div>
                 </div>
                 <div className="rounded-[40px] border border-white/5 bg-slate-900/40 backdrop-blur-2xl p-10 shadow-2xl transition-all hover:bg-slate-900/60 group relative overflow-hidden">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] italic mb-3">Face ID Sync</p>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] italic mb-3">Face ID Sinkron</p>
                     <p className="text-4xl font-black text-blue-400 italic tracking-tighter text-glow-md">
                         {Math.round((users.filter(u => u.faceReferenceUrl).length / (users.length || 1)) * 100)}%
                     </p>
@@ -320,7 +332,7 @@ export default function EmployeesPage() {
                             : 'text-slate-500 hover:text-white'
                             }`}
                     >
-                        Personnel Matrix
+                        Matriks Karyawan
                     </button>
                     <button
                         onClick={() => setActiveTab('inactive')}
@@ -329,7 +341,7 @@ export default function EmployeesPage() {
                             : 'text-slate-500 hover:text-white'
                             }`}
                     >
-                        Personnel Archive
+                        Arsip Karyawan
                     </button>
                 </div>
 
@@ -338,7 +350,7 @@ export default function EmployeesPage() {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
                         <input
                             type="text"
-                            placeholder="Locate personnel by node ID, name, or job title..."
+                            placeholder="Cari karyawan berdasarkan ID, nama, atau jabatan..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-full sm:w-80 pl-12 pr-6 py-4 text-xs bg-slate-900/80 border border-white/5 text-white rounded-[24px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-600 italic font-black"
@@ -352,7 +364,7 @@ export default function EmployeesPage() {
                             }`}
                     >
                         <Clock className={`h-5 w-5 ${showExpiringOnly ? 'animate-pulse' : ''}`} />
-                        <span className="text-[10px] font-black uppercase tracking-widest italic">{showExpiringOnly ? 'LIST_ALL' : 'FILTER_EXPIRING'}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest italic">{showExpiringOnly ? 'LIHAT_SEMUA' : 'KONTRAK_BERAKHIR'}</span>
                     </button>
                 </div>
             </div>
@@ -451,7 +463,7 @@ export default function EmployeesPage() {
                                                 )
                                             ) : (
                                                 <div className="flex flex-col">
-                                                    <span className="text-red-600 font-semibold">Resigned</span>
+                                                    <span className="text-red-600 font-semibold">Resign</span>
                                                     <span className="text-xs text-slate-500">{user.resignDate ? new Date(user.resignDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span>
                                                 </div>
                                             )}
@@ -546,6 +558,14 @@ export default function EmployeesPage() {
                                                             title="Foto Referensi Wajah (AI)"
                                                         >
                                                             <Camera className="h-4 w-4" />
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => handleResetDevice(user)}
+                                                            className="p-1 px-2 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded transition-colors"
+                                                            title="Reset Device ID (Ganti HP)"
+                                                        >
+                                                            <Smartphone className="h-4 w-4" />
                                                         </button>
 
                                                         <button

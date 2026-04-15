@@ -2542,6 +2542,41 @@ app.patch('/api/users/:id/deactivate', tenantMiddleware, async (req: Request, re
   }
 });
 
+// B1.7 Endpoint Reset Device ID Karyawan (Anti-Fraud: izinkan ganti HP)
+app.patch('/api/users/:id/reset-device', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+    const targetUserId = parseInt(req.params.id as string);
+
+    // Hanya Admin dan Superadmin yang bisa melakukan reset
+    if (!['ADMIN', 'SUPERADMIN', 'OWNER'].includes(userRole)) {
+      return res.status(403).json({ error: 'Hanya Admin yang dapat mereset Device ID karyawan.' });
+    }
+
+    const userToReset = await prisma.user.findFirst({
+      where: { id: targetUserId, companyId: tenantId }
+    });
+
+    if (!userToReset) {
+      return res.status(404).json({ error: 'Karyawan tidak ditemukan atau Anda tidak memiliki akses.' });
+    }
+
+    await prisma.user.update({
+      where: { id: targetUserId },
+      // @ts-ignore
+      data: { lastDeviceId: null }
+    });
+
+    console.log(`[Anti-Fraud] Device ID reset for user ${targetUserId} by role ${userRole}`);
+    res.json({ message: `Device ID ${userToReset.name} berhasil direset. Karyawan bisa mendaftarkan HP baru pada absensi berikutnya.` });
+
+  } catch (error: any) {
+    console.error('Error resetting device ID:', error);
+    res.status(500).json({ error: 'Gagal mereset Device ID: ' + (error.message || error) });
+  }
+});
+
 // B2. Endpoint Mendapatkan Daftar Karyawan (Menggunakan Tenant Middleware)
 app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
   try {
