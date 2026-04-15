@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2, Camera } from 'lucide-react';
+import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2, Camera, ShieldCheck } from 'lucide-react';
 import EmployeeDocumentsModal from '@/components/dashboard/EmployeeDocumentsModal';
 import EmployeeAssetsModal from '@/components/dashboard/EmployeeAssetsModal';
 
