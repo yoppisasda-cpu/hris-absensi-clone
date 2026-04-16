@@ -375,6 +375,10 @@ export default function Sidebar() {
                             <TrendingUp className="h-5 w-5" />
                             Performa KPI
                         </Link>
+                        <Link href="/dashboard/assignments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <Briefcase className="h-5 w-5 text-indigo-400" />
+                            Penugasan & Monitoring
+                        </Link>
                         <Link href="/dashboard/learning" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <GraduationCap className="h-5 w-5" />
                             Learning & Development

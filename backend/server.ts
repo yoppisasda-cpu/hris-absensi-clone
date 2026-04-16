@@ -11533,6 +11533,286 @@ app.get('/api/finance/company-info', tenantMiddleware, async (req: Request, res:
 
 
 
+
+// ==========================================
+// WORK ASSIGNMENTS (TASK MONITORING) MODULE
+// ==========================================
+
+// 1. Get List of Assignments
+app.get('/api/assignments', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId;
+    const role = (req as any).userRole;
+
+    const where: any = { companyId: tenantId };
+
+    // If Employee, only show tasks assigned to them OR created by them
+    if (role === 'EMPLOYEE') {
+      where.OR = [
+        { userId: userId },
+        { assignedById: userId }
+      ];
+    }
+
+    const assignments = await prisma.assignment.findMany({
+      where,
+      include: {
+        user: { select: { id: true, name: true, jobTitle: true, division: true } },
+        assignedBy: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(assignments);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data penugasan: ' + error.message });
+  }
+});
+
+// 2. Create Assignment (Two-way)
+app.post('/api/assignments', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const creatorId = (req as any).userId;
+    const role = (req as any).userRole;
+    const { userId, title, description, priority, dueDate } = req.body;
+
+    if (!title) return res.status(400).json({ error: 'Judul tugas wajib diisi' });
+
+    // Determine initial status
+    let status: any = 'IN_PROGRESS';
+    let targetUserId = userId ? Number(userId) : creatorId;
+
+    // If employee creates for themselves, it starts as PENDING for approval
+    if (role === 'EMPLOYEE') {
+      status = 'PENDING';
+      targetUserId = creatorId; // Force self-assignment if employee
+    }
+
+    const newAssignment = await prisma.assignment.create({
+      data: {
+        companyId: tenantId,
+        userId: targetUserId,
+        assignedById: creatorId,
+        title,
+        description,
+        priority: priority || 'MEDIUM',
+        dueDate: dueDate ? new Date(dueDate) : null,
+        status: status
+      },
+      include: { user: true }
+    });
+
+    // Notify user if assigned by someone else
+    if (targetUserId !== creatorId) {
+      await sendNotification(
+        tenantId, 
+        targetUserId, 
+        'Tugas Baru Di-assign', 
+        `Anda mendapatkan tugas baru: ${title}. Segera cek aplikasi!`
+      );
+    } else if (role === 'EMPLOYEE') {
+      // Notify Admin if employee proposes a task
+      await notifyAdmins(
+        tenantId,
+        'Pengajuan Tugas Baru',
+        `${newAssignment.user.name} mengajukan tugas baru: ${title}`
+      );
+    }
+
+    res.json(newAssignment);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal membuat penugasan: ' + error.message });
+  }
+});
+
+// 3. Update Assignment Status
+app.patch('/api/assignments/:id/status', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const role = (req as any).userRole;
+    const userId = (req as any).userId;
+    const { status } = req.body;
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: Number(req.params.id) }
+    });
+
+    if (!assignment || assignment.companyId !== tenantId) {
+      return res.status(404).json({ error: 'Tugas tidak ditemukan' });
+    }
+
+    // Permission check: only assignee or creator can update status
+    if (role === 'EMPLOYEE' && assignment.userId !== userId && assignment.assignedById !== userId) {
+      return res.status(403).json({ error: 'Bukan wewenang Anda' });
+    }
+
+    const updated = await prisma.assignment.update({
+      where: { id: assignment.id },
+      data: { status }
+    });
+
+    // Notify creator if completed by employee
+    if (status === 'COMPLETED' && assignment.assignedById !== userId) {
+       await sendNotification(
+         tenantId,
+         assignment.assignedById,
+         'Tugas Selesai',
+         `Tugas "${assignment.title}" telah diselesaikan oleh pelaksana.`
+       );
+    }
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal update status: ' + error.message });
+  }
+});
+
+// 4. Submit Result (with evidence)
+app.patch('/api/assignments/:id/result', tenantMiddleware, upload.single('photo'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId;
+    const { resultNote } = req.body;
+    
+    // Get file path if uploaded
+    let resultImageUrl = req.body.resultImageUrl;
+    if (req.file) {
+      resultImageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: Number(req.params.id) }
+    });
+
+    if (!assignment || assignment.companyId !== tenantId) {
+      return res.status(404).json({ error: 'Tugas tidak ditemukan' });
+    }
+
+    if (assignment.userId !== userId) {
+      return res.status(403).json({ error: 'Hanya pelaksana tugas yang bisa mengirim hasil' });
+    }
+
+    const updated = await prisma.assignment.update({
+      where: { id: assignment.id },
+      data: { 
+        resultNote, 
+        resultImageUrl,
+        status: 'COMPLETED' 
+      }
+    });
+
+    // Notify Admin/Manager that result is submitted
+    await sendNotification(
+      tenantId,
+      assignment.assignedById,
+      'Hasil Tugas Masuk',
+      `Hasil untuk tugas "${assignment.title}" telah dikirimkan.`
+    );
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error("SUBMIT RESULT ERROR:", error);
+    res.status(500).json({ error: 'Gagal mengirim hasil: ' + error.message });
+  }
+});
+
+// 5. Admin Approve/Verify Task (with KPI Integration)
+app.patch('/api/assignments/:id/approve', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const role = (req as any).userRole;
+    const { action } = req.body; // 'APPROVE', 'REJECT', or 'VERIFY'
+    
+    if (role === 'EMPLOYEE') return res.status(403).json({ error: 'Hanya Admin/Manager yang bisa menyetujui' });
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: Number(req.params.id) }
+    });
+
+    if (!assignment || assignment.companyId !== tenantId) {
+      return res.status(404).json({ error: 'Tugas tidak ditemukan' });
+    }
+
+    let newStatus: AssignmentStatus = assignment.status;
+    let kpiMessage = '';
+
+    if (action === 'APPROVE') {
+      newStatus = 'IN_PROGRESS';
+    } else if (action === 'REJECT') {
+      newStatus = 'REJECTED';
+    } else if (action === 'VERIFY') {
+      // Final Approval after completion -> Award KPI
+      newStatus = 'COMPLETED'; // Ensure it's marked as final
+      
+      // KPI Integration logic
+      // 1. Find or Create Indicator for "Penugasan Khusus"
+      let indicator = await prisma.kPIIndicator.findFirst({
+        where: { companyId: tenantId, name: 'Penugasan Khusus / RnD' }
+      });
+
+      if (!indicator) {
+        indicator = await prisma.kPIIndicator.create({
+          data: {
+            companyId: tenantId,
+            name: 'Penugasan Khusus / RnD',
+            description: 'Poin dari penyelesaian tugas mandiri atau delegasi khusus.',
+            weight: 1,
+            target: 100
+          }
+        });
+      }
+
+      // 2. Add Score
+      const now = new Date();
+      const score = assignment.priority === 'HIGH' ? 100 : (assignment.priority === 'MEDIUM' ? 85 : 70);
+      
+      await prisma.kPIScore.upsert({
+        where: {
+          userId_indicatorId_month_year: {
+            userId: assignment.userId,
+            indicatorId: indicator.id,
+            month: now.getMonth() + 1,
+            year: now.getFullYear()
+          }
+        },
+        update: {
+          score: { increment: score },
+          comment: `Penyelesaian tugas: ${assignment.title}`
+        },
+        create: {
+          companyId: tenantId,
+          userId: assignment.userId,
+          indicatorId: indicator.id,
+          score: score,
+          month: now.getMonth() + 1,
+          year: now.getFullYear(),
+          comment: `Penyelesaian tugas: ${assignment.title}`
+        }
+      });
+      kpiMessage = ` Poin KPI sebesar ${score} telah ditambahkan.`;
+    }
+
+    const updated = await prisma.assignment.update({
+      where: { id: assignment.id },
+      data: { status: newStatus }
+    });
+
+    await sendNotification(
+      tenantId,
+      assignment.userId,
+      `Tugas ${action === 'VERIFY' ? 'Selesai & Diverifikasi' : (action === 'APPROVE' ? 'Disetujui' : 'Ditolak')}`,
+      `Tugas "${assignment.title}" Anda telah ${action === 'VERIFY' ? 'diverifikasi admin.' : (action === 'APPROVE' ? 'disetujui dan bisa dimulai.' : 'ditolak.')}${kpiMessage}`
+    );
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error("APPROVE ERROR:", error);
+    res.status(500).json({ error: 'Gagal proses persetujuan: ' + error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
   console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);

@@ -5,7 +5,8 @@ class ApiService {
   // PENTING: Jika menggunakan HP asli, ganti 'localhost' dengan IP komputer Anda (cek pakai ipconfig)
   // Contoh: static const String baseUrl = 'http://192.168.1.15:5000/api';
   // Gunakan API Server Live yang sudah dideploy ke Railway
-  static const String baseUrl = 'https://api.aivola.id/api'; // V1 Live Production
+  static const String baseUrl = 'http://10.0.2.2:5000/api'; // Local Backend via Emulator
+  // static const String baseUrl = 'https://api.aivola.id/api'; // V1 Live Production
   // static const String baseUrl = 'http://localhost:5000/api'; // ADB Reverse (adb reverse tcp:5000 tcp:5000)
   // static const String baseUrl = 'http://192.168.1.157:5000/api'; // HP Fisik via WiFi (butuh router non-isolated)
   // static const String baseUrl = 'http://10.0.2.2:5000/api'; // Android Emulator saja
@@ -742,6 +743,60 @@ class ApiService {
       return response.data as Map<String, dynamic>;
     } catch (e) {
       throw Exception('Gagal melakukan closing kasir: $e');
+    }
+  }
+
+  // --- MODUL PENUGASAN (TASK ASSIGNMENT) ---
+
+  // Tarik daftar penugasan (Assignee/Karyawan)
+  Future<List<dynamic>> getAssignments() async {
+    try {
+      final response = await _dio.get('/assignments');
+      return response.data as List<dynamic>;
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar penugasan.');
+    }
+  }
+
+  // Buat penugasan baru (Pengajuan dari Karyawan)
+  Future<bool> createAssignment(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.post('/assignments', data: data);
+      return response.statusCode == 201 || response.statusCode == 200;
+    } catch (e) {
+      throw Exception('Gagal mengajukan penugasan.');
+    }
+  }
+
+  // Update status penugasan (Misal: Dari PENDING ke IN_PROGRESS)
+  Future<bool> updateAssignmentStatus(int id, String status) async {
+    try {
+      final response = await _dio.patch('/assignments/$id/status', data: {'status': status});
+      return response.statusCode == 200;
+    } catch (e) {
+      throw Exception('Gagal memperbarui status penugasan.');
+    }
+  }
+
+  // Submit hasil penugasan (Note + Foto)
+  Future<bool> submitAssignmentResult(int id, String note, {String? imagePath}) async {
+    try {
+      Map<String, dynamic> body = {
+        'resultNote': note,
+      };
+
+      if (imagePath != null) {
+        body['photo'] = await MultipartFile.fromFile(
+          imagePath,
+          filename: 'assignment_result_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+      }
+
+      final formData = FormData.fromMap(body);
+      final response = await _dio.patch('/assignments/$id/result', data: formData);
+      return response.statusCode == 200;
+    } catch (e) {
+      throw Exception('Gagal mengirim hasil penugasan.');
     }
   }
 }

@@ -263,13 +263,18 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                                 >
                                     <option value="Pcs">PIECES (PCS)</option>
-                                    <option value="Porsi">PORTION / DOSE</option>
-                                    <option value="Box">CARGO BOX</option>
+                                    <option value="Porsi">PORSI (PORTION)</option>
+                                    <option value="Box">BOX / DUS</option>
+                                    <option value="Carton">CARTON (KARTON)</option>
+                                    <option value="Pack">PACK / BUNGKUS</option>
                                     <option value="Kg">KILOGRAM (KG)</option>
                                     <option value="Gram">GRAM (G)</option>
                                     <option value="Liter">LITER (L)</option>
                                     <option value="ml">MILLILITER (ML)</option>
-                                    <option value="Pack">BUNDLE PACK</option>
+                                    <option value="Tabung">TABUNG</option>
+                                    <option value="Butir">BUTIR</option>
+                                    <option value="Karung">KARUNG</option>
+                                    <option value="Jerigen">JERIGEN</option>
                                 </select>
                             </div>
                             <div className="space-y-2">

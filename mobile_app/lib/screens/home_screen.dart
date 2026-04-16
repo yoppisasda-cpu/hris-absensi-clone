@@ -19,6 +19,7 @@ import 'kpi_screen.dart';
 import 'vent_screen.dart';
 import 'learning_center_screen.dart';
 import 'pos_screen.dart';
+import 'assignment_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -31,12 +32,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? _attendance;
   List<dynamic> _logs = [];
   List<dynamic> _announcements = [];
+  List<dynamic> _assignments = [];
 
   @override
   void initState() {
     super.initState();
     _checkStatus();
     _fetchAnnouncements();
+    _fetchAssignments();
   }
 
   // --- ANTI FRAUD (Phase 51) ---
@@ -75,6 +78,18 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       print('Announcements error: $e');
+    }
+  }
+
+  Future<void> _fetchAssignments() async {
+    try {
+      final data = await _apiService.getAssignments();
+      print('DEBUG: Berhasil ambil ${data.length} penugasan');
+      setState(() {
+        _assignments = data;
+      });
+    } catch (e) {
+      print('Assignments badge error: $e');
     }
   }
 
@@ -181,6 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       _checkStatus(); // Refresh status
+      _fetchAssignments(); // Refresh badges
     } catch (e) {
       final String msg = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -245,6 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
         _checkStatus(); // Refresh status
+        _fetchAssignments(); // Refresh badges
       }
     } catch (e) {
       final String msg = e.toString().replaceFirst('Exception: ', '');
@@ -273,7 +290,11 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(Icons.notifications_outlined, color: Colors.blue[800]),
+            icon: Badge(
+              label: Text(_assignments.where((a) => a['status'] == 'IN_PROGRESS').length.toString()),
+              isLabelVisible: _assignments.where((a) => a['status'] == 'IN_PROGRESS').isNotEmpty,
+              child: Icon(Icons.notifications_outlined, color: Colors.blue[800]),
+            ),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => NotificationInboxScreen()),
@@ -285,10 +306,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await Future.wait([
+            _checkStatus(),
+            _fetchAnnouncements(),
+            _fetchAssignments(),
+          ]);
+        },
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               GestureDetector(
@@ -539,16 +569,30 @@ class _HomeScreenState extends State<HomeScreen> {
                       MaterialPageRoute(builder: (_) => VentScreen()),
                     ),
                   ),
-                  _buildMenuCard(
-                    context,
-                    title: 'Learning Center',
-                    icon: Icons.school,
-                    color: Colors.indigo,
-                    onTap: () => Navigator.push(
+                    _buildMenuCard(
                       context,
-                      MaterialPageRoute(builder: (_) => LearningCenterScreen()),
+                      title: 'Learning Center',
+                      icon: Icons.school,
+                      color: Colors.indigo,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => LearningCenterScreen()),
+                      ),
                     ),
-                  ),
+                    _buildMenuCard(
+                      context,
+                      title: 'Penugasan',
+                      icon: Icons.assignment,
+                      color: Colors.teal,
+                      badgeCount: _assignments.where((a) => a['status'] == 'IN_PROGRESS').length,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => AssignmentListScreen()),
+                        );
+                        _fetchAssignments(); // Refresh when back
+                      },
+                    ),
                 ],
               ),
 
@@ -727,8 +771,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMenuCard(
     BuildContext context, {
@@ -736,6 +781,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    int badgeCount = 0,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -755,7 +801,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 28),
+            Badge(
+              label: Text(badgeCount.toString()),
+              isLabelVisible: badgeCount > 0,
+              child: Icon(icon, color: color, size: 28),
+            ),
             SizedBox(height: 8),
             Text(
               title,
