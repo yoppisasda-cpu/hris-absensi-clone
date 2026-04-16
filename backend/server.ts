@@ -4878,10 +4878,11 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
 
     if (req.file) {
       try {
-        const fullLocalPath = path.join(__dirname, 'uploads/reimbursements', req.file.filename);
+        // req.file.path sudah berisi path absolut yang benar dari multer
+        const fullLocalPath = path.join(process.cwd(), req.file.path);
         receiptUrl = await uploadToSupabase(fullLocalPath, 'reimbursements');
       } catch (uploadError) {
-        console.error('Failed to upload reimbursement to R2:', uploadError);
+        console.error('Failed to upload reimbursement to Supabase:', uploadError);
       }
     }
 
@@ -4889,23 +4890,27 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
       return res.status(400).json({ error: 'Judul dan nominal klaim wajib diisi.' });
     }
 
-    const fullPath = req.file ? path.join(__dirname, 'uploads/reimbursements', req.file.filename) : null;
+    // Gunakan req.file.path (path absolut dari multer) agar tidak salah di Railway
+    const fullPath = req.file ? path.join(process.cwd(), req.file.path) : null;
 
     let ocrResult = { amount: null, date: null, category: null };
     let fraudCheck = { isFraud: false, reason: null, receiptHash: null };
 
     if (fullPath) {
-      console.log(`[AI] Processing receipt: ${fullPath}`);
-      const { performOCR, detectFraud } = require('./reimbursementAI');
-      
-      ocrResult = await performOCR(fullPath);
-      fraudCheck = await detectFraud(
-          tenantId, 
-          userId, 
-          fullPath, 
-          parseFloat(amount), 
-          ocrResult.amount
-      );
+      try {
+        console.log(`[AI] Processing receipt: ${fullPath}`);
+        const { performOCR, detectFraud } = require('./reimbursementAI');
+        ocrResult = await performOCR(fullPath);
+        fraudCheck = await detectFraud(
+            tenantId,
+            userId,
+            fullPath,
+            parseFloat(amount),
+            ocrResult.amount
+        );
+      } catch (aiError) {
+        console.error('[AI] Reimbursement AI processing failed, continuing without AI data:', aiError);
+      }
     }
 
     const reimbursement = await prisma.reimbursement.create({
