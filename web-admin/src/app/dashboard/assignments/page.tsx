@@ -87,7 +87,7 @@ export default function AssignmentsPage() {
         }
     };
 
-    const handleApprove = async (id: number, action: 'APPROVE' | 'REJECT') => {
+    const handleApprove = async (id: number, action: 'APPROVE' | 'REJECT' | 'VERIFY') => {
         try {
             await api.patch(`/assignments/${id}/approve`, { action });
             fetchData();
