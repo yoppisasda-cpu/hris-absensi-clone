@@ -92,6 +92,34 @@ export default function ReimbursementsPage() {
         });
     };
 
+    const getFullImageUrl = (path: string | null) => {
+        if (!path) return '';
+        if (path.startsWith('http')) return path; // already a full URL (Supabase)
+        let backendBase = api.defaults.baseURL || 'https://api.aivola.id/api';
+        if (backendBase.endsWith('/api')) backendBase = backendBase.slice(0, -4);
+        if (!backendBase) backendBase = 'https://api.aivola.id';
+        const cleanPath = path.startsWith('/') ? path : `/${path}`;
+        return `${backendBase}${cleanPath}`;
+    };
+
+    const handleDownload = async (url: string) => {
+        try {
+            const fullUrl = getFullImageUrl(url);
+            const response = await fetch(fullUrl);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = 'kuitansi-' + Date.now() + '.jpg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+        } catch (e) {
+            alert('Gagal mengunduh gambar.');
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -256,17 +284,16 @@ export default function ReimbursementsPage() {
                                 </button>
                             </div>
                             <div className="p-4 overflow-auto flex justify-center bg-slate-100">
-                                <img src={selectedImage} alt="Receipt" className="max-w-full h-auto rounded shadow-lg" />
+                                <img src={getFullImageUrl(selectedImage)} alt="Receipt" className="max-w-full h-auto rounded shadow-lg" />
                             </div>
                             <div className="p-4 border-t text-right">
-                                <a
-                                    href={selectedImage}
-                                    download
+                                <button
+                                    onClick={() => handleDownload(selectedImage!)}
                                     className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                                 >
                                     <Download className="h-4 w-4" />
                                     Download Gambar
-                                </a>
+                                </button>
                             </div>
                         </div>
                     </div>
