@@ -5,8 +5,8 @@ class ApiService {
   // PENTING: Jika menggunakan HP asli, ganti 'localhost' dengan IP komputer Anda (cek pakai ipconfig)
   // Contoh: static const String baseUrl = 'http://192.168.1.15:5000/api';
   // Gunakan API Server Live yang sudah dideploy ke Railway
-  static const String baseUrl = 'http://10.0.2.2:5000/api'; // Local Backend via Emulator
-  // static const String baseUrl = 'https://api.aivola.id/api'; // V1 Live Production
+  // static const String baseUrl = 'http://10.0.2.2:5000/api'; // Local Backend via Emulator
+  static const String baseUrl = 'https://api.aivola.id/api'; // V1 Live Production
   // static const String baseUrl = 'http://localhost:5000/api'; // ADB Reverse (adb reverse tcp:5000 tcp:5000)
   // static const String baseUrl = 'http://192.168.1.157:5000/api'; // HP Fisik via WiFi (butuh router non-isolated)
   // static const String baseUrl = 'http://10.0.2.2:5000/api'; // Android Emulator saja

@@ -66,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('Status error: $e');
     } finally {
-      setState(() => _isLoading = true);
+      setState(() => _isLoading = false);
     }
   }
 
@@ -126,7 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // 2. Cegat Posisi Koordinat Asli HP
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
 
       // --- ANTI FAKEMAP (Phase 51) ---
@@ -220,7 +221,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // 2. Cegat Posisi Koordinat Asli HP
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
 
       // --- ANTI FAKEMAP (Phase 51) ---

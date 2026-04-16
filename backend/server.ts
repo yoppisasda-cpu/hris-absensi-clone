@@ -3048,7 +3048,7 @@ app.patch('/api/users/:id/face-reference', tenantMiddleware, uploadFaceReference
   }
 });
 
-// C1.1. Admin melihat semua daftar absensi (Terbaru)
+// C1.1. Admin melihat semua daftar absensi (Filter per tanggal)
 app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
@@ -3056,14 +3056,28 @@ app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response)
 
     // SECURITY: POS_VIEWER cannot see attendance logs
     if (userRole === 'POS_VIEWER') {
-       return res.json([]); // Return empty list instead of 403 to avoid UI crashes on dashboard
+       return res.json([]);
     }
 
+    // Filter by date: ?date=2026-04-17 (default: hari ini)
+    const dateParam = req.query.date as string | undefined;
+    const targetDate = dateParam ? new Date(dateParam) : new Date();
+    targetDate.setHours(0, 0, 0, 0);
+    const nextDay = new Date(targetDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const baseWhere = userRole === 'SUPERADMIN' ? {} : { companyId: tenantId };
+
     const attendances = await prisma.attendance.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: {
+        ...baseWhere,
+        clockIn: {
+          gte: targetDate,
+          lt: nextDay,
+        },
+      },
       include: { user: { select: { name: true, email: true } } },
       orderBy: { clockIn: 'desc' },
-      take: 50 // Limit 50 terbaru
     });
     res.json(attendances);
   } catch (error) {

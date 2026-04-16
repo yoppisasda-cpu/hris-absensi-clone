@@ -38,11 +38,12 @@ export default function AttendancePage() {
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPhoto, setSelectedPhoto] = useState<{ url: string, title: string } | null>(null);
+    const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
-    const fetchAttendances = async () => {
+    const fetchAttendances = async (date: string) => {
         try {
             setIsLoading(true);
-            const response = await api.get('/attendance');
+            const response = await api.get(`/attendance?date=${date}`);
             setAttendances(response.data);
         } catch (err) {
             setError('Gagal mengambil data absensi.');
@@ -53,8 +54,8 @@ export default function AttendancePage() {
     };
 
     useEffect(() => {
-        fetchAttendances();
-    }, []);
+        fetchAttendances(selectedDate);
+    }, [selectedDate]);
 
     const handleExportExcel = () => {
         if (attendances.length === 0) return;
@@ -141,6 +142,37 @@ export default function AttendancePage() {
                     <p className="text-sm text-slate-400 mt-1">Rekapitulasi log kehadiran karyawan (GPS & Wajah).</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    {/* Date Picker dengan navigasi hari */}
+                    <div className="flex items-center gap-1 bg-slate-900/50 border border-slate-700 rounded-lg px-2 py-1.5">
+                        <button
+                            onClick={() => {
+                                const d = new Date(selectedDate);
+                                d.setDate(d.getDate() - 1);
+                                setSelectedDate(d.toISOString().split('T')[0]);
+                            }}
+                            className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition text-lg font-bold"
+                            title="Hari Sebelumnya"
+                        >‹</button>
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="bg-transparent text-white text-sm font-medium focus:outline-none px-1 cursor-pointer"
+                        />
+                        <button
+                            onClick={() => {
+                                const d = new Date(selectedDate);
+                                d.setDate(d.getDate() + 1);
+                                setSelectedDate(d.toISOString().split('T')[0]);
+                            }}
+                            className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition text-lg font-bold"
+                            title="Hari Berikutnya"
+                        >›</button>
+                        <button
+                            onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                            className="ml-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition px-2 py-1 rounded-lg hover:bg-indigo-500/10"
+                        >Hari ini</button>
+                    </div>
                     <div className="relative flex-grow">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                         <input
