@@ -754,7 +754,8 @@ export default function EmployeesPage() {
                                         <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-sm text-indigo-400 font-black italic uppercase tracking-tighter outline-none cursor-pointer">
                                             <option value="OWNER">Owner (Pemilik)</option>
                                             <option value="ADMIN">Administrator HR</option>
-                                            <option value="MANAGER">Manager / Supervisor</option>
+                                            <option value="MANAGER">Manager</option>
+                                            <option value="SUPERVISOR">Supervisor</option>
                                             <option value="FINANCE">Finance (Keuangan)</option>
                                             <option value="PURCHASING">Purchasing (Pembelian)</option>
                                             <option value="OPERATIONAL">Operational (Gudang/Toko)</option>
@@ -768,7 +769,7 @@ export default function EmployeesPage() {
                                         <select value={formData.reportToId} onChange={e => setFormData({ ...formData, reportToId: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white outline-none cursor-pointer">
                                             <option value="">-- Lapor ke Admin --</option>
                                             {users
-                                                .filter(u => u.id !== formData.id && (u.role === 'ADMIN' || u.role === 'MANAGER' || u.role === 'OWNER'))
+                                                .filter(u => u.id !== formData.id && (u.role === 'ADMIN' || u.role === 'MANAGER' || u.role === 'OWNER' || u.role === 'SUPERVISOR'))
                                                 .map(u => (
                                                     <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                                 ))}

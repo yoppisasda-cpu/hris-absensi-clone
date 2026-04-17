@@ -9,6 +9,7 @@ import 'leave_history_screen.dart';
 import 'reimbursement_history_screen.dart';
 import 'overtime_history_screen.dart';
 import 'announcement_detail_screen.dart';
+import 'approval_list_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -33,6 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _logs = [];
   List<dynamic> _announcements = [];
   List<dynamic> _assignments = [];
+  List<dynamic> _notifications = [];
+  int _pendingCount = 0;
 
   @override
   void initState() {
@@ -40,6 +43,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _checkStatus();
     _fetchAnnouncements();
     _fetchAssignments();
+    _fetchNotifications();
+    _fetchPendingCount();
   }
 
   // --- ANTI FRAUD (Phase 51) ---
@@ -84,12 +89,38 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchAssignments() async {
     try {
       final data = await _apiService.getAssignments();
-      print('DEBUG: Berhasil ambil ${data.length} penugasan');
       setState(() {
         _assignments = data;
       });
     } catch (e) {
       print('Assignments badge error: $e');
+    }
+  }
+
+  Future<void> _fetchNotifications() async {
+    try {
+      final data = await _apiService.getNotifications();
+      setState(() {
+        _notifications = data;
+      });
+    } catch (e) {
+      print('Notifications error: $e');
+    }
+  }
+
+  Future<void> _fetchPendingCount() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (auth.userRole == 'ADMIN' || auth.userRole == 'OWNER' || auth.userRole == 'SUPERADMIN' || auth.userRole == 'SUPERVISOR' || auth.userRole == 'MANAGER') {
+      try {
+        final data = await _apiService.getPendingApprovals();
+        final leaves = data['leaves'] as List? ?? [];
+        final overtimes = data['overtimes'] as List? ?? [];
+        setState(() {
+          _pendingCount = leaves.length + overtimes.length;
+        });
+      } catch (e) {
+        print('Pending count error: $e');
+      }
     }
   }
 
@@ -293,8 +324,8 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: Badge(
-              label: Text(_assignments.where((a) => a['status'] == 'IN_PROGRESS').length.toString()),
-              isLabelVisible: _assignments.where((a) => a['status'] == 'IN_PROGRESS').isNotEmpty,
+              label: Text(_notifications.where((n) => n['isRead'] == false).length.toString()),
+              isLabelVisible: _notifications.where((n) => n['isRead'] == false).isNotEmpty,
               child: Icon(Icons.notifications_outlined, color: Colors.blue[800]),
             ),
             onPressed: () => Navigator.push(
@@ -314,6 +345,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _checkStatus(),
             _fetchAnnouncements(),
             _fetchAssignments(),
+            _fetchNotifications(),
+            _fetchPendingCount(),
           ]);
         },
         child: SingleChildScrollView(
@@ -580,6 +613,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         context,
                         MaterialPageRoute(builder: (_) => LearningCenterScreen()),
                       ),
+                    ),
+                  if (auth.userRole == 'ADMIN' || auth.userRole == 'OWNER' || auth.userRole == 'SUPERADMIN' || auth.userRole == 'SUPERVISOR' || auth.userRole == 'MANAGER')
+                    _buildMenuCard(
+                      context,
+                      title: 'Persetujuan',
+                      icon: Icons.assignment_turned_in,
+                      color: Colors.blueAccent,
+                      badgeCount: _pendingCount,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ApprovalListScreen()),
+                        );
+                        _fetchPendingCount(); // Refresh when back
+                      },
                     ),
                     _buildMenuCard(
                       context,

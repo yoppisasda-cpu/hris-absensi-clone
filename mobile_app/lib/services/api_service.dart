@@ -6,7 +6,7 @@ class ApiService {
   // Contoh: static const String baseUrl = 'http://192.168.1.15:5000/api';
   // Gunakan API Server Live yang sudah dideploy ke Railway
   // static const String baseUrl = 'http://10.0.2.2:5000/api'; // Local Backend via Emulator
-  static const String baseUrl = 'https://api.aivola.id/api'; // V1 Live Production
+  static const String baseUrl = 'http://10.0.2.2:5000/api'; // LOCAL TESTING - EMULATOR
   // static const String baseUrl = 'http://localhost:5000/api'; // ADB Reverse (adb reverse tcp:5000 tcp:5000)
   // static const String baseUrl = 'http://192.168.1.157:5000/api'; // HP Fisik via WiFi (butuh router non-isolated)
   // static const String baseUrl = 'http://10.0.2.2:5000/api'; // Android Emulator saja
@@ -228,7 +228,7 @@ class ApiService {
 
       final response = await _dio.post('/reimbursements', data: formData);
 
-      return response.statusCode == 201;
+      return response.statusCode == 200 || response.statusCode == 201;
     } on DioException catch (e) {
       if (e.response != null && e.response?.data['error'] != null) {
         throw Exception(e.response?.data['error']);
@@ -797,6 +797,36 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       throw Exception('Gagal mengirim hasil penugasan.');
+    }
+  }
+
+  // --- MODUL PERSETUJUAN (SUPERVISOR/ADMIN) ---
+  
+  // Ambil daftar pengajuan yang perlu disetujui (Phase SUPERVISOR)
+  Future<Map<String, dynamic>> getPendingApprovals() async {
+    try {
+      final response = await _dio.get('/approvals/pending');
+      return response.data;
+    } catch (e) {
+      throw Exception('Gagal memuat daftar persetujuan: $e');
+    }
+  }
+
+  // Update Status Cuti
+  Future<void> updateLeaveStatus(int id, String status) async {
+    try {
+      await _dio.patch('/leaves/$id', data: {'status': status});
+    } catch (e) {
+      throw Exception('Gagal memproses persetujuan cuti: $e');
+    }
+  }
+
+  // Update Status Lembur
+  Future<void> updateOvertimeStatus(int id, String status) async {
+    try {
+      await _dio.patch('/overtimes/$id', data: {'status': status});
+    } catch (e) {
+      throw Exception('Gagal memproses persetujuan lembur: $e');
     }
   }
 }

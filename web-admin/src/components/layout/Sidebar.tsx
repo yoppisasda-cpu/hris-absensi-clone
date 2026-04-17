@@ -393,14 +393,6 @@ export default function Sidebar() {
                             <Banknote className="h-5 w-5" />
                             Bonus & THR
                         </Link>
-                        <Link href="/dashboard/reimbursements" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Receipt className="h-5 w-5" />
-                            Reimbursement
-                        </Link>
-                        <Link href="/dashboard/loans" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <CreditCard className="h-5 w-5" />
-                            Pinjaman
-                        </Link>
                         <Link href="/dashboard/assets" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <Laptop className="h-5 w-5" />
                             Aset Perusahaan
@@ -461,13 +453,23 @@ export default function Sidebar() {
                             Kas & Bank
                         </Link>
                         <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Laporan Keuangan</div>
+                        <Link href="/dashboard/finance/profit-loss" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <BarChart3 className="h-5 w-5" />
+                            Laba Rugi
+                        </Link>
+
+                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Keuangan Karyawan</div>
                         <Link href="/dashboard/payroll" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <Banknote className="h-5 w-5 text-emerald-400" />
                             Manajemen Gaji (Payroll)
                         </Link>
-                        <Link href="/dashboard/finance/profit-loss" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <BarChart3 className="h-5 w-5" />
-                            Laba Rugi
+                        <Link href="/dashboard/reimbursements" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <Receipt className="h-5 w-5 text-amber-400" />
+                            Reimbursement (Klaim)
+                        </Link>
+                        <Link href="/dashboard/loans" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <CreditCard className="h-5 w-5 text-indigo-400" />
+                            Pinjaman & Kasbon
                         </Link>
                         <Link href="/dashboard/finance/balance-sheet" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <PieChart className="h-5 w-5" />

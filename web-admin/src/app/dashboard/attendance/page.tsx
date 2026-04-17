@@ -105,31 +105,22 @@ export default function AttendancePage() {
     };
 
     const getFullImageUrl = (path: string | null) => {
-        try {
-            if (!path) return '';
-            if (typeof path !== 'string') return '';
-            
-            // If already a full cloud URL (Supabase/S3), return as is
-            if (path.startsWith('http')) return path;
-            
-            // If a relative path, resolve it against the backend baseURL
-            // Remove /api from the end of baseURL if present to get the static files root
-            let backendBase = api.defaults.baseURL || '';
-            if (backendBase.endsWith('/api')) {
-                backendBase = backendBase.substring(0, backendBase.length - 4);
-            }
-            
-            // Fallback for production if baseURL is just a relative path
-            if (!backendBase || backendBase === '/api') {
-                backendBase = 'https://api.aivola.id';
-            }
-            
-            const cleanPath = path.startsWith('/') ? path : `/${path}`;
-            return `${backendBase}${cleanPath}`;
-        } catch (err) {
-            console.error("Error resolving image URL:", err);
-            return '';
+        if (!path) return '';
+        if (path.startsWith('http')) return path; // already a full URL (Supabase)
+        
+        // Handle potential absolute paths saved in DB by mistake
+        let cleanPath = path;
+        const uploadsMatch = path.match(/uploads[\\/].*/i);
+        if (uploadsMatch) {
+            cleanPath = '/' + uploadsMatch[0].replace(/\\/g, '/');
         }
+
+        let backendBase = api.defaults.baseURL || 'https://api.aivola.id/api';
+        if (backendBase.endsWith('/api')) backendBase = backendBase.slice(0, -4);
+        if (!backendBase) backendBase = 'https://api.aivola.id';
+        
+        const finalPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+        return `${backendBase}${finalPath}`;
     };
 
     return (

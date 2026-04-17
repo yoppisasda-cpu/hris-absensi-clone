@@ -32,6 +32,11 @@ const VERSION = 'v1.0.6-final-live';
 // Helper for cleaning up local files after Supabase upload (Phase Cloud)
 const cleanupLocalFile = (filePath: string | null) => {
   if (!filePath) return;
+  // Jangan hapus file jika sedang berjalan di localhost agar bisa dites
+  if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
+    console.log(`[Cloud Cleanup] Dev mode: Skipping local file deletion for ${path.basename(filePath)}`);
+    return;
+  }
   try {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
@@ -50,7 +55,8 @@ const prisma = new PrismaClient();
 const requiredFolders = [
   path.join(process.cwd(), 'uploads'),
   path.join(process.cwd(), 'uploads/attendance'),
-  path.join(process.cwd(), 'uploads/face_references')
+  path.join(process.cwd(), 'uploads/face_references'),
+  path.join(process.cwd(), 'uploads/reimbursements')
 ];
 
 requiredFolders.forEach(folder => {
@@ -80,6 +86,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_hris_key_123';
 
 app.use(cors());
 app.use(express.json());
+
+// Logger middleware to see incoming requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+const uploadsDir = path.resolve(process.cwd(), 'uploads');
+console.log(`[BOOT] Serving static files from: ${uploadsDir}`);
+app.use('/uploads', express.static(uploadsDir));
 
 
 app.get('/api/health', (req, res) => {
@@ -3461,9 +3477,22 @@ app.post('/api/leaves', tenantMiddleware, async (req: Request, res: Response) =>
       }
     });
 
-    // TRIGGER NOTIFIKASI KE ADMIN
+    // TRIGGER NOTIFIKASI KE ADMIN & SUPERVISOR
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
-    await notifyAdmins(tenantId, 'Pengajuan Cuti Baru', `${targetUser?.name || 'Seorang karyawan'} mengajukan cuti baru.`);
+    const requesterName = targetUser?.name || 'Seorang karyawan';
+    
+    // Notif ke Admin
+    await notifyAdmins(tenantId, 'Pengajuan Cuti Baru', `${requesterName} mengajukan cuti baru.`);
+    
+    // Notif ke Supervisor (Approver)
+    if (leaveRequest.approverId) {
+      await sendNotification(
+        tenantId,
+        leaveRequest.approverId,
+        'Persetujuan Cuti Baru',
+        `${requesterName} mengajukan cuti baru. Silakan tinjau di menu Persetujuan.`
+      );
+    }
 
     res.json({ message: 'Pengajuan cuti berhasil dikirim', leaveRequest });
   } catch (error) {
@@ -3603,6 +3632,51 @@ app.get('/api/leaves', tenantMiddleware, async (req: Request, res: Response) => 
   }
 });
 
+// E2.2. Get Pending Approvals (Leaves & Overtimes) - Phase SUPERVISOR
+app.get('/api/approvals/pending', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId;
+    const userRole = (req as any).userRole;
+
+    const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER'].includes(userRole);
+
+    // Fetch Pending Leaves
+    const leaves = await prisma.leaveRequest.findMany({
+      where: {
+        companyId: tenantId,
+        status: 'PENDING',
+        ...(isAdmin ? {} : { approverId: userId })
+      },
+      include: {
+        user: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Fetch Pending Overtimes
+    const overtimes = await (prisma.overtimeRequest as any).findMany({
+      where: {
+        companyId: tenantId,
+        status: 'PENDING',
+        ...(isAdmin ? {} : { approverId: userId })
+      },
+      include: {
+        user: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      leaves,
+      overtimes
+    });
+  } catch (error: any) {
+    console.error('Pending Approvals Error:', error);
+    res.status(500).json({ error: 'Gagal mengambil data persetujuan.' });
+  }
+});
+
 // E3. Admin memberikan persetujuan atau penolakan cuti
 app.patch('/api/leaves/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -3620,6 +3694,16 @@ app.patch('/api/leaves/:id', tenantMiddleware, async (req: Request, res: Respons
     });
 
     if (!leave) return res.status(404).json({ error: 'Data cuti tidak ditemukan' });
+
+    // --- CHECK AUTHORIZATION ---
+    const userRole = (req as any).userRole;
+    const currentUserId = (req as any).userId;
+
+    const isAuthorized = ['SUPERADMIN', 'ADMIN', 'OWNER'].includes(userRole) || leave.approverId === currentUserId;
+    
+    if (!isAuthorized) {
+        return res.status(403).json({ error: 'Anda tidak memiliki wewenang untuk menyetujui cuti ini.' });
+    }
 
     const updatedLeave = await prisma.leaveRequest.update({
       where: { id: leaveId },
@@ -4751,37 +4835,89 @@ app.get('/api/my-payroll', tenantMiddleware, async (req: Request, res: Response)
 // 4. Admin menandai reimbursement sebagai DIBAYAR (Phase 35)
 app.patch('/api/reimbursements/:id/pay', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).tenantId;
+    const tenantId = Number((req as any).tenantId);
+    const userRole = (req as any).userRole;
     const { id } = req.params;
+    const { accountId, categoryId } = req.body;
 
-    const reimbursement = await (prisma.reimbursement as any).findFirst({
-        where: { id: parseInt(id as string), companyId: tenantId as any }
+    const reimbursement = await prisma.reimbursement.findUnique({
+        where: { id: parseInt(id as string) }
     });
 
-    if (!reimbursement) return res.status(404).json({ error: 'Data tidak ditemukan' });
+    if (!reimbursement) {
+        return res.status(404).json({ error: `Data reimbursement ID ${id} tidak ditemukan.` });
+    }
+
+    if (userRole !== 'SUPERADMIN' && reimbursement.companyId !== tenantId) {
+        return res.status(403).json({ error: 'Anda tidak memiliki akses ke data ini.' });
+    }
+
     if (reimbursement.status !== 'APPROVED') {
         return res.status(400).json({ error: 'Hanya reimbursement yang sudah DISETUJUI yang bisa dibayar.' });
     }
 
-    const updated = await (prisma.reimbursement as any).update({
-      where: { id: parseInt(id as string) },
-      data: {
-        isPaid: true,
-        paidAt: new Date()
-      }
+    if (reimbursement.isPaid) {
+        return res.status(400).json({ error: 'Reimbursement ini sudah pernah dibayar.' });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+        // 1. Mark status as Paid
+        const r = await tx.reimbursement.update({
+            where: { id: parseInt(id as string) },
+            data: {
+                isPaid: true,
+                paidAt: new Date()
+            }
+        });
+
+        // 2. Create Finance Entry (if requested)
+        if (accountId && categoryId) {
+            // Check Account
+            const accIdNum = parseInt(accountId.toString());
+            const catIdNum = parseInt(categoryId.toString());
+
+            const account = await tx.financialAccount.findUnique({ where: { id: accIdNum } });
+            if (!account || account.companyId !== tenantId) throw new Error('Akun Kas/Bank tidak valid atau bukan milik perusahaan ini.');
+
+            // Create Expense
+            // Using $queryRaw for reliability with enums across various Prisma versions
+            await tx.$executeRawUnsafe(
+              `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "amount", "date", "status", "description", "paidTo", "updatedAt")
+               VALUES ($1, $2, $3, $4, NOW(), 'PAID', $5, $6, NOW())`,
+              tenantId,
+              accIdNum,
+              catIdNum,
+              reimbursement.amount,
+              `Pembayaran Reimbursement: ${reimbursement.title}`,
+              `User ID: ${reimbursement.userId}`
+            );
+
+            // Update Account Balance
+            await tx.financialAccount.update({
+                where: { id: accIdNum },
+                data: { balance: { decrement: reimbursement.amount } }
+            });
+        }
+
+        return r;
     });
 
     // Notifikasi ke karyawan
-    await sendNotification(
-      tenantId,
-      updated.userId,
-      `Reimbursement Dibayar`,
-      `Dana untuk klaim "${updated.title}" sebesar Rp${updated.amount} telah dibayarkan/ditransfer.`
-    );
+    try {
+        await sendNotification(
+            tenantId,
+            updated.userId,
+            `Reimbursement Dibayar`,
+            `Dana untuk klaim "${updated.title}" sebesar Rp${updated.amount.toLocaleString('id-ID')} telah dibayarkan ${accountId ? 'via Kas/Bank' : ''}.`
+        );
+    } catch (notifErr) {
+        console.error('[PAY_NOTIF] Failed:', notifErr);
+    }
 
     res.json(updated);
-  } catch (error) {
-    res.status(500).json({ error: 'Gagal memproses pembayaran reimbursement.' });
+  } catch (error: any) {
+    console.error('[REIMBURSE_PAY] Error:', error?.message || error);
+    res.status(500).json({ error: 'Gagal memproses pembayaran reimbursement. ' + (error?.message || '') });
   }
 });
 
@@ -4947,7 +5083,7 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
       console.error('[REIMBURSE] Notifikasi gagal (non-fatal):', notifError);
     }
 
-    res.json({ message: 'Reimbursement berhasil diajukan', reimbursement });
+    res.status(201).json({ message: 'Reimbursement berhasil diajukan', reimbursement });
   } catch (error: any) {
     console.error('[REIMBURSE] FATAL ERROR:', error?.message, error?.stack);
     res.status(500).json({ error: 'Gagal mengajukan klaim reimbursement.' });
@@ -5005,16 +5141,25 @@ app.patch('/api/reimbursements/:id', tenantMiddleware, async (req: Request, res:
     const { id } = req.params;
     const { status } = req.body;
     const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
 
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
-      return res.status(400).json({ error: 'Status tidak valid.' });
+    const whereClause: any = { id: parseInt(id as string) };
+    if (userRole !== 'SUPERADMIN') {
+      whereClause.companyId = tenantId;
+    }
+
+    // First check if exists
+    const check = await prisma.reimbursement.findUnique({ where: { id: parseInt(id as string) } });
+    if (!check) {
+       return res.status(404).json({ error: `Reimbursement ID ${id} tidak ditemukan.` });
+    }
+    
+    if (userRole !== 'SUPERADMIN' && check.companyId !== tenantId) {
+       return res.status(403).json({ error: `Anda tidak diizinkan mengubah data perusahaan lain. (Record: ${check.companyId}, Your: ${tenantId})` });
     }
 
     const reimbursement = await prisma.reimbursement.update({
-      where: {
-        id: parseInt(id as string),
-        companyId: tenantId
-      },
+      where: { id: parseInt(id as string) },
       data: { status }
     });
 
@@ -5027,8 +5172,9 @@ app.patch('/api/reimbursements/:id', tenantMiddleware, async (req: Request, res:
     );
 
     res.json(reimbursement);
-  } catch (error) {
-    res.status(500).json({ error: 'Gagal memperbarui status reimbursement.' });
+  } catch (error: any) {
+    console.error('[REIMBURSE_UPDATE] Error:', error?.message || error);
+    res.status(500).json({ error: 'Gagal memperbarui status reimbursement. ' + (error?.message || '') });
   }
 });
 
@@ -5825,6 +5971,23 @@ app.post('/api/overtimes', tenantMiddleware, async (req: Request, res: Response)
       }
     });
 
+    // TRIGGER NOTIFIKASI KE ADMIN & SUPERVISOR
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    const requesterName = targetUser?.name || 'Seorang karyawan';
+
+    // Notif ke Admin
+    await notifyAdmins(tenantId, 'Pengajuan Lembur Baru', `${requesterName} mengajukan lembur baru.`);
+
+    // Notif ke Supervisor (Approver)
+    if (request.approverId) {
+      await sendNotification(
+        tenantId,
+        request.approverId,
+        'Persetujuan Lembur Baru',
+        `${requesterName} mengajukan lembur baru. Silakan tinjau di menu Persetujuan.`
+      );
+    }
+
     res.json({ message: 'Ajuan lembur berhasil dibuat', request });
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengajukan lembur.' });
@@ -5852,7 +6015,7 @@ app.patch('/api/overtimes/:id', tenantMiddleware, async (req: Request, res: Resp
       return res.status(404).json({ error: 'Data lembur tidak ditemukan.' });
     }
 
-    if (userRole !== 'SUPERADMIN' && userRole !== 'ADMIN' && target.approverId !== userId) {
+    if (userRole !== 'SUPERADMIN' && userRole !== 'ADMIN' && userRole !== 'OWNER' && target.approverId !== userId) {
       return res.status(403).json({ error: 'Anda tidak memiliki wewenang untuk menyetujui lembur ini.' });
     }
 
@@ -7573,19 +7736,31 @@ app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Res
 app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const { name, type, balance, branchId } = req.body;
+    const tenantId = Number((req as any).tenantId);
+
+    if (!name || !type) {
+      return res.status(400).json({ error: 'Nama akun dan tipe akun wajib diisi.' });
+    }
+
+    if (isNaN(tenantId)) {
+       return res.status(401).json({ error: 'Sesi tidak valid. Silakan login ulang.' });
+    }
+
     const account = await prisma.financialAccount.create({
       data: {
-        companyId: (req as any).tenantId,
-        branchId: branchId ? parseInt(branchId) : null,
-        name,
-        type,
-        balance: parseFloat(balance) || 0
+        companyId: tenantId,
+        branchId: branchId ? parseInt(branchId.toString()) : null,
+        name: name.toString(),
+        type: type.toString(),
+        balance: balance ? parseFloat(balance.toString()) : 0
       }
     });
+
     res.status(201).json(account);
   } catch (error: any) {
-    console.error('[Account Creation Error]:', error);
-    res.status(500).json({ error: 'Gagal membuat akun keuangan: ' + error.message });
+    console.error('[Account Creation Error] Data:', req.body);
+    console.error('[Account Creation Error] Error:', error);
+    res.status(500).json({ error: 'Gagal membuat akun keuangan: ' + (error.message || 'Kesalahan Server') });
   }
 });
 

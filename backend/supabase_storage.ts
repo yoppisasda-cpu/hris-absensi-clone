@@ -24,9 +24,12 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
  * @returns Public URL of the uploaded file
  */
 export async function uploadToSupabase(localPath: string, destinationFolder: string): Promise<string> {
+  const relativePath = path.relative(process.cwd(), localPath).replace(/\\/g, '/');
+  const webPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+
   if (!supabase) {
     console.warn("Supabase Storage not configured. Falling back to local URL.");
-    return `/${localPath.replace(/\\/g, '/')}`;
+    return webPath;
   }
 
   try {
@@ -54,7 +57,7 @@ export async function uploadToSupabase(localPath: string, destinationFolder: str
   } catch (error) {
     console.error("Supabase Upload Error (Falling back to local Mode):", error);
     // If upload fails, return local path as fallback instead of crashing
-    return `/${localPath.replace(/\\/g, '/')}`;
+    return webPath;
   }
 }
 

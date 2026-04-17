@@ -19,14 +19,20 @@ const getBaseURL = () => {
             return 'https://api.aivola.id/api';
         }
 
+        // If on Localhost
+        if (host === 'localhost' || host === '127.0.0.1') {
+            console.log("[API] Hits Backend at (Localhost): http://localhost:5000/api");
+            return 'http://localhost:5000/api';
+        }
+
         // If on Railway, usually the API is a different service. 
-        // We warn the user to set the ENV variable.
         if (host.includes('railway.app')) {
             console.warn("[API WARNING] NEXT_PUBLIC_API_URL IS MISSING! This might cause 401 logouts.");
         }
     }
     
-    const defaultApi = 'https://api.aivola.id/api';
+    // Default fallback to local for development if nothing else matches
+    const defaultApi = 'http://localhost:5000/api';
     console.log("[API] Hits Backend at (Default):", defaultApi);
     return defaultApi; 
 };

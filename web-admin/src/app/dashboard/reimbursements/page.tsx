@@ -36,6 +36,13 @@ export default function ReimbursementsPage() {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
+    // Finance Integration States
+    const [accounts, setAccounts] = useState<any[]>([]);
+    const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+    const [showPayModal, setShowPayModal] = useState(false);
+    const [payData, setPayData] = useState<{ claimId: number, accountId: string, categoryId: string, amount: number, title: string } | null>(null);
+    const [isSubmittingPay, setIsSubmittingPay] = useState(false);
+
     const fetchClaims = async () => {
         try {
             const response = await api.get('/reimbursements');
@@ -47,8 +54,22 @@ export default function ReimbursementsPage() {
         }
     };
 
+    const fetchFinanceData = async () => {
+        try {
+            const [accRes, catRes] = await Promise.all([
+                api.get('/finance/accounts'),
+                api.get('/finance/expense-categories')
+            ]);
+            setAccounts(accRes.data);
+            setExpenseCategories(catRes.data);
+        } catch (err) {
+            console.error("Gagal memuat data finansial untuk integrasi.");
+        }
+    };
+
     useEffect(() => {
         fetchClaims();
+        fetchFinanceData();
     }, []);
 
     const handleUpdateStatus = async (id: number, status: 'APPROVED' | 'REJECTED') => {
@@ -60,7 +81,43 @@ export default function ReimbursementsPage() {
         }
     };
 
+    const openPayModal = (claim: Reimbursement) => {
+        setPayData({
+            claimId: claim.id,
+            accountId: accounts.length > 0 ? accounts[0].id.toString() : '',
+            categoryId: expenseCategories.length > 0 ? expenseCategories[0].id.toString() : '',
+            amount: claim.amount,
+            title: claim.title
+        });
+        setShowPayModal(true);
+    };
+
+    const handleConfirmPayment = async () => {
+        if (!payData || !payData.accountId || !payData.categoryId) {
+            alert('Mohon pilih akun kas/bank dan kategori pengeluaran.');
+            return;
+        }
+
+        setIsSubmittingPay(true);
+        try {
+            await api.patch(`/reimbursements/${payData.claimId}/pay`, {
+                accountId: payData.accountId,
+                categoryId: payData.categoryId
+            });
+            
+            setClaims(prev => prev.map(item => item.id === payData.claimId ? { ...item, isPaid: true, paidAt: new Date().toISOString() } : item));
+            setShowPayModal(false);
+            setPayData(null);
+            alert('Pembayaran berhasil diproses dan tercatat di Modul Keuangan.');
+        } catch (err: any) {
+            alert('Gagal memproses pembayaran: ' + (err.response?.data?.error || 'Kesalahan Server'));
+        } finally {
+            setIsSubmittingPay(false);
+        }
+    };
+
     const handlePay = async (id: number) => {
+        // Fallback or simple pay if no finance data
         if (!confirm('Tandai reimbursement ini sebagai SUDAH DIBAYAR?')) return;
         try {
             await api.patch(`/reimbursements/${id}/pay`);
@@ -95,11 +152,20 @@ export default function ReimbursementsPage() {
     const getFullImageUrl = (path: string | null) => {
         if (!path) return '';
         if (path.startsWith('http')) return path; // already a full URL (Supabase)
+        
+        // Handle potential absolute paths saved in DB by mistake
+        let cleanPath = path;
+        const uploadsMatch = path.match(/uploads[\\/].*/i);
+        if (uploadsMatch) {
+            cleanPath = '/' + uploadsMatch[0].replace(/\\/g, '/');
+        }
+
         let backendBase = api.defaults.baseURL || 'https://api.aivola.id/api';
         if (backendBase.endsWith('/api')) backendBase = backendBase.slice(0, -4);
         if (!backendBase) backendBase = 'https://api.aivola.id';
-        const cleanPath = path.startsWith('/') ? path : `/${path}`;
-        return `${backendBase}${cleanPath}`;
+        
+        const finalPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+        return `${backendBase}${finalPath}`;
     };
 
     const handleDownload = async (url: string) => {
@@ -254,7 +320,7 @@ export default function ReimbursementsPage() {
                                                 </div>
                                             ) : (claim.status === 'APPROVED' && !claim.isPaid) ? (
                                                 <button
-                                                    onClick={() => handlePay(claim.id)}
+                                                    onClick={() => openPayModal(claim)}
                                                     className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
                                                 >
                                                     <CreditCard className="h-3.5 w-3.5" />
@@ -271,6 +337,81 @@ export default function ReimbursementsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Modal Konfirmasi Pembayaran (Integrasi Finance) */}
+            {showPayModal && payData && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="bg-amber-500 p-4 flex justify-between items-center text-white">
+                            <h3 className="font-bold text-lg flex items-center gap-2">
+                                <CreditCard className="h-5 w-5" />
+                                Konfirmasi Pembayaran
+                            </h3>
+                            <button onClick={() => setShowPayModal(false)} className="hover:bg-white/20 p-1 rounded-full text-white">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 space-y-4">
+                            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Detail Klaim</p>
+                                <p className="font-bold text-slate-900">{payData.title}</p>
+                                <p className="text-lg font-black text-amber-600">{formatCurrency(payData.amount)}</p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                                        Bayar Menggunakan (Kas/Bank)
+                                    </label>
+                                    <select 
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                                        value={payData.accountId}
+                                        onChange={(e) => setPayData({...payData, accountId: e.target.value})}
+                                    >
+                                        <option value="">Pilih Akun Kas/Bank</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>{acc.name} (Saldo: {formatCurrency(acc.balance)})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                                        Kategori Pengeluaran
+                                    </label>
+                                    <select 
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                                        value={payData.categoryId}
+                                        onChange={(e) => setPayData({...payData, categoryId: e.target.value})}
+                                    >
+                                        <option value="">Pilih Kategori</option>
+                                        {expenseCategories.map(cat => (
+                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 border-t flex gap-3">
+                            <button 
+                                onClick={() => setShowPayModal(false)}
+                                className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+                            >
+                                Batal
+                            </button>
+                            <button 
+                                onClick={handleConfirmPayment}
+                                disabled={isSubmittingPay}
+                                className="flex-1 py-2.5 text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all shadow-md active:scale-95 disabled:opacity-50"
+                            >
+                                {isSubmittingPay ? 'Memproses...' : 'Proses Bayar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal Preview Gambar */}
             {

@@ -116,11 +116,21 @@ export default function AssignmentsPage() {
 
     const getFullImageUrl = (path: string | null) => {
         if (!path) return '';
-        if (path.startsWith('http')) return path;
+        if (path.startsWith('http')) return path; // already a full URL (Supabase)
+        
+        // Handle potential absolute paths saved in DB by mistake
+        let cleanPath = path;
+        const uploadsMatch = path.match(/uploads[\\/].*/i);
+        if (uploadsMatch) {
+            cleanPath = '/' + uploadsMatch[0].replace(/\\/g, '/');
+        }
+
         let backendBase = api.defaults.baseURL || 'https://api.aivola.id/api';
-        if (backendBase.endsWith('/api')) backendBase = backendBase.substring(0, backendBase.length - 4);
-        const cleanPath = path.startsWith('/') ? path : `/${path}`;
-        return `${backendBase}${cleanPath}`;
+        if (backendBase.endsWith('/api')) backendBase = backendBase.slice(0, -4);
+        if (!backendBase) backendBase = 'https://api.aivola.id';
+        
+        const finalPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+        return `${backendBase}${finalPath}`;
     };
 
     return (
