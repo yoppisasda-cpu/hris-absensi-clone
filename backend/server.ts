@@ -4874,7 +4874,9 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
     const { title, description, amount } = req.body;
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
+    const numericAmount = parseFloat(amount) || 0;
     let receiptUrl = req.file ? `/uploads/reimbursements/${req.file.filename}` : null;
+    console.log(`[REIMBURSE] userId=${userId}, tenantId=${tenantId}, title=${title}, amount=${amount}, hasFile=${!!req.file}`);
 
     if (req.file) {
       try {
@@ -4913,13 +4915,14 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
       }
     }
 
+    console.log('[REIMBURSE] Saving to database...');
     const reimbursement = await prisma.reimbursement.create({
       data: {
         companyId: tenantId,
         userId: userId,
         title,
         description,
-        amount: parseFloat(amount),
+        amount: numericAmount,
         receiptUrl,
         // AI Hasil (Phase 34)
         ocrAmount: ocrResult.amount,
@@ -4931,17 +4934,22 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
         status: 'PENDING'
       } as any
     });
+    console.log(`[REIMBURSE] Saved OK, id=${reimbursement.id}`);
 
     // Cleanup local file after Supabase upload and AI processing
     cleanupLocalFile(fullPath);
 
     // TRIGGER NOTIFIKASI KE ADMIN
-    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
-    await notifyAdmins(tenantId, 'Pengajuan Reimbursement', `${targetUser?.name || 'Seorang karyawan'} mengajukan reimbursement sebesar Rp ${amount.toLocaleString('id-ID')}.`);
+    try {
+      const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+      await notifyAdmins(tenantId, 'Pengajuan Reimbursement', `${targetUser?.name || 'Seorang karyawan'} mengajukan reimbursement sebesar Rp ${Number(amount).toLocaleString('id-ID')}.`);
+    } catch (notifError) {
+      console.error('[REIMBURSE] Notifikasi gagal (non-fatal):', notifError);
+    }
 
     res.json({ message: 'Reimbursement berhasil diajukan', reimbursement });
-  } catch (error) {
-    console.error('Error reimbursement:', error);
+  } catch (error: any) {
+    console.error('[REIMBURSE] FATAL ERROR:', error?.message, error?.stack);
     res.status(500).json({ error: 'Gagal mengajukan klaim reimbursement.' });
   }
 });
