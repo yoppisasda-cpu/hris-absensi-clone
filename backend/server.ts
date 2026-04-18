@@ -10208,6 +10208,101 @@ app.post('/api/inventory/produce', tenantMiddleware, async (req: Request, res: R
   }
 });
 
+// --- FACTORY SYNC ENDPOINT (Phase: Production Integration) ---
+// Bulk update product stock based on SKU from external factory app
+app.post('/api/products/sync-bulk-stock', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { items, warehouseId } = req.body; // warehouseId can be global for the batch or per-item
+
+    if (!items || !Array.isArray(items)) {
+      return res.status(400).json({ error: 'Data items wajib berupa array.' });
+    }
+
+    console.log(`[SYNC] Bulk sync started for tenant: ${tenantId}, items: ${items.length}`);
+
+    const results = await prisma.$transaction(async (tx) => {
+      const summary = {
+        success: 0,
+        failed: 0,
+        errors: [] as string[]
+      };
+
+      for (const item of items) {
+        try {
+          const { sku, quantity } = item;
+          const targetQty = parseFloat(quantity);
+          const targetWarehouseId = item.warehouseId || warehouseId;
+
+          if (!sku || isNaN(targetQty)) {
+            summary.failed++;
+            summary.errors.push(`SKU ${sku || 'NULL'}: Data tidak valid.`);
+            continue;
+          }
+
+          // 1. Find Product
+          const product = await tx.product.findFirst({
+            where: { sku: String(sku), companyId: tenantId }
+          });
+
+          if (!product) {
+            summary.failed++;
+            summary.errors.push(`SKU ${sku}: Produk tidak ditemukan.`);
+            continue;
+          }
+
+          // 2. Update Global Stock (Overwrite as requested)
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: targetQty, updatedAt: new Date() }
+          });
+
+          // 3. Update Warehouse Stock
+          if (targetWarehouseId) {
+            const wId = parseInt(targetWarehouseId);
+            await tx.warehouseStock.upsert({
+              where: { productId_warehouseId: { productId: product.id, warehouseId: wId } },
+              update: { quantity: targetQty, updatedAt: new Date() },
+              create: { productId: product.id, warehouseId: wId, quantity: targetQty }
+            });
+          }
+
+          // 4. Record Transaction for Audit Trail
+          await tx.stockTransaction.create({
+            data: {
+              productId: product.id,
+              type: 'ADJUST',
+              quantity: targetQty,
+              reference: `Factory Sync: ${new Date().toLocaleString('id-ID')}`,
+              warehouseId: targetWarehouseId ? parseInt(targetWarehouseId) : null,
+              date: new Date()
+            }
+          });
+
+          summary.success++;
+        } catch (itemError: any) {
+          summary.failed++;
+          summary.errors.push(`Internal error for item: ${itemError.message}`);
+        }
+      }
+
+      return summary;
+    });
+
+    res.json({
+      message: 'Sinkronisasi stok selesai.',
+      total_processed: items.length,
+      success: results.success,
+      failed: results.failed,
+      errors: results.failed > 0 ? results.errors : undefined
+    });
+
+  } catch (error: any) {
+    console.error('[SYNC ERROR]:', error);
+    res.status(500).json({ error: 'Gagal melakukan sinkronisasi massal: ' + error.message });
+  }
+});
+
 
 // Get all stock transactions for the tenant
 app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) => {
