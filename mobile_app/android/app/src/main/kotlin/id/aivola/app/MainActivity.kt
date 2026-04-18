@@ -1,4 +1,4 @@
-package com.example.mobile_app
+package id.aivola.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -103,14 +103,6 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-3"><Key className="h-5 w-5" /> Ubah Kata Sandi</div>
                     </button>
 
-                    {(user?.role === 'OWNER' || user?.role === 'SUPERADMIN' || user?.role === 'ADMIN') && (
-                        <button
-                            onClick={() => setActiveSection('integration' as any)}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-all ${activeSection === ('integration' as any) ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-slate-800 text-slate-400'}`}
-                        >
-                            <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5" /> Integrasi API</div>
-                        </button>
-                    )}
 
                     <div className="pt-4 mt-4 border-t border-slate-700/50">
                         <Link href="/dashboard/settings/company-profile" className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800 text-slate-400 text-sm font-medium rounded-lg transition-colors">
@@ -199,56 +191,6 @@ export default function SettingsPage() {
                                 </div>
                             )}
 
-                            {(activeSection as any) === 'integration' && (
-                                <div className="bg-slate-900/50 rounded-xl border border-slate-800 shadow-sm overflow-hidden">
-                                    <div className="p-6 border-b border-slate-800 bg-slate-800/30">
-                                        <h3 className="text-lg font-bold text-white">Integrasi & API Key</h3>
-                                        <p className="text-xs text-slate-400">Gunakan API Key ini untuk menghubungkan aplikasi eksternal (Pabrik) ke sistem Aivola.id.</p>
-                                    </div>
-                                    <div className="p-8 space-y-6">
-                                        <div className="p-6 bg-slate-800/40 rounded-xl border border-slate-700 space-y-4">
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Integration API Key</label>
-                                                {user?.company?.integrationApiKey ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="flex-1 font-mono text-sm bg-slate-950 px-4 py-3 rounded border border-slate-700 text-emerald-400 select-all overflow-x-auto whitespace-nowrap">
-                                                            {user.company.integrationApiKey}
-                                                        </div>
-                                                        <button 
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(user.company.integrationApiKey);
-                                                                alert("API Key berhasil disalin ke clipboard!");
-                                                            }}
-                                                            className="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold text-xs transition-colors whitespace-nowrap"
-                                                        >
-                                                            Salin Key
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="p-4 bg-amber-900/20 border border-amber-800/50 rounded text-amber-400 text-sm">
-                                                        API Key belum dibuat untuk perusahaan Anda. Silakan hubungi Support Aivola.id untuk mengaktifkan fitur integrasi.
-                                                    </div>
-                                                )}
-                                            </div>
-                                            
-                                            <div className="pt-4 border-t border-slate-700/50">
-                                                <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                                    <ShieldCheck className="h-4 w-4 text-emerald-400" /> Endpoint Sinkronisasi Gaji & Stok
-                                                </h4>
-                                                <div className="space-y-3">
-                                                    <div className="p-3 bg-slate-950 rounded border border-slate-800 border-l-4 border-l-blue-500">
-                                                        <p className="text-[10px] font-mono text-blue-400 mb-1 font-bold uppercase">STOCK SYNC ENDPOINT (POST)</p>
-                                                        <p className="text-xs font-mono text-slate-300 break-all">https://api.aivola.id/api/products/sync-bulk-stock</p>
-                                                    </div>
-                                                    <div className="text-[11px] text-slate-400 leading-relaxed italic">
-                                                        * Gunakan header <code className="text-emerald-400">x-api-key</code> dengan nilai API Key di atas. Kirim data dalam format JSON array untuk sinkronisasi massal stok dari pabrik.
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                             {activeSection === 'password' && (
                                 <div className="bg-slate-900/50 rounded-xl border border-slate-800 shadow-sm overflow-hidden">

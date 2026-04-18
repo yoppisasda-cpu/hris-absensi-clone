@@ -30,7 +30,7 @@ const Header = () => (
   <nav className="header-nav">
     <div className="logo-container">
       <Logo />
-      <span className="logo-text">Aivola.id.id</span>
+      <span className="logo-text">Aivola.id</span>
       <span className="logo-badge">AI Powered</span>
     </div>
     <div className="nav-links">
@@ -708,7 +708,7 @@ const Footer = () => (
   <footer className="footer">
     <div className="footer-content">
       <div className="footer-brand">
-        <span className="logo-text">Aivola.id.id</span>
+        <span className="logo-text">Aivola.id</span>
         <p>Sistem Manajemen Bisnis yang Cerdas & Terintegrasi.</p>
       </div>
       <div className="footer-links">
@@ -731,6 +731,89 @@ const Footer = () => (
     </div>
   </footer>
 );
+
+const PrivacyPage = () => {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  return (
+    <div className="privacy-page" style={{ 
+      background: '#0a0a0f', 
+      minHeight: '100vh', 
+      color: '#cbd5e1', 
+      fontFamily: 'Inter, system-ui, sans-serif',
+      paddingBottom: '5rem'
+    }}>
+      <style>{`
+        .privacy-container { max-w-4xl mx-auto px-6 py-20; }
+        .privacy-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 32px; padding: 3rem; margin-bottom: 2rem; }
+        .privacy-card h2 { color: white; margin-bottom: 1.5rem; font-size: 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
+        .privacy-card h2 span { color: #8b5cf6; }
+        .privacy-card p { line-height: 1.8; margin-bottom: 1rem; }
+        .privacy-card ul { list-style: none; padding: 0; }
+        .privacy-card li { margin-bottom: 0.75rem; display: flex; gap: 0.75rem; }
+        .privacy-card li::before { content: '✓'; color: #4ade80; font-weight: bold; }
+        .back-link { display: inline-flex; align-items: center; gap: 0.5rem; color: #8b5cf6; text-decoration: none; font-weight: 700; margin-bottom: 2rem; }
+        .back-link:hover { text-decoration: underline; }
+      `}</style>
+      
+      <div className="privacy-container">
+        <a href="#" className="back-link">
+          <ChevronRight size={20} style={{ transform: 'rotate(180deg)' }} /> Kembali ke Beranda
+        </a>
+        
+        <header style={{ marginBottom: '4rem' }}>
+          <div className="hero-badge">Legal & Transparency</div>
+          <h1 style={{ color: 'white', fontSize: '3rem', fontWeight: 900, marginTop: '1rem' }}>Kebijakan Privasi</h1>
+          <p style={{ color: '#94a3b8' }}>Terakhir diperbarui: 18 April 2026</p>
+        </header>
+
+        <div className="privacy-card">
+          <h2><span>1.</span> Pendahuluan</h2>
+          <p>
+            Selamat datang di Aivola.id. Kami sangat menghargai privasi Anda dan berkomitmen untuk melindungi data pribadi karyawan dan perusahaan Anda sesuai dengan standar keamanan industri.
+          </p>
+          <p>
+            Kebijakan Privasi ini menjelaskan bagaimana kami mengumpulkan, menggunakan, dan melindungi informasi pribadi Anda saat Anda menggunakan aplikasi mobile Aivola dan ekosistem SaaS kami.
+          </p>
+        </div>
+
+        <div className="privacy-card">
+          <h2><span>2.</span> Pengumpulan Data Penting</h2>
+          <p>Untuk menjalankan fungsi HR, absensi, dan payroll secara akurat, kami mengumpulkan jenis data berikut:</p>
+          <ul>
+            <li><strong>Lokasi (GPS)</strong>: Kami mencatat koordinat lokasi saat karyawan melakukan Clock-In/Clock-Out untuk verifikasi kehadiran di area geofencing kantor.</li>
+            <li><strong>Kamera & Foto</strong>: Kami memerlukan akses kamera untuk pengambilan foto wajah (Face Matching) sebagai bukti kehadiran yang sah dan pencegahan fraud.</li>
+            <li><strong>Identitas Karyawan</strong>: Nama lengkap, email, dan nomor telepon yang didaftarkan oleh Admin perusahaan melalui portal Web Admin.</li>
+            <li><strong>Informasi Perangkat</strong>: ID perangkat unik untuk memastikan satu akun hanya digunakan pada perangkat yang sah.</li>
+          </ul>
+        </div>
+
+        <div className="privacy-card">
+          <h2><span>3.</span> Penggunaan & Keamanan Data</h2>
+          <p>
+            Data Anda hanya digunakan untuk kepentingan internal perusahaan Anda sendiri (perhitungan gaji, manajemen kehadiran, dan pelaporan HR). Kami tidak membagikan atau menjual data pribadi Anda kepada pihak ketiga manapun untuk tujuan pemasaran.
+          </p>
+          <p style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '1.5rem', borderRadius: '16px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+            <strong>Keamanan Lapis Tinggi:</strong> Seluruh transmisi data menggunakan enkripsi SSL tingkat lanjut dan disimpan dalam basis data yang aman dengan akses terbatas.
+          </p>
+        </div>
+
+        <div className="privacy-card">
+          <h2><span>4.</span> Penghapusan Data</h2>
+          <p>
+            Akun dan data karyawan dikelola sepenuhnya oleh Admin HR di perusahaan masing-masing. Jika Anda ingin meminta penghapusan data Anda, silakan hubungi Departemen HR perusahaan Anda atau hubungi tim support kami melalui email di <strong>support@aivola.id</strong>.
+          </p>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: '4rem', color: '#444', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '2px' }}>
+          © 2026 Aivola.id System Intelligence
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function AttendancePage() {
   const [isVideoOpen, setIsVideoOpen] = useState(false);
@@ -763,6 +846,7 @@ function App() {
     const handleHash = () => {
       const hash = window.location.hash;
       if (hash === '#finance') setActivePage('finance');
+      else if (hash === '#privacy') setActivePage('privacy');
       else setActivePage('attendance');
     };
 
@@ -774,7 +858,7 @@ function App() {
 
   return (
     <>
-      {activePage === 'finance' ? <FinancePage /> : <AttendancePage />}
+      {activePage === 'finance' ? <FinancePage /> : activePage === 'privacy' ? <PrivacyPage /> : <AttendancePage />}
       <ChatWidget />
     </>
   );

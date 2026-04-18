@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { Loader2, CheckCircle, XCircle, Clock, ExternalLink, Building2 } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Clock, ExternalLink, Building2, Laptop, Copy, ArrowRight, Zap, Database } from 'lucide-react';
 
 interface IntegrationRequest {
     id: number;
@@ -18,27 +18,54 @@ interface IntegrationRequest {
     };
 }
 
-export default function IntegrationApprovalPage() {
+interface CompanyData {
+    id: number;
+    name: string;
+    isApiEnabled: boolean;
+    integrationApiKey: string | null;
+}
+
+export default function IntegrationPage() {
     const [requests, setRequests] = useState<IntegrationRequest[]>([]);
+    const [myCompany, setMyCompany] = useState<CompanyData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState<number | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
 
     const fetchRequests = async () => {
         try {
-            setIsLoading(true);
             const response = await api.get('/admin/integrations/requests');
             setRequests(response.data);
         } catch (error) {
             console.error(error);
-        } finally {
-            setIsLoading(false);
         }
     };
 
+    const fetchMyCompany = async () => {
+        try {
+            const response = await api.get('/companies/my');
+            setMyCompany(response.data);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const init = async () => {
+        setIsLoading(true);
+        const role = localStorage.getItem('userRole');
+        setUserRole(role);
+
+        if (role === 'SUPERADMIN') {
+            await fetchRequests();
+        } else if (role === 'OWNER') {
+            await fetchMyCompany();
+        }
+        setIsLoading(false);
+    };
+
     useEffect(() => {
-        fetchRequests();
-        setUserRole(localStorage.getItem('userRole'));
+        init();
     }, []);
 
     const handleAction = async (requestId: number, status: 'APPROVED' | 'REJECTED') => {
@@ -56,6 +83,14 @@ export default function IntegrationApprovalPage() {
         }
     };
 
+    const handleCopy = () => {
+        if (myCompany?.integrationApiKey) {
+            navigator.clipboard.writeText(myCompany.integrationApiKey);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
     if (userRole !== 'SUPERADMIN' && userRole !== 'OWNER') {
         return (
             <DashboardLayout>
@@ -63,13 +98,139 @@ export default function IntegrationApprovalPage() {
                     <div className="text-center">
                         <XCircle className="mx-auto h-12 w-12 text-rose-500 mb-4" />
                         <h2 className="text-xl font-bold text-slate-900">Akses Terbatas</h2>
-                        <p className="text-slate-500">Hanya Admin Pusat yang dapat mengakses halaman ini.</p>
+                        <p className="text-slate-500">Hanya Admin Pusat atau Pemilik Perusahaan yang dapat mengakses halaman ini.</p>
                     </div>
                 </div>
             </DashboardLayout>
         );
     }
 
+    // --- RENDER OWNER VIEW ---
+    if (userRole === 'OWNER') {
+        return (
+            <DashboardLayout>
+                <div className="mb-10">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+                                <div className="p-2 bg-amber-500 rounded-lg shadow-lg shadow-amber-200">
+                                    <Laptop className="h-6 w-6 text-white" />
+                                </div>
+                                Integrasi API & Eksternal
+                            </h1>
+                            <p className="text-slate-500 mt-2 font-medium">Hubungkan aplikasi pabrik, POS kustom, atau perangkat IoT Anda secara langsung ke ekosistem Aivola.id.</p>
+                        </div>
+                        
+                        <div className={`px-4 py-2 rounded-full border flex items-center gap-2 ${myCompany?.isApiEnabled ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                            {myCompany?.isApiEnabled ? (
+                                <><Zap className="h-4 w-4 fill-emerald-500" /> <span className="text-xs font-black uppercase tracking-widest">Koneksi Aktif</span></>
+                            ) : (
+                                <><Clock className="h-4 w-4" /> <span className="text-xs font-black uppercase tracking-widest">Koneksi Nonaktif</span></>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {isLoading ? (
+                    <div className="flex h-64 items-center justify-center">
+                        <Loader2 className="h-10 w-10 animate-spin text-amber-500" />
+                    </div>
+                ) : (
+                    <div className="grid gap-8 max-w-5xl">
+                        {/* API KEY SECTION */}
+                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden border-b-4 border-b-amber-500">
+                            <div className="p-6 md:p-8">
+                                <h2 className="text-lg font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+                                    <Zap className="h-5 w-5 text-amber-500" />
+                                    Kredensial Akses (API Key)
+                                </h2>
+
+                                {!myCompany?.isApiEnabled ? (
+                                    <div className="bg-slate-50 rounded-2xl p-8 text-center border border-dashed border-slate-300">
+                                        <XCircle className="mx-auto h-12 w-12 text-slate-300 mb-4" />
+                                        <h3 className="text-slate-900 font-bold mb-1">API Belum Diaktifkan</h3>
+                                        <p className="text-xs text-slate-500 mb-6 px-4">Modul integrasi untuk perusahaan Anda belum disetujui atau diaktifkan oleh Admin Pusat.</p>
+                                        <button className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">
+                                            Ajukan Aktivasi API
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <div className="relative group">
+                                            <div className="absolute -top-2 left-6 px-2 bg-white text-[10px] font-black text-amber-600 uppercase tracking-widest z-10">Integration Secret Key</div>
+                                            <div className="flex items-center gap-2 p-4 md:p-5 bg-slate-950 rounded-2xl border border-slate-800 group-hover:border-amber-500/50 transition-all">
+                                                <code className="flex-1 text-amber-400 font-mono text-xs md:text-sm break-all">
+                                                    {myCompany.integrationApiKey || 'BELUM_ADA_KEY'}
+                                                </code>
+                                                <button 
+                                                    onClick={handleCopy}
+                                                    className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all flex items-center gap-2"
+                                                >
+                                                    {copied ? <CheckCircle className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                                                    <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">Salin</span>
+                                                </button>
+                                            </div>
+                                            <p className="mt-3 text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                                                <XCircle className="h-3 w-3 text-rose-500" />
+                                                Jangan bagikan key ini kepada siapapun kecuali developer sistem integrasi Anda.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* DOCUMENTATION SECTION */}
+                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="p-6 md:p-8">
+                                <h2 className="text-lg font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+                                    <Database className="h-5 w-5 text-indigo-500" />
+                                    Endpoint Sinkronisasi (Pabrik ke Aivola)
+                                </h2>
+
+                                <div className="space-y-8">
+                                    <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100">
+                                        <div className="flex items-center gap-2 text-indigo-700 mb-2">
+                                            <span className="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] font-black">POST</span>
+                                            <span className="text-xs font-black font-mono">/api/products/sync-bulk-stock</span>
+                                        </div>
+                                        <p className="text-xs text-indigo-900/70 font-medium">Gunakan endpoint ini untuk mengirim data update stok secara massal dari sistem internal pabrik Anda.</p>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
+                                            Struktur JSON Request
+                                        </h3>
+                                        <div className="bg-slate-950 rounded-2xl p-5 border border-slate-800">
+                                            <pre className="text-indigo-300 font-mono text-[11px] md:text-xs overflow-x-auto">
+{`{
+  "warehouseId": 1, // Optional: Target Gudang Utama
+  "items": [
+    { "sku": "DBSKM011", "quantity": 1500 },
+    { "sku": "DBSKM009", "quantity": 800 }
+  ]
+}`}
+                                            </pre>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold hover:text-indigo-600 transition-colors cursor-pointer group">
+                                            Lihat Dokumentasi API Lengkap
+                                            <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </DashboardLayout>
+        );
+    }
+
+    // --- RENDER SUPERADMIN VIEW ---
     return (
         <DashboardLayout>
             <div className="mb-8">
@@ -77,9 +238,9 @@ export default function IntegrationApprovalPage() {
                     <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-200">
                         <ExternalLink className="h-6 w-6 text-white" />
                     </div>
-                    Manajemen Integrasi Eksternal
+                    Manajemen Integrasi Eksternal (Admin Pusat)
                 </h1>
-                <p className="text-slate-500 mt-2 font-medium italic">Kelola persetujuan akses API untuk koneksi mesin pabrik, POS pihak ketiga, dan IoT.</p>
+                <p className="text-slate-500 mt-2 font-medium italic">Kelola persetujuan akses API untuk koneksi mesin pabrik, POS pihak ketiga, dan IoT dari seluruh klien Aivola.id.</p>
             </div>
 
             {isLoading ? (
