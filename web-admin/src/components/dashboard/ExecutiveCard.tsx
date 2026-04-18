@@ -38,7 +38,7 @@ const ExecutiveCard: React.FC<ExecutiveCardProps> = ({
   const gradient = getGradient();
 
   return (
-    <div className={`glass relative overflow-hidden rounded-[2.5rem] p-8 border border-white/10 shadow-2xl transition-all duration-500 hover:scale-[1.02] hover:shadow-indigo-500/10 group ${className}`}>
+    <div className={`glass relative overflow-hidden rounded-[2.5rem] p-8 border border-white/10 shadow-2xl transition-all duration-500 hover:scale-[1.02] hover:shadow-indigo-500/10 group flex flex-col ${className}`}>
         {/* Background Accent Gradient */}
         <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${gradient} opacity-10 blur-3xl -translate-y-1/2 translate-x-1/2 transition-all duration-700 group-hover:scale-150`} />
         
@@ -61,7 +61,9 @@ const ExecutiveCard: React.FC<ExecutiveCardProps> = ({
                 {value && <p className="text-4xl font-black text-white tracking-tighter italic">{value}</p>}
                 {subtitle && <p className="text-[10px] font-bold text-slate-500 uppercase italic transition-all duration-500 translate-y-1">{subtitle}</p>}
             </div>
-            {children}
+            <div className="flex-1 min-h-0">
+                {children}
+            </div>
         </div>
 
         {/* Bottom Progress Indicator */}

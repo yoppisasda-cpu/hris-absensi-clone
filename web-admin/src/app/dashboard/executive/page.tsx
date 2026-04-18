@@ -240,7 +240,7 @@ export default function ExecutiveDashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={finData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
@@ -250,7 +250,7 @@ export default function ExecutiveDashboard() {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="date" stroke={isTVMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke={isTVMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `Rp${v/1000000}M`} />
+                <YAxis stroke={isTVMode ? '#64748b' : '#94a3b8'} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `Rp${(v/1000000).toFixed(1)}M`} />
                 <Tooltip 
                     contentStyle={{ 
                         backgroundColor: isTVMode ? '#0f172a' : '#fff', 
@@ -260,7 +260,7 @@ export default function ExecutiveDashboard() {
                         color: isTVMode ? '#fff' : '#000'
                     }} 
                 />
-                <Area type="monotone" dataKey="income" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorIncome)" />
+                <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorRevenue)" />
                 <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={4} fillOpacity={1} fill="url(#colorExpense)" />
               </AreaChart>
             </ResponsiveContainer>
