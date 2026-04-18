@@ -11,26 +11,26 @@ const Header = () => (
   <nav className="f-header">
     <div className="f-logo">
       <Logo />
-      <span>aivola finance</span>
+      <span>Aivola.id finance</span>
     </div>
     <div className="f-links">
       <a href="/">Kembali ke HR</a>
       <a href="#features">Fitur</a>
       <a href="#pricing">Harga</a>
-      <a href="https://admin.aivola.id" className="f-btn-login">Masuk Admin</a>
+      <a href="https://admin.Aivola.id.id" className="f-btn-login">Masuk Admin</a>
     </div>
   </nav>
 );
 
 const FinanceHero = () => (
   <section className="f-hero">
-    <div className="f-badge">🧬 Aivola AI Mind - Finance Module</div>
+    <div className="f-badge">🧬 Aivola.id AI Mind - Finance Module</div>
     <h1>
       Kelola Keuangan & POS <br />
       <span className="f-gradient">dengan Analisis AI Strategis</span>
     </h1>
     <p className="f-subtitle">
-      Bukan sekadar kasir digital. Aivola Finance membantu Anda mengoptimalkan profit,
+      Bukan sekadar kasir digital. Aivola.id Finance membantu Anda mengoptimalkan profit,
       memprediksi stok, dan menganalisis margin secara real-time.
     </p>
     <div className="f-cta">
@@ -148,7 +148,7 @@ const FinancePricing = () => {
             <li><span>✓</span> Laporan Penjualan Dasar</li>
           </ul>
           <a 
-            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket STARTER FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            href={"https://wa.me/6287882716935?text=Halo Aivola.id, saya tertarik dengan Paket STARTER FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
             target="_blank" 
             rel="noopener noreferrer"
             className="f-btn-card"
@@ -172,7 +172,7 @@ const FinancePricing = () => {
             <li><span>✓</span> AI Stock Forecasting</li>
           </ul>
           <a 
-            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket PRO FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            href={"https://wa.me/6287882716935?text=Halo Aivola.id, saya tertarik dengan Paket PRO FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
             target="_blank" 
             rel="noopener noreferrer"
             className="f-btn-card"
@@ -196,7 +196,7 @@ const FinancePricing = () => {
             <li><span>✓</span> Prioritas Support 24/7</li>
           </ul>
           <a 
-            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket ENTERPRISE FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            href={"https://wa.me/6287882716935?text=Halo Aivola.id, saya tertarik dengan Paket ENTERPRISE FINANCE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
             target="_blank" 
             rel="noopener noreferrer"
             className="f-btn-card"
@@ -246,7 +246,7 @@ const FinancePricing = () => {
             </div>
             <div style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ color: 'white', fontWeight: 700 }}>🧠 Aivola Mind (AI Advisor)</span>
+                <span style={{ color: 'white', fontWeight: 700 }}>🧠 Aivola.id Mind (AI Advisor)</span>
                 <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 20.000/bln</span>
               </div>
               <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Penasehat bisnis AI strategis untuk seluruh level paket Anda.</p>
@@ -329,7 +329,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
                   transition: '0.3s all'
                 }}
               >
-                {tab === 'invoicing' ? 'Invoicing' : tab === 'report' ? 'Profit & Loss' : 'Aivola Mind AI'}
+                {tab === 'invoicing' ? 'Invoicing' : tab === 'report' ? 'Profit & Loss' : 'Aivola.id Mind AI'}
               </button>
             ))}
           </div>
@@ -437,7 +437,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
           {activeTab === 'ai' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, color: 'white' }}>Aivola Mind - AI Intelligence</h3>
+                <h3 style={{ margin: 0, color: 'white' }}>Aivola.id Mind - AI Intelligence</h3>
                 <div style={{ color: '#ec4899', fontWeight: 800 }}>⚡ OPTIMIZING BUSINESS</div>
               </div>
 
@@ -448,7 +448,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
                     <div style={{ fontWeight: 800, color: '#f472b6' }}>Optimization Strategy</div>
                   </div>
                   <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
-                    "Berdasarkan korelasi stok and harga suplier, Aivola Mind merekomendasikan pembelian **Biji Kopi Robustica** minggu depan untuk menghemat tambahan 15% biaya produksi."
+                    "Berdasarkan korelasi stok and harga suplier, Aivola.id Mind merekomendasikan pembelian **Biji Kopi Robustica** minggu depan untuk menghemat tambahan 15% biaya produksi."
                   </p>
                   <button style={{ width: '100%', padding: '1rem', background: '#ec4899', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 800 }}>Approve Purchase Strategy</button>
                 </div>
@@ -470,7 +470,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
         </div>
 
         <div style={{ padding: '1.5rem', textAlign: 'center', background: 'rgba(255,255,255,0.01)', fontSize: '0.8rem', color: '#444', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          Aivola Finance System • Intelligent Profit Optimization
+          Aivola.id Finance System • Intelligent Profit Optimization
         </div>
       </div>
     </div>
@@ -505,7 +505,7 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
       }}>
         <img
           src="/admin_invoice_demo.png"
-          alt="Aivola Finance Dashboard Demo"
+          alt="Aivola.id Finance Dashboard Demo"
           style={{ width: '100%', display: 'block', opacity: 0.9 }}
         />
       </div>
@@ -560,7 +560,7 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
       </div>
       <div className="f-card">
         <h5 style={{ color: '#f472b6', marginBottom: '1rem' }}>Laporan AI</h5>
-        <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Analisis margin and stok real-time dengan bantuan Aivola Mind AI.</p>
+        <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Analisis margin and stok real-time dengan bantuan Aivola.id Mind AI.</p>
       </div>
     </div>
   </section>

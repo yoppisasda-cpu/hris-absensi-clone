@@ -57,22 +57,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.fingerprint, size: 64, color: Colors.blue.shade700),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          height: 100,
+                          fit: BoxFit.contain,
                         ),
                       ),
                       const SizedBox(height: 24),
                       RichText(
                         textAlign: TextAlign.center,
                         text: TextSpan(
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                           children: [
-                            const TextSpan(text: 'aivola ', style: TextStyle(color: Colors.black87)),
+                            const TextSpan(text: 'Aivola.id ', style: TextStyle(color: Colors.black87)),
                             TextSpan(text: 'Portal', style: TextStyle(color: Colors.blueAccent)),
                           ],
                         ),

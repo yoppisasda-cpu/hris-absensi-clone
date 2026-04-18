@@ -224,14 +224,15 @@ export default function Sidebar() {
             `}</style>
             
             <div className="flex flex-col items-center justify-center border-b border-white/5 mt-6 pb-6 px-4">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                         <Sparkles className="h-6 w-6 text-white animate-pulse" />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-2xl font-black tracking-tighter text-white uppercase italic">aivola</span>
-                        <span className="text-[9px] text-white/20 font-bold uppercase tracking-widest">v1.0.8-SaaS</span>
-                    </div>
+                <div className="flex items-center justify-center w-full px-2 mb-2">
+                    <img 
+                      src="/logo.png" 
+                      alt="Aivola.id Logo" 
+                      className="h-12 w-auto object-contain brightness-110 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+                    />
+                </div>
+                <div className="flex flex-col items-center mb-4">
+                    <span className="text-[10px] text-white/30 font-black uppercase tracking-[0.4em] leading-none">Intelligence Ecosystem</span>
                 </div>
 
                 {/* HOLDING COMPANY SWITCHER */}
@@ -320,7 +321,7 @@ export default function Sidebar() {
                 >
                     <div className="flex items-center gap-3">
                         <BrainCircuit className="h-5 w-5" />
-                        AIVOLA MIND
+                        AIVOLA.ID MIND
                     </div>
                     {!hasFeature('AI_ADVISOR') && <Lock className="h-3.5 w-3.5 text-amber-500" />}
                     {hasFeature('AI_ADVISOR') && <div className="absolute top-0 right-0 bg-violet-500 text-white text-[7px] px-1 py-0.5 font-black uppercase tracking-tighter rounded-bl-md">Active</div>}
@@ -593,7 +594,7 @@ export default function Sidebar() {
             <div className="mt-auto border-t border-slate-700 p-4">
                 <Link href="/dashboard/store" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-gradient-to-r from-purple-600/10 to-blue-600/10 text-purple-400 hover:bg-slate-800 transition-colors border border-purple-500/20 mb-2">
                     <ShoppingBag className="h-5 w-5 animate-pulse" />
-                    Aivola Store
+                    Aivola.id Store
                 </Link>
                 <Link href="/dashboard/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                     <Settings className="h-5 w-5" />

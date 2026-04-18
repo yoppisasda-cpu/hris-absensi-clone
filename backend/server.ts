@@ -6907,12 +6907,14 @@ app.get('/api/stats/visual-finance', tenantMiddleware, async (req: Request, res:
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-    // 1. Get Sales Aggregated by Date
-    const salesData: any[] = await prisma.$queryRawUnsafe(`
-      SELECT DATE_TRUNC('day', "date") as day, SUM("totalAmount") as total 
-      FROM "Sale" 
-      WHERE "companyId" = $1 AND "date" >= $2
-      GROUP BY day 
+    // 1. Get Revenue (Sales + Incomes) Aggregated by Date
+    const revenueData: any[] = await prisma.$queryRawUnsafe(`
+      SELECT day, SUM(total) as total FROM (
+        SELECT DATE_TRUNC('day', "date") as day, "totalAmount" as total FROM "Sale" WHERE "companyId" = $1 AND "date" >= $2
+        UNION ALL
+        SELECT DATE_TRUNC('day', "date") as day, "amount" as total FROM "Income" WHERE "companyId" = $1 AND "date" >= $2
+      ) combined
+      GROUP BY day
       ORDER BY day ASC
     `, tenantId, thirtyDaysAgo);
 
@@ -6932,7 +6934,7 @@ app.get('/api/stats/visual-finance', tenantMiddleware, async (req: Request, res:
       date.setDate(date.getDate() - i);
       const dayStr = date.toISOString().split('T')[0];
 
-      const saleMatch = salesData.find(s => s.day.toISOString().split('T')[0] === dayStr);
+      const saleMatch = revenueData.find(s => s.day.toISOString().split('T')[0] === dayStr);
       const expMatch = expenseData.find(e => e.day.toISOString().split('T')[0] === dayStr);
 
       history.push({

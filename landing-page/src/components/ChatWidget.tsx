@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ChatWidget.css';
 
-const API_BASE_URL = 'https://api.aivola.id';
+const API_BASE_URL = 'https://api.Aivola.id.id';
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,7 +22,7 @@ export function ChatWidget() {
     // Basic welcome message
     if (messages.length === 0) {
       setMessages([
-        { sender: 'AI', content: 'Halo! Saya Aivola Strategic Assistant. Ada yang bisa saya bantu terkait Absensi, Payroll, atau Manajemen Keuangan Bisnis Anda?' }
+        { sender: 'AI', content: 'Halo! Saya Aivola.id Strategic Assistant. Ada yang bisa saya bantu terkait Absensi, Payroll, atau Manajemen Keuangan Bisnis Anda?' }
       ]);
     }
   };
@@ -70,7 +70,7 @@ export function ChatWidget() {
       {isOpen && (
         <div className="chat-window">
           <div className="chat-header">
-            <h4>Live Chat Aivola</h4>
+            <h4>Live Chat Aivola.id</h4>
             <p>Asisten AI siap membantu Anda</p>
           </div>
           <div className="chat-messages">

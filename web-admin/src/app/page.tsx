@@ -85,12 +85,12 @@ export default function LoginPage() {
           <div className="mb-10 flex flex-col items-center text-center">
             <img 
               src="/logo.png" 
-              alt="aivola Logo" 
+              alt="Aivola.id Logo" 
               className="mb-4" 
               style={{ height: '60px', width: 'auto', marginBottom: '1rem' }} 
             />
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              aivola <span className="text-blue-600">Portal</span>
+              Aivola.id <span className="text-blue-600">Portal</span>
             </h1>
             <p className="mt-4 text-slate-500">
               Selamat datang kembali. Masuk ke panel admin untuk mengelola karyawan perusahaan Anda.

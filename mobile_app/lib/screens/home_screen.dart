@@ -316,7 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Image.asset('assets/images/logo.png', height: 32),
             SizedBox(width: 8),
-            Text('aivola', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+            Text('Aivola.id', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
           ],
         ),
         backgroundColor: Colors.white,

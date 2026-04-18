@@ -30,7 +30,7 @@ const Header = () => (
   <nav className="header-nav">
     <div className="logo-container">
       <Logo />
-      <span className="logo-text">aivola</span>
+      <span className="logo-text">Aivola.id.id</span>
       <span className="logo-badge">AI Powered</span>
     </div>
     <div className="nav-links">
@@ -38,7 +38,7 @@ const Header = () => (
       <a href="#ai-showcase" className="nav-ai-link">AI Co-Pilot</a>
       <a href="#finance" className="nav-finance-link">Finance & POS</a>
       <a href="#pricing">Harga</a>
-      <a href="https://admin.aivola.id" className="btn-login">Masuk</a>
+      <a href="https://admin.Aivola.id.id" className="btn-login">Masuk</a>
     </div>
   </nav>
 );
@@ -56,7 +56,7 @@ const Hero = () => (
         Didesain untuk membantu bisnis Anda tumbuh lebih cepat.
       </p>
       <div className="cta-group">
-        <a href="https://admin.aivola.id/register" className="btn-primary">Coba Gratis 14 Hari</a>
+        <a href="https://admin.Aivola.id.id/register" className="btn-primary">Coba Gratis 14 Hari</a>
         <a href="https://wa.me/6287882716935" className="btn-secondary">Konsultasi Gratis</a>
       </div>
     </div>
@@ -90,10 +90,10 @@ const AIShowcase = () => {
       <div className="ai-container">
         <div className="ai-header">
             <div className="hero-badge animate-pulse">
-                <Zap size={14} className="fill-amber-400 text-amber-400" /> NEW: AIVOLA MIND AI
+                <Zap size={14} className="fill-amber-400 text-amber-400" /> NEW: Aivola.id MIND AI
             </div>
             <h2>Kelola Bisnis dengan <span className="text-gradient">Kekuatan AI</span></h2>
-            <p>Hanya di Aivola, bisnis Anda dikelola oleh asisten cerdas yang bekerja 24 jam penuh tanpa lelah.</p>
+            <p>Hanya di Aivola.id, bisnis Anda dikelola oleh asisten cerdas yang bekerja 24 jam penuh tanpa lelah.</p>
         </div>
 
         <div className="ai-grid">
@@ -235,7 +235,7 @@ const PricingSection = () => {
             <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Laporan Penjualan Dasar</li>
           </ul>
           <a 
-            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket STARTER (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            href={"https://wa.me/6287882716935?text=Halo Aivola.id, saya tertarik dengan Paket STARTER (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
             target="_blank" 
             rel="noopener noreferrer"
             className="btn-cta-big" 
@@ -264,7 +264,7 @@ const PricingSection = () => {
             <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> AI Stock Forecasting</li>
           </ul>
           <a 
-            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket PRO (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            href={"https://wa.me/6287882716935?text=Halo Aivola.id, saya tertarik dengan Paket PRO (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
             target="_blank" 
             rel="noopener noreferrer"
             className="btn-cta-big" 
@@ -292,7 +292,7 @@ const PricingSection = () => {
             <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Prioritas Support 24/7</li>
           </ul>
           <a 
-            href={"https://wa.me/6287882716935?text=Halo Aivola, saya tertarik dengan Paket ENTERPRISE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            href={"https://wa.me/6287882716935?text=Halo Aivola.id, saya tertarik dengan Paket ENTERPRISE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
             target="_blank" 
             rel="noopener noreferrer"
             className="btn-cta-big" 
@@ -343,7 +343,7 @@ const PricingSection = () => {
             </div>
             <div style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ color: 'white', fontWeight: 700 }}>🧠 Aivola Mind (AI Advisor)</span>
+                <span style={{ color: 'white', fontWeight: 700 }}>🧠 Aivola.id Mind (AI Advisor)</span>
                 <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 20.000/bln</span>
               </div>
               <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Penasehat bisnis AI strategis untuk seluruh level paket Anda.</p>
@@ -374,13 +374,13 @@ const PricingSection = () => {
 const AboutSection = () => (
   <section id="about" className="about-section">
     <div className="section-header">
-      <div className="hero-badge">Tentang Aivola</div>
+      <div className="hero-badge">Tentang Aivola.id</div>
       <h2>Masa Depan Manajemen SDM Indonesia</h2>
       <p>Solusi cerdas untuk mengelola aset paling berharga perusahaan Anda: Karyawan.</p>
     </div>
     <div className="about-grid">
       <div className="about-text">
-        <p>Aivola lahir dari kebutuhan mendalam akan sistem manajemen sumber daya manusia yang tidak hanya efisien, tetapi juga cerdas. Kami menggabungkan teknologi cloud SaaS terdepan dengan integrasi AI untuk membantu perusahaan dari berbagai industri...</p>
+        <p>Aivola.id lahir dari kebutuhan mendalam akan sistem manajemen sumber daya manusia yang tidak hanya efisien, tetapi juga cerdas. Kami menggabungkan teknologi cloud SaaS terdepan dengan integrasi AI untuk membantu perusahaan dari berbagai industri...</p>
         <div className="vision-card">
           <h4>Visi Kami</h4>
           <p>Menjadi mitra strategis bagi setiap HRD di Indonesia dalam menciptakan lingkungan kerja yang produktif, transparan, dan terautomasi sepenuhnya.</p>
@@ -409,7 +409,7 @@ const IndustrySection = () => (
   <section className="industry-section">
     <div className="section-header">
       <h2>Cocok untuk Berbagai Jenis Bisnis</h2>
-      <p>Fleksibilitas Aivola telah terbukti membantu efisiensi operasional di berbagai sektor industri.</p>
+      <p>Fleksibilitas Aivola.id telah terbukti membantu efisiensi operasional di berbagai sektor industri.</p>
     </div>
     <div className="industry-grid">
       {[
@@ -571,7 +571,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
               </div>
 
               <div style={{padding: '2rem', background: 'rgba(139, 92, 246, 0.05)', borderRadius: '24px', border: '1px solid rgba(139, 92, 246, 0.2)'}}>
-                <div style={{color: '#a78bfa', fontWeight: 700, marginBottom: '1rem'}}>Aivola Skill Mentor (AI):</div>
+                <div style={{color: '#a78bfa', fontWeight: 700, marginBottom: '1rem'}}>Aivola.id Skill Mentor (AI):</div>
                 <p style={{color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6}}>
                   "Sistem AI mendeteksi 5 karyawan baru belum menyelesaikan ujian SOP Kebersihan. Disarankan untuk mengirimkan notifikasi pengingat via WhatsApp."
                 </p>
@@ -583,7 +583,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
             <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                 <div>
-                  <h3 style={{margin: 0, color: 'white'}}>Aivola Cloud System Intelligence</h3>
+                  <h3 style={{margin: 0, color: 'white'}}>Aivola.id Cloud System Intelligence</h3>
                   <p style={{color: '#94a3b8', margin: '0.5rem 0 0'}}>Executive summary & AI-powered strategic insights.</p>
                 </div>
                 <div style={{padding: '0.6rem 1.2rem', background: '#111', borderRadius: '12px', color: '#8b5cf6', fontSize: '0.8rem', border: '1px solid #8b5cf6'}}>ENTER TV MODE</div>
@@ -621,7 +621,7 @@ const VideoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
         </div>
         
         <div style={{padding: '1.5rem', textAlign: 'center', background: 'rgba(255,255,255,0.01)', fontSize: '0.8rem', color: '#444', borderTop: '1px solid rgba(255,255,255,0.05)'}}>
-          Demo Aivola SaaS System v1.0 • Built with Intelligent AI
+          Demo Aivola.id SaaS System v1.0 • Built with Intelligent AI
         </div>
       </div>
     </div>
@@ -660,7 +660,7 @@ const DemoSection = ({ onPlay }: { onPlay: () => void }) => (
       }}>
         <div style={{textAlign: 'center', color: '#8b5cf6', opacity: 0.5}}>
           <span style={{fontSize: '5rem'}}>📊</span>
-          <h3>Aivola HR Dashboard</h3>
+          <h3>Aivola.id HR Dashboard</h3>
           <p>Visualisasi Data Karyawan & Payroll</p>
         </div>
         
@@ -708,7 +708,7 @@ const Footer = () => (
   <footer className="footer">
     <div className="footer-content">
       <div className="footer-brand">
-        <span className="logo-text">aivola</span>
+        <span className="logo-text">Aivola.id.id</span>
         <p>Sistem Manajemen Bisnis yang Cerdas & Terintegrasi.</p>
       </div>
       <div className="footer-links">
@@ -727,7 +727,7 @@ const Footer = () => (
       </div>
     </div>
     <div className="footer-bottom">
-      &copy; 2026 Aivola. Built with ❤️ in Indonesia.
+      &copy; 2026 Aivola.id. Built with ❤️ in Indonesia.
     </div>
   </footer>
 );

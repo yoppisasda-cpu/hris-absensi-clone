@@ -910,7 +910,7 @@ class _POSScreenState extends State<POSScreen> {
     return Scaffold(
       backgroundColor: Color(0xFFF7F8FA),
       appBar: AppBar(
-        title: Text('Aivola POS', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: Text('Aivola.id POS', style: TextStyle(fontWeight: FontWeight.w900)),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,

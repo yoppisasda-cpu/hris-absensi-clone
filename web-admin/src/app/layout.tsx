@@ -10,8 +10,8 @@ import { UpgradeModal } from '@/components/dashboard/UpgradeModal';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'aivola HR Admin Panel - AI Powered HR',
-  description: 'Portal Web Admin untuk mengelola Dashboard Multi-Tenant aivola',
+  title: 'Aivola.id HR Admin Panel - AI Powered HR',
+  description: 'Portal Web Admin untuk mengelola Dashboard Multi-Tenant Aivola.id',
 };
 
 export default function RootLayout({

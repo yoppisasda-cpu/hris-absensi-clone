@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In id, this message translates to:
-  /// **'Aivola'**
+  /// **'Aivola.id'**
   String get appTitle;
 
   /// No description provided for @menuHome.
