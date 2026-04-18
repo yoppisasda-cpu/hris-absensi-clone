@@ -46,6 +46,7 @@ export default function ExecutiveDashboard() {
   const [finData, setFinData] = useState<any[]>([]);
   const [invData, setInvData] = useState<any>(null);
   const [insights, setInsights] = useState<any[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,6 +70,7 @@ export default function ExecutiveDashboard() {
       }
     };
     fetchData();
+    setIsMounted(true);
   }, []);
 
   const toggleTVMode = () => {
@@ -237,33 +239,46 @@ export default function ExecutiveDashboard() {
             variant="blue"
             className={`h-[450px] ${isTVMode ? 'bg-slate-900/50 border-white/10' : ''}`}
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={finData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" stroke={isTVMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke={isTVMode ? '#64748b' : '#94a3b8'} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `Rp${(v/1000000).toFixed(1)}M`} />
-                <Tooltip 
-                    contentStyle={{ 
-                        backgroundColor: isTVMode ? '#0f172a' : '#fff', 
-                        borderRadius: '16px', 
-                        border: 'none', 
-                        boxShadow: '0 20px 50px rgba(0,0,0,0.1)',
-                        color: isTVMode ? '#fff' : '#000'
-                    }} 
-                />
-                <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorRevenue)" />
-                <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={4} fillOpacity={1} fill="url(#colorExpense)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="h-[350px] w-full flex items-center justify-center">
+              {!isMounted ? (
+                <div className="flex flex-col items-center gap-3 animate-pulse">
+                  <div className="h-8 w-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                  <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest italic">Initializing Canvas...</p>
+                </div>
+              ) : finData.length === 0 ? (
+                <div className="text-center p-12 bg-slate-900/20 rounded-3xl border border-dashed border-white/5 w-full">
+                  <p className="text-slate-500 text-sm font-medium italic">Belum ada data aliran kas untuk divisualisasikan.</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={finData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" stroke={isTVMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke={isTVMode ? '#64748b' : '#94a3b8'} fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `Rp${(v/1000000).toFixed(1)}M`} />
+                    <Tooltip 
+                        contentStyle={{ 
+                            backgroundColor: isTVMode ? '#0f172a' : '#fff', 
+                            borderRadius: '16px', 
+                            border: 'none', 
+                            boxShadow: '0 20px 50px rgba(0,0,0,0.1)',
+                            color: isTVMode ? '#fff' : '#000'
+                        }} 
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorRevenue)" />
+                    <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={4} fillOpacity={1} fill="url(#colorExpense)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </ExecutiveCard>
         </div>
 
