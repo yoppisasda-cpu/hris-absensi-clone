@@ -277,7 +277,5 @@ export default function PaycheckModal({ isOpen, onClose, payroll, company }: Pay
                 </div>
             </div>
         </div>
-            </div>
-        </div>
     );
 }

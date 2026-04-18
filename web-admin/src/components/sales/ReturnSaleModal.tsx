@@ -250,8 +250,5 @@ export default function ReturnSaleModal({ isOpen, onClose, saleId, onRefresh }: 
 
             </div>
         </div>
-
-            </div>
-        </div>
     );
 }

@@ -186,7 +186,6 @@ export default function EmployeeDocumentsModal({ userId, userName, isOpen, onClo
                                 ))}
                             </div>
                         )}
-                    </div>
                 </div>
             </div>
         </div>
