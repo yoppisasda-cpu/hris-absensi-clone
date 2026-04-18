@@ -12,6 +12,10 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Aivola.id HR Admin Panel - AI Powered HR',
   description: 'Portal Web Admin untuk mengelola Dashboard Multi-Tenant Aivola.id',
+  icons: {
+    icon: '/favicon.ico?v=2',
+    apple: '/favicon.ico?v=2',
+  },
 };
 
 export default function RootLayout({
