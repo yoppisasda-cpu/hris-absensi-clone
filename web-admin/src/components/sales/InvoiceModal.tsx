@@ -219,7 +219,6 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                         </div>
                     )}
                 </div>
-
             </div>
         </div>
     );

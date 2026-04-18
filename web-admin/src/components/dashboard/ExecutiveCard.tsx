@@ -55,7 +55,7 @@ const ExecutiveCard: React.FC<ExecutiveCardProps> = ({
             )}
         </div>
 
-        <div className="space-y-1 relative z-10">
+        <div className="space-y-1 relative z-10 flex-1 flex flex-col">
             {title && <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{title}</h3>}
             <div className="flex items-baseline gap-2">
                 {value && <p className="text-4xl font-black text-white tracking-tighter italic">{value}</p>}
