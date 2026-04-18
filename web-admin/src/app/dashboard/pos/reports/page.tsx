@@ -8,7 +8,7 @@ import {
     Search, Monitor, Download, Eye, Printer, 
     Building2, Calendar, Filter, CreditCard, 
     TrendingUp, ShoppingCart, ArrowUpRight, ArrowDownRight,
-    Trophy, Sparkles
+    Trophy, Sparkles, Receipt
 } from "lucide-react";
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -193,7 +193,7 @@ export default function POSReportsPage() {
 
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm relative overflow-hidden group">
                     <div className="absolute right-0 top-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform">
-                        < Sparkles className="h-24 w-24 text-emerald-500" />
+                        <Sparkles className="h-24 w-24 text-emerald-500" />
                     </div>
                     <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1 flex items-center gap-2">
                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" />
