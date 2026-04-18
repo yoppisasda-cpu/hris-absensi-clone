@@ -86,7 +86,6 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
     if (!isOpen) return null;
 
     return (
-    return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
             <div className="glass w-full max-w-lg rounded-[3.5rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
