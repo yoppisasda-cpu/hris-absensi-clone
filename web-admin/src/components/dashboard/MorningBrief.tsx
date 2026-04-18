@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, ArrowRight, Sun, Calendar, TrendingUp, AlertCircle, ShoppingBag } from 'lucide-react';
+import { Sparkles, Sun, Calendar, TrendingUp, AlertCircle, ShoppingBag } from 'lucide-react';
 
 interface MorningBriefProps {
     stats: any;
@@ -112,13 +112,7 @@ const MorningBrief: React.FC<MorningBriefProps> = ({ stats, insights, loading, a
                         </div>
                     </div>
 
-                    <button 
-                        onClick={() => window.scrollTo({ top: 500, behavior: 'smooth' })}
-                        className="group/btn flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-95"
-                    >
-                        Lihat Detail Analita
-                        <ArrowRight className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
-                    </button>
+
                 </div>
             </div>
         </div>
