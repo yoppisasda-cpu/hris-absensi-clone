@@ -106,9 +106,10 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 animate-in fade-in duration-300">
-            <div className="w-full max-w-4xl bg-slate-900 rounded-[40px] shadow-[0_0_100px_rgba(79,70,229,0.1)] overflow-hidden animate-in fade-in zoom-in duration-300 border border-slate-700/50 flex flex-col max-h-[95vh]">
-                <div className="bg-slate-950/50 border-b border-white/5 px-8 py-6 flex justify-between items-center shrink-0">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="glass w-full max-w-4xl max-h-[95vh] rounded-[3rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col">
+                <div className="bg-slate-950/50 border-b border-indigo-500/20 px-10 py-8 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
                             <ShoppingBag className="h-6 w-6 stroke-[2.5px]" />
@@ -118,7 +119,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Official Purchase Order Requisition</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
                         <X className="h-5 w-5" />
                     </button>
                 </div>

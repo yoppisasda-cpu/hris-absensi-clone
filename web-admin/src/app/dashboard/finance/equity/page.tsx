@@ -335,37 +335,34 @@ export default function EquityPage() {
 
             {/* Modal: Edit Capital */}
             {isEditCapitalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200">
-                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                <Wallet className="h-5 w-5 text-blue-600" /> Modal Dasar PT
-                            </h2>
-                            <button onClick={() => setIsEditCapitalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                                <Plus className="h-5 w-5 text-slate-500 rotate-45" />
-                            </button>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={() => setIsEditCapitalOpen(false)} />
+                    <div className="glass w-full max-w-sm rounded-[4rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="p-12 pb-6 text-center">
+                            <div className="w-20 h-20 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-500/10">
+                                <Wallet className="w-10 h-10 text-indigo-400" />
+                            </div>
+                            <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic tracking-tight">Modal Dasar PT</h2>
+                            <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-3 px-6 leading-loose italic leading-relaxed">Nilai nominal saham perseroan sesuai AKTA anggaran dasar.</p>
                         </div>
-                        <form onSubmit={handleUpdateCapital} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Nominal Modal Dasar (Rp)</label>
+                        <form onSubmit={handleUpdateCapital} className="p-12 pt-4 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.15em] ml-1 italic italic">Nominal Capital (Rp)</label>
                                 <input 
                                     required
                                     type="number"
                                     value={tempCapital}
                                     onChange={(e) => setTempCapital(e.target.value)}
-                                    className="w-full rounded-lg border border-slate-200 px-3 py-3 text-lg font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-5 text-white text-xl font-black outline-none focus:border-indigo-500/50 transition-all placeholder:text-white/5 italic"
                                     placeholder="0"
                                 />
-                                <p className="text-[10px] text-slate-400 mt-2 italic leading-relaxed">
-                                    Modal dasar adalah seluruh nilai nominal saham perseroan yang disebut dalam anggaran dasar (AKTA).
-                                </p>
                             </div>
                             <button 
                                 type="submit" 
                                 disabled={isProcessing}
-                                className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all italic"
                             >
-                                {isProcessing ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : 'Simpan Modal Dasar'}
+                                {isProcessing ? 'Saving...' : 'Simpan Modal Dasar'}
                             </button>
                         </form>
                     </div>

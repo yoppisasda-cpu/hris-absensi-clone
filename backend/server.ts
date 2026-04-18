@@ -6346,10 +6346,35 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     });
     const totalReceivable = Number(receivableAgg._sum.totalAmount || 0);
 
-    const inventoryValRes: any[] = await prisma.$queryRawUnsafe(`
-      SELECT SUM(stock * price) as value FROM "Product" WHERE "companyId" = $1
-    `, tenantId);
-    const inventoryValue = Number(inventoryValRes[0]?.value || 0);
+    // 6. Inventory Valuation (Aligned with Inventory Page logic)
+    const products = await prisma.product.findMany({
+      where: { companyId: tenantId },
+      include: {
+        Recipes: {
+          include: { Material: true }
+        }
+      }
+    });
+
+    const getProductCost = (product: any, allProducts: any[], visited = new Set<number>()): number => {
+      if (!product || visited.has(product.id)) return 0;
+      visited.add(product.id);
+
+      if (product.Recipes && product.Recipes.length > 0) {
+        return product.Recipes.reduce((sum: number, r: any) => {
+          const material = allProducts.find(m => m.id === r.materialId);
+          const materialUnitCost = material ? getProductCost(material, allProducts, new Set(visited)) : (r.Material?.costPrice || 0);
+          return sum + (r.quantity * materialUnitCost);
+        }, 0);
+      }
+
+      return product.costPrice || 0;
+    };
+
+    const inventoryValue = products.reduce((sum, p) => {
+      const unitCost = (p.Recipes && p.Recipes.length > 0) ? getProductCost(p, products) : (p.costPrice || 0);
+      return sum + (Number(p.stock || 0) * unitCost);
+    }, 0);
 
     // 7. NEW: Rincian Gaji Karyawan (Untuk Dashboard Coffee)
     let staff_list: any[] = [];
@@ -10577,77 +10602,163 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     // 1. Get user branch
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
-    const { branchId } = req.query;
+    const { branchId, startDate, endDate, paymentMethod } = req.query;
 
     // 2. Build query based on branch and role
-    let sales: any[];
     const isPosViewer = (user?.role as string) === 'POS_VIEWER';
-    const invoiceFilter = isPosViewer ? `AND s."invoiceNumber" LIKE 'POS-%'` : '';
+    
+    let whereConditions = [`s."companyId" = ${tenantId}`];
+    if (isPosViewer) {
+      whereConditions.push(`s."invoiceNumber" LIKE 'POS-%'`);
+    }
 
-    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE' || isPosViewer) {
-      // Admins and owners see everything for the company, but can filter by branchId if provided
-      let effectiveBranchId = branchId;
+    // Branch Filter
+    let effectiveBranchId = branchId;
+    if (isPosViewer && user?.branchId) {
+      effectiveBranchId = user.branchId.toString();
+    }
 
-      // FORCED ISOLATION: POS_VIEWER with assigned branch cannot see others
-      if (isPosViewer && user?.branchId) {
-          effectiveBranchId = user.branchId.toString();
-      }
-
-      if (effectiveBranchId && effectiveBranchId !== 'all') {
-        const bId = effectiveBranchId === 'null' ? null : parseInt(effectiveBranchId as string);
-        
-        if (bId === null) {
-          sales = await prisma.$queryRawUnsafe(`
-            SELECT s.*, c.name as "customerName"
-            FROM "Sale" s
-            LEFT JOIN "Customer" c ON s."customerId" = c.id
-            WHERE s."companyId" = $1 AND s."branchId" IS NULL ${invoiceFilter}
-            ORDER BY s."date" DESC
-          `, tenantId);
-        } else {
-          sales = await prisma.$queryRawUnsafe(`
-            SELECT s.*, c.name as "customerName"
-            FROM "Sale" s
-            LEFT JOIN "Customer" c ON s."customerId" = c.id
-            WHERE s."companyId" = $1 AND s."branchId" = $2 ${invoiceFilter}
-            ORDER BY s."date" DESC
-          `, tenantId, bId);
-        }
+    if (effectiveBranchId && effectiveBranchId !== 'all') {
+      if (effectiveBranchId === 'null') {
+        whereConditions.push(`s."branchId" IS NULL`);
       } else {
-        sales = await prisma.$queryRawUnsafe(`
-          SELECT s.*, c.name as "customerName"
-          FROM "Sale" s
-          LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 ${invoiceFilter}
-          ORDER BY s."date" DESC
-        `, tenantId);
-      }
-    } else {
-      // Cashiers/Staff see only their branch's sales
-      if (user?.branchId === null) {
-        sales = await prisma.$queryRawUnsafe(`
-          SELECT s.*, c.name as "customerName"
-          FROM "Sale" s
-          JOIN "User" u ON s."cashierId" = u.id
-          LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 AND u."branchId" IS NULL ${invoiceFilter}
-          ORDER BY s."date" DESC
-        `, tenantId);
-      } else {
-        sales = await prisma.$queryRawUnsafe(`
-          SELECT s.*, c.name as "customerName"
-          FROM "Sale" s
-          JOIN "User" u ON s."cashierId" = u.id
-          LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 AND u."branchId" = $2 ${invoiceFilter}
-          ORDER BY s."date" DESC
-        `, tenantId, user?.branchId);
+        whereConditions.push(`s."branchId" = ${parseInt(effectiveBranchId as string)}`);
       }
     }
+
+    // Date Filter
+    if (startDate) {
+      whereConditions.push(`s."date" >= '${startDate}'`);
+    }
+    if (endDate) {
+      // Add one day to endDate to include the entire day
+      const d = new Date(endDate as string);
+      d.setDate(d.getDate() + 1);
+      whereConditions.push(`s."date" < '${d.toISOString().split('T')[0]}'`);
+    }
+
+    // Payment Method Filter
+    if (paymentMethod && paymentMethod !== 'all') {
+      whereConditions.push(`s."notes" ILIKE '%${paymentMethod}%'`);
+    }
+
+    // Role-based Access (Non-Admin Restricted to their own branch)
+    const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '');
+    if (!isAdmin && !isPosViewer) {
+      if (user?.branchId === null) {
+        whereConditions.push(`s."branchId" IS NULL`);
+      } else {
+        whereConditions.push(`s."branchId" = ${user?.branchId}`);
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+    
+    // Use explicit column selection to avoid property name issues
+    const sales = await prisma.$queryRawUnsafe(`
+      SELECT s.*, c.name as "customerName"
+      FROM "Sale" s
+      LEFT JOIN "Customer" c ON s."customerId" = c.id
+      ${whereClause}
+      ORDER BY s."date" DESC
+    `);
     
     res.json(sales);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil data penjualan: ' + error.message });
+  }
+});
+
+app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
+
+    const { branchId, startDate, endDate } = req.query;
+
+    let whereConditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`];
+    let queryParams: any[] = [tenantId];
+    let paramIndex = 2;
+    
+    if (branchId && branchId !== 'all') {
+      if (branchId === 'null') {
+        whereConditions.push(`s."branchId" IS NULL`);
+      } else {
+        whereConditions.push(`s."branchId" = $${paramIndex++}`);
+        queryParams.push(parseInt(branchId as string));
+      }
+    }
+
+    if (startDate) {
+      whereConditions.push(`s."date" >= $${paramIndex++}`);
+      queryParams.push(new Date(startDate as string));
+    }
+    if (endDate) {
+      const d = new Date(endDate as string);
+      d.setDate(d.getDate() + 1);
+      whereConditions.push(`s."date" < $${paramIndex++}`);
+      queryParams.push(d);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // 1. Top Products
+    const topProducts = await prisma.$queryRawUnsafe(`
+      SELECT p.name, SUM(si.quantity) as "totalSold", SUM(si.total) as "totalRevenue"
+      FROM "SaleItem" si
+      JOIN "Sale" s ON si."saleId" = s.id
+      JOIN "Product" p ON si."productId" = p.id
+      WHERE ${whereClause}
+      GROUP BY p.name
+      ORDER BY "totalSold" DESC
+      LIMIT 5
+    `, ...queryParams);
+
+    // 2. Sales Trend (Daily)
+    const salesTrend = await prisma.$queryRawUnsafe(`
+      SELECT DATE_TRUNC('day', s."date") as "date", SUM(s."totalAmount") as "total", COUNT(s.id) as "count"
+      FROM "Sale" s
+      WHERE ${whereClause}
+      GROUP BY DATE_TRUNC('day', s."date")
+      ORDER BY "date" ASC
+    `, ...queryParams);
+
+    // 3. Payment Method Distribution
+    const paymentMethods = await prisma.$queryRawUnsafe(`
+      SELECT method, SUM(totalAmount) as total
+      FROM (
+        SELECT 
+          CASE 
+            WHEN s."notes" ILIKE '%QRIS%' THEN 'QRIS'
+            WHEN s."notes" ILIKE '%GOFOOD%' THEN 'GOFOOD'
+            WHEN s."notes" ILIKE '%GRABFOOD%' THEN 'GRABFOOD'
+            WHEN s."notes" ILIKE '%SHOPEEFOOD%' THEN 'SHOPEEFOOD'
+            WHEN s."notes" ILIKE '%TRANSFER%' THEN 'TRANSFER'
+            ELSE 'TUNAI'
+          END as method,
+          s."totalAmount" as totalAmount
+        FROM "Sale" s
+        WHERE ${whereClause}
+      ) sub
+      GROUP BY method
+      ORDER BY total DESC
+    `, ...queryParams);
+
+    // Helper to handle BigInt serialization
+    const serialize = (data: any) => {
+      return JSON.parse(JSON.stringify(data, (key, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+      ));
+    };
+
+    res.json(serialize({
+      topProducts,
+      salesTrend,
+      paymentMethods
+    }));
+  } catch (error: any) {
+    console.error("POS Analytics Error Detail:", error);
+    res.status(500).json({ error: 'Gagal menganalisa data POS: ' + error.message });
   }
 });
 

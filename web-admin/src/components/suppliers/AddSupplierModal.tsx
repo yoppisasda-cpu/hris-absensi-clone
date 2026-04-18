@@ -65,128 +65,130 @@ export default function AddSupplierModal({ isOpen, onClose, onSuccess, editData 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#050505]/95 backdrop-blur-2xl animate-in fade-in duration-300">
-            <div className="w-full max-w-lg rounded-[48px] bg-slate-900 border border-white/5 shadow-[0_0_100px_rgba(245,158,11,0.1)] animate-in zoom-in-95 duration-300 overflow-hidden">
-                <div className="bg-slate-950/50 px-10 py-8 flex items-center justify-between border-b border-white/5">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="glass w-full max-w-lg rounded-[3.5rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="bg-slate-950/50 border-b border-amber-500/20 px-10 py-8 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                        <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shadow-lg shadow-amber-500/10">
                             <Truck className="h-6 w-6 stroke-[2.5px]" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-black italic tracking-tighter uppercase text-white text-glow-sm">
-                                {editData ? 'MOD_PARTNER' : 'NEW_PARTNER'}
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">
+                                {editData ? 'Nexus Vendor Edit' : 'Nexus Vendor Registry'}
                             </h3>
-                            <p className="text-[10px] text-slate-500 font-black tracking-[0.2em] uppercase italic mt-1 opacity-70">Logistics Schema Directive</p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Global Supply Chain & Logistics Hub</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
-                        <X className="h-6 w-6" />
+                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-10 space-y-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                    <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-2">Executive Nomenclature</label>
+                <form onSubmit={handleSubmit} className="p-10 space-y-6 max-h-[80vh] overflow-y-auto no-scrollbar">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Vendor Nomenclature</label>
                         <div className="relative group">
                             <input
                                 type="text"
                                 required
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full rounded-[24px] border border-white/5 bg-slate-950 py-5 pl-14 pr-7 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-slate-800 italic uppercase tracking-[0.1em] shadow-inner"
-                                placeholder="INPUT BUSINESS ENTITY NAME..."
+                                className="w-full rounded-2xl bg-slate-950 border border-slate-800 pl-14 pr-6 py-4 text-xs font-black text-white focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800 shadow-inner"
+                                placeholder="E.G. APEX LOGISTICS CORP"
                             />
-                            <Truck className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-700 group-focus-within:text-amber-500 transition-colors stroke-[2px]" />
+                            <Truck className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-700 group-focus-within:text-amber-500 transition-colors" />
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-2">Human Liaison (PIC)</label>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Liaison Officer (PIC)</label>
                         <div className="relative group">
                             <input
                                 type="text"
                                 value={formData.contactPerson}
                                 onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                                className="w-full rounded-[24px] border border-white/5 bg-slate-950 py-5 pl-14 pr-7 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-slate-800 italic uppercase tracking-[0.1em] shadow-inner"
-                                placeholder="INPUT RESPONSIBLE PERSONNEL..."
+                                className="w-full rounded-2xl bg-slate-950 border border-slate-800 pl-14 pr-6 py-4 text-xs font-black text-white focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800 shadow-inner"
+                                placeholder="E.G. MARCUS VANCE"
                             />
-                            <User className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-700 group-focus-within:text-amber-500 transition-colors stroke-[2px]" />
+                            <User className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-700 group-focus-within:text-amber-500 transition-colors" />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-8">
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-2">Voice Comms</label>
+                    <div className="grid grid-cols-2 gap-5">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Voip Channel</label>
                             <div className="relative group">
                                 <input
                                     type="tel"
                                     value={formData.phone}
                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    className="w-full rounded-[24px] border border-white/5 bg-slate-950 py-5 pl-14 pr-7 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-slate-800 italic uppercase tracking-[0.1em] shadow-inner"
-                                    placeholder="TEL_NUMBER..."
+                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 pl-14 pr-6 py-4 text-xs font-black text-white focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800 shadow-inner"
+                                    placeholder="08XXX..."
                                 />
-                                <Phone className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-700 group-focus-within:text-amber-500 transition-colors stroke-[2px]" />
+                                <Phone className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-700 group-focus-within:text-amber-500 transition-colors" />
                             </div>
                         </div>
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-2">Vector Typology</label>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Material Typology</label>
                             <div className="relative group">
                                 <input
                                     type="text"
                                     value={formData.category}
                                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                    className="w-full rounded-[24px] border border-white/5 bg-slate-950 py-5 pl-14 pr-7 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-slate-800 italic uppercase tracking-[0.1em] shadow-inner"
-                                    placeholder="RAW/LOG/UTILITY..."
+                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 pl-14 pr-6 py-4 text-xs font-black text-white focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800 shadow-inner"
+                                    placeholder="E.G. RAW MATERIAL"
                                 />
-                                <Tag className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-700 group-focus-within:text-amber-500 transition-colors stroke-[2px]" />
+                                <Tag className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-700 group-focus-within:text-amber-500 transition-colors" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-2">Digital Liaison (Email)</label>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Data Anchor (Email)</label>
                         <div className="relative group">
                             <input
                                 type="email"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full rounded-[24px] border border-white/5 bg-slate-950 py-5 pl-14 pr-7 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-slate-800 italic uppercase tracking-[0.1em] shadow-inner"
-                                placeholder="INPUT COMMUNICATIONS ENDPOINT..."
+                                className="w-full rounded-2xl bg-slate-950 border border-slate-800 pl-14 pr-6 py-4 text-xs font-black text-white focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800 shadow-inner"
+                                placeholder="SUPPLY@Nexus.CO"
                             />
-                            <Mail className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-700 group-focus-within:text-amber-500 transition-colors stroke-[2px]" />
+                            <Mail className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-700 group-focus-within:text-amber-500 transition-colors" />
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-2">Geographic Directives (Address)</label>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Geospatial Directives</label>
                         <div className="relative group">
                             <textarea
                                 value={formData.address}
                                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                className="w-full rounded-[24px] border border-white/5 bg-slate-950 py-5 pl-14 pr-7 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all placeholder:text-slate-800 italic uppercase tracking-[0.1em] shadow-inner min-h-[120px] leading-relaxed resize-none"
+                                className="w-full rounded-[2rem] bg-slate-950 border border-slate-800 pl-14 pr-6 py-5 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all min-h-[100px] resize-none italic placeholder:text-slate-800 shadow-inner"
                                 placeholder="INPUT FULL LOGISTICS ADDRESS..."
                             />
-                            <MapPin className="absolute left-6 top-6 h-5 w-5 text-slate-700 group-focus-within:text-amber-500 transition-colors stroke-[2px]" />
+                            <MapPin className="absolute left-6 top-6 h-4 w-4 text-slate-700 group-focus-within:text-amber-500 transition-colors" />
                         </div>
                     </div>
 
-                    <div className="flex gap-4 pt-8 border-t border-white/5">
+                    <div className="flex gap-4 pt-6">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 rounded-[24px] border border-white/5 bg-slate-950/50 py-5 text-[10px] font-black text-slate-500 hover:text-white hover:bg-slate-950 transition-all uppercase tracking-[0.2em] italic border-b-4 border-b-white/5"
+                            className="flex-1 rounded-2xl bg-white/5 border border-white/5 py-5 text-[10px] font-black text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-[0.3em] italic"
                         >
                             Abort
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-[2] rounded-[24px] bg-amber-600 py-5 text-[10px] font-black text-white shadow-2xl shadow-amber-500/20 hover:bg-amber-700 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] border-b-4 border-b-amber-900"
+                            className="flex-[2] rounded-2xl bg-amber-600 py-5 text-[10px] font-black text-white shadow-2xl shadow-amber-600/20 hover:bg-amber-700 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.3em] italic border border-white/10"
                         >
                             {loading ? (
-                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                             ) : (
-                                <><Save className="h-4 w-4 stroke-[3px]" /> {editData ? 'UPDATE_SCHEMA' : 'INITIALIZE_PARTNER'}</>
+                                <><Save className="h-4 w-4 stroke-[3px]" /> {editData ? 'Sync Schema' : 'Transmit Registry'}</>
                             )}
                         </button>
                     </div>

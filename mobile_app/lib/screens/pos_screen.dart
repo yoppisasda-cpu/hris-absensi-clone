@@ -178,6 +178,7 @@ class _POSScreenState extends State<POSScreen> {
           'priceShopeefood': product['priceShopeefood'],
           'quantity': 1,
           'maxStock': product['stock'],
+          'trackStock': product['trackStock'] ?? true,
           'modifiers': modifiers,
         });
       }
@@ -200,12 +201,17 @@ class _POSScreenState extends State<POSScreen> {
         final newQty = _cart[index]['quantity'] + delta;
         if (newQty <= 0) {
           _cart.removeAt(index);
-        } else if (newQty <= _cart[index]['maxStock']) {
-          _cart[index]['quantity'] = newQty;
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Stok tidak cukup')),
-          );
+          bool trackStock = _cart[index]['trackStock'] ?? true;
+          int maxStock = (_cart[index]['maxStock'] ?? 0).toInt();
+
+          if (!trackStock || newQty <= maxStock) {
+            _cart[index]['quantity'] = newQty;
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Stok tidak cukup')),
+            );
+          }
         }
       }
     });
@@ -283,7 +289,7 @@ class _POSScreenState extends State<POSScreen> {
                 SizedBox(height: 20),
 
                 Container(
-                  constraints: BoxConstraints(maxHeight: 150),
+                  constraints: BoxConstraints(maxHeight: 400),
                   child: ListView.builder(
                     shrinkWrap: true,
                     itemCount: _cart.length,
@@ -587,12 +593,17 @@ class _POSScreenState extends State<POSScreen> {
                     }
                     
                     final bool isCash = _selectedPaymentMethod == 'Tunai';
-                    if (isCash && _cashReceived < _grandTotal) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Uang tunai kurang!')));
-                      return;
-                    }
                     if (_selectedAccountId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Silahkan buka pengaturan dan tambahkan Akun Keuangan terlebih dahulu')));
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text('Akun Keuangan Belum Set'),
+                          content: Text('Silahkan buka pengaturan di Web Admin dan tambahkan Akun Keuangan (Kas/Bank) terlebih dahulu agar bisa menerima pembayaran.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context), child: Text('OK')),
+                          ],
+                        ),
+                      );
                       return;
                     }
                     _processCheckout(context, isModal: isModal);
@@ -779,8 +790,15 @@ class _POSScreenState extends State<POSScreen> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal Checkout: $e'), backgroundColor: Colors.red),
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Gagal Checkout'),
+          content: Text('$e'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text('OK')),
+          ],
+        ),
       );
     } finally {
       setState(() => _isLoading = false);

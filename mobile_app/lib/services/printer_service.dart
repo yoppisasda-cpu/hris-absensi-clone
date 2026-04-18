@@ -177,6 +177,9 @@ class PrinterService {
 
     // Order Info
     bytes += generator.text('Invoice: ${saleData['invoiceNumber'] ?? '-'}');
+    if (saleData['customerName'] != null && saleData['customerName'].toString().isNotEmpty) {
+      bytes += generator.text('Pelanggan: ${saleData['customerName']}');
+    }
     bytes += generator.text('Tanggal: ${DateFormat('dd-MM-yyyy HH:mm').format(DateTime.now())}');
     bytes += generator.text('Kasir  : ${saleData['cashierName'] ?? 'Admin'}');
     bytes += generator.hr();
@@ -296,6 +299,8 @@ class PrinterService {
               pw.Center(child: pw.Text('Telp: ${store['phone']}', style: pw.TextStyle(fontSize: 8))),
               pw.Divider(thickness: 0.5),
               pw.Text('Invoice: ${saleData['invoiceNumber'] ?? '-'}', style: pw.TextStyle(fontSize: 8)),
+              if (saleData['customerName'] != null && saleData['customerName'].toString().isNotEmpty)
+                pw.Text('Pelanggan: ${saleData['customerName']}', style: pw.TextStyle(fontSize: 8)),
               pw.Text('Tanggal: ${DateFormat('dd-MM-yyyy HH:mm').format(DateTime.now())}', style: pw.TextStyle(fontSize: 8)),
               pw.Text('Kasir  : ${saleData['cashierName'] ?? 'Admin'}', style: pw.TextStyle(fontSize: 8)),
               pw.Divider(thickness: 0.5),

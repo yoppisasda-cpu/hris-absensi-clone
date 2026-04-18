@@ -18,63 +18,85 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
     if (!isOpen || !expense) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200 text-slate-900 border border-slate-200">
-                <div className="flex items-center justify-between border-b px-6 py-4">
-                    <h3 className="text-lg font-bold">Pelunasan Hutang (Tempo)</h3>
-                    <button onClick={onClose} className="rounded-full p-1 hover:bg-slate-100 transition-colors">
-                        <X className="h-5 w-5 text-slate-500" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="glass w-full max-w-md rounded-[3rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="bg-slate-950/50 border-b border-rose-500/20 px-10 py-8 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shadow-lg shadow-rose-500/10">
+                            <Wallet className="h-6 w-6 stroke-[2.5px]" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Debt Settlement</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic truncate max-w-[180px]">Account Payable Verification</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-4">
-                    <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
-                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">DATA TRANSAKSI</p>
-                        <p className="text-sm font-bold text-slate-700">{expense.category?.name} - {expense.paidTo || 'Vendor'}</p>
-                        <p className="text-xl font-black text-slate-900 mt-1">Rp {expense.amount.toLocaleString()}</p>
+                <div className="p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
+                    <div className="rounded-[2.5rem] bg-slate-950 border border-white/5 p-8 shadow-inner relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <CheckCircle2 className="h-20 w-20 text-emerald-500" />
+                        </div>
+                        <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-3 italic">LIFECYCLE PAYLOAD</p>
+                        <p className="text-sm font-black text-white italic truncate pr-12">{expense.category?.name} - {expense.paidTo || 'Vendor'}</p>
+                        <p className="text-3xl font-black text-white mt-2 tracking-tighter italic text-glow-sm">Rp {expense.amount.toLocaleString()}</p>
                     </div>
 
-                    <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest italic">Pilih Akun Sumber Dana:</label>
-                        <div className="grid gap-2">
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Funding Interface Selection</label>
+                        <div className="grid gap-3 p-2 bg-slate-950/50 border border-white/5 rounded-[2.5rem]">
                             {accounts.map(acc => (
                                 <button
                                     key={acc.id}
                                     type="button"
                                     onClick={() => setSelectedId(acc.id.toString())}
-                                    className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${selectedId === acc.id.toString() ? 'border-red-600 bg-red-50/50 shadow-md ring-1 ring-red-600' : 'border-slate-100 bg-slate-50 hover:border-slate-300'}`}
+                                    className={`flex items-center justify-between p-5 rounded-[1.8rem] border transition-all ${
+                                        selectedId === acc.id.toString() 
+                                        ? 'border-indigo-500/50 bg-indigo-500/10 shadow-lg shadow-indigo-500/5' 
+                                        : 'border-white/5 bg-slate-950 hover:border-white/10'
+                                    }`}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${selectedId === acc.id.toString() ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                                            <Wallet className="h-4 w-4" />
+                                    <div className="flex items-center gap-4">
+                                        <div className={`h-11 w-11 rounded-2xl flex items-center justify-center transition-colors ${
+                                            selectedId === acc.id.toString() ? 'bg-indigo-500 text-white shadow-lg' : 'bg-slate-900 text-slate-600'
+                                        }`}>
+                                            <Wallet className="h-5 w-5" />
                                         </div>
                                         <div className="text-left">
-                                            <p className={`text-sm font-bold ${selectedId === acc.id.toString() ? 'text-red-900' : 'text-slate-700'}`}>{acc.name}</p>
-                                            <p className="text-[10px] text-slate-400 font-medium">Saldo: Rp {acc.balance.toLocaleString()}</p>
+                                            <p className={`text-xs font-black italic uppercase tracking-widest transition-colors ${selectedId === acc.id.toString() ? 'text-white' : 'text-slate-500'}`}>{acc.name}</p>
+                                            <p className="text-[9px] text-slate-600 font-bold uppercase mt-1">Available: Rp {acc.balance.toLocaleString()}</p>
                                         </div>
                                     </div>
-                                    {selectedId === acc.id.toString() && <CheckCircle2 className="h-5 w-5 text-red-600" />}
+                                    {selectedId === acc.id.toString() && (
+                                        <div className="h-6 w-6 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                                            <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+                                        </div>
+                                    )}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    <div className="flex gap-3 pt-4">
+                    <div className="flex gap-4 pt-4">
                         <button
                             onClick={onClose}
-                            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all font-inter"
+                            className="flex-1 rounded-[24px] border border-white/5 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white hover:bg-white/5 transition-all italic"
                         >
-                            Batal
+                            Cancel
                         </button>
                         <button
                             disabled={!selectedId || loading}
                             onClick={() => onConfirm(selectedId)}
-                            className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+                            className="flex-[2] rounded-[24px] bg-emerald-600/20 text-emerald-500 border border-emerald-600/30 py-5 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/10 hover:bg-emerald-600 hover:text-white active:scale-95 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-3 italic"
                         >
                             {loading ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500"></div>
                             ) : (
-                                "LUNASI SEKARANG"
+                                "Execute Settlement"
                             )}
                         </button>
                     </div>

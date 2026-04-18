@@ -81,97 +81,110 @@ export default function EmployeeDocumentsModal({ userId, userName, isOpen, onClo
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200">
-                {/* Header */}
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                            <FileBox className="h-5 w-5 text-blue-600" /> Dokumen Karyawan
-                        </h2>
-                        <p className="text-sm text-slate-500">{userName}</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="glass w-full max-w-2xl rounded-[3rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="bg-slate-950/50 border-b border-blue-500/20 px-10 py-8 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shadow-lg shadow-blue-500/10">
+                            <FileBox className="h-6 w-6 stroke-[2.5px]" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Document Vault</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic truncate max-w-[250px]">{userName}</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition">
-                        <X className="h-6 w-6" />
+                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <div className="p-6">
+                <div className="p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
                     {/* Form Upload */}
-                    <form onSubmit={handleUpload} className="mb-8 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-                        <h3 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-4">Unggah Dokumen Baru</h3>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                            <div className="flex-1">
-                                <input
-                                    type="text"
-                                    placeholder="Nama Dokumen (misal: KTP, NPWP)"
-                                    value={docTitle}
-                                    onChange={e => setDocTitle(e.target.value)}
-                                    className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-blue-500 outline-none"
-                                />
+                    <form onSubmit={handleUpload} className="p-8 bg-slate-950 border border-white/5 rounded-[2.5rem] relative overflow-hidden group shadow-inner">
+                        <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
+                            <Plus className="h-20 w-20 text-blue-500" />
+                        </div>
+                        <h3 className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mb-6 italic ml-1">Ingress New Payload</h3>
+                        <div className="flex flex-col gap-5">
+                            <input
+                                type="text"
+                                placeholder="DOCUMENT DESCRIPTOR (E.G. KTP, NPWP)"
+                                value={docTitle}
+                                onChange={e => setDocTitle(e.target.value)}
+                                className="w-full rounded-2xl bg-slate-900 border border-slate-800 px-6 py-4 text-xs font-black text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800"
+                            />
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="flex-1 relative">
+                                    <input
+                                        type="file"
+                                        onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+                                        className="w-full text-[10px] text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:bg-blue-600/10 file:text-blue-500 hover:file:bg-blue-600/20 border border-slate-800 rounded-2xl p-2 bg-slate-900 italic uppercase tracking-widest"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isUploading || !selectedFile || !docTitle}
+                                    className="bg-blue-600 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3 italic border border-white/10 shadow-lg shadow-blue-900/20"
+                                >
+                                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 stroke-[3px]" />}
+                                    Commit
+                                </button>
                             </div>
-                            <div className="flex-1">
-                                <input
-                                    type="file"
-                                    onChange={e => setSelectedFile(e.target.files?.[0] || null)}
-                                    className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-white file:text-blue-700 hover:file:bg-blue-50 border border-slate-200 rounded-lg p-1"
-                                />
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={isUploading || !selectedFile || !docTitle}
-                                className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shrink-0"
-                            >
-                                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                                Unggah
-                            </button>
                         </div>
                     </form>
 
                     {/* List Dokumen */}
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Asset Repository Map</label>
                         {isLoading ? (
-                            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-                                <Loader2 className="h-8 w-8 animate-spin mb-2" />
-                                <p>Memuat dokumen...</p>
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                                <Loader2 className="h-10 w-10 animate-spin mb-4 text-blue-500/30" />
+                                <p className="text-[10px] font-black uppercase tracking-widest italic animate-pulse">Synchronizing Data...</p>
                             </div>
                         ) : documents.length === 0 ? (
-                            <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                                <FileText className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                                <p className="text-sm text-slate-500">Belum ada dokumen yang diunggah.</p>
+                            <div className="text-center py-20 bg-slate-950 rounded-[2.5rem] border border-dashed border-white/5">
+                                <FileText className="h-12 w-12 text-slate-800 mx-auto mb-4 opacity-5" />
+                                <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] italic">No active data payloads found</p>
                             </div>
                         ) : (
-                            documents.map(doc => (
-                                <div key={doc.id} className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-200 hover:bg-blue-50/20 transition group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                                            <FileText className="h-6 w-6" />
+                            <div className="grid gap-3">
+                                {documents.map(doc => (
+                                    <div key={doc.id} className="flex items-center justify-between p-6 bg-slate-950 border border-white/5 rounded-[2rem] hover:border-blue-500/30 hover:bg-slate-900/50 transition-all group shadow-inner">
+                                        <div className="flex items-center gap-5">
+                                            <div className="h-14 w-14 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex items-center justify-center text-blue-500/50 group-hover:text-blue-500 group-hover:bg-blue-500/10 transition-all shrink-0 shadow-lg">
+                                                <FileText className="h-7 w-7 stroke-[1.5px]" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-xs font-black text-white leading-none mb-2 uppercase tracking-widest italic">{doc.title}</h4>
+                                                <div className="flex items-center gap-3">
+                                                    <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest italic">Commit Date: {new Date(doc.createdAt).toLocaleDateString('id-ID')}</p>
+                                                    <div className="h-1 w-1 rounded-full bg-slate-800" />
+                                                    <p className="text-[9px] text-blue-500/50 font-black uppercase tracking-widest italic">Encrypted Secure Store</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="text-sm font-bold text-slate-900 leading-none mb-1">{doc.title}</h4>
-                                            <p className="text-[10px] text-slate-400">Diunggah pd: {new Date(doc.createdAt).toLocaleDateString('id-ID')}</p>
+                                        <div className="flex items-center gap-3">
+                                            <a
+                                                href={doc.fileUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="h-11 w-11 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-all group/btn"
+                                                title="Open Artifact"
+                                            >
+                                                <Download className="h-5 w-5 transform group-hover/btn:-translate-y-0.5 transition-transform" />
+                                            </a>
+                                            <button
+                                                onClick={() => handleDelete(doc.id)}
+                                                className="h-11 w-11 flex items-center justify-center text-rose-500/40 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl border border-white/5 hover:border-rose-500/20 transition-all group/btn"
+                                                title="Purge Script"
+                                            >
+                                                <Trash2 className="h-5 w-5 transform group-hover/btn:rotate-6 transition-transform" />
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <a
-                                            href={doc.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                                            title="Buka Dokumen"
-                                        >
-                                            <Download className="h-5 w-5" />
-                                        </a>
-                                        <button
-                                            onClick={() => handleDelete(doc.id)}
-                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                                            title="Hapus"
-                                        >
-                                            <Trash2 className="h-5 w-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>

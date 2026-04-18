@@ -107,130 +107,142 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between border-b px-6 py-4">
-                    <h3 className="text-lg font-bold text-slate-900">
-                        {initialData ? 'Ubah Pemasukan' : 'Catat Pemasukan Baru'}
-                    </h3>
-                    <button onClick={onClose} className="rounded-full p-1 hover:bg-slate-100 transition-colors">
-                        <X className="h-5 w-5 text-slate-500" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="glass w-full max-w-2xl rounded-[3.5rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="bg-slate-950/50 border-b border-emerald-500/20 px-10 py-8 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
+                            <TrendingUp className="h-6 w-6 stroke-[2.5px]" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Fiscal Accretion Node</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">{initialData ? 'Update Record Protocol' : 'Cash-In Initialization'}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal</label>
+                <form onSubmit={handleSubmit} className="p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Temporal Directive</label>
                             <input
                                 type="date"
                                 required
                                 value={formData.date}
                                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-emerald-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Jumlah (Rp)</label>
-                            <input
-                                type="number"
-                                required
-                                placeholder="0"
-                                value={formData.amount}
-                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono text-blue-600 font-bold"
-                            />
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] italic ml-1 font-black">Accretion Magnitude (IDR)</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    required
+                                    min="0"
+                                    placeholder="0"
+                                    value={formData.amount}
+                                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                    className="w-full bg-emerald-500/5 border border-emerald-500/20 rounded-2xl px-6 py-4 text-xs font-black text-emerald-400 focus:border-emerald-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-emerald-950"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Masuk ke Akun</label>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1 flex items-center gap-2">
+                            <Wallet className="h-3 w-3" /> Target Vault (Cash-In)
+                        </label>
                         <select
                             required
                             value={formData.accountId}
                             onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-all"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-emerald-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer"
                         >
                             {accounts.map(acc => (
-                                <option key={acc.id} value={acc.id}>{acc.name} (Saldo: Rp {acc.balance.toLocaleString()})</option>
+                                <option key={acc.id} value={acc.id} className="bg-slate-900">{acc.name.toUpperCase()} (Rp {acc.balance.toLocaleString()})</option>
                             ))}
                         </select>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kategori Pemasukan</label>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center ml-1">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Classification Vector</label>
                             {!showNewCategory && (
-                                <button type="button" onClick={() => setShowNewCategory(true)} className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1">
-                                    <Plus className="h-2 w-2" /> Kategori Baru
+                                <button type="button" onClick={() => setShowNewCategory(true)} className="text-[9px] font-black text-emerald-400 hover:text-emerald-300 flex items-center gap-2 uppercase tracking-[0.2em] italic transition-colors">
+                                    <Plus className="h-3 w-3 stroke-[3px]" /> NEW_TAG
                                 </button>
                             )}
                         </div>
                         
                         {showNewCategory ? (
-                            <div className="flex gap-2 animate-in slide-in-from-top-1 duration-200">
+                            <div className="flex gap-4 animate-in fade-in slide-in-from-top-2 duration-300 p-2 bg-slate-950 border border-emerald-500/20 rounded-[2rem]">
                                 <input
                                     type="text"
-                                    placeholder="Nama kategori..."
+                                    placeholder="INPUT NEW SCHE MA..."
                                     value={newCategoryName}
                                     onChange={(e) => setNewCategoryName(e.target.value)}
-                                    className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+                                    className="flex-1 bg-transparent px-6 py-3 text-xs font-black text-white outline-none italic uppercase tracking-widest placeholder:text-slate-900"
                                 />
-                                <button type="button" onClick={handleCreateCategory} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold">Simpan</button>
-                                <button type="button" onClick={() => setShowNewCategory(false)} className="text-slate-400 px-2 py-2 rounded-lg text-xs">Batal</button>
+                                <button type="button" onClick={handleCreateCategory} className="bg-emerald-600 text-white px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic shadow-lg shadow-emerald-600/20">COMMIT</button>
+                                <button type="button" onClick={() => setShowNewCategory(false)} className="text-slate-500 px-3 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
                             </div>
                         ) : (
                             <select
                                 required
                                 value={formData.categoryId}
                                 onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 transition-all font-medium"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-emerald-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer"
                             >
                                 {categories.map(cat => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    <option key={cat.id} value={cat.id} className="bg-slate-900">{cat.name.toUpperCase()}</option>
                                 ))}
                             </select>
                         )}
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Diterima Dari (Opsional)</label>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Entity Source / Origin</label>
                         <input
                             type="text"
-                            placeholder="Contoh: Customer A, PT. Maju Jaya"
+                            placeholder="EX: CORPORATE_CLIENT // INTERNAL_TRANSFER..."
                             value={formData.receivedFrom}
                             onChange={(e) => setFormData({ ...formData, receivedFrom: e.target.value })}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 outline-none transition-all"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-emerald-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-slate-900"
                         />
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan / Memo</label>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Internal Directives / Notes</label>
                         <textarea
-                            placeholder="Detail transaksi..."
+                            placeholder="INPUT TRANSACTIONAL DATA ANCHORS..."
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 outline-none transition-all min-h-[80px]"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-[2rem] px-8 py-6 text-xs font-black text-white focus:border-emerald-500/50 outline-none transition-all min-h-[120px] italic no-scrollbar uppercase tracking-widest placeholder:text-slate-900 shadow-inner resize-none"
                         />
                     </div>
 
-                    <div className="flex gap-3 pt-4">
+                    <div className="flex gap-4 pt-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                            className="flex-1 rounded-2xl bg-white/5 border border-white/5 py-5 text-[10px] font-black text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-[0.3em] italic"
                         >
-                            Batal
+                            Abort
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                            className="flex-[2] rounded-2xl bg-emerald-600 py-5 text-[10px] font-black text-white shadow-2xl shadow-emerald-900/40 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.3em] italic border border-white/10"
                         >
                             {loading ? (
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                             ) : (
-                                <><Save className="h-4 w-4" /> {initialData ? 'Perbarui Transaksi' : 'Simpan Transaksi'}</>
+                                <><Save className="h-4 w-4 stroke-[3px]" /> {initialData ? 'Update Record' : 'Transmit Schema'}</>
                             )}
                         </button>
                     </div>

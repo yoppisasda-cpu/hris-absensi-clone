@@ -125,7 +125,7 @@ export default function Header() {
                 </div>
             )}
             
-            <header className="flex h-16 w-full items-center justify-between px-6 glass rounded-2xl border border-white/20 shadow-premium">
+            <header className="flex h-16 w-full items-center justify-between px-6 glass rounded-2xl border border-white/10 shadow-premium bg-slate-900/40">
                 <div className="flex items-center gap-4">
                     {/* MODULE PICKER - Refined Premium Style */}
                     {allowedModules === 'BOTH' ? (

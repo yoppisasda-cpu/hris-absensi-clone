@@ -17,10 +17,10 @@
 }
 
 :root {
-  --background: #fdfdff;
-  --foreground: #1e293b;
-  --sidebar-bg: rgba(255, 255, 255, 0.8);
-  --card-bg: #ffffff;
+  --background: #020617; /* Dark Slate 950 */
+  --foreground: #f8fafc; /* Slate 50 */
+  --sidebar-bg: rgba(15, 23, 42, 0.8);
+  --card-bg: #0f172a;
   --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
 }
 
@@ -40,11 +40,18 @@ body {
 
 /* Custom Utilities for Glassmorphism */
 @utility glass-card {
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(15, 23, 42, 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.125);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: var(--shadow-glass);
+}
+
+.glass {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .primary-btn {

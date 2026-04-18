@@ -86,110 +86,121 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between border-b px-6 py-4">
-                    <h3 className="text-lg font-bold text-slate-900">
-                        {initialData ? 'Edit Akun Kas & Bank' : 'Tambah Akun Kas & Bank'}
-                    </h3>
-                    <button onClick={onClose} className="rounded-full p-1 hover:bg-slate-100 transition-colors">
-                        <X className="h-5 w-5 text-slate-500" />
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="glass w-full max-w-lg rounded-[3.5rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="bg-slate-950/50 border-b border-indigo-500/20 px-10 py-8 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
+                            <Landmark className="h-6 w-6 stroke-[2.5px]" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Fiscal Nexus Node</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">{initialData ? 'Update Profile Protocol' : 'Account Initialization'}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Akun</label>
-                        <input
-                            type="text"
-                            required
-                            placeholder="Contoh: Bank BCA, Kas Kecil, Tunai"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 outline-none transition-all"
-                        />
-                    </div>
+                <form onSubmit={handleSubmit} className="p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Account Nomenclature</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="EX: MAIN_RESERVE // PETTY_CASH..."
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-slate-900"
+                            />
+                        </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                            <Building2 className="h-3 w-3" /> Penempatan Cabang
-                        </label>
-                        <select
-                            value={formData.branchId}
-                            onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 outline-none transition-all"
-                        >
-                            <option value="">Kantor Pusat / Umum</option>
-                            {branches.map(branch => (
-                                <option key={branch.id} value={branch.id}>{branch.name}</option>
-                            ))}
-                        </select>
-                        <p className="text-[10px] text-slate-400 italic">Pilih cabang jika saldo ini khusus untuk outlet tertentu.</p>
-                    </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1 flex items-center gap-2">
+                                <Building2 className="h-3 w-3 text-indigo-400" /> Branch Affiliation
+                            </label>
+                            <select
+                                value={formData.branchId}
+                                onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer"
+                            >
+                                <option value="">ENTITAS PUSAT / GLOBAL</option>
+                                {branches.map(branch => (
+                                    <option key={branch.id} value={branch.id} className="bg-slate-900">{branch.name.toUpperCase()}</option>
+                                ))}
+                            </select>
+                        </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipe Akun</label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setFormData({ ...formData, type: 'BANK' })}
-                                className={`flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition-all ${
-                                    formData.type === 'BANK' 
-                                    ? 'border-blue-600 bg-blue-50 text-blue-600' 
-                                    : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                                }`}
-                            >
-                                < Landmark className="h-4 w-4" /> Bank
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setFormData({ ...formData, type: 'CASH' })}
-                                className={`flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition-all ${
-                                    formData.type === 'CASH' 
-                                    ? 'border-blue-600 bg-blue-50 text-blue-600' 
-                                    : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                                }`}
-                            >
-                                <Wallet className="h-4 w-4" /> Kas/Tunai
-                            </button>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Nexus Classification</label>
+                            <div className="grid grid-cols-2 gap-4 p-1.5 bg-slate-950 border border-white/5 rounded-[22px]">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, type: 'BANK' })}
+                                    className={`flex items-center justify-center gap-3 rounded-2xl py-4 text-[10px] font-black transition-all italic tracking-widest uppercase ${
+                                        formData.type === 'BANK' 
+                                        ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 shadow-lg' 
+                                        : 'text-slate-600 hover:text-white'
+                                    }`}
+                                >
+                                    <Landmark className="h-4 w-4" /> PERBANKAN
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, type: 'CASH' })}
+                                    className={`flex items-center justify-center gap-3 rounded-2xl py-4 text-[10px] font-black transition-all italic tracking-widest uppercase ${
+                                        formData.type === 'CASH' 
+                                        ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 shadow-lg' 
+                                        : 'text-slate-600 hover:text-white'
+                                    }`}
+                                >
+                                    <Wallet className="h-4 w-4" /> KAS / TUNAI
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className={`space-y-2 transition-all ${initialData ? 'opacity-40 filter blur-[0.5px]' : 'opacity-100'}`}>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">
+                                {initialData ? 'Liquid Assets (Read-Only)' : 'Initial Reserve Magnitude (IDR)'}
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    required
+                                    disabled={!!initialData}
+                                    placeholder="0"
+                                    value={formData.balance}
+                                    onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-slate-900"
+                                />
+                            </div>
+                            {initialData && (
+                                <p className="text-[8px] text-slate-600 italic ml-1 tracking-widest uppercase font-black uppercase">* Balance adjustments must be finalized via Journal Entries protocol.</p>
+                            )}
                         </div>
                     </div>
 
-                    <div className="space-y-1.5 opacity-80">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            {initialData ? 'Saldo Saat Ini (Rp)' : 'Saldo Awal (Rp)'}
-                        </label>
-                        <input
-                            type="number"
-                            required
-                            disabled={!!initialData}
-                            placeholder="0"
-                            value={formData.balance}
-                            onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-                            className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 outline-none transition-all font-mono font-bold text-blue-600 ${initialData ? 'bg-slate-50 cursor-not-allowed opacity-70' : ''}`}
-                        />
-                        {initialData && (
-                            <p className="text-[10px] text-slate-400 italic">* Saldo hanya bisa diubah melalui transaksi pemasukan/pengeluaran.</p>
-                        )}
-                    </div>
-
-                    <div className="flex gap-3 pt-4">
+                    <div className="flex gap-4 pt-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                            className="flex-1 rounded-2xl bg-white/5 border border-white/5 py-5 text-[10px] font-black text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-[0.3em] italic"
                         >
-                            Batal
+                            Abort
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                            className="flex-[2] rounded-2xl bg-indigo-600 py-5 text-[10px] font-black text-white shadow-2xl shadow-indigo-900/40 hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.3em] italic border border-white/10"
                         >
                             {loading ? (
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                             ) : (
-                                <><Save className="h-4 w-4" /> {initialData ? 'Simpan Perubahan' : 'Simpan Akun'}</>
+                                <><Save className="h-4 w-4 stroke-[3px]" /> {initialData ? 'Update Record' : 'Transmit Schema'}</>
                             )}
                         </button>
                     </div>

@@ -29,7 +29,7 @@ export default function DashboardLayout({
     }, [isMounted, router]);
 
     return (
-        <div className="flex h-screen bg-[#f8fafc] dark:bg-[#050505] overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 font-sans">
+        <div className="flex h-screen bg-[#020617] overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 font-sans">
             {/* Sidebar Kiri */}
             <div id="main-sidebar" className="print:hidden z-30 transition-all duration-500 ease-in-out">
                 <Sidebar />

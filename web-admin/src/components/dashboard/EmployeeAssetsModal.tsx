@@ -46,64 +46,69 @@ export default function EmployeeAssetsModal({ userId, userName, isOpen, onClose 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 transition-all scale-100">
-                {/* Header */}
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                            <Laptop className="h-5 w-5 text-blue-600" /> Aset Karyawan
-                        </h2>
-                        <p className="text-sm text-slate-500 font-medium">{userName}</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="glass w-full max-w-lg rounded-[3rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="bg-slate-950/50 border-b border-indigo-500/20 px-10 py-8 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
+                            <Laptop className="h-6 w-6 stroke-[2.5px]" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Asset Inventory</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic truncate max-w-[200px]">{userName}</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition">
-                        <X className="h-6 w-6" />
+                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <div className="p-6">
-                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Hardware Allocation Protocol</label>
                         {isLoading ? (
-                            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-                                <Loader2 className="h-8 w-8 animate-spin mb-2" />
-                                <p className="text-sm font-medium">Memeriksa inventaris...</p>
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                                <Loader2 className="h-10 w-10 animate-spin mb-4 text-indigo-500/30" />
+                                <p className="text-[10px] font-black uppercase tracking-widest italic animate-pulse">Scanning Bio-Links...</p>
                             </div>
                         ) : assets.length === 0 ? (
-                            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                <ShieldCheck className="h-12 w-12 text-slate-200 mx-auto mb-3" />
-                                <p className="text-sm text-slate-500 font-medium">Tidak ada aset perusahaan yang<br />sedang dipinjam oleh karyawan ini.</p>
+                            <div className="text-center py-20 bg-slate-950 rounded-[2.5rem] border border-dashed border-white/5">
+                                <ShieldCheck className="h-12 w-12 text-slate-800 mx-auto mb-4 opacity-5" />
+                                <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] italic">No active hardware anchors detected</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-3">
+                            <div className="grid gap-3">
                                 {assets.map(asset => (
-                                    <div key={asset.id} className="p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-200 hover:shadow-sm transition-all group">
+                                    <div key={asset.id} className="p-6 bg-slate-950 border border-white/5 rounded-[2rem] hover:border-indigo-500/30 hover:bg-slate-900/50 transition-all group shadow-inner">
                                         <div className="flex items-start justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-lg bg-blue-50 border border-blue-100/50 overflow-hidden flex items-center justify-center shrink-0">
+                                            <div className="flex items-center gap-5">
+                                                <div className="h-14 w-14 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 overflow-hidden flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                                                     {asset.imageUrl ? (
                                                         <img src={asset.imageUrl} alt={asset.name} className="h-full w-full object-cover" />
                                                     ) : (
-                                                        <Laptop className="h-5 w-5 text-blue-600" />
+                                                        <Laptop className="h-7 w-7 text-indigo-500/50 group-hover:text-indigo-500 transition-colors" />
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-slate-900 mb-0.5">{asset.name}</h4>
-                                                    <p className="text-[11px] text-slate-400 font-mono tracking-wider">{asset.serialNumber}</p>
+                                                    <h4 className="text-xs font-black text-white leading-none mb-2 uppercase tracking-widest italic">{asset.name}</h4>
+                                                    <p className="text-[9px] text-slate-600 font-mono font-bold tracking-[0.2em] uppercase">{asset.serialNumber}</p>
                                                 </div>
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${asset.condition === 'GOOD' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                                asset.condition === 'FAIR' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                                    'bg-red-50 text-red-600 border border-red-100'
-                                                }`}>
-                                                {asset.condition === 'GOOD' ? 'GOOD' : asset.condition === 'FAIR' ? 'FAIR' : 'BROKEN'}
+                                            <span className={`px-4 py-1.5 rounded-full text-[9px] font-black tracking-widest uppercase italic border ${
+                                                asset.condition === 'GOOD' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                                asset.condition === 'FAIR' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                                'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                            }`}>
+                                                {asset.condition}
                                             </span>
                                         </div>
-                                        <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between text-[10px] font-medium text-slate-400">
-                                            <div className="flex items-center gap-1">
-                                                <Calendar className="h-3 w-3" />
-                                                {asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('id-ID') : 'N/A'}
+                                        <div className="mt-5 pt-5 border-t border-white/5 flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-[9px] font-black text-slate-600 uppercase tracking-widest italic">
+                                                <Calendar className="h-3 w-3 text-indigo-500/50" />
+                                                Registry: {asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('id-ID') : 'N/A'}
                                             </div>
-                                            <div className="text-blue-500">Aset Inventaris</div>
+                                            <div className="text-[9px] font-black text-indigo-500/40 uppercase tracking-[0.3em] italic">Corporate Asset Hub</div>
                                         </div>
                                     </div>
                                 ))}
@@ -111,12 +116,12 @@ export default function EmployeeAssetsModal({ userId, userName, isOpen, onClose 
                         )}
                     </div>
 
-                    <div className="mt-6 pt-5 border-t border-slate-100 flex justify-center">
+                    <div className="flex justify-center pt-4">
                         <button
                             onClick={onClose}
-                            className="px-8 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors uppercase tracking-widest"
+                            className="w-full py-5 bg-white/5 text-slate-500 border border-white/5 rounded-[1.5rem] hover:text-white hover:bg-white/10 transition-all font-black text-[10px] uppercase italic tracking-[0.2em]"
                         >
-                            Tutup
+                            Close Overlay
                         </button>
                     </div>
                 </div>

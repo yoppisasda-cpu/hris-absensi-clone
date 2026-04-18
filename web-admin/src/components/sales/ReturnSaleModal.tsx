@@ -111,65 +111,71 @@ export default function ReturnSaleModal({ isOpen, onClose, saleId, onRefresh }: 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="glass w-full max-w-2xl rounded-[3.5rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
                 
-                <div className="bg-orange-600 px-6 py-4 flex items-center justify-between text-white shrink-0">
-                    <div className="flex items-center gap-3">
-                        <RotateCcw className="h-5 w-5" />
-                        <h2 className="text-lg font-black uppercase tracking-tight">Proses Retur Penjualan</h2>
+                <div className="bg-slate-950/50 border-b border-orange-500/20 px-10 py-8 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shadow-lg shadow-orange-500/10">
+                            <RotateCcw className="h-6 w-6 stroke-[2.5px]" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Credit Reclamation Hub</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Commercial Return Protocol</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="rounded-full p-2 hover:bg-white/10 transition-colors">
+                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <div className="overflow-y-auto p-6 flex flex-col gap-6">
+                <div className="overflow-y-auto p-10 flex flex-col gap-8 no-scrollbar">
                     {loading ? (
-                        <div className="py-20 flex flex-col items-center gap-4 animate-pulse">
-                            <div className="h-10 w-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                            <p className="text-slate-400 font-bold italic">Menyiapkan data retur...</p>
+                        <div className="py-20 flex flex-col items-center gap-6 animate-pulse">
+                            <div className="h-16 w-16 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
+                            <p className="text-slate-500 font-black italic uppercase tracking-widest text-[9px]">Initializing Reconciliation Data...</p>
                         </div>
                     ) : (
                         <>
                             {error && (
-                                <div className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-start gap-3">
-                                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                                    <p className="text-sm text-red-600 font-medium">{error}</p>
+                                <div className="bg-rose-500/5 border border-rose-500/20 p-6 rounded-[2rem] flex items-start gap-4 animate-in fade-in duration-300">
+                                    <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
+                                    <p className="text-[10px] text-rose-400 font-black uppercase italic tracking-widest">{error}</p>
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Invoice</p>
-                                    <p className="text-sm font-bold text-slate-900">{sale?.invoiceNumber}</p>
+                            <div className="grid grid-cols-2 gap-8 bg-slate-950/40 p-8 rounded-[2.5rem] border border-white/5 shadow-inner">
+                                <div className="space-y-2">
+                                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic ml-1">Target Invoice</p>
+                                    <p className="text-xs font-black text-white italic tracking-widest uppercase">{sale?.invoiceNumber}</p>
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer</p>
-                                    <p className="text-sm font-bold text-slate-900">{sale?.customerName || 'General Customer'}</p>
+                                <div className="space-y-2 text-right">
+                                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic mr-1">Origin Entity</p>
+                                    <p className="text-xs font-black text-white italic tracking-widest uppercase">{sale?.customerName || 'GENERAL_GUEST'}</p>
                                 </div>
                             </div>
 
-                            <div className="space-y-4">
-                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
-                                    <Package className="h-4 w-4 text-orange-500" /> Pilih Barang & Jumlah Retur
+                            <div className="space-y-6">
+                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-3 italic ml-1">
+                                    <Package className="h-4 w-4 text-orange-500 stroke-[2.5px]" /> Inventory Restitution Items
                                 </h3>
                                 
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     {returnItems.map((item) => (
-                                        <div key={item.productId} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-white transition-colors">
-                                            <div className="flex-1">
-                                                <p className="font-bold text-slate-900 text-sm leading-tight">{item.product_name}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
-                                                    Sisa bisa retur: <span className="text-orange-600">{item.remainingQty} {item.product_unit}</span>
+                                        <div key={item.productId} className="flex items-center gap-6 p-6 rounded-[2.5rem] border border-slate-900 bg-slate-950/50 hover:bg-slate-900 transition-all group shadow-inner">
+                                            <div className="flex-1 space-y-2">
+                                                <p className="font-black text-white text-[11px] uppercase tracking-tighter group-hover:text-orange-400 transition-colors">{item.product_name}</p>
+                                                <p className="text-[9px] text-slate-600 font-black uppercase tracking-[0.2em] italic">
+                                                    Available for Return: <span className="text-white">{item.remainingQty} {item.product_unit}</span>
                                                 </p>
                                             </div>
-                                            <div className="w-24 px-3 py-2 bg-white rounded-xl border border-slate-200">
+                                            <div className="w-28 px-4 py-3 bg-slate-900 rounded-xl border border-white/5 focus-within:border-orange-500/50 transition-all shadow-inner">
                                                 <input 
                                                     type="number"
                                                     value={item.returnQty || ''}
                                                     onChange={(e) => handleQtyChange(item.productId, e.target.value)}
-                                                    className="w-full text-center font-black text-slate-900 outline-none placeholder:text-slate-200"
+                                                    className="w-full bg-transparent text-center font-black text-white outline-none placeholder:text-slate-800 italic uppercase"
                                                     placeholder="0"
                                                     max={item.remainingQty}
                                                     min="0"
@@ -178,70 +184,72 @@ export default function ReturnSaleModal({ isOpen, onClose, saleId, onRefresh }: 
                                         </div>
                                     ))}
                                     {returnItems.length === 0 && (
-                                        <div className="py-10 text-center border-2 border-dashed border-slate-100 rounded-3xl">
-                                            <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
-                                            <p className="text-slate-400 font-bold italic">Semua barang sudah diretur.</p>
+                                        <div className="py-16 text-center border-2 border-dashed border-white/5 rounded-[3.5rem] group">
+                                            <CheckCircle className="h-12 w-12 text-emerald-500/20 mx-auto mb-4 group-hover:text-emerald-500 group-hover:scale-110 transition-all duration-500" />
+                                            <p className="text-slate-700 font-black italic uppercase tracking-[0.3em] text-[10px]">ALL_ITEMS_RESTITUTED // PROTOCOL_COMPLETE</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="space-y-4 pt-4 border-t border-slate-100">
-                                <label className="text-xs font-black uppercase tracking-widest text-slate-900 block flex items-center gap-2">
-                                    <CreditCard className="h-4 w-4 text-orange-500" /> Akun Refund (Kembalian Dana)
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 block flex items-center gap-3 italic ml-1">
+                                    <CreditCard className="h-4 w-4 text-orange-500 stroke-[2.5px]" /> Refund Settlement Vault
                                 </label>
                                 <select 
                                     value={selectedAccountId}
                                     onChange={(e) => setSelectedAccountId(e.target.value)}
-                                    className="w-full p-4 rounded-2xl border border-slate-200 bg-white font-bold text-slate-900 outline-none focus:border-orange-500 transition-all"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-orange-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer"
                                 >
-                                    <option value="">Tanpa Refund Dana</option>
+                                    <option value="">NO_REFUND_SETTLEMENT</option>
                                     {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.name} (Saldo: Rp {acc.balance?.toLocaleString()})</option>
+                                        <option key={acc.id} value={acc.id} className="bg-slate-900">{acc.name.toUpperCase()} (AVL: Rp {acc.balance?.toLocaleString()})</option>
                                     ))}
                                 </select>
                             </div>
 
                             <div className="space-y-4">
-                                <label className="text-xs font-black uppercase tracking-widest text-slate-900 block">Catatan Retur</label>
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 block italic ml-1">Reclamation Directives / Memo</label>
                                 <textarea 
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    className="w-full p-4 rounded-2xl border border-slate-200 bg-white font-medium text-slate-700 outline-none focus:border-orange-500 transition-all h-24 resize-none"
-                                    placeholder="Masukkan alasan retur..."
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-[2.5rem] px-8 py-6 text-xs font-black text-white focus:border-orange-500/50 outline-none transition-all h-28 resize-none no-scrollbar uppercase italic tracking-widest placeholder:text-slate-900 shadow-inner"
+                                    placeholder="INPUT REASON FOR RECLAMATION..."
                                 />
                             </div>
                         </>
                     )}
                 </div>
 
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
+                <div className="p-10 bg-slate-950/50 border-t border-white/5 flex items-center justify-between shrink-0">
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Refund</p>
-                        <p className="text-lg font-black text-orange-600">Rp {calculateTotalRefund().toLocaleString()}</p>
+                        <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic mb-1">Total Refund Value</p>
+                        <p className="text-2xl font-black text-orange-500 italic tracking-tighter uppercase">Rp {calculateTotalRefund().toLocaleString()}</p>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-5">
                         <button 
                             disabled={loading || submitting}
                             onClick={onClose}
-                            className="px-6 py-3 rounded-2xl font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                            className="px-8 py-4 text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-[0.2em] italic transition-all"
                         >
-                            Batal
+                            Abort
                         </button>
                         <button 
                             disabled={loading || submitting || returnItems.length === 0}
                             onClick={handleSubmit}
-                            className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-lg shadow-orange-100"
+                            className="flex items-center gap-3 bg-orange-600 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-orange-900/20 hover:bg-orange-700 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed italic border border-white/10"
                         >
                             {submitting ? (
-                                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                             ) : (
-                                <Save className="h-4 w-4" />
+                                <><Save className="h-4 w-4 stroke-[3px]" /> COMMIT_RECALAMATION</>
                             )}
-                            Simpan Retur
                         </button>
                     </div>
                 </div>
+
+            </div>
+        </div>
 
             </div>
         </div>
