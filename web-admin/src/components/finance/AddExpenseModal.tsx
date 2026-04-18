@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { X, Save, Plus, ArrowDownLeft } from "lucide-react";
+import { X, Save, Plus, ArrowDownLeft, Wallet } from "lucide-react";
 import api from "@/lib/api";
 
 interface AddExpenseModalProps {

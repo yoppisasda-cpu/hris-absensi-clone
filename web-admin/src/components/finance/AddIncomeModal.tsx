@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { X, Save, Plus } from "lucide-react";
+import { X, Save, Plus, TrendingUp, Wallet } from "lucide-react";
 import api from "@/lib/api";
 
 interface AddIncomeModalProps {
