@@ -102,145 +102,145 @@ export default function ProductionModal({ product, isOpen, onClose, onSuccess }:
 
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
                     <div className="p-8 space-y-8 overflow-y-auto flex-1 custom-scrollbar bg-slate-950/20">
-                    <div className="space-y-6">
-                        <div className="p-6 bg-slate-950/50 border border-slate-800 rounded-[32px] flex items-center justify-between shadow-inner">
-                            <div className="text-center flex-1 border-r border-white/5">
-                                <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-2 italic">Total Hasil</p>
-                                <p className="text-2xl font-black text-white italic tracking-tighter">{formData.quantity} <span className="text-[10px] text-slate-700 not-italic ml-1">SATUAN</span></p>
+                        <div className="space-y-6">
+                            <div className="p-6 bg-slate-950/50 border border-slate-800 rounded-[32px] flex items-center justify-between shadow-inner">
+                                <div className="text-center flex-1 border-r border-white/5">
+                                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-2 italic">Total Hasil</p>
+                                    <p className="text-2xl font-black text-white italic tracking-tighter">{formData.quantity} <span className="text-[10px] text-slate-700 not-italic ml-1">SATUAN</span></p>
+                                </div>
+                                <div className="px-5 text-indigo-500/30 font-black italic">➤</div>
+                                <div className="text-center flex-1">
+                                    <p className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-2 italic">Stok Akhir</p>
+                                    <p className="text-2xl font-black text-indigo-500 italic tracking-tighter text-glow-sm">
+                                        {(product?.stock || 0) + (formData.quantity || 0)}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="px-5 text-indigo-500/30 font-black italic">➤</div>
-                            <div className="text-center flex-1">
-                                <p className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-2 italic">Stok Akhir</p>
-                                <p className="text-2xl font-black text-indigo-500 italic tracking-tighter text-glow-sm">
-                                    {(product?.stock || 0) + (formData.quantity || 0)}
+
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">
+                                    Total Hasil Produksi
+                                </label>
+                                <div className="flex gap-4">
+                                    <input
+                                        required
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        className="flex-1 rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-6 text-sm font-black text-white focus:border-indigo-500/50 outline-none transition-all shadow-inner text-glow-sm tracking-widest font-mono"
+                                        value={formData.quantity || ""}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setFormData({ ...formData, quantity: val === "" ? 0 : parseFloat(val) });
+                                        }}
+                                    />
+                                    <div className="flex items-center px-6 bg-slate-800/50 border border-white/5 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest italic">
+                                        {product?.unit}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Lokasi Produksi (Gudang/Dapur)</label>
+                                <div className="relative group">
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors pointer-events-none z-10" />
+                                    <select
+                                        required
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-4 text-[10px] font-black text-slate-400 group-focus-within:text-white outline-none transition-all italic tracking-widest uppercase appearance-none"
+                                        value={formData.warehouseId}
+                                        onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                                    >
+                                        <option value="">PILIH LOKASI...</option>
+                                        {warehouses.map((w) => (
+                                            <option key={w.id} value={w.id}>{w.name.toUpperCase()} {w.isMain ? '(CORE)' : ''}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[8px] pointer-events-none">▼</div>
+                                </div>
+                                <p className="mt-2 text-[9px] text-slate-600 font-bold italic leading-tight uppercase tracking-widest">
+                                    * STOK BAHAN BAKU AKAN DIPOTONG DARI LOKASI INI
                                 </p>
                             </div>
-                        </div>
 
-                        <div className="space-y-2">
-                            <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">
-                                Total Hasil Produksi
-                            </label>
-                            <div className="flex gap-4">
-                                <input
-                                    required
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
-                                    className="flex-1 rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-6 text-sm font-black text-white focus:border-indigo-500/50 outline-none transition-all shadow-inner text-glow-sm tracking-widest font-mono"
-                                    value={formData.quantity || ""}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setFormData({ ...formData, quantity: val === "" ? 0 : parseFloat(val) });
-                                    }}
-                                />
-                                <div className="flex items-center px-6 bg-slate-800/50 border border-white/5 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest italic">
-                                    {product?.unit}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Lokasi Produksi (Gudang/Dapur)</label>
-                            <div className="relative group">
-                                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors pointer-events-none z-10" />
-                                <select
-                                    required
-                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-4 text-[10px] font-black text-slate-400 group-focus-within:text-white outline-none transition-all italic tracking-widest uppercase appearance-none"
-                                    value={formData.warehouseId}
-                                    onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
-                                >
-                                    <option value="">PILIH LOKASI...</option>
-                                    {warehouses.map((w) => (
-                                        <option key={w.id} value={w.id}>{w.name.toUpperCase()} {w.isMain ? '(CORE)' : ''}</option>
-                                    ))}
-                                </select>
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[8px] pointer-events-none">▼</div>
-                            </div>
-                            <p className="mt-2 text-[9px] text-slate-600 font-bold italic leading-tight uppercase tracking-widest">
-                                * STOK BAHAN BAKU AKAN DIPOTONG DARI LOKASI INI
-                            </p>
-                        </div>
-
-                        {/* RECIPE PREVIEW SECTION */}
-                        <div className="rounded-[32px] border border-white/5 overflow-hidden bg-slate-950/30">
-                            <div className="bg-slate-900/50 px-6 py-4 border-b border-white/5 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-6 w-6 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-                                        <ChefHat className="h-3.5 w-3.5 stroke-[2.5px]" />
+                            <div className="rounded-[32px] border border-white/5 overflow-hidden bg-slate-950/30">
+                                <div className="bg-slate-900/50 px-6 py-4 border-b border-white/5 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-6 w-6 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                                            <ChefHat className="h-3.5 w-3.5 stroke-[2.5px]" />
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic">Daftar Bahan Baku (Resep)</span>
                                     </div>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic">Daftar Bahan Baku (Resep)</span>
+                                    {fetchingRecipe && (
+                                        <div className="h-3 w-3 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></div>
+                                    )}
                                 </div>
-                                {fetchingRecipe && (
-                                    <div className="h-3 w-3 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></div>
-                                )}
-                            </div>
-                            <div className="p-6 space-y-4">
-                                {recipe.length > 0 ? (
-                                    recipe.map((item: any) => {
-                                        const yieldDivisor = product.recipeYield && product.recipeYield > 0 ? product.recipeYield : 1;
-                                        const required = (parseFloat(item.quantity) / yieldDivisor) * formData.quantity;
-                                        const isInsufficient = item.availableStock < required;
-                                        
-                                        return (
-                                            <div key={item.materialId} className="flex items-center justify-between group">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`h-1.5 w-1.5 rounded-full ${isInsufficient ? 'bg-red-500 animate-ping' : 'bg-slate-700'}`}></div>
-                                                    <div>
-                                                        <p className={`text-[11px] font-black uppercase tracking-tighter italic ${isInsufficient ? 'text-red-400' : 'text-slate-400'}`}>
-                                                            {item.material_name}
-                                                        </p>
-                                                        <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mt-0.5">
-                                                            Kebutuhan: <span className="text-white italic">{required.toLocaleString()} {item.material_unit}</span>
-                                                            {formData.warehouseId && (
-                                                                <>
-                                                                    <span className={`ml-2 px-1.5 py-0.5 rounded bg-white/5 ${isInsufficient ? 'text-red-500 font-black' : 'text-slate-500'}`}>
-                                                                        (Lokasi: {item.availableStock?.toLocaleString()})
-                                                                    </span>
-                                                                    <span className="ml-1 text-[8px] text-slate-700">
-                                                                        / Total: {item.globalStock?.toLocaleString()}
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                        </p>
-                                                        {isInsufficient && item.globalStock >= required && (
-                                                            <p className="text-[7px] text-amber-500 font-bold italic mt-1 uppercase tracking-wider leading-none">
-                                                                ⚠ Stok tersedia di lokasi lain. Mohon lakukan mutasi stok!
+                                <div className="p-6 space-y-4">
+                                    {recipe.length > 0 ? (
+                                        recipe.map((item: any) => {
+                                            const yieldDivisor = product.recipeYield && product.recipeYield > 0 ? product.recipeYield : 1;
+                                            const required = (parseFloat(item.quantity) / yieldDivisor) * formData.quantity;
+                                            const isInsufficient = item.availableStock < required;
+                                            
+                                            return (
+                                                <div key={item.materialId} className="flex items-center justify-between group">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`h-1.5 w-1.5 rounded-full ${isInsufficient ? 'bg-red-500 animate-ping' : 'bg-slate-700'}`}></div>
+                                                        <div>
+                                                            <p className={`text-[11px] font-black uppercase tracking-tighter italic ${isInsufficient ? 'text-red-400' : 'text-slate-400'}`}>
+                                                                {item.material_name}
                                                             </p>
-                                                        )}
+                                                            <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mt-0.5">
+                                                                Kebutuhan: <span className="text-white italic">{required.toLocaleString()} {item.material_unit}</span>
+                                                                {formData.warehouseId && (
+                                                                    <>
+                                                                        <span className={`ml-2 px-1.5 py-0.5 rounded bg-white/5 ${isInsufficient ? 'text-red-500 font-black' : 'text-slate-500'}`}>
+                                                                            (Lokasi: {item.availableStock?.toLocaleString()})
+                                                                        </span>
+                                                                        <span className="ml-1 text-[8px] text-slate-700">
+                                                                            / Total: {item.globalStock?.toLocaleString()}
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                            {isInsufficient && item.globalStock >= required && (
+                                                                <p className="text-[7px] text-amber-500 font-bold italic mt-1 uppercase tracking-wider leading-none">
+                                                                    ⚠ Stok tersedia di lokasi lain. Mohon lakukan mutasi stok!
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right flex items-center gap-3">
+                                                        {isInsufficient && <AlertTriangle className="h-3 w-3 text-red-500 animate-pulse" />}
+                                                        <span className={`text-[10px] font-black px-3 py-1 rounded-xl italic tracking-widest text-glow-sm border ${isInsufficient ? 'bg-red-500/20 border-red-500/30 text-red-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
+                                                            -{required.toLocaleString()}
+                                                        </span>
                                                     </div>
                                                 </div>
-                                                <div className="text-right flex items-center gap-3">
-                                                    {isInsufficient && <AlertTriangle className="h-3 w-3 text-red-500 animate-pulse" />}
-                                                    <span className={`text-[10px] font-black px-3 py-1 rounded-xl italic tracking-widest text-glow-sm border ${isInsufficient ? 'bg-red-500/20 border-red-500/30 text-red-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
-                                                        -{required.toLocaleString()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <div className="flex flex-col items-center py-6 text-slate-700 italic text-center">
-                                        <AlertTriangle className="h-8 w-8 mb-2 opacity-10" />
-                                        <p className="text-[9px] font-black uppercase tracking-[0.2em]">Resep Belum Diatur</p>
-                                        <p className="text-[8px] font-bold uppercase mt-1">BELUM ADA DATA RESEP UNTUK PRODUK INI.</p>
-                                    </div>
-                                )}
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="flex flex-col items-center py-6 text-slate-700 italic text-center">
+                                            <AlertTriangle className="h-8 w-8 mb-2 opacity-10" />
+                                            <p className="text-[9px] font-black uppercase tracking-[0.2em]">Resep Belum Diatur</p>
+                                            <p className="text-[8px] font-bold uppercase mt-1">BELUM ADA DATA RESEP UNTUK PRODUK INI.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Catatan Produksi</label>
+                                <input
+                                    type="text"
+                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-6 text-sm font-black text-white focus:border-indigo-500/50 outline-none transition-all shadow-inner italic placeholder:text-slate-800"
+                                    placeholder="..."
+                                    value={formData.notes}
+                                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                />
                             </div>
                         </div>
-
-                        <div className="space-y-2">
-                            <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Catatan Produksi</label>
-                            <input
-                                type="text"
-                                className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-6 text-sm font-black text-white focus:border-indigo-500/50 outline-none transition-all shadow-inner italic placeholder:text-slate-800"
-                                placeholder="..."
-                                value={formData.notes}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            />
-                        </div>
                     </div>
-                    
+
                     <div className="p-8 bg-slate-950/80 border-t border-white/5 backdrop-blur-md flex gap-4 shrink-0">
                         <button
                             type="button"
