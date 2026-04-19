@@ -902,6 +902,7 @@ model Warehouse {
   branch       Branch?            @relation(fields: [branchId], references: [id])
   company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   stocks       WarehouseStock[]
+  purchaseOrders PurchaseOrder[]
 }
 
 model WarehouseStock {
@@ -1153,6 +1154,8 @@ model PurchaseOrder {
   approvedBy    User?               @relation("POApprovedBy", fields: [approvedById], references: [id])
   company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   supplier      Supplier            @relation(fields: [supplierId], references: [id])
+  warehouseId   Int?
+  warehouse     Warehouse?          @relation(fields: [warehouseId], references: [id])
   items         PurchaseOrderItem[]
 }
 

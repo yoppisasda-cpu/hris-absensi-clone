@@ -507,31 +507,40 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
       if (targetTenantId) {
           const requestedTenantId = parseInt(targetTenantId as string);
           
-          // 1. SuperAdmin can switch to ANY tenant
-          if (decoded.role === 'SUPERADMIN') {
-              (req as any).tenantId = requestedTenantId;
-          } 
-          // 2. Owner can switch if they have access in UserAccess table
-          else if (decoded.role === 'OWNER' && requestedTenantId !== Number(decoded.companyId)) {
-              const access = await prisma.userAccess.findUnique({
-                  where: {
-                      userId_companyId: {
-                          userId: Number(decoded.userId),
-                          companyId: requestedTenantId
-                      }
-                  }
-              });
-              if (access) {
-                  (req as any).tenantId = requestedTenantId;
-                  console.log(`[AUTH] Owner ${decoded.userId} authorized Switch to Tenant ${requestedTenantId}`);
-              } else {
-                  console.warn(`[AUTH] Unauthorized Tenant Switch attempt by Owner ${decoded.userId} to Tenant ${requestedTenantId}`);
-                  return res.status(403).json({ 
-                    error: 'Akses Ditolak: Anda tidak memiliki izin akses untuk perusahaan ini. Hubungi pusat untuk menghubungkan akun.' 
-                  });
-              }
+          if (!isNaN(requestedTenantId)) {
+            // 1. SuperAdmin can switch to ANY tenant
+            if (decoded.role === 'SUPERADMIN') {
+                (req as any).tenantId = requestedTenantId;
+            } 
+            // 2. Owner can switch if they have access in UserAccess table
+            else if (decoded.role === 'OWNER' && requestedTenantId !== Number(decoded.companyId)) {
+                const access = await prisma.userAccess.findUnique({
+                    where: {
+                        userId_companyId: {
+                            userId: Number(decoded.userId),
+                            companyId: requestedTenantId
+                        }
+                    }
+                });
+                if (access) {
+                    (req as any).tenantId = requestedTenantId;
+                    console.log(`[AUTH] Owner ${decoded.userId} authorized Switch to Tenant ${requestedTenantId}`);
+                } else {
+                    console.warn(`[AUTH] Unauthorized Tenant Switch attempt by Owner ${decoded.userId} to Tenant ${requestedTenantId}`);
+                    return res.status(403).json({ 
+                      error: 'Akses Ditolak: Anda tidak memiliki izin akses untuk perusahaan ini. Hubungi pusat untuk menghubungkan akun.' 
+                    });
+                }
+            }
           }
       }
+
+      // Final Sanity Check for tenantId (Must be a Number and > 0)
+      if (isNaN((req as any).tenantId) || (req as any).tenantId === 0) {
+          // If no tenant assigned yet, default to their decoded companyId or fallback to 1
+          (req as any).tenantId = Number(decoded.companyId) || 1;
+      }
+
       return next();
     } catch (error) {
       return res.status(401).json({ error: 'Token tidak valid atau sudah kadaluarsa.' });
@@ -9759,7 +9768,13 @@ app.delete('/api/pos/categories/:id', tenantMiddleware, async (req: Request, res
 app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const userRole = (req as any).userRole;
     const { branchId, warehouseId } = req.query;
+
+    // DIAGNOSTIC LOGGING
+    const fs = require('fs');
+    const logMsg = `[${new Date().toISOString()}] GET /api/inventory/products | tenantId: ${tenantId} | role: ${userRole} | branch: ${branchId} | warehouse: ${warehouseId}\n`;
+    fs.appendFileSync('debug_error.txt', logMsg);
 
     const products = await prisma.product.findMany({
       where: { companyId: tenantId },
@@ -9788,8 +9803,9 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
          if (product.Recipes && product.Recipes.length > 0) {
            const totalBatchCost = product.Recipes.reduce((sum: number, r: any) => {
              const material = products.find(m => m.id === r.materialId);
+             // Safety fallback: if material not in current list, use its own costPrice if available in raw relation
              const materialUnitCost = material ? getProductCost(material, new Set(visited)) : (r.Material?.costPrice || 0);
-             return sum + (r.quantity * materialUnitCost);
+             return sum + (Number(r.quantity || 0) * Number(materialUnitCost || 0));
            }, 0);
 
            // Divide by yield to get UNIT HPP
@@ -9817,6 +9833,9 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 
        return { ...p, stock: displayStock, originalTotalStock: p.stock, recipeCogs };
     });
+
+    // LOG RESULT COUNT
+    fs.appendFileSync('debug_error.txt', `[${new Date().toISOString()}] Result Count: ${productsWithFilteredStock.length}\n`);
 
     res.json(productsWithFilteredStock);
   } catch (error: any) {
