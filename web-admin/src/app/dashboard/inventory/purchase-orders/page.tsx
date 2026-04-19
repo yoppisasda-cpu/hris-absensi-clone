@@ -376,7 +376,15 @@ export default function PurchaseOrdersPage() {
                                     <tr key={po.id} className="group hover:bg-white/[0.02] transition-colors">
                                         <td className="px-8 py-6">
                                             <div className="flex flex-col">
-                                                <p className="font-black text-white italic text-base tracking-tighter uppercase group-hover:text-indigo-400 transition-colors">#{po.orderNumber}</p>
+                                                <p 
+                                                    className="font-black text-white italic text-base tracking-tighter uppercase group-hover:text-indigo-400 transition-colors cursor-pointer hover:underline underline-offset-4 decoration-indigo-500/50"
+                                                    onClick={() => {
+                                                        setSelectedPo(po);
+                                                        setIsDetailModalOpen(true);
+                                                    }}
+                                                >
+                                                    #{po.orderNumber}
+                                                </p>
                                                 <div className="flex items-center gap-3 mt-2">
                                                     <span className="text-[9px] font-black text-slate-500 flex items-center gap-1.5 uppercase tracking-widest italic">
                                                         <Clock className="h-3 w-3 text-indigo-500" /> {new Date(po.date).toLocaleDateString()}
@@ -429,7 +437,18 @@ export default function PurchaseOrdersPage() {
                                         <td className="px-8 py-6 text-right">
                                             <div className="flex items-center justify-end gap-3 translate-x-4 group-hover:translate-x-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
                                                 {po.status === 'PENDING' && isPurchasingOrAdmin ? (
-                                                    <>
+                                                    <div className="flex items-center gap-3">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setSelectedPo(po);
+                                                                setIsDetailModalOpen(true);
+                                                            }}
+                                                            title="INSPECT MANIFEST"
+                                                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 hover:bg-slate-800 transition-all border border-indigo-500/20 active:scale-95 shadow-inner shadow-indigo-500/5"
+                                                        >
+                                                            <FileText className="h-4 w-4 stroke-[2.5px]" />
+                                                        </button>
+                                                        <div className="h-6 w-px bg-slate-800 mx-1"></div>
                                                         <button 
                                                             onClick={() => handleUpdateStatus(po.id, 'APPROVED')}
                                                             title="AUTHORIZE REQUISITION"
@@ -444,7 +463,7 @@ export default function PurchaseOrdersPage() {
                                                         >
                                                             <XCircle className="h-5 w-5 stroke-[2.5px]" />
                                                         </button>
-                                                    </>
+                                                    </div>
                                                 ) : (
                                                     <div className="flex items-center gap-2">
                                                         {po.status !== 'REJECTED' && (
@@ -518,6 +537,14 @@ export default function PurchaseOrdersPage() {
                 isOpen={isDetailModalOpen}
                 onClose={() => setIsDetailModalOpen(false)}
                 po={selectedPo}
+                onApprove={(id: number, status: 'APPROVED' | 'REJECTED') => {
+                    handleUpdateStatus(id, status);
+                    setIsDetailModalOpen(false);
+                }}
+                onReject={(id: number, status: 'APPROVED' | 'REJECTED') => {
+                    handleUpdateStatus(id, status);
+                    setIsDetailModalOpen(false);
+                }}
             />
         </DashboardLayout>
     );

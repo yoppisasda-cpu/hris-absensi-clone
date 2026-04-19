@@ -197,8 +197,8 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                             <ArrowDownLeft className="h-6 w-6 stroke-[2.5px]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Fiscal Depletion Node</h3>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">{expenseToEdit ? 'Update Record Protocol' : 'Cash-Out Initialization'}</p>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Pengeluaran / Pembelian</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">{expenseToEdit ? 'Pembaruan Data Transaksi' : 'Pencatatan Pengeluaran Kas'}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
@@ -217,20 +217,20 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                             }}
                             className={`flex-1 py-4 text-[9px] font-black rounded-xl transition-all italic tracking-[0.2em] uppercase ${expenseMode === 'OPERATIONAL' ? 'bg-white/10 text-white shadow-lg border border-white/10' : 'text-slate-600 hover:text-white'}`}
                         >
-                            General_Operational
+                            Operasional_Umum
                         </button>
                         <button
                             type="button"
                             onClick={() => setExpenseMode('BAHAN_BAKU')}
                             className={`flex-1 py-4 text-[9px] font-black rounded-xl transition-all italic tracking-[0.2em] uppercase ${expenseMode === 'BAHAN_BAKU' ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20' : 'text-slate-600 hover:text-white'}`}
                         >
-                            Raw_Materials_COGS
+                            Bahan_Baku_HPP
                         </button>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Temporal Directive</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Tanggal Transaksi</label>
                             <input
                                 type="date"
                                 required
@@ -240,7 +240,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] italic ml-1 font-black">Depletion Magnitude (IDR)</label>
+                            <label className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] italic ml-1 font-black">Nominal Pengeluaran (IDR)</label>
                             <div className="relative">
                                 <input
                                     type="number"
@@ -257,27 +257,27 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Settlement Schema</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Skema Pelunasan</label>
                             <div className="flex p-1.5 bg-slate-950 border border-white/5 rounded-[22px]">
                                 <button
                                     type="button"
                                     onClick={() => setFormData({ ...formData, status: 'PAID' })}
                                     className={`flex-1 py-4 text-[9px] font-black rounded-xl transition-all italic tracking-widest uppercase ${formData.status === 'PAID' ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 shadow-lg' : 'text-slate-600 hover:text-white'}`}
                                 >
-                                    SETTLED
+                                    LUNAS
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setFormData({ ...formData, status: 'PENDING' })}
                                     className={`flex-1 py-4 text-[9px] font-black rounded-xl transition-all italic tracking-widest uppercase ${formData.status === 'PENDING' ? 'bg-amber-600/20 text-amber-400 border border-amber-500/20 shadow-lg' : 'text-slate-600 hover:text-white'}`}
                                 >
-                                    DEFERRED
+                                    TEMPO / HUTANG
                                 </button>
                             </div>
                         </div>
                         {formData.status === 'PENDING' && (
                             <div className="space-y-2 animate-in slide-in-from-right-4 duration-300">
-                                <label className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] italic ml-1">Maturity Horizon</label>
+                                <label className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] italic ml-1">Tanggal Jatuh Tempo</label>
                                 <input
                                     type="date"
                                     required
@@ -291,7 +291,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
 
                     <div className={`space-y-2 transition-all duration-500 ${formData.status === 'PENDING' ? 'opacity-30 pointer-events-none filter blur-[1px]' : 'opacity-100'}`}>
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1 flex items-center gap-2">
-                            <Wallet className="h-3 w-3" /> Origin Vault (Cash-Out)
+                            <Wallet className="h-3 w-3" /> Sumber Dana (Kas/Bank)
                         </label>
                         <select
                             disabled={formData.status === 'PENDING'}
@@ -300,7 +300,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                             onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
                             className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-rose-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer"
                         >
-                            <option value="">-- RESOLVE VAULT --</option>
+                            <option value="">-- PILIH REKENING --</option>
                             {accounts.map(acc => (
                                 <option key={acc.id} value={acc.id} className="bg-slate-900">{acc.name.toUpperCase()} (AVL: Rp {acc.balance.toLocaleString()})</option>
                             ))}
@@ -313,17 +313,20 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                             <div className="absolute top-0 right-0 h-40 w-40 bg-rose-500/5 blur-3xl -mr-20 -mt-20 rounded-full group-hover:bg-rose-500/10 transition-colors"></div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 relative z-10">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] italic ml-1">Module Mapping</label>
+                                    <label className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] italic ml-1">Pilih Bahan Baku</label>
                                     <select
                                         required
                                         value={formData.productId}
                                         onChange={(e) => handleProductChange(e.target.value)}
                                         className="w-full bg-slate-950 border border-rose-500/30 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-rose-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer shadow-xl"
                                     >
-                                        <option value="">-- UNIT RESOLUTION --</option>
-                                        {products.map(p => (
-                                            <option key={p.id} value={p.id} className="bg-slate-900">{p.name.toUpperCase()} ({p.sku})</option>
-                                        ))}
+                                        <option value="">-- PILIH BARANG --</option>
+                                        {products
+                                            .filter(p => p.type === 'RAW_MATERIAL')
+                                            .map(p => (
+                                                <option key={p.id} value={p.id} className="bg-slate-900">{p.name.toUpperCase()} ({p.sku})</option>
+                                            ))
+                                        }
                                     </select>
                                 </div>
                                 <div className="space-y-2">
@@ -346,10 +349,10 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                     ) : (
                         <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                             <div className="flex justify-between items-center ml-1">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Classification Vector</label>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Kategori Pengeluaran</label>
                                 {!showNewCategory && (
                                     <button type="button" onClick={() => setShowNewCategory(true)} className="text-[9px] font-black text-rose-400 hover:text-rose-300 flex items-center gap-2 uppercase tracking-[0.2em] italic transition-colors">
-                                        <Plus className="h-3 w-3 stroke-[3px]" /> NEW_TAG
+                                        <Plus className="h-3 w-3 stroke-[3px]" /> KATEGORI_BARU
                                     </button>
                                 )}
                             </div>
@@ -357,7 +360,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                             {showNewCategory ? (
                                 <div className="space-y-6 p-8 border border-white/5 bg-slate-950 rounded-[2.5rem] animate-in fade-in duration-500 shadow-inner">
                                     <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Nomenclature Definition</label>
+                                        <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Nama Kategori Baru</label>
                                         <input
                                             type="text"
                                             placeholder="EX: UTILITY_SEWA // LOGistics..."
@@ -408,7 +411,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                     
                     {/* SECTION: VENDOR / PAYEE INFO */}
                     <div className="space-y-4 animate-in fade-in duration-500">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Beneficiary Entity / Payee</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Penerima / Supplier</label>
                         {expenseMode === 'BAHAN_BAKU' ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                                 <select
@@ -423,14 +426,14 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                                     }}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-rose-500/50 outline-none appearance-none cursor-pointer transition-all italic tracking-widest uppercase"
                                 >
-                                    <option value="">-- RESOLVE SUPPLIER --</option>
+                                    <option value="">-- PILIH SUPPLIER --</option>
                                     {suppliers.map(s => (
                                         <option key={s.id} value={s.id} className="bg-slate-900">{s.name.toUpperCase()}</option>
                                     ))}
                                 </select>
                                 <input
                                     type="text"
-                                    placeholder="DIRECT_ENTITY_NAMING..."
+                                    placeholder="NAMA PENERIMA LANGSUNG..."
                                     value={formData.paidTo}
                                     onChange={(e) => setFormData({ ...formData, paidTo: e.target.value })}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-rose-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-slate-900"
@@ -448,9 +451,9 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Internal Directives / Notes</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Catatan Internal</label>
                         <textarea
-                            placeholder="INPUT TRANSACTIONAL DATA ANCHORS..."
+                            placeholder="MASUKKAN DETAIL TRANSAKSI / CATATAN..."
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             className="w-full bg-slate-950 border border-slate-800 rounded-[2rem] px-8 py-6 text-xs font-black text-white focus:border-rose-500/50 outline-none transition-all min-h-[120px] italic no-scrollbar uppercase tracking-widest placeholder:text-slate-900 shadow-inner resize-none"
@@ -463,7 +466,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                             onClick={onClose}
                             className="flex-1 rounded-2xl bg-white/5 border border-white/5 py-5 text-[10px] font-black text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-[0.3em] italic"
                         >
-                            Abort
+                            Batal
                         </button>
                         <button
                             type="submit"
@@ -473,7 +476,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                             {loading ? (
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                             ) : (
-                                <><Save className="h-4 w-4 stroke-[3px]" /> {expenseToEdit ? 'Update Record' : 'Transmit Schema'}</>
+                                <><Save className="h-4 w-4 stroke-[3px]" /> {expenseToEdit ? 'Simpan Perubahan' : 'Simpan Transaksi'}</>
                             )}
                         </button>
                     </div>

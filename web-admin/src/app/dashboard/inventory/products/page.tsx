@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, Filter, MoreVertical, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit3, Trash2, Box, Info, TrendingUp, ScanLine, MapPin, Edit2, Tag, ChefHat, Building2, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit3, Trash2, Box, Info, TrendingUp, ScanLine, MapPin, Edit2, Tag, ChefHat, Building2, CheckCircle2, Truck } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import AddProductModal from "@/components/inventory/AddProductModal";
@@ -10,6 +10,7 @@ import StockAdjustModal from "@/components/inventory/StockAdjustModal";
 import ProductionModal from "@/components/inventory/ProductionModal";
 import CategoryModal from "@/components/inventory/CategoryModal";
 import WarehouseModal from "@/components/inventory/WarehouseModal";
+import StockTransferModal from "@/components/inventory/StockTransferModal";
 
 export default function ProductsPage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -20,6 +21,7 @@ export default function ProductsPage() {
     const [isProductionModalOpen, setIsProductionModalOpen] = useState(false);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState(false);
+    const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [selectedType, setSelectedType] = useState<string>("all");
@@ -142,6 +144,15 @@ export default function ProductsPage() {
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-slate-400 hover:bg-slate-800 hover:text-white transition-all uppercase tracking-widest italic"
                     >
                         <Tag className="h-4 w-4" /> Kategori
+                    </button>
+                    <button 
+                        onClick={() => {
+                            setSelectedProduct(null);
+                            setIsTransferModalOpen(true);
+                        }}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-indigo-400/80 hover:bg-indigo-500/10 hover:text-indigo-400 transition-all uppercase tracking-widest italic"
+                    >
+                        <Truck className="h-4 w-4" /> Mutasi Stok
                     </button>
                     <button 
                         onClick={() => {
@@ -460,6 +471,16 @@ export default function ProductsPage() {
                                                             >
                                                                 <Edit3 className="h-4 w-4 text-amber-500" /> Stock Koreksi
                                                             </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setSelectedProduct(product);
+                                                                    setIsTransferModalOpen(true);
+                                                                    setOpenMenuId(null);
+                                                                }}
+                                                                className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
+                                                            >
+                                                                <Truck className="h-4 w-4 text-indigo-400" /> Mutasi Stok
+                                                            </button>
 
                                                             {(product.type === 'FINISHED_GOOD' || product.type === 'WIP') && (
                                                                 <button 
@@ -559,6 +580,16 @@ export default function ProductsPage() {
                 isOpen={isProductionModalOpen}
                 onClose={() => {
                     setIsProductionModalOpen(false);
+                    setSelectedProduct(null);
+                }}
+                onSuccess={fetchProducts}
+                product={selectedProduct}
+            />
+
+            <StockTransferModal
+                isOpen={isTransferModalOpen}
+                onClose={() => {
+                    setIsTransferModalOpen(false);
                     setSelectedProduct(null);
                 }}
                 onSuccess={fetchProducts}

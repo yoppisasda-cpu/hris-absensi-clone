@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { X, Package, Tag, Box, AlertCircle, Layers, Plus, Trash2, ChefHat, ScanLine, MapPin, Save, Info, TrendingUp } from "lucide-react";
+import { X, Package, Tag, Box, AlertCircle, Layers, Plus, Trash2, ChefHat, ScanLine, MapPin, Save, Info, TrendingUp, Calculator } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 
@@ -22,7 +22,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         trackStock: true,
         priceGofood: 0,
         priceGrabfood: 0,
-        priceShopeefood: 0
+        priceShopeefood: 0,
+        recipeYield: 0
     });
     const [warehouses, setWarehouses] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
@@ -32,6 +33,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     const [customizations, setCustomizations] = useState<any[]>([]);
     const [selectedCustomizations, setSelectedCustomizations] = useState<number[]>([]);
     const [loading, setLoading] = useState(false);
+    const [showCalc, setShowCalc] = useState(false);
+    const [calcData, setCalcData] = useState({ total: 0, qty: 1000 });
+    const [totalBatchCost, setTotalBatchCost] = useState(0);
+    const [unitHpp, setUnitHpp] = useState(0);
 
     useEffect(() => {
         if (isOpen) {
@@ -56,7 +61,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     trackStock: product.trackStock !== undefined ? product.trackStock : true,
                     priceGofood: product.priceGofood || 0,
                     priceGrabfood: product.priceGrabfood || 0,
-                    priceShopeefood: product.priceShopeefood || 0
+                    priceShopeefood: product.priceShopeefood || 0,
+                    recipeYield: product.recipeYield !== undefined ? product.recipeYield : 0
                 });
                 fetchRecipe(product.id);
                 if (product.customizations) {
@@ -66,7 +72,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 }
             } else {
                 setFormData({
-                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
@@ -89,6 +95,34 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             console.error("Gagal mengambil resep", error);
         }
     };
+
+    // Automatic HPP (COGS) Calculation from BOM
+    useEffect(() => {
+        if (hasRecipe && recipeItems.length > 0) {
+            let totalMaterialCost = 0;
+            recipeItems.forEach(item => {
+                const material = productList.find(p => p.id.toString() === item.materialId.toString());
+                if (material) {
+                    const materialCost = material.costPrice || 0;
+                    totalMaterialCost += materialCost * (Number(item.quantity) || 0);
+                }
+            });
+
+            const yieldVal = Number(formData.recipeYield) || 1;
+            const calculatedHpp = totalMaterialCost / yieldVal;
+            
+            setTotalBatchCost(totalMaterialCost);
+            setUnitHpp(calculatedHpp);
+
+            // Only update the main purchase price if it's different
+            if (Math.abs(formData.costPrice - calculatedHpp) > 0.01) {
+                setFormData(prev => ({ ...prev, costPrice: Number(calculatedHpp.toFixed(2)) }));
+            }
+        } else {
+            setTotalBatchCost(0);
+            setUnitHpp(0);
+        }
+    }, [recipeItems, formData.recipeYield, hasRecipe, productList]);
 
     const fetchCategories = async () => {
         try {
@@ -133,7 +167,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     if (!isOpen) return null;
 
     const addRecipeItem = () => {
-        setRecipeItems([...recipeItems, { materialId: "", quantity: 1 }]);
+        setRecipeItems([...recipeItems, { materialId: "", quantity: 0 }]);
     };
 
     const removeRecipeItem = (index: number) => {
@@ -159,7 +193,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             stock: Number(formData.stock) || 0,
             priceGofood: Number(formData.priceGofood) || 0,
             priceGrabfood: Number(formData.priceGrabfood) || 0,
-            priceShopeefood: Number(formData.priceShopeefood) || 0
+            priceShopeefood: Number(formData.priceShopeefood) || 0,
+            recipeYield: formData.recipeYield !== undefined ? Number(formData.recipeYield) : 0
         };
 
         try {
@@ -181,7 +216,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
 
             setFormData({
-                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0
             });
             setHasRecipe(false);
             setRecipeItems([]);
@@ -200,8 +235,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
-            <div className="glass w-full max-w-2xl rounded-[3rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
-                <div className="bg-slate-950/50 border-b border-indigo-500/20 px-10 py-8 flex items-center justify-between">
+            <div className="glass w-full max-w-2xl max-h-[90vh] rounded-[3rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col">
+                <div className="bg-slate-950/50 border-b border-indigo-500/20 px-10 py-8 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
                             <Package className="h-6 w-6 stroke-[2.5px]" />
@@ -380,8 +415,59 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                         </div>
 
                         <div className="grid grid-cols-3 gap-6">
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Purchase Price (IDR)</label>
+                            <div className="space-y-2 relative group-calc">
+                                <div className="flex justify-between items-center">
+                                    <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Purchase Price (IDR)</label>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowCalc(!showCalc)}
+                                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border transition-all ${showCalc ? 'bg-indigo-500 text-white border-indigo-400' : 'bg-slate-800 text-slate-400 border-white/5 hover:text-indigo-400'}`}
+                                    >
+                                        Calculator
+                                    </button>
+                                </div>
+                                
+                                {showCalc && (
+                                    <div className="absolute bottom-full mb-3 left-0 right-0 bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-2xl z-50 animate-in slide-in-from-bottom-2 duration-200">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="h-6 w-6 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                                                <Info className="h-3.5 w-3.5" />
+                                            </div>
+                                            <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest italic">Unit Price Helper</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="number" 
+                                                placeholder="Total Price (e.g. 140000)"
+                                                className="flex-[2] bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-[10px] font-bold text-white outline-none focus:border-indigo-500/50"
+                                                value={calcData.total || ""}
+                                                onChange={(e) => {
+                                                    const total = parseFloat(e.target.value) || 0;
+                                                    const result = total / (calcData.qty || 1);
+                                                    setCalcData({ ...calcData, total });
+                                                    setFormData({ ...formData, costPrice: Number(result.toFixed(2)) });
+                                                }}
+                                            />
+                                            <span className="text-slate-600 font-black">/</span>
+                                            <input 
+                                                type="number" 
+                                                placeholder="Qty (e.g. 1000)"
+                                                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-[10px] font-bold text-white outline-none focus:border-indigo-500/50"
+                                                value={calcData.qty || ""}
+                                                onChange={(e) => {
+                                                    const qty = parseFloat(e.target.value) || 1;
+                                                    const result = (calcData.total || 0) / qty;
+                                                    setCalcData({ ...calcData, qty });
+                                                    setFormData({ ...formData, costPrice: Number(result.toFixed(2)) });
+                                                }}
+                                            />
+                                        </div>
+                                        <p className="mt-3 text-[9px] text-slate-500 font-bold italic uppercase tracking-tighter">
+                                            Result: <span className="text-emerald-400">Rp {formData.costPrice}</span> / {formData.unit}
+                                        </p>
+                                    </div>
+                                )}
+
                                 <input
                                     type="number"
                                     placeholder="0"
@@ -435,6 +521,39 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     <h3 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] italic">Online Ecosystem Strategy</h3>
                                 </div>
                                 <div className="grid grid-cols-3 gap-6 relative z-10">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between ml-1">
+                                            <label className="block text-[9px] font-black uppercase text-slate-600 tracking-widest italic">Purchase Price (IDR)</label>
+                                            {hasRecipe && (
+                                                <span className="text-[8px] font-black uppercase text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 animate-pulse">
+                                                    Calculated from BOM
+                                                </span>
+                                            )}
+                                            {!hasRecipe && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCalc(!showCalc)}
+                                                    className="bg-slate-800 hover:bg-slate-700 text-[8px] font-black uppercase text-slate-300 px-2.5 py-1 rounded-lg border border-white/5 transition-all shadow-lg"
+                                                >
+                                                    Calculator
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="relative">
+                                            <input
+                                                required
+                                                type="number"
+                                                readOnly={hasRecipe}
+                                                className={`w-full rounded-2xl bg-slate-900 border border-slate-800 py-3.5 px-5 text-sm font-black text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner ${hasRecipe ? 'opacity-70 cursor-not-allowed bg-slate-950 border-amber-500/20 text-amber-500' : ''}`}
+                                                value={formData.costPrice || ""}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData({ ...formData, costPrice: val === "" ? 0 : parseFloat(val) || 0 });
+                                                }}
+                                            />
+                                            {hasRecipe && <ChefHat className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500/50" />}
+                                        </div>
+                                    </div>
                                     <div className="space-y-2">
                                         <label className="block text-[9px] font-black uppercase text-slate-600 tracking-widest italic ml-1">GoFood SKU Price</label>
                                         <input
@@ -520,26 +639,38 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
 
                         {/* BOM / RECIPE SECTION */}
                         <div className="bg-slate-900/50 -mx-8 px-8 py-8 border-y border-white/5 relative">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-                                        <ChefHat className="h-4 w-4 stroke-[2.5px]" />
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-amber-500/10 p-2.5 rounded-2xl border border-amber-500/20">
+                                        <ChefHat className="h-5 w-5 text-amber-500" />
                                     </div>
-                                    <h3 className="text-[10px] font-black uppercase text-amber-500 tracking-[0.3em] italic">Bill Of Materials (BOM)</h3>
+                                    <div>
+                                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Bill of Materials (BOM)</h3>
+                                        <p className="text-[10px] text-slate-500 font-bold italic">Define ingredients and production yield</p>
+                                    </div>
                                 </div>
-                                <label className="flex items-center gap-4 cursor-pointer group">
-                                    <div className="relative">
-                                        <input 
-                                            type="checkbox" 
-                                            className="sr-only peer" 
-                                            checked={hasRecipe}
-                                            onChange={(e) => setHasRecipe(e.target.checked)}
-                                        />
-                                        <div className="w-12 h-6 bg-slate-800 border border-white/5 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600 after:shadow-lg"></div>
+                                <div className="flex items-center gap-6">
+                                    <div className="flex flex-col items-end gap-1">
+                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Yield Amount</span>
+                                        <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 focus-within:border-amber-500/30 transition-all">
+                                            <input 
+                                                type="number"
+                                                className="w-12 bg-transparent text-xs font-black text-emerald-400 outline-none text-right"
+                                                value={formData.recipeYield || ""}
+                                                onChange={(e) => setFormData({...formData, recipeYield: parseFloat(e.target.value) || 0})}
+                                            />
+                                            <span className="text-[9px] font-black text-slate-600 uppercase tracking-tighter">{formData.unit || 'Pack'}</span>
+                                        </div>
                                     </div>
-                                    <span className="text-[9px] font-black uppercase text-slate-600 tracking-widest italic group-hover:text-amber-400 transition-colors">ENABLE RECIPE</span>
-                                </label>
-                            </div>                            {hasRecipe ? (
+                                    <div className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-2xl border border-white/5">
+                                        <div className={`w-10 h-5 rounded-full relative cursor-pointer transition-all duration-300 ${hasRecipe ? 'bg-amber-600 shadow-[0_0_15px_rgba(217,119,6,0.4)]' : 'bg-slate-800'}`} onClick={() => setHasRecipe(!hasRecipe)}>
+                                            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-300 ${hasRecipe ? 'left-6' : 'left-1'}`} />
+                                        </div>
+                                        <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest italic">Enable Recipe</span>
+                                    </div>
+                                </div>
+                            </div>
+                            {hasRecipe ? (
                                 <div className="space-y-4">
                                     {recipeItems.map((item, index) => (
                                         <div key={index} className="flex gap-3 animate-in fade-in slide-in-from-left-4 duration-300">
@@ -562,7 +693,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                                     type="number"
                                                     placeholder="QTY"
                                                     className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3 px-5 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all text-center italic"
-                                                    value={isNaN(item.quantity) ? "" : item.quantity}
+                                                    value={item.quantity || ""}
                                                     onChange={(e) => {
                                                         const val = parseFloat(e.target.value);
                                                         updateRecipeItem(index, 'quantity', isNaN(val) ? 0 : val);
@@ -578,13 +709,63 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                             </button>
                                         </div>
                                     ))}
-                                    <button
-                                        type="button"
-                                        onClick={addRecipeItem}
-                                        className="w-full py-4 bg-slate-950 border border-dashed border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] hover:text-amber-500 hover:border-amber-500/50 transition-all flex items-center justify-center gap-3 italic"
-                                    >
-                                        <Plus className="h-3 w-3" /> Insert Material Component
-                                    </button>
+                                    {/* COST SUMMARY FOOTER */}
+                                    <div className="mt-8 pt-6 border-t border-slate-800 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <div className="bg-slate-950/80 rounded-3xl p-6 border border-white/5 backdrop-blur-md shadow-2xl relative overflow-hidden group">
+                                            {/* Decorative radial background */}
+                                            <div className="absolute inset-0 bg-radial-gradient from-amber-500/5 to-transparent opacity-50 pointer-events-none" />
+                                            
+                                            <div className="flex flex-col md:flex-row justify-between items-center gap-8 relative z-10">
+                                                <div className="flex items-center gap-6">
+                                                    <div className="h-14 w-14 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform duration-300">
+                                                        <Calculator className="h-7 w-7 opacity-80" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic">Batch Cost Analysis</h4>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                            <span className="text-[11px] font-bold text-slate-400">Yield: {formData.recipeYield || 0} {formData.unit || 'Units'}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-10">
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic">Total Batch Value</span>
+                                                        <div className="flex items-baseline gap-1.5 font-black">
+                                                            <span className="text-xs text-slate-500 uppercase">Rp</span>
+                                                            <span className="text-xl text-white tracking-tight">{totalBatchCost.toLocaleString('id-ID')}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="h-10 w-[1px] bg-white/5 hidden md:block" />
+
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest italic drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]">Unit HPP Result</span>
+                                                        <div className="flex items-baseline gap-1.5 font-black">
+                                                            <span className="text-xs text-amber-500 uppercase">Rp</span>
+                                                            <span className="text-3xl text-amber-500 tracking-tighter drop-shadow-[0_0_15px_rgba(245,158,11,0.4)]">
+                                                                {unitHpp.toLocaleString('id-ID')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4">
+                                        <button
+                                            type="button"
+                                            onClick={addRecipeItem}
+                                            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border-2 border-dashed border-slate-800 hover:border-amber-500/30 hover:bg-amber-500/5 text-slate-500 hover:text-amber-500 transition-all duration-300 group"
+                                        >
+                                            <div className="h-6 w-6 rounded-lg bg-slate-900 border border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <Plus className="h-3 w-3" />
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] italic">Insert Material Component</span>
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="p-8 bg-slate-950/50 border border-dashed border-slate-800 rounded-[28px] text-center">

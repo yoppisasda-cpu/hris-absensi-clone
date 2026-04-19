@@ -1546,7 +1546,7 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
   try {
     const tenantId = Number((req as any).tenantId);
     const userId = (req as any).userId;
-    const { supplierId, date, items, notes } = req.body;
+    const { supplierId, date, items, notes, warehouseId } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Minimal harus ada 1 barang yang dipesan.' });
@@ -1555,25 +1555,30 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
     const orderNumber = `PO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const totalAmount = items.reduce((sum: number, item: any) => sum + (Number(item.quantity) * Number(item.price)), 0);
 
-    const result = await prisma.purchaseOrder.create({
-      data: {
-        companyId: tenantId,
-        supplierId: parseInt(supplierId),
-        orderNumber,
-        date: date ? new Date(date) : new Date(),
-        totalAmount,
-        notes,
-        createdById: userId,
-        status: 'PENDING',
-        items: {
-          create: items.map((item: any) => ({
-            productId: parseInt(item.productId),
-            quantity: parseFloat(item.quantity),
-            price: parseFloat(item.price),
-            total: parseFloat(item.quantity) * parseFloat(item.price)
-          }))
-        }
-      },
+    // Using Raw SQL for Create to handle warehouseId without regenerating Prisma Client
+    const poResult: any[] = await prisma.$queryRawUnsafe(`
+      INSERT INTO "PurchaseOrder" 
+      ("companyId", "supplierId", "orderNumber", "date", "totalAmount", "status", "notes", "createdById", "updatedAt", "warehouseId")
+      VALUES ($1, $2, $3, $4, $5, 'PENDING', $6, $7, NOW(), $8)
+      RETURNING id
+    `, tenantId, parseInt(supplierId), orderNumber, date ? new Date(date) : new Date(), totalAmount, notes, userId, warehouseId ? parseInt(warehouseId) : null);
+
+    if (!poResult || poResult.length === 0) throw new Error("Gagal membuat data PO utama.");
+    const poId = poResult[0].id;
+
+    // Create Items
+    await prisma.purchaseOrderItem.createMany({
+      data: items.map((item: any) => ({
+        purchaseOrderId: poId,
+        productId: parseInt(item.productId),
+        quantity: parseFloat(item.quantity),
+        price: parseFloat(item.price),
+        total: parseFloat(item.quantity) * parseFloat(item.price)
+      }))
+    });
+
+    const result = await prisma.purchaseOrder.findUnique({
+      where: { id: poId },
       include: { items: true }
     });
 
@@ -1603,13 +1608,22 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const po = await tx.purchaseOrder.findUnique({
-        where: { id, companyId: tenantId },
-        include: { supplier: true, items: true }
+      const po: any = await tx.$queryRawUnsafe(`
+        SELECT po.*, s.name as supplier_name
+        FROM "PurchaseOrder" po
+        JOIN "Supplier" s ON po."supplierId" = s.id
+        WHERE po.id = $1 AND po."companyId" = $2
+      `, id, tenantId);
+
+      if (!po || po.length === 0) throw new Error('PO tidak ditemukan.');
+      const poData = po[0];
+
+      // Fetch items separately
+      const poItems = await tx.purchaseOrderItem.findMany({
+        where: { purchaseOrderId: id }
       });
 
-      if (!po) throw new Error('PO tidak ditemukan.');
-      if (po.status !== 'PENDING') throw new Error('PO sudah diproses sebelumnya.');
+      if (poData.status !== 'PENDING') throw new Error('PO sudah diproses sebelumnya.');
 
       const updatedPo = await tx.purchaseOrder.update({
         where: { id },
@@ -1622,6 +1636,7 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
 
       // If APPROVED, create a PENDING Expense (Hutang) AND update Inventory
       if (status === 'APPROVED') {
+        const warehouseId = poData.warehouseId;
         // 1. Create Finance Record (Hutang)
         // Find or create "Pembelian (Auto-PO)" category
         let category: any = await tx.expenseCategory.findFirst({
@@ -1634,6 +1649,10 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
             VALUES ($1, 'Pembelian (Auto-PO)', 'OPERATIONAL', NOW())
             RETURNING id
           `, tenantId);
+          
+          if (!catResult || catResult.length === 0) {
+            throw new Error('Gagal membuat kategori pengeluaran otomatis (Auto-PO).');
+          }
           category = { id: catResult[0].id };
         }
 
@@ -1642,26 +1661,56 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
           data: {
             companyId: tenantId,
             categoryId: category.id,
-            supplierId: po.supplierId,
-            amount: po.totalAmount,
+            supplierId: poData.supplierId,
+            amount: poData.totalAmount,
             date: new Date(),
             dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
-            description: `Hutang otomatis dari PO #${po.orderNumber}`,
+            description: `Hutang otomatis dari PO #${poData.orderNumber}`,
             status: 'PENDING',
-            paidTo: po.supplier.name
+            paidTo: poData.supplier_name
           }
         });
 
-        // 2. Update Stock for each item
-        for (const item of po.items) {
-          // Update Global Stock
-          await tx.product.update({
+        // 2. Update Stock & Calculate Moving Average Cost for each item
+        for (const item of poItems) {
+          // Fetch current stock and cost price for WAC (Weighted Average Cost) calculation
+          const currentProduct = await tx.product.findUnique({
             where: { id: item.productId },
-            data: { 
-              stock: { increment: item.quantity },
-              costPrice: item.price // Update latest purchase price
-            }
+            select: { stock: true, costPrice: true }
           });
+
+          if (currentProduct) {
+            const currentStock = Math.max(0, currentProduct.stock);
+            const currentCost = currentProduct.costPrice || 0;
+            const incomingQty = item.quantity;
+            const incomingPrice = item.price;
+
+            const newTotalStock = currentStock + incomingQty;
+            
+            // Formula: ((Current Stock * Current Cost) + (Incoming Qty * Incoming Price)) / New Total Stock
+            const newAverageCost = newTotalStock > 0 
+              ? ((currentStock * currentCost) + (incomingQty * incomingPrice)) / newTotalStock
+              : incomingPrice;
+
+            // Update Global Stock & Moving Average Cost
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { 
+                stock: { increment: incomingQty },
+                costPrice: Number(newAverageCost.toFixed(2))
+              }
+            });
+
+            // NEW: Update Warehouse Stock
+            if (warehouseId) {
+              await tx.$executeRawUnsafe(`
+                INSERT INTO "WarehouseStock" ("productId", "warehouseId", "quantity", "updatedAt")
+                VALUES ($1, $2, $3, NOW())
+                ON CONFLICT ("productId", "warehouseId") 
+                DO UPDATE SET "quantity" = "WarehouseStock"."quantity" + $3, "updatedAt" = NOW()
+              `, item.productId, warehouseId, incomingQty);
+            }
+          }
 
           // Record Stock Transaction
           await tx.stockTransaction.create({
@@ -1669,14 +1718,17 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
               productId: item.productId,
               type: 'IN',
               quantity: item.quantity,
-              reference: `PO #${po.orderNumber} (Approved)`,
-              date: new Date()
+              reference: `PO #${poData.orderNumber} (Approved)`,
+              date: new Date(),
+              warehouseId: warehouseId || null
             }
           });
         }
       }
 
       return updatedPo;
+    }, {
+      timeout: 30000 // 30 seconds to handle large PO lists safely
     });
 
     res.json({ message: `PO berhasil ${status === 'APPROVED' ? 'disetujui' : 'ditolak'}`, result });
@@ -8710,12 +8762,14 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       const items: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "SaleItem" WHERE "saleId" = $1`, s.id);
       for (const item of items) {
         const recipes: any[] = await prisma.$queryRawUnsafe(`
-          SELECT pr.*, p."costPrice" FROM "ProductRecipe" pr
+          SELECT pr.*, p."costPrice", targetP."recipeYield" FROM "ProductRecipe" pr
           JOIN "Product" p ON pr."materialId" = p.id
+          JOIN "Product" targetP ON pr."productId" = targetP.id
           WHERE pr."productId" = $1
         `, item.productId);
         if (recipes.length > 0) {
-          calculatedCogsFromSales += item.quantity * recipes.reduce((sum, r) => sum + (parseFloat(r.quantity) * (r.costPrice || 0)), 0);
+          const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
+          calculatedCogsFromSales += item.quantity * (recipes.reduce((sum, r) => sum + (parseFloat(r.quantity) * (r.costPrice || 0)), 0) / yieldVal);
         } else {
           const products: any[] = await prisma.$queryRawUnsafe(`SELECT "costPrice" FROM "Product" WHERE id = $1`, item.productId);
           calculatedCogsFromSales += item.quantity * (products[0]?.costPrice || 0);
@@ -9732,11 +9786,14 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
          visited.add(product.id);
 
          if (product.Recipes && product.Recipes.length > 0) {
-           return product.Recipes.reduce((sum: number, r: any) => {
+           const totalBatchCost = product.Recipes.reduce((sum: number, r: any) => {
              const material = products.find(m => m.id === r.materialId);
              const materialUnitCost = material ? getProductCost(material, new Set(visited)) : (r.Material?.costPrice || 0);
              return sum + (r.quantity * materialUnitCost);
            }, 0);
+
+           // Divide by yield to get UNIT HPP
+           return totalBatchCost / (product.recipeYield || 1);
          }
 
          return product.costPrice || 0;
@@ -9772,7 +9829,7 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood } = req.body;
+    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create Product
@@ -9794,6 +9851,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           priceGofood: Number(priceGofood) || 0,
           priceGrabfood: Number(priceGrabfood) || 0,
           priceShopeefood: Number(priceShopeefood) || 0,
+          recipeYield: Number(recipeYield) || 1,
           updatedAt: new Date()
         }
       });
@@ -9877,7 +9935,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
   try {
     const tenantId = Number((req as any).tenantId);
     const id = parseInt(req.params.id as string);
-    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood } = req.body;
+    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield } = req.body;
 
     // Verify ownership
     const existingProduct = await prisma.product.findFirst({
@@ -9905,6 +9963,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
         priceGofood: priceGofood !== undefined ? Number(priceGofood) : existingProduct.priceGofood,
         priceGrabfood: priceGrabfood !== undefined ? Number(priceGrabfood) : existingProduct.priceGrabfood,
         priceShopeefood: priceShopeefood !== undefined ? Number(priceShopeefood) : existingProduct.priceShopeefood,
+        recipeYield: recipeYield !== undefined ? Number(recipeYield) : existingProduct.recipeYield,
         updatedAt: new Date()
       }
     });
@@ -9945,12 +10004,17 @@ app.delete('/api/inventory/products/:id', tenantMiddleware, async (req: Request,
 app.get('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const productId = parseInt(req.params.id as string);
+    const { warehouseId } = req.query;
+    
     const recipes = await prisma.$queryRawUnsafe(`
-      SELECT pr.*, p.name as material_name, p.unit as material_unit
+      SELECT pr.*, p.name as material_name, p.unit as material_unit,
+             COALESCE(p.stock, 0)::float as "globalStock",
+             COALESCE(ws.quantity, 0)::float as "availableStock"
       FROM "ProductRecipe" pr
       JOIN "Product" p ON pr."materialId" = p.id
+      LEFT JOIN "WarehouseStock" ws ON ws."productId" = p.id AND ws."warehouseId" = $2
       WHERE pr."productId" = $1
-    `, productId);
+    `, productId, warehouseId ? parseInt(warehouseId as string) : -1);
     res.json(recipes);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil resep: ' + error.message });
@@ -10089,6 +10153,81 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
+// I5. Stock Transfer (Mutation)
+app.post('/api/inventory/transfer', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = (req as any).userId;
+    const { productId, fromWarehouseId, toWarehouseId, quantity, notes } = req.body;
+
+    if (!productId || !fromWarehouseId || !toWarehouseId || !quantity) {
+      return res.status(400).json({ error: 'Data transfer tidak lengkap.' });
+    }
+
+    if (parseInt(fromWarehouseId) === parseInt(toWarehouseId)) {
+      return res.status(400).json({ error: 'Gudang asal dan tujuan tidak boleh sama.' });
+    }
+
+    const qty = parseFloat(quantity);
+    if (qty <= 0) return res.status(400).json({ error: 'Jumlah transfer harus lebih dari 0.' });
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Check Source Stock
+      const sourceStock = await tx.warehouseStock.findUnique({
+        where: { productId_warehouseId: { productId: parseInt(productId), warehouseId: parseInt(fromWarehouseId) } }
+      });
+
+      if (!sourceStock || sourceStock.quantity < qty) {
+        throw new Error(`Stok tidak mencukupi di gudang asal. Tersedia: ${sourceStock?.quantity || 0}`);
+      }
+
+      // 2. Decrement Source
+      await tx.warehouseStock.update({
+        where: { productId_warehouseId: { productId: parseInt(productId), warehouseId: parseInt(fromWarehouseId) } },
+        data: { quantity: { decrement: qty } }
+      });
+
+      // 3. Increment Destination (using raw SQL to handle potential missing record)
+      await tx.$executeRawUnsafe(`
+        INSERT INTO "WarehouseStock" ("productId", "warehouseId", "quantity", "updatedAt")
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT ("productId", "warehouseId") 
+        DO UPDATE SET "quantity" = "WarehouseStock"."quantity" + $3, "updatedAt" = NOW()
+      `, parseInt(productId), parseInt(toWarehouseId), qty);
+
+      // 4. Record transactions
+      const fromW = await tx.warehouse.findUnique({ where: { id: parseInt(fromWarehouseId) }, select: { name: true } });
+      const toW = await tx.warehouse.findUnique({ where: { id: parseInt(toWarehouseId) }, select: { name: true } });
+
+      await tx.stockTransaction.createMany({
+        data: [
+          {
+            productId: parseInt(productId),
+            type: 'OUT',
+            quantity: qty,
+            reference: `Mutasi ke ${toW?.name || 'Gudang'}. ${notes || ''}`,
+            warehouseId: parseInt(fromWarehouseId),
+            date: new Date()
+          },
+          {
+            productId: parseInt(productId),
+            type: 'IN',
+            quantity: qty,
+            reference: `Mutasi dari ${fromW?.name || 'Gudang'}. ${notes || ''}`,
+            warehouseId: parseInt(toWarehouseId),
+            date: new Date()
+          }
+        ]
+      });
+    });
+
+    res.json({ message: "Mutasi stok berhasil diselesaikan." });
+  } catch (error: any) {
+    console.error("TRANSFER ERROR:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // I3.5. Production API (Manufacturing: Raw/WIP -> Finished Good)
 app.post('/api/inventory/produce', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -10130,7 +10269,8 @@ app.post('/api/inventory/produce', tenantMiddleware, async (req: Request, res: R
 
       // 2. Process each material in the recipe
       for (const recipeItem of product.Recipes) {
-        const neededQty = parseFloat(recipeItem.quantity.toString()) * producedQty;
+        const yieldDivisor = product.recipeYield && product.recipeYield > 0 ? Number(product.recipeYield) : 1;
+        const neededQty = (parseFloat(recipeItem.quantity.toString()) / yieldDivisor) * producedQty;
         const materialId = recipeItem.materialId;
 
         // Check if sufficient stock exists in the warehouse
@@ -10613,15 +10753,18 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         // --- NEW BOM LOGIC ---
         // Check if product has a recipe (BOM)
         const recipes: any[] = await tx.$queryRawUnsafe(`
-          SELECT * FROM "ProductRecipe" WHERE "productId" = $1
+          SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr
+          JOIN "Product" p ON pr."productId" = p.id
+          WHERE pr."productId" = $1
         `, productId);
 
         if (recipes.length > 0) {
+          const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
           // Decrement Materials instead of Product
           for (const recipe of recipes) {
             const materialId = recipe.materialId;
             const recipeQty = parseFloat(recipe.quantity);
-            const totalMaterialNeeded = recipeQty * quantity;
+            const totalMaterialNeeded = (recipeQty / yieldVal) * quantity;
 
             await tx.$executeRawUnsafe(`
               UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2
@@ -11104,10 +11247,15 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
         `, returnId, item.productId, item.quantity, item.price, item.total);
 
         // Check BOM
-        const recipes: any[] = await tx.$queryRawUnsafe(`SELECT * FROM "ProductRecipe" WHERE "productId" = $1`, item.productId);
+        const recipes: any[] = await tx.$queryRawUnsafe(`
+          SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr
+          JOIN "Product" p ON pr."productId" = p.id
+          WHERE pr."productId" = $1
+        `, item.productId);
         if (recipes.length > 0) {
+          const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
           for (const recipe of recipes) {
-            const materialQty = parseFloat(recipe.quantity) * item.quantity;
+            const materialQty = (parseFloat(recipe.quantity) / yieldVal) * item.quantity;
             await tx.$executeRawUnsafe(`UPDATE "Product" SET stock = stock + $1 WHERE id = $2`, materialQty, recipe.materialId);
             await tx.$executeRawUnsafe(`
               INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
@@ -11479,14 +11627,17 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
 
             // --- BOM LOGIC INTEGRATION ---
             const recipes: any[] = await tx.$queryRawUnsafe(`
-                SELECT * FROM "ProductRecipe" WHERE "productId" = $1
+                SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr
+                JOIN "Product" p ON pr."productId" = p.id
+                WHERE pr."productId" = $1
             `, productId);
 
             if (recipes.length > 0) {
+                const yieldVal = Number(recipes[0].recipeYield) || 1;
                 // If product has a recipe, decrement the MATERIALS
                 for (const recipe of recipes) {
                     const materialId = Number(recipe.materialId);
-                    const materialQtyNeeded = Number(recipe.quantity) * quantity;
+                    const materialQtyNeeded = (Number(recipe.quantity) / yieldVal) * quantity;
 
                     // Update Material Global Stock
                     await tx.product.update({

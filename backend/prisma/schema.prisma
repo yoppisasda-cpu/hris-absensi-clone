@@ -782,6 +782,7 @@ model Product {
   priceGofood      Float              @default(0)
   priceGrabfood     Float              @default(0)
   priceShopeefood   Float              @default(0)
+  recipeYield      Float              @default(1)
   category         ProductCategory?   @relation(fields: [categoryId], references: [id])
   Company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   StockTransaction StockTransaction[]

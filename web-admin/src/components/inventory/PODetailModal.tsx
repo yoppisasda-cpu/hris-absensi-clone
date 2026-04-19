@@ -2,7 +2,7 @@
 
 import { X, Truck, Package, Clock, User, CheckCircle2, XCircle, FileText, ShoppingBag, Printer } from "lucide-react";
 
-export default function PODetailModal({ isOpen, onClose, po }: any) {
+export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject }: any) {
     if (!isOpen || !po) return null;
 
     const getStatusStyle = (status: string) => {
@@ -158,13 +158,30 @@ export default function PODetailModal({ isOpen, onClose, po }: any) {
                     )}
                 </div>
 
-                <div className="p-10 bg-slate-950 border-t border-white/10 flex justify-end print:hidden">
-                    <button
-                        onClick={onClose}
-                        className="px-12 py-5 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase italic tracking-[0.3em] shadow-2xl shadow-indigo-900/40 hover:bg-indigo-700 transition-all active:scale-95 border border-white/10"
-                    >
-                        Abort_Analysis
-                    </button>
+                <div className="p-10 bg-slate-950 border-t border-white/10 flex justify-end gap-4 print:hidden">
+                    {po.status === 'PENDING' && onApprove && onReject ? (
+                        <>
+                            <button
+                                onClick={() => onReject(po.id, 'REJECTED')}
+                                className="px-10 py-5 rounded-2xl bg-red-600/10 text-red-500 text-[10px] font-black uppercase italic tracking-[0.3em] hover:bg-red-600 hover:text-white transition-all active:scale-95 border border-red-500/20"
+                            >
+                                Tolak_Requisition
+                            </button>
+                            <button
+                                onClick={() => onApprove(po.id, 'APPROVED')}
+                                className="px-10 py-5 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase italic tracking-[0.3em] shadow-2xl shadow-emerald-900/40 hover:bg-emerald-700 transition-all active:scale-95 border border-white/10"
+                            >
+                                Approve_Manifest
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={onClose}
+                            className="px-12 py-5 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase italic tracking-[0.3em] shadow-2xl shadow-indigo-900/40 hover:bg-indigo-700 transition-all active:scale-95 border border-white/10"
+                        >
+                            Abort_Analysis
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

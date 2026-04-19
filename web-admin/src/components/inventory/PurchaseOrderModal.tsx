@@ -10,8 +10,11 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     
+    const [warehouses, setWarehouses] = useState<any[]>([]);
+    
     const [formData, setFormData] = useState({
         supplierId: "",
+        warehouseId: "",
         date: new Date().toISOString().split('T')[0],
         notes: "",
         items: [{ productId: "", quantity: 1, price: 0 }]
@@ -21,8 +24,22 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
         if (isOpen) {
             fetchSuppliers();
             fetchProducts();
+            fetchWarehouses();
         }
     }, [isOpen]);
+
+    const fetchWarehouses = async () => {
+        try {
+            const res = await api.get('/inventory/warehouses');
+            setWarehouses(res.data);
+            if (res.data.length > 0) {
+                const main = res.data.find((w: any) => w.isMain) || res.data[0];
+                setFormData(prev => ({ ...prev, warehouseId: main.id.toString() }));
+            }
+        } catch (error) {
+            console.error("Gagal mengambil data gudang", error);
+        }
+    };
 
     const fetchSuppliers = async () => {
         try {
@@ -80,6 +97,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
         
         // Validation
         if (!formData.supplierId) return toast.error("Pilih supplier terlebih dahulu.");
+        if (!formData.warehouseId) return toast.error("Pilih gudang tujuan terlebih dahulu.");
         if (formData.items.some(item => !item.productId || item.quantity <= 0)) {
             return toast.error("Lengkapi data barang dan jumlah pesanan.");
         }
@@ -93,6 +111,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
             // Reset form
             setFormData({
                 supplierId: "",
+                warehouseId: warehouses.find((w: any) => w.isMain)?.id.toString() || (warehouses[0]?.id.toString() || ""),
                 date: new Date().toISOString().split('T')[0],
                 notes: "",
                 items: [{ productId: "", quantity: 1, price: 0 }]
@@ -115,8 +134,8 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                             <ShoppingBag className="h-6 w-6 stroke-[2.5px]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Procurement Pipeline</h3>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Official Purchase Order Requisition</p>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Pipeline Pengadaan (PO)</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Pengajuan Pesanan Pembelian Resmi</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
@@ -129,7 +148,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                         {/* Section 1: Header Info */}
                         <div className="grid grid-cols-2 gap-8">
                             <div className="space-y-2">
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Fulfillment Source (Vendor)</label>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Sumber Pemenuhan (Vendor / Supplier)</label>
                                 <div className="relative group">
                                     <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors z-10" />
                                     <select
@@ -138,16 +157,16 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                         value={formData.supplierId}
                                         onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
                                     >
-                                        <option value="">SELECT VENDOR...</option>
+                                        <option value="">PILIH VENDOR...</option>
                                         {suppliers.map((s) => (
-                                            <option key={s.id} value={s.id}>{s.name.toUpperCase()} – {s.category?.toUpperCase() || 'GENERAL'}</option>
+                                            <option key={s.id} value={s.id}>{s.name.toUpperCase()} – {s.category?.toUpperCase() || 'UMUM'}</option>
                                         ))}
                                     </select>
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[8px] pointer-events-none">▼</div>
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Emission Date</label>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Tanggal Pengajuan</label>
                                 <div className="relative group">
                                     <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors z-10" />
                                     <input
@@ -157,6 +176,28 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                         value={formData.date}
                                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                                     />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Target Warehouse Selection */}
+                        <div className="space-y-2">
+                            <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1 text-glow-sm">Gudang Tujuan (Alokasi Stok Masuk)</label>
+                            <div className="relative group">
+                                <Package className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors z-10" />
+                                <select
+                                    required
+                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-4 text-[10px] font-black text-slate-400 group-focus-within:text-white outline-none transition-all italic tracking-widest uppercase appearance-none"
+                                    value={formData.warehouseId}
+                                    onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                                >
+                                    <option value="">PILIH GUDANG TUJUAN...</option>
+                                    {warehouses.map((w: any) => (
+                                        <option key={w.id} value={w.id}>{w.name.toUpperCase()} {w.isMain ? '(UTAMA)' : ''}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[8px] pointer-events-none italic font-black uppercase tracking-widest">
+                                    {warehouses.find(w => w.id.toString() === formData.warehouseId)?.type || 'Select'}
                                 </div>
                             </div>
                         </div>
@@ -170,51 +211,57 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                     <div className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                                         <Package className="h-4 w-4 stroke-[2.5px]" />
                                     </div>
-                                    <h3 className="text-[11px] font-black uppercase text-white tracking-[0.2em] italic">Itemization Matrix</h3>
+                                    <h3 className="text-[11px] font-black uppercase text-white tracking-[0.2em] italic">Daftar Barang</h3>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={addItem}
                                     className="px-5 py-2.5 bg-indigo-600 text-white text-[9px] font-black uppercase rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 tracking-widest italic border border-white/10 shadow-lg shadow-indigo-500/20"
                                 >
-                                    <Plus className="h-3.5 w-3.5 stroke-[3px]" /> Inject Item
+                                    <Plus className="h-3.5 w-3.5 stroke-[3px]" /> Tambah Barang
                                 </button>
                             </div>
 
                             <div className="flex gap-4 mb-4 px-4 text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] italic relative z-10">
-                                <div className="flex-[4]">SKU Descriptor / Material</div>
-                                <div className="flex-1 text-center">Quantity</div>
-                                <div className="flex-[1.8] text-right">Unit Price (IDR)</div>
+                                <div className="flex-[3.5]">Deskripsi Produk / Bahan</div>
+                                <div className="flex-[1.8] text-center">Jumlah</div>
+                                <div className="flex-[1.8] text-right">Harga Satuan (IDR)</div>
                                 <div className="w-10"></div>
                             </div>
 
                             <div className="space-y-4 relative z-10">
                                 {formData.items.map((item, index) => (
                                     <div key={index} className="flex gap-4 animate-in slide-in-from-left-4 duration-300 group items-center bg-slate-900/50 p-2 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all">
-                                        <div className="flex-[4] relative group/select">
+                                        <div className="flex-[3.5] relative group/select">
                                             <select
                                                 required
                                                 className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 px-4 text-[10px] font-black text-slate-400 group-focus-within/select:text-white outline-none transition-all appearance-none italic uppercase tracking-widest"
                                                 value={item.productId}
                                                 onChange={(e) => updateItem(index, 'productId', e.target.value)}
                                             >
-                                                <option value="">SELECT SKU...</option>
-                                                {products.map((p) => (
-                                                    <option key={p.id} value={p.id}>{p.name.toUpperCase()} – RP {p.costPrice?.toLocaleString()}</option>
-                                                ))}
+                                                <option value="">PILIH BARANG...</option>
+                                                {products
+                                                    .filter(p => p.type === 'RAW_MATERIAL')
+                                                    .map((p) => (
+                                                        <option key={p.id} value={p.id}>{p.name.toUpperCase()} – RP {p.costPrice?.toLocaleString()}</option>
+                                                    ))
+                                                }
                                             </select>
                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[6px] pointer-events-none">▼</div>
                                         </div>
-                                        <div className="flex-1">
+                                        <div className="flex-[1.8] relative group/qty">
                                             <input
                                                 required
                                                 type="number"
                                                 step="any"
                                                 placeholder="0"
-                                                className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 px-4 text-[10px] font-black text-white text-center focus:border-indigo-500/50 outline-none transition-all shadow-inner tracking-widest"
+                                                className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 pl-3 pr-10 text-[10px] font-black text-white text-left focus:border-indigo-500/50 outline-none transition-all shadow-inner tracking-widest"
                                                 value={item.quantity}
                                                 onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                                             />
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[7px] font-black text-indigo-500/40 uppercase tracking-widest italic pointer-events-none">
+                                                {products.find(p => p.id.toString() === item.productId.toString())?.unit || 'MOD'}
+                                            </div>
                                         </div>
                                         <div className="flex-[1.8]">
                                             <input
@@ -238,11 +285,23 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                 ))}
                             </div>
 
-                            {/* Total Calculation */}
-                            <div className="mt-10 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Net Procurement Value</p>
-                                    <p className="text-[9px] font-bold uppercase text-slate-700 mt-1">Estimasi Total Tagihan Terkalkulasi</p>
+                            {/* Conversion Hint & Total Calculation */}
+                            <div className="mt-10 pt-6 border-t border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
+                                <div className="space-y-3">
+                                    <div className="flex flex-wrap gap-4">
+                                        <div className="px-3 py-1.5 rounded-lg bg-indigo-500/5 border border-indigo-500/10 flex items-center gap-2">
+                                            <div className="h-2 w-2 rounded-full bg-indigo-500"></div>
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest italic">1.000 GRAM = 1 KG</span>
+                                        </div>
+                                        <div className="px-3 py-1.5 rounded-lg bg-indigo-500/5 border border-indigo-500/10 flex items-center gap-2">
+                                            <div className="h-2 w-2 rounded-full bg-indigo-500"></div>
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest italic">1.000 ML = 1 LITER</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Total Nilai Pengadaan</p>
+                                        <p className="text-[9px] font-bold uppercase text-slate-700 mt-1">Estimasi Total Tagihan Terkalkulasi</p>
+                                    </div>
                                 </div>
                                 <p className="text-3xl font-black italic text-white tracking-tighter text-glow-lg">Rp {calculateTotal().toLocaleString()}</p>
                             </div>
@@ -250,7 +309,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
 
                         {/* Section 3: Notes */}
                         <div className="space-y-2">
-                            <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Logistics / Delivery Directive</label>
+                            <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Catatan Logistik / Pengiriman</label>
                             <div className="relative group">
                                 <FileText className="absolute left-4 top-4 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors pointer-events-none z-10" />
                                 <textarea
@@ -269,7 +328,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                             onClick={onClose}
                             className="flex-1 py-4 text-[10px] font-black text-slate-500 bg-white/5 border border-white/5 hover:text-white hover:bg-white/10 rounded-2xl transition-all uppercase tracking-[0.2em] italic"
                         >
-                            Abort Requisition
+                            Batalkan Pengajuan
                         </button>
                         <button
                             type="submit"
@@ -279,7 +338,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                             {loading ? (
                                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                             ) : (
-                                <><ShoppingBag className="h-4 w-4 stroke-[3px]" /> TRANSMIT PURCHASE ORDER</>
+                                <><ShoppingBag className="h-4 w-4 stroke-[3px]" /> KIRIM PESANAN PEMBELIAN (PO)</>
                             )}
                         </button>
                     </div>
