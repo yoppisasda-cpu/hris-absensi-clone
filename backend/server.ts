@@ -10259,6 +10259,7 @@ app.post('/api/inventory/produce', tenantMiddleware, async (req: Request, res: R
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      console.log(`[PRODUCTION] Starting for Product ID: ${productId} | SKU: ${sku} | Qty: ${producedQty} | Warehouse: ${warehouseId}`);
       // 1. Get Product & its Recipe
       let product;
       if (productId) {
@@ -10291,6 +10292,8 @@ app.post('/api/inventory/produce', tenantMiddleware, async (req: Request, res: R
         const yieldDivisor = product.recipeYield && product.recipeYield > 0 ? Number(product.recipeYield) : 1;
         const neededQty = (parseFloat(recipeItem.quantity.toString()) / yieldDivisor) * producedQty;
         const materialId = recipeItem.materialId;
+
+        console.log(`[PRODUCTION] Processing Material: ${recipeItem.Material.name} (ID: ${materialId}) | Needed: ${neededQty}`);
 
         // Check if sufficient stock exists in the warehouse
         const wStock = await tx.warehouseStock.findUnique({
@@ -10357,6 +10360,9 @@ app.post('/api/inventory/produce', tenantMiddleware, async (req: Request, res: R
         producedQty,
         remainingUnit: product.unit
       };
+    }, {
+      maxWait: 10000,
+      timeout: 30000
     });
 
     res.json({ message: 'Produksi berhasil dicatat, stok otomatis disesuaikan.', result });
