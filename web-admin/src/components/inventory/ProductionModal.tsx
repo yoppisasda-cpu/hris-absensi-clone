@@ -84,7 +84,7 @@ export default function ProductionModal({ product, isOpen, onClose, onSuccess }:
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
-            <div className="glass w-full max-w-lg rounded-[3rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col">
+            <div className="glass w-full max-w-lg max-h-[95vh] rounded-[3rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col">
                 <div className="bg-slate-950/50 border-b border-indigo-500/20 px-10 py-8 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/10">
@@ -100,7 +100,8 @@ export default function ProductionModal({ product, isOpen, onClose, onSuccess }:
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto flex-grow custom-scrollbar bg-slate-950/20">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                    <div className="p-8 space-y-8 overflow-y-auto flex-1 custom-scrollbar bg-slate-950/20">
                     <div className="space-y-6">
                         <div className="p-6 bg-slate-950/50 border border-slate-800 rounded-[32px] flex items-center justify-between shadow-inner">
                             <div className="text-center flex-1 border-r border-white/5">
@@ -239,8 +240,8 @@ export default function ProductionModal({ product, isOpen, onClose, onSuccess }:
                             />
                         </div>
                     </div>
-
-                    <div className="mt-10 flex gap-4 shrink-0">
+                    
+                    <div className="p-8 bg-slate-950/80 border-t border-white/5 backdrop-blur-md flex gap-4 shrink-0">
                         <button
                             type="button"
                             onClick={onClose}
