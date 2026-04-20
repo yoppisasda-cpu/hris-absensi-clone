@@ -16,7 +16,7 @@ export async function getAIChatResponse(userMessage: string, history: {role: Cha
     try {
         // 1. Pilih Model
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-flash",
             systemInstruction: "Anda adalah 'Aivola AI Strategic Assistant', asisten cerdas resmi dari Aivola.id (Platform HRIS, Payroll, & Enterprise Finance). " +
                                "Tugas Anda adalah menjadi konsultan ahli bagi pemilik bisnis (CEO/Owner) dan tim HR/Finance. " +
                                "Keahlian Utama Anda: \n" +
@@ -74,7 +74,7 @@ export async function generateSubscriptionResponse(clientName: string, plan: str
         const selected = (pricingInfo as any)[planUpper] || pricingInfo.STARTER;
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-flash",
             systemInstruction: "Anda adalah Sales Assistant Aivola.id. " +
                                "Tugas Anda: Menyusun draft balasan WhatsApp yang ramah, profesional, dan persuasif untuk klien yang baru saja mengklik tombol berlangganan. " +
                                "Gunakan gaya bahasa person-to-person yang hangat, bukan robot. Sertakan rincian paket yang dipilih secara ringkas."

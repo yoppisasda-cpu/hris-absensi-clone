@@ -16,7 +16,7 @@ export interface FaceResult {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: "v1" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }, { apiVersion: "v1beta" });
 
 async function fileToGenerativePart(filePath: string, mimeType: string) {
     let finalPath = filePath;
@@ -99,10 +99,10 @@ export async function compareFaces(referencePath: string, capturePath: string): 
     }
 
     const modelNames = [
-        "gemini-1.5-flash", 
-        "gemini-1.5-flash-8b",
-        "gemini-2.0-flash-exp",
-        "gemini-1.5-pro"
+        "gemini-2.5-flash", 
+        "gemini-flash-latest",
+        "gemini-2.0-flash",
+        "gemini-pro-latest"
     ];
 
     let lastError = "Tidak ada model yang merespons.";
