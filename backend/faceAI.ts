@@ -4,6 +4,7 @@ import path from 'path';
 import os from 'os';
 import axios from 'axios';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import sharp from 'sharp';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -17,22 +18,19 @@ export interface FaceResult {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: "v1" });
 
-function fileToGenerativePart(filePath: string, mimeType: string) {
+async function fileToGenerativePart(filePath: string, mimeType: string) {
     let finalPath = filePath;
     
     // Self-Healing Path Check
     if (!fs.existsSync(finalPath)) {
         console.warn(`[Face AI] Path not found: ${finalPath}. Attempting deeper self-healing...`);
         
-        // Coba 1: Bersihkan total (buang //, buang /app/ di depan jika ada)
         let cleaned = filePath.replace(/^\/+/, "").replace(/\/\//g, "/");
         if (cleaned.startsWith('app/')) {
             cleaned = cleaned.replace('app/', '');
         }
 
         const try1 = path.join(process.cwd(), cleaned);
-        
-        // Coba 2: Cari langsung di folder uploads root
         const fileName = path.basename(filePath);
         const folderName = filePath.includes('attendance') ? 'attendance' : 'face_references';
         const try2 = path.join(process.cwd(), 'uploads', folderName, fileName);
@@ -43,16 +41,35 @@ function fileToGenerativePart(filePath: string, mimeType: string) {
             finalPath = try2;
         } else {
             console.error(`[Face AI] ENOENT File not found for: ${filePath}. Current CWD: ${process.cwd()}`);
-            throw new Error(`Verifikasi Gagal: Foto Master bapak tidak ditemukan di server. Silakan hubungi Admin atau daftar ulang wajah bapak di Web Admin.`);
+            throw new Error(`Verifikasi Gagal: Foto Master tidak ditemukan.`);
         }
     }
 
-    return {
-        inlineData: {
-            data: Buffer.from(fs.readFileSync(finalPath)).toString("base64"),
-            mimeType,
-        },
-    };
+    try {
+        console.log(`[Face AI] Compressing image: ${path.basename(finalPath)}...`);
+        // Compress image to ensure it's under API limits and faster to upload
+        const compressedBuffer = await sharp(finalPath)
+            .resize({ width: 1024, withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+            
+        console.log(`[Face AI] Compression done. Original: ${fs.statSync(finalPath).size} bytes, Compressed: ${compressedBuffer.length} bytes`);
+        
+        return {
+            inlineData: {
+                data: compressedBuffer.toString("base64"),
+                mimeType,
+            },
+        };
+    } catch (error) {
+        console.error(`[Face AI] Sharp Compression Failed! Falling back to raw.`, error);
+        return {
+            inlineData: {
+                data: Buffer.from(fs.readFileSync(finalPath)).toString("base64"),
+                mimeType,
+            },
+        };
+    }
 }
 
 async function downloadImage(url: string, dest: string) {
@@ -82,9 +99,10 @@ export async function compareFaces(referencePath: string, capturePath: string): 
     }
 
     const modelNames = [
-        "models/gemini-1.5-flash", 
-        "models/gemini-2.0-flash",
-        "models/gemini-pro-vision"
+        "gemini-1.5-flash", 
+        "gemini-1.5-flash-8b",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro"
     ];
 
     let lastError = "Tidak ada model yang merespons.";
@@ -92,60 +110,55 @@ export async function compareFaces(referencePath: string, capturePath: string): 
 
     // loop through all potential models
     for (const modelName of modelNames) {
-        try {
-            console.log(`[Face AI] Trying model: ${modelName}...`);
-            const model = genAI.getGenerativeModel({ model: modelName });
-            
-            let finalRefPath = referencePath;
-            // Handle remote references (Supabase)
-            if (referencePath.startsWith('http')) {
-                const tempRef = path.join(os.tmpdir(), `ref-${Date.now()}.jpg`);
-                await downloadImage(referencePath, tempRef);
-                finalRefPath = tempRef;
-                tempFiles.push(tempRef);
+        const maxRetries = 2;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                if (attempt > 0) console.log(`[Face AI] RETRY attempt ${attempt} for model ${modelName}...`);
+                console.log(`[Face AI] Requesting analysis from ${modelName}...`);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                
+                let finalRefPath = referencePath;
+                if (referencePath.startsWith('http')) {
+                    const tempRef = path.join(os.tmpdir(), `ref-${Date.now()}.jpg`);
+                    await downloadImage(referencePath, tempRef);
+                    finalRefPath = tempRef;
+                    tempFiles.push(tempRef);
+                }
+
+                const refPart = await fileToGenerativePart(finalRefPath, "image/jpeg");
+                const capPart = await fileToGenerativePart(capturePath, "image/jpeg");
+
+                const prompt = `
+                    Perform a rigorous biometric facial comparison between these two images.
+                    analyze key facial structures (eyes, nose, jawline). Return JSON: {"isSamePerson": boolean, "confidenceScore": number}.
+                `;
+
+                // Add a fetch timeout or safety if possible, or just catch it
+                const result = await model.generateContent([prompt, refPart, capPart]);
+                const response = await result.response;
+                const text = response.text();
+                
+                const cleanText = text.replace(/```json|```/g, "").trim();
+                const json = JSON.parse(cleanText);
+
+                console.log(`[Face AI] ${modelName} SUCCESS:`, json);
+                return {
+                    verified: json.isSamePerson,
+                    score: json.confidenceScore
+                };
+            } catch (error: any) {
+                console.error(`[Face AI] ${modelName} attempt ${attempt} FAILED:`, error.message);
+                lastError = error.message;
+                
+                if (error.message.includes("fetch") || error.message.includes("quota")) {
+                    // Wait a bit before retry if it's a fetch or quota issue
+                    if (attempt < maxRetries) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                    continue;
+                }
+                break; // If it's not a fetch issue, move to next model
+            } finally {
+                tempFiles.forEach(f => { if (fs.existsSync(f)) try { fs.unlinkSync(f); } catch(e) {} });
             }
-
-            const refPart = fileToGenerativePart(finalRefPath, "image/jpeg");
-            const capPart = fileToGenerativePart(capturePath, "image/jpeg");
-
-            const prompt = `
-                Perform a rigorous biometric facial comparison between these two images.
-                
-                Analyze the following features:
-                1. Eye shape and inter-ocular distance.
-                2. Nasal bridge structure and width.
-                3. Jawline contour and chin shape.
-                4. Distinctive facial markers or bone structure.
-                
-                Ignore temporary variations like: expression, lighting, background, facial hair, or accessories.
-                
-                Scoring Rule:
-                - Provide a highly granular confidenceScore between 0.0 and 1.0. 
-                - Avoid rounding to 0.95. A real-world match should naturally vary (e.g., 0.88, 0.93, 0.97).
-                - Identical images should be 1.0.
-                
-                Return ONLY a JSON object: {"isSamePerson": boolean, "confidenceScore": number}.
-            `;
-
-
-            const result = await model.generateContent([prompt, refPart, capPart]);
-            const response = await result.response;
-            const text = response.text();
-            
-            const cleanText = text.replace(/```json|```/g, "").trim();
-            const json = JSON.parse(cleanText);
-
-            console.log(`[Face AI] ${modelName} SUCCESS:`, json);
-            return {
-                verified: json.isSamePerson,
-                score: json.confidenceScore
-            };
-        } catch (error: any) {
-            console.error(`[Face AI] ${modelName} FAILED:`, error.message);
-            lastError = error.message;
-            // We NO LONGER break. We try every model in the list.
-        } finally {
-            tempFiles.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
         }
     }
 
