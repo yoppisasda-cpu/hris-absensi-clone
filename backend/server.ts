@@ -6194,8 +6194,12 @@ app.delete('/api/announcements/:id', tenantMiddleware, async (req: Request, res:
 // 1. Ambil Notifikasi Pribadi (Employee)
 app.get('/api/notifications', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId;
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+
+    if (isNaN(tenantId) || isNaN(userId)) {
+      return res.json([]);
+    }
 
     const notifications = await prisma.notification.findMany({
       where: { companyId: tenantId, userId: userId },
@@ -6204,15 +6208,16 @@ app.get('/api/notifications', tenantMiddleware, async (req: Request, res: Respon
     });
 
     res.json(notifications);
-  } catch (error) {
+  } catch (error: any) {
+    console.error(`[NOTIFICATIONS ERROR] tenantId: ${(req as any).tenantId}, userId: ${(req as any).userId}`, error.message);
     res.status(500).json({ error: 'Gagal mengambil notifikasi.' });
   }
 });
 
 app.patch('/api/notifications/:id/read', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId;
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
     const id = parseInt(req.params.id as string);
 
     await prisma.notification.update({
@@ -6221,7 +6226,8 @@ app.patch('/api/notifications/:id/read', tenantMiddleware, async (req: Request, 
     });
 
     res.json({ message: 'Notifikasi ditandai telah dibaca.' });
-  } catch (error) {
+  } catch (error: any) {
+    console.error(`[NOTIFICATION READ ERROR] id: ${req.params.id}, tenantId: ${(req as any).tenantId}, userId: ${(req as any).userId}`, error.message);
     res.status(500).json({ error: 'Gagal memperbarui notifikasi.' });
   }
 });
@@ -9939,6 +9945,8 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
       }
 
       return productId;
+    }, {
+      timeout: 30000 // Increase timeout to 30s
     });
 
     res.status(201).json({ message: 'Produk berhasil ditambahkan', productId: result });
@@ -10054,12 +10062,17 @@ app.post('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Req
       // 2. Insert new recipe items
       if (items && Array.isArray(items)) {
         for (const item of items) {
+          // Diagnostic Logging
+          console.log(`[RECIPE SAVE] Product: ${productId} | Material: ${item.materialId} | Qty: ${item.quantity}`);
+          
           await tx.$executeRawUnsafe(`
             INSERT INTO "ProductRecipe" ("productId", "materialId", "quantity", "updatedAt")
             VALUES ($1, $2, $3, NOW())
           `, productId, parseInt(item.materialId), parseFloat(item.quantity));
         }
       }
+    }, {
+      timeout: 30000 // Increase timeout to 30s to handle many items
     });
 
     res.json({ message: 'Resep berhasil diperbarui' });

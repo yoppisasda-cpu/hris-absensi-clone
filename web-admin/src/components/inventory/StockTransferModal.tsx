@@ -99,7 +99,7 @@ export default function StockTransferModal({ product, isOpen, onClose, onSuccess
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" onClick={onClose} />
+            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl" />
             <div className="glass w-full max-w-lg rounded-[3.5rem] border border-white/10 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
                 <div className="bg-slate-950/50 border-b border-indigo-500/20 px-10 py-8 flex items-center justify-between">
                     <div className="flex items-center gap-4">
