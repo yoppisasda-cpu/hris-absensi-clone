@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, ShoppingBag, Plus, Trash2, Search, Package, User, FileText, Calendar } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
+import SearchableSelect from "../common/SearchableSelect";
 
 export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) {
     const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -151,17 +152,16 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                 <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Sumber Pemenuhan (Vendor / Supplier)</label>
                                 <div className="relative group">
                                     <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-indigo-400 transition-colors z-10" />
-                                    <select
-                                        required
-                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-4 text-[10px] font-black text-slate-400 group-focus-within:text-white outline-none transition-all italic tracking-widest uppercase appearance-none"
+                                    <SearchableSelect
+                                        options={suppliers.map((s) => ({
+                                            id: s.id.toString(),
+                                            name: s.name
+                                        }))}
                                         value={formData.supplierId}
-                                        onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
-                                    >
-                                        <option value="">PILIH VENDOR...</option>
-                                        {suppliers.map((s) => (
-                                            <option key={s.id} value={s.id}>{s.name.toUpperCase()} – {s.category?.toUpperCase() || 'UMUM'}</option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => setFormData({ ...formData, supplierId: val.toString() })}
+                                        placeholder="Pilih Vendor..."
+                                        className="pl-8"
+                                    />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[8px] pointer-events-none">▼</div>
                                 </div>
                             </div>
@@ -203,7 +203,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                         </div>
 
                         {/* Section 2: Items List */}
-                        <div className="bg-slate-950/40 -mx-8 px-10 py-8 border-y border-white/5 relative overflow-hidden">
+                        <div className="bg-slate-950/40 -mx-8 px-10 py-8 border-y border-white/5 relative overflow-visible">
                             <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
                             
                             <div className="flex items-center justify-between mb-6 relative z-10">
@@ -232,22 +232,19 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                             <div className="space-y-4 relative z-10">
                                 {formData.items.map((item, index) => (
                                     <div key={index} className="flex gap-4 animate-in slide-in-from-left-4 duration-300 group items-center bg-slate-900/50 p-2 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all">
-                                        <div className="flex-[3.5] relative group/select">
-                                            <select
-                                                required
-                                                className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 px-4 text-[10px] font-black text-slate-400 group-focus-within/select:text-white outline-none transition-all appearance-none italic uppercase tracking-widest"
-                                                value={item.productId}
-                                                onChange={(e) => updateItem(index, 'productId', e.target.value)}
-                                            >
-                                                <option value="">PILIH BARANG...</option>
-                                                {products
+                                        <div className="flex-[3.5]">
+                                            <SearchableSelect
+                                                options={products
                                                     .filter(p => p.type === 'RAW_MATERIAL')
-                                                    .map((p) => (
-                                                        <option key={p.id} value={p.id}>{p.name.toUpperCase()} – RP {p.costPrice?.toLocaleString()}</option>
-                                                    ))
+                                                    .map((p) => ({
+                                                        id: p.id.toString(),
+                                                        name: p.name
+                                                    }))
                                                 }
-                                            </select>
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 text-[6px] pointer-events-none">▼</div>
+                                                value={item.productId}
+                                                onChange={(val) => updateItem(index, 'productId', val.toString())}
+                                                placeholder="Pilih Barang..."
+                                            />
                                         </div>
                                         <div className="flex-[1.8] relative group/qty">
                                             <input

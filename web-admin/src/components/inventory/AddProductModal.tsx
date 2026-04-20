@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Package, Tag, Box, AlertCircle, Layers, Plus, Trash2, ChefHat, ScanLine, MapPin, Save, Info, TrendingUp, Calculator } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
+import SearchableSelect from "../common/SearchableSelect";
 
 export default function AddProductModal({ isOpen, onClose, onSuccess, product }: any) {
     const [formData, setFormData] = useState({
@@ -674,18 +675,16 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                 <div className="space-y-4">
                                     {recipeItems.map((item, index) => (
                                         <div key={index} className="flex gap-3 animate-in fade-in slide-in-from-left-4 duration-300">
-                                            <div className="flex-[3] relative">
-                                                <select
-                                                    required
-                                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3 px-5 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all italic text-glow-sm"
+                                            <div className="flex-[3]">
+                                                <SearchableSelect
+                                                    options={productList.map((p) => ({
+                                                        id: p.id.toString(),
+                                                        name: p.name
+                                                    }))}
                                                     value={item.materialId}
-                                                    onChange={(e) => updateRecipeItem(index, 'materialId', e.target.value)}
-                                                >
-                                                    <option value="">SELECT RAW MATERIAL...</option>
-                                                    {productList.map((p) => (
-                                                        <option key={p.id} value={p.id}>{p.name.toUpperCase()} ({p.unit.toUpperCase()})</option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) => updateRecipeItem(index, 'materialId', val.toString())}
+                                                    placeholder="Select Raw Material..."
+                                                />
                                             </div>
                                             <div className="flex-1">
                                                 <input
