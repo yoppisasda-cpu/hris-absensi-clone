@@ -10122,10 +10122,13 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
       }
 
       // 5. Record Transaction
+      const safeSupplierId = supplierId && !isNaN(parseInt(String(supplierId))) ? parseInt(String(supplierId)) : null;
+      const safeWarehouseId = warehouseId && !isNaN(parseInt(String(warehouseId))) ? parseInt(String(warehouseId)) : null;
+      
       await tx.$executeRawUnsafe(`
         INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "supplierId", "warehouseId")
         VALUES ($1, $2, $3, $4, NOW(), $5, $6)`,
-        productId, type, quantity, reference, supplierId ? parseInt(supplierId) : null, warehouseId ? parseInt(warehouseId) : null
+        productId, type, Number(quantity || 0), reference, safeSupplierId, safeWarehouseId
       );
 
       // 5. Optional Expense Sync (Only for IN)
@@ -10142,12 +10145,14 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
         });
 
         if (!category) {
-          const catResult: any[] = await tx.$queryRawUnsafe(`
-            INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
-            VALUES ($1, $2, $3::"ExpenseType", NOW())
-            RETURNING id
-          `, tenantId, catName, catType);
-          category = { id: catResult[0].id };
+          category = await tx.expenseCategory.create({
+            data: {
+              companyId: tenantId,
+              name: catName,
+              type: catType as any,
+              updatedAt: new Date()
+            }
+          });
         }
 
         let paidTo = reference || 'Supplier';
