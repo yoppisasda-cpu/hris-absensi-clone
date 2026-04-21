@@ -219,7 +219,7 @@ export default function SchedulingMatrixPage() {
                 <select 
                     value={filterBranch} 
                     onChange={e => setFilterBranch(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
                 >
                     <option value="">Semua Cabang (Global)</option>
                     {branches.map(b => (
@@ -234,7 +234,7 @@ export default function SchedulingMatrixPage() {
                         placeholder="Cari Karyawan..." 
                         value={userSearch}
                         onChange={e => setUserSearch(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        className="w-full pl-9 pr-3 py-2 text-sm bg-slate-800 border border-slate-700 text-white rounded-lg outline-none focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-500"
                     />
                 </div>
             </div>
