@@ -674,7 +674,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                             {hasRecipe ? (
                                 <div className="space-y-4">
                                     {recipeItems.map((item, index) => (
-                                        <div key={index} className="flex gap-3 animate-in fade-in slide-in-from-left-4 duration-300">
+                                        <div key={index} style={{ zIndex: 50 - index }} className="flex gap-3 animate-in fade-in slide-in-from-left-4 duration-300 relative">
                                             <div className="flex-[3]">
                                                 <SearchableSelect
                                                     options={productList.map((p) => ({

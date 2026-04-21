@@ -228,10 +228,10 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                 <div className="flex-[1.8] text-right">Harga Satuan (IDR)</div>
                                 <div className="w-10"></div>
                             </div>
-
-                            <div className="space-y-4 relative z-10">
+                            {/* Items list container - needs high z-index to break out dropdowns */}
+                            <div className="space-y-4 relative z-50">
                                 {formData.items.map((item, index) => (
-                                    <div key={index} className="flex gap-4 animate-in slide-in-from-left-4 duration-300 group items-center bg-slate-900/50 p-2 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all">
+                                    <div key={index} style={{ zIndex: 50 - index }} className="flex gap-4 animate-in slide-in-from-left-4 duration-300 group items-center bg-slate-900/50 p-2 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all relative">
                                         <div className="flex-[3.5]">
                                             <SearchableSelect
                                                 options={products
