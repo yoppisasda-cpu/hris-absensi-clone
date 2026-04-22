@@ -202,7 +202,7 @@ export default function ProductsPage() {
                         <div>
                             <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] mb-1">Inventory Valuation</p>
                             <p className="text-3xl font-black italic tracking-tighter text-white">
-                                Rp {products.reduce((sum, p) => sum + (p.stock * (p.recipeCogs > 0 ? p.recipeCogs : p.costPrice)), 0).toLocaleString()}
+                                Rp {products.reduce((sum, p) => sum + (p.stock * (p.recipeCogs > 0 ? p.recipeCogs : p.costPrice)), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                     </div>
