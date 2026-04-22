@@ -165,6 +165,97 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         }
     };
 
+    const generateSuggestedSku = (type: string) => {
+        if (!productList || productList.length === 0) {
+            if (type === 'RAW_MATERIAL') return "DBS001";
+            if (type === 'WIP') return "WIP001";
+            return "RFS001";
+        }
+
+        // 1. Filter products of this specific type to find the dominant prefix
+        const typeProducts = productList.filter((p: any) => p.type === type && p.sku);
+        
+        let prefix = "";
+        let numberLength = 3;
+
+        if (typeProducts.length > 0) {
+            const prefixCounts: Record<string, number> = {};
+            typeProducts.forEach((p: any) => {
+                // Match pattern: (prefix)(trailing digits)
+                const match = p.sku.toUpperCase().match(/^(.*?)(\d+)$/);
+                if (match) {
+                    const pfx = match[1];
+                    prefixCounts[pfx] = (prefixCounts[pfx] || 0) + 1;
+                }
+            });
+
+            // Find the most frequently used prefix for this classification
+            let maxCount = 0;
+            for (const pfx in prefixCounts) {
+                if (prefixCounts[pfx] > maxCount) {
+                    maxCount = prefixCounts[pfx];
+                    prefix = pfx;
+                }
+            }
+        }
+
+        // 2. If no prefix detected for this type, use defaults
+        if (!prefix) {
+            if (type === 'RAW_MATERIAL') prefix = "DBS";
+            else if (type === 'WIP') prefix = "WIP";
+            else prefix = "RFS"; 
+        }
+
+        // 3. Find the highest number for this specific prefix in the ENTIRE product list
+        let maxNum = -1;
+        productList.forEach((p: any) => {
+            if (!p.sku) return;
+            const sku = p.sku.toUpperCase();
+            if (sku.startsWith(prefix)) {
+                const numPart = sku.substring(prefix.length);
+                const digitsMatch = numPart.match(/^(\d+)/);
+                if (digitsMatch) {
+                    const numStr = digitsMatch[1];
+                    const num = parseInt(numStr);
+                    if (num > maxNum) {
+                        maxNum = num;
+                        numberLength = Math.max(numberLength, numStr.length);
+                    }
+                }
+            }
+        });
+
+        // 4. Increment and format
+        const nextNum = maxNum === -1 ? 1 : maxNum + 1;
+        const nextNumStr = nextNum.toString().padStart(numberLength, '0');
+        
+        return `${prefix}${nextNumStr}`;
+    };
+
+    const handleTypeChange = (newType: string) => {
+        const updates: any = { type: newType };
+        if (newType === 'RAW_MATERIAL') {
+            updates.showInPos = false;
+            updates.price = 0;
+        }
+
+        if (!product) {
+            const suggested = generateSuggestedSku(newType);
+            if (suggested) {
+                updates.sku = suggested;
+            }
+        }
+
+        setFormData(prev => ({ ...prev, ...updates }));
+    };
+
+    useEffect(() => {
+        if (isOpen && !product && productList.length > 0 && formData.sku === "") {
+            const suggested = generateSuggestedSku(formData.type);
+            setFormData(prev => ({ ...prev, sku: suggested }));
+        }
+    }, [isOpen, product, productList, formData.type]);
+
     if (!isOpen) return null;
 
     const addRecipeItem = () => {
@@ -319,15 +410,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                 <select
                                     className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-5 text-sm font-black text-indigo-400 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all italic"
                                     value={formData.type}
-                                    onChange={(e) => {
-                                        const newType = e.target.value;
-                                        const updates: any = { type: newType };
-                                        if (newType === 'RAW_MATERIAL') {
-                                            updates.showInPos = false;
-                                            updates.price = 0;
-                                        }
-                                        setFormData({ ...formData, ...updates });
-                                    }}
+                                    onChange={(e) => handleTypeChange(e.target.value)}
                                 >
                                     <option value="FINISHED_GOOD">FINISHED GOODS / MENU</option>
                                     <option value="WIP">WORK IN PROGRESS (WIP)</option>
