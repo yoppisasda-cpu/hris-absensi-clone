@@ -119,11 +119,23 @@ class _POSScreenState extends State<POSScreen> {
   }
 
   double _getItemPrice(Map<String, dynamic> item) {
-    double basePrice;
-    if (_saleType == 'GOFOOD' && (item['priceGofood'] ?? 0) > 0) basePrice = (item['priceGofood'] as num).toDouble();
-    else if (_saleType == 'GRABFOOD' && (item['priceGrabfood'] ?? 0) > 0) basePrice = (item['priceGrabfood'] as num).toDouble();
-    else if (_saleType == 'SHOPEEFOOD' && (item['priceShopeefood'] ?? 0) > 0) basePrice = (item['priceShopeefood'] as num).toDouble();
-    else basePrice = (item['price'] as num).toDouble();
+    double basePrice = 0;
+    
+    // Convert platform prices safely
+    double pGofood = double.tryParse(item['priceGofood']?.toString() ?? '0') ?? 0;
+    double pGrabfood = double.tryParse(item['priceGrabfood']?.toString() ?? '0') ?? 0;
+    double pShopeefood = double.tryParse(item['priceShopeefood']?.toString() ?? '0') ?? 0;
+    double pNormal = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
+
+    if (_saleType == 'GOFOOD' && pGofood > 0) {
+      basePrice = pGofood;
+    } else if (_saleType == 'GRABFOOD' && pGrabfood > 0) {
+      basePrice = pGrabfood;
+    } else if (_saleType == 'SHOPEEFOOD' && pShopeefood > 0) {
+      basePrice = pShopeefood;
+    } else {
+      basePrice = pNormal;
+    }
 
     double modPrice = 0;
     if (item['modifiers'] != null) {
@@ -285,54 +297,39 @@ class _POSScreenState extends State<POSScreen> {
               children: [
                 Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
                 SizedBox(height: 20),
-                Text('Konfirmasi Checkout', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.blue[900])),
-                SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Konfirmasi Checkout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.blue[900])),
+                    IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, color: Colors.grey)),
+                  ],
+                ),
+                SizedBox(height: 12),
 
+                // Compact Cart Summary
                 Container(
-                  constraints: BoxConstraints(maxHeight: 400),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _cart.length,
-                    itemBuilder: (context, i) {
-                      String modsStr = "";
-                      if (_cart[i]['modifiers'] != null && (_cart[i]['modifiers'] as List).isNotEmpty) {
-                        modsStr = '\n' + (_cart[i]['modifiers'] as List).map((m) => m['optionName']).join(', ');
-                      }
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(_cart[i]['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        subtitle: Text('Rp ${_getItemPrice(_cart[i]).toStringAsFixed(0)} x ${_cart[i]['quantity']}$modsStr'),
-                        trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-                            onPressed: () => setPanelState(() => _updateCartQty(i, -1)),
-                          ),
-                          Text('${_cart[i]['quantity']}', style: TextStyle(fontWeight: FontWeight.bold)),
-                          IconButton(
-                            icon: Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
-                            onPressed: () => setPanelState(() => _updateCartQty(i, 1)),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.blueGrey[50]?.withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('${_cart.length} Item(s)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[700])),
+                      Text('Rp ${_grandTotal.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.blue[800])),
+                    ],
                   ),
                 ),
-                Divider(height: 32),
+                SizedBox(height: 16),
                 
-                Text('Tipe Penjualan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600], letterSpacing: 0.5)),
-                SizedBox(height: 10),
-                Row(
+                Text('Tipe Penjualan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blueGrey[600], letterSpacing: 0.5)),
+                SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    _buildSaleTypeChip('WALK_IN', 'Walk-in', Icons.person, setPanelState),
-                    SizedBox(width: 8),
-                    _buildSaleTypeChip('GOFOOD', 'GoFood', Icons.delivery_dining, setPanelState),
-                    SizedBox(width: 8),
-                    _buildSaleTypeChip('GRABFOOD', 'GrabFood', Icons.delivery_dining, setPanelState),
-                    SizedBox(width: 8),
-                    _buildSaleTypeChip('SHOPEEFOOD', 'ShopeeFood', Icons.delivery_dining, setPanelState),
+                    _buildCompactSaleTypeChip('WALK_IN', 'Walk-in', Icons.person, setPanelState),
+                    _buildCompactSaleTypeChip('GOFOOD', 'GoFood', Icons.delivery_dining, setPanelState),
+                    _buildCompactSaleTypeChip('GRABFOOD', 'GrabFood', Icons.delivery_dining, setPanelState),
+                    _buildCompactSaleTypeChip('SHOPEEFOOD', 'ShopeeFood', Icons.delivery_dining, setPanelState),
                   ],
                 ),
                 SizedBox(height: 24),
@@ -438,15 +435,20 @@ class _POSScreenState extends State<POSScreen> {
                   ),
                 ),
                 
-                SizedBox(height: 24),
-                Text('Metode Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
-                SizedBox(height: 10),
-                Column(
-                  children: ['Tunai', 'QRIS', 'Debit/Credit', 'Transfer', 'GoFood', 'GrabFood', 'ShopeeFood'].map((method) {
-                    final bool isSelected = _selectedPaymentMethod == method;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: InkWell(
+                if (_saleType == 'WALK_IN') ...[
+                  SizedBox(height: 24),
+                  Text('Metode Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
+                  SizedBox(height: 10),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    childAspectRatio: 2.5,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    children: ['Tunai', 'QRIS', 'Debit/Credit', 'Transfer'].map((method) {
+                      final bool isSelected = _selectedPaymentMethod == method;
+                      return InkWell(
                         onTap: () {
                           setPanelState(() {
                             _selectedPaymentMethod = method;
@@ -454,15 +456,6 @@ class _POSScreenState extends State<POSScreen> {
                             if (method == 'Tunai') {
                                final cashAcc = _accounts.firstWhere((a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
                                if (cashAcc != null) _selectedAccountId = cashAcc['id'];
-                            } else if (method == 'GoFood' || method == 'GrabFood' || method == 'ShopeeFood') {
-                               final marketAcc = _accounts.firstWhere(
-                                 (a) => a['name'].toString().toLowerCase().contains('market') || a['name'].toString().toLowerCase().contains('delivery'),
-                                 orElse: () => _accounts.isNotEmpty ? _accounts.first : null
-                               );
-                               if (marketAcc != null) {
-                                 _selectedAccountId = marketAcc['id'];
-                               }
-                               _saleType = method.toUpperCase();
                             } else {
                                final bankAcc = _accounts.firstWhere((a) => a['type'] == 'BANK' || !a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
                                if (bankAcc != null) _selectedAccountId = bankAcc['id'];
@@ -470,51 +463,43 @@ class _POSScreenState extends State<POSScreen> {
                           });
                           setState(() {});
                         },
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          padding: EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
                             border: Border.all(
                               color: isSelected ? Colors.green[600]! : Colors.grey[200]!,
                               width: isSelected ? 2 : 1.5,
                             ),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                             color: isSelected ? Colors.green[50]?.withOpacity(0.3) : Colors.white,
                           ),
                           child: Row(
                             children: [
-                              Container(
-                                padding: EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? Colors.green[100]!.withOpacity(0.5) : Colors.grey[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  _getPaymentIcon(method),
-                                  color: isSelected ? Colors.green[700] : Colors.grey[600],
-                                  size: 20,
-                                ),
+                              Icon(
+                                _getPaymentIcon(method),
+                                color: isSelected ? Colors.green[700] : Colors.grey[600],
+                                size: 18,
                               ),
-                              SizedBox(width: 16),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   method,
                                   style: TextStyle(
                                     fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
                                     color: isSelected ? Colors.green[900] : Colors.blueGrey[800],
-                                    fontSize: 14,
+                                    fontSize: 12,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (isSelected)
-                                Icon(Icons.check_circle, color: Colors.green[600], size: 22),
                             ],
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                      );
+                    }).toList(),
+                  ),
+                ],
                 
                 SizedBox(height: 32),
                 
@@ -584,41 +569,113 @@ class _POSScreenState extends State<POSScreen> {
                   ];
                 })(),
 
-                ElevatedButton(
-                  onPressed: () {
-                    if (_isWaiterMode) {
-                      if (isModal) Navigator.pop(context);
-                      _showTableLabelDialog();
-                      return;
-                    }
-                    
-                    final bool isCash = _selectedPaymentMethod == 'Tunai';
-                    if (_selectedAccountId == null) {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text('Akun Keuangan Belum Set'),
-                          content: Text('Silahkan buka pengaturan di Web Admin dan tambahkan Akun Keuangan (Kas/Bank) terlebih dahulu agar bisa menerima pembayaran.'),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(context), child: Text('OK')),
-                          ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: _isWaiterMode 
+                        ? ElevatedButton.icon(
+                            onPressed: () {
+                              if (isModal) Navigator.pop(context);
+                              _showTableLabelDialog();
+                            },
+                            icon: Icon(Icons.pause_circle_outline, color: Colors.white),
+                            label: Text('SIMPAN PESANAN', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber[800],
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: () {
+                              if (isModal) Navigator.pop(context);
+                              _showTableLabelDialog();
+                            },
+                            icon: Icon(Icons.pause_circle_outline, color: Colors.amber[900]),
+                            label: Text('HOLD', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[900])),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              side: BorderSide(color: Colors.amber[900]!),
+                            ),
+                          ),
+                    ),
+                    if (!_isWaiterMode) ...[
+                      SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (_selectedAccountId == null) {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text('Akun Keuangan Belum Set'),
+                                  content: Text('Silahkan buka pengaturan di Web Admin dan tambahkan Akun Keuangan (Kas/Bank) terlebih dahulu agar bisa menerima pembayaran.'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(context), child: Text('OK')),
+                                  ],
+                                ),
+                              );
+                              return;
+                            }
+                            _processCheckout(context, isModal: isModal);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[800],
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            elevation: 4,
+                          ),
+                          child: Text('BAYAR SEKARANG', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                         ),
-                      );
-                      return;
-                    }
-                    _processCheckout(context, isModal: isModal);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isWaiterMode ? Colors.amber[800] : Colors.blue[800],
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 4,
-                  ),
-                  child: Text(_isWaiterMode ? 'KIRIM KE MEJA / KASIR' : 'BAYAR SEKARANG', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                      ),
+                    ],
+                  ],
                 ),
                 SizedBox(height: 20),
               ],
             ),
+    );
+  }
+
+  Widget _buildCompactSaleTypeChip(String type, String label, IconData icon, Function setPanelState) {
+    bool isSelected = _saleType == type;
+    return GestureDetector(
+      onTap: () {
+        setPanelState(() {
+          _saleType = type;
+          if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD') {
+            _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : 'ShopeeFood');
+            final marketAcc = _accounts.firstWhere(
+              (a) => a['name'].toString().toLowerCase().contains('market') || a['name'].toString().toLowerCase().contains('delivery'),
+              orElse: () => _accounts.isNotEmpty ? _accounts.first : null
+            );
+            if (marketAcc != null) _selectedAccountId = marketAcc['id'];
+          } else if (type == 'WALK_IN') {
+            _selectedPaymentMethod = 'Tunai';
+            final cashAcc = _accounts.firstWhere((a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
+            if (cashAcc != null) _selectedAccountId = cashAcc['id'];
+          }
+        });
+        setState(() {});
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue[800] : Colors.white,
+          border: Border.all(color: isSelected ? Colors.blue[800]! : Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : Colors.blueGrey[600], size: 14),
+            SizedBox(width: 6),
+            Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.blueGrey[600], fontSize: 11, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -916,6 +973,16 @@ class _POSScreenState extends State<POSScreen> {
         foregroundColor: Colors.black,
         actions: [
           IconButton(
+            icon: Icon(Icons.refresh, color: Colors.blue[800]),
+            tooltip: 'Sinkronisasi Data',
+            onPressed: () {
+              _fetchData();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Data berhasil disinkronkan'), duration: Duration(seconds: 1)),
+              );
+            },
+          ),
+          IconButton(
             icon: Icon(Icons.print_outlined, color: Colors.blue[800]),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => PrinterSettingsScreen())),
           ),
@@ -1028,7 +1095,7 @@ class _POSScreenState extends State<POSScreen> {
                                 childAspectRatio: 0.68,
                                 crossAxisSpacing: 8,
                                 mainAxisSpacing: 8,
-                              ),
+                                ),
                           itemCount: _filteredProducts.length,
                           itemBuilder: (context, i) {
                             final p = _filteredProducts[i];
@@ -1162,4 +1229,3 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 }
-
