@@ -14,14 +14,6 @@ backend/generated/
 backend/prisma/migrations/
 backend/uploads/
 backend/*.log
-backend/diag_*.ts
-backend/check_*.ts
-backend/audit_*.ts
-backend/simulate_login.ts
-backend/verify_*.ts
-backend/test_*.ts
-backend/create_*.ts
-backend/list_*.ts
 backend/*.traineddata
 
 # Web Admin
@@ -49,3 +41,6 @@ mobile_app/analysis.txt
 .idea/
 *.swp
 *.swo
+backend/*.ts
+backend/*.js
+!backend/server.ts

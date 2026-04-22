@@ -94,15 +94,15 @@ export default function SalesPage() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 mb-8">
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-blue-500">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Penjualan</p>
-                    <p className="text-xl font-black text-white">Rp {stats.total.toLocaleString()}</p>
+                    <p className="text-xl font-black text-white">Rp {stats.total.toLocaleString('id-ID')}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-emerald-500">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Sudah Dibayar</p>
-                    <p className="text-xl font-black text-emerald-400">Rp {stats.paid.toLocaleString()}</p>
+                    <p className="text-xl font-black text-emerald-400">Rp {stats.paid.toLocaleString('id-ID')}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-amber-500">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Belum Bayar (Piutang)</p>
-                    <p className="text-xl font-black text-amber-400">Rp {stats.pending.toLocaleString()}</p>
+                    <p className="text-xl font-black text-amber-400">Rp {stats.pending.toLocaleString('id-ID')}</p>
                 </div>
             </div>
 
@@ -164,7 +164,7 @@ export default function SalesPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="font-black text-slate-900 text-sm">Rp {sale.totalAmount.toLocaleString()}</div>
+                                            <div className="font-black text-slate-900 text-sm">Rp {sale.totalAmount.toLocaleString('id-ID')}</div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center gap-2">

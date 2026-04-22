@@ -202,7 +202,7 @@ export default function ProductsPage() {
                         <div>
                             <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] mb-1">Inventory Valuation</p>
                             <p className="text-3xl font-black italic tracking-tighter text-white">
-                                Rp {products.reduce((sum, p) => sum + (p.stock * (p.recipeCogs > 0 ? p.recipeCogs : p.costPrice)), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                Rp {products.reduce((sum, p) => sum + (p.stock * (p.recipeCogs > 0 ? p.recipeCogs : p.costPrice)), 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                     </div>
@@ -350,7 +350,7 @@ export default function ProductsPage() {
                                         <td className="px-6 py-6 text-right">
                                             <div className="flex flex-col items-end">
                                                  <span className="text-xs font-black text-slate-500 italic tracking-tighter">
-                                                    { (product.recipeCogs > 0 || product.costPrice > 0) ? `Rp ${(product.recipeCogs > 0 ? product.recipeCogs : product.costPrice).toLocaleString()}` : 'N/A' }
+                                                    { (product.recipeCogs > 0 || product.costPrice > 0) ? `Rp ${(product.recipeCogs > 0 ? product.recipeCogs : product.costPrice).toLocaleString('id-ID')}` : 'N/A' }
                                                  </span>
                                                 {product.recipeCogs > 0 && (
                                                     <span className="text-[8px] text-amber-500 flex items-center gap-1 font-black uppercase tracking-[0.2em] mt-1 italic">
@@ -366,7 +366,7 @@ export default function ProductsPage() {
                                                 <div className="h-2 w-2 rounded-full bg-slate-800 mx-auto" />
                                             )}
                                         </td>
-                                        <td className="px-6 py-6 text-right font-black text-white italic tracking-tighter text-sm uppercase">Rp {product.price.toLocaleString()}</td>
+                                        <td className="px-6 py-6 text-right font-black text-white italic tracking-tighter text-sm uppercase">Rp {product.price.toLocaleString('id-ID')}</td>
                                         <td className="px-6 py-6 text-center">
                                             {(() => {
                                                 const hpp = product.recipeCogs > 0 ? product.recipeCogs : product.costPrice;
