@@ -1229,3 +1229,4 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 }
+
