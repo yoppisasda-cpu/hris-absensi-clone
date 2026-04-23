@@ -306,15 +306,68 @@ class _POSScreenState extends State<POSScreen> {
                 ),
                 SizedBox(height: 12),
 
-                // Compact Cart Summary
+                // Compact Cart Summary with Editable List
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.blueGrey[50]?.withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text('${_cart.length} Item(s)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[700])),
-                      Text('Rp ${_grandTotal.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.blue[800])),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${_cart.length} Item(s)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[700])),
+                          Text('Rp ${_grandTotal.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.blue[800])),
+                        ],
+                      ),
+                      if (_cart.isNotEmpty) ...[
+                        Divider(height: 16, color: Colors.blueGrey[100]),
+                        Container(
+                          constraints: BoxConstraints(maxHeight: 140),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _cart.length,
+                            itemBuilder: (context, i) {
+                              String modsStr = "";
+                              if (_cart[i]['modifiers'] != null && (_cart[i]['modifiers'] as List).isNotEmpty) {
+                                modsStr = '\n' + (_cart[i]['modifiers'] as List).map((m) => m['optionName']).join(', ');
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(_cart[i]['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis),
+                                          Text('Rp ${_getItemPrice(_cart[i]).toStringAsFixed(0)} x ${_cart[i]['quantity']}$modsStr', style: TextStyle(fontSize: 10, color: Colors.blueGrey[600])),
+                                        ],
+                                      ),
+                                    ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        InkWell(
+                                          onTap: () => setPanelState(() => _updateCartQty(i, -1)),
+                                          child: Container(padding: EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.red[200]!)), child: Icon(Icons.remove, size: 14, color: Colors.red)),
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text('${_cart[i]['quantity']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        SizedBox(width: 8),
+                                        InkWell(
+                                          onTap: () => setPanelState(() => _updateCartQty(i, 1)),
+                                          child: Container(padding: EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.green[200]!)), child: Icon(Icons.add, size: 14, color: Colors.green)),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -422,7 +475,7 @@ class _POSScreenState extends State<POSScreen> {
                   decoration: BoxDecoration(color: Colors.blueGrey[50], borderRadius: BorderRadius.circular(16)),
                   child: Column(
                     children: [
-                      _buildSummaryRow('Subtotal Items', 'Rp ${_subtotalAmount}'),
+                      _buildSummaryRow('Subtotal Items', 'Rp ${_subtotalAmount.toStringAsFixed(0)}'),
                       Divider(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,

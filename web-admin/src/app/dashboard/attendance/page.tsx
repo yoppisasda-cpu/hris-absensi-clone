@@ -38,7 +38,7 @@ export default function AttendancePage() {
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPhoto, setSelectedPhoto] = useState<{ url: string, title: string } | null>(null);
-    const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState<string>(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date()));
 
     const fetchAttendances = async (date: string) => {
         try {
@@ -84,7 +84,7 @@ export default function AttendancePage() {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Absensi");
 
         // Generate filename with current date
-        const date = new Date().toISOString().split('T')[0];
+        const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
         XLSX.writeFile(workbook, `Laporan_Absensi_${date}.xlsx`);
     };
 
@@ -160,7 +160,7 @@ export default function AttendancePage() {
                             title="Hari Berikutnya"
                         >›</button>
                         <button
-                            onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                            onClick={() => setSelectedDate(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date()))}
                             className="ml-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition px-2 py-1 rounded-lg hover:bg-indigo-500/10"
                         >Hari ini</button>
                     </div>

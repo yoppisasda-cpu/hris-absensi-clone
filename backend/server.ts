@@ -2866,8 +2866,8 @@ async function clockInHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Koordinat GPS perangkat wajib dilampirkan!' });
     }
 
-    // 1. Tarik Data Karyawan beserta Cabang & Perusahaannya
-    const todayStr = new Date().toISOString().split('T')[0];
+    // 1. Tarik Data Karyawan beserta Cabang & Perusahaannya (Gunakan zona waktu Jakarta +7)
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
     const [user, manualSchedule] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
@@ -3137,12 +3137,13 @@ app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response)
        return res.json([]);
     }
 
-    // Filter by date: ?date=2026-04-17 (default: hari ini)
+    // Filter by date: ?date=2026-04-17 (default: hari ini di Jakarta +7)
     const dateParam = req.query.date as string | undefined;
-    const targetDate = dateParam ? new Date(dateParam) : new Date();
-    targetDate.setHours(0, 0, 0, 0);
-    const nextDay = new Date(targetDate);
-    nextDay.setDate(nextDay.getDate() + 1);
+    const dateStr = dateParam || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+    
+    // Set range mulai dari jam 00:00:00 WIB sampai 23:59:59 WIB
+    const targetDate = new Date(`${dateStr}T00:00:00+07:00`);
+    const nextDay = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
 
     const baseWhere = userRole === 'SUPERADMIN' ? {} : { companyId: tenantId };
 
@@ -9960,6 +9961,19 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
   } catch (error: any) {
     fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] PRODUCT CREATE ERROR: \n${error.stack || error.message}\n`);
     console.error('Product Create Error:', error);
+    
+    // Handle Prisma Unique Constraint Error (e.g. Duplicate SKU)
+    if (error.code === 'P2002') {
+      const targets = error.meta?.target || [];
+      if (targets.includes('sku')) {
+        return res.status(400).json({ error: 'Gagal: SKU sudah digunakan oleh produk lain!' });
+      }
+      if (targets.includes('name')) {
+        return res.status(400).json({ error: 'Gagal: Nama produk sudah ada!' });
+      }
+      return res.status(400).json({ error: 'Gagal: Data (SKU/Nama) sudah terdaftar di sistem.' });
+    }
+    
     res.status(500).json({ error: 'Gagal menambah produk: ' + error.message });
   }
 });
@@ -10005,6 +10019,19 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
     res.json({ message: 'Produk berhasil diperbarui' });
   } catch (error: any) {
     console.error('Product Update Error:', error);
+    
+    // Handle Prisma Unique Constraint Error (e.g. Duplicate SKU)
+    if (error.code === 'P2002') {
+      const targets = error.meta?.target || [];
+      if (targets.includes('sku')) {
+        return res.status(400).json({ error: 'Gagal: SKU sudah digunakan oleh produk lain!' });
+      }
+      if (targets.includes('name')) {
+        return res.status(400).json({ error: 'Gagal: Nama produk sudah ada!' });
+      }
+      return res.status(400).json({ error: 'Gagal: Data (SKU/Nama) sudah terdaftar di sistem.' });
+    }
+    
     res.status(500).json({ error: 'Gagal memperbarui produk: ' + error.message });
   }
 });

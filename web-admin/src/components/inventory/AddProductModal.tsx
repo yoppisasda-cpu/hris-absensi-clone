@@ -316,9 +316,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             onSuccess();
             onClose();
             toast.success(product ? "Produk diperbarui" : "Produk ditambahkan");
-        } catch (error) {
+        } catch (error: any) {
             console.error("Gagal menyimpan produk", error);
-            alert("Gagal menyimpan produk.");
+            const errorMsg = error.response?.data?.error || error.message || "Gagal menyimpan produk.";
+            toast.error(errorMsg);
         } finally {
             setLoading(false);
         }
