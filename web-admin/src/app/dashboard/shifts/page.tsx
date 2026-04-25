@@ -82,7 +82,7 @@ export default function ShiftsPage() {
                             placeholder="Cari nama shift..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-500"
+                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-white border border-slate-300 text-slate-950 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
                         />
                     </div>
                     {!showForm && (
@@ -105,7 +105,7 @@ export default function ShiftsPage() {
                             <input
                                 type="text" required
                                 value={formObj.title} onChange={e => setFormObj({ ...formObj, title: e.target.value })}
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Contoh: Shift Gudang Siang"
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Contoh: Shift Gudang Siang"
                             />
                         </div>
                         <div>
@@ -113,7 +113,7 @@ export default function ShiftsPage() {
                             <input
                                 type="time" required
                                 value={formObj.startTime} onChange={e => setFormObj({ ...formObj, startTime: e.target.value })}
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                             />
                         </div>
                         <div>
@@ -121,7 +121,7 @@ export default function ShiftsPage() {
                             <input
                                 type="time" required
                                 value={formObj.endTime} onChange={e => setFormObj({ ...formObj, endTime: e.target.value })}
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                             />
                         </div>
                         <div className="md:col-span-4 flex justify-end gap-4 mt-4">

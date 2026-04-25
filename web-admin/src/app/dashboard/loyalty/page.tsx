@@ -170,7 +170,7 @@ export default function LoyaltyPage() {
                                                     min="0"
                                                     value={companySettings.pointsEarnRatio}
                                                     onChange={e => setCompanySettings({...companySettings, pointsEarnRatio: e.target.value})}
-                                                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold focus:border-fuchsia-500 outline-none"
+                                                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-950 font-bold focus:border-fuchsia-500 outline-none"
                                                 />
                                             </div>
                                             <div>
@@ -181,7 +181,7 @@ export default function LoyaltyPage() {
                                                     min="0"
                                                     value={companySettings.pointsRedeemValue}
                                                     onChange={e => setCompanySettings({...companySettings, pointsRedeemValue: e.target.value})}
-                                                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold focus:border-fuchsia-500 outline-none"
+                                                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-950 font-bold focus:border-fuchsia-500 outline-none"
                                                 />
                                             </div>
                                         </div>
@@ -198,7 +198,7 @@ export default function LoyaltyPage() {
                                                 <select 
                                                     value={companySettings.memberDiscountType}
                                                     onChange={e => setCompanySettings({...companySettings, memberDiscountType: e.target.value})}
-                                                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold focus:border-emerald-500 outline-none"
+                                                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-950 font-bold focus:border-emerald-500 outline-none"
                                                 >
                                                     <option value="PERCENTAGE">Persentase (%)</option>
                                                     <option value="FIXED">Nominal Tetap (Rp)</option>
@@ -211,7 +211,7 @@ export default function LoyaltyPage() {
                                                     min="0"
                                                     value={companySettings.memberDiscountValue}
                                                     onChange={e => setCompanySettings({...companySettings, memberDiscountValue: e.target.value})}
-                                                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold focus:border-emerald-500 outline-none"
+                                                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-950 font-bold focus:border-emerald-500 outline-none"
                                                 />
                                             </div>
                                         </div>
@@ -236,7 +236,7 @@ export default function LoyaltyPage() {
                                         placeholder="Cari kode voucher..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-11 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-bold text-white focus:border-indigo-500 transition-all outline-none"
+                                        className="w-full pl-11 pr-4 py-3 bg-white border border-slate-300 rounded-2xl text-sm font-bold text-slate-950 focus:border-indigo-500 transition-all outline-none"
                                     />
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
                                 </div>

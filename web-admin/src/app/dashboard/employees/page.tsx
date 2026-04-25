@@ -353,7 +353,7 @@ export default function EmployeesPage() {
                             placeholder="Cari karyawan berdasarkan ID, nama, atau jabatan..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full sm:w-80 pl-12 pr-6 py-4 text-xs bg-slate-900/80 border border-white/5 text-white rounded-[24px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-600 italic font-black"
+                            className="w-full sm:w-80 pl-12 pr-6 py-4 text-xs bg-white border border-slate-300 text-slate-950 rounded-[24px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400 italic font-black"
                         />
                     </div>
                     <button
@@ -643,16 +643,16 @@ export default function EmployeesPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="col-span-2">
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Nama Lengkap</label>
-                                        <input required type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. John Doe" />
+                                        <input required type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. John Doe" />
                                     </div>
                                     <div className="col-span-2 md:col-span-1">
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Alamat Email</label>
-                                        <input required type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. john@pt.com" />
+                                        <input required type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. john@pt.com" />
                                     </div>
                                     {!isEditMode && (
                                         <div className="col-span-2 md:col-span-1">
                                             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Kata Sandi</label>
-                                            <input required type="text" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Min. 6 Karakter" />
+                                            <input required type="text" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Min. 6 Karakter" />
                                         </div>
                                     )}
                                 </div>
@@ -660,19 +660,19 @@ export default function EmployeesPage() {
                                 <div className="grid grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Jabatan</label>
-                                        <input type="text" value={formData.jobTitle} onChange={e => setFormData({ ...formData, jobTitle: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. Staff" />
+                                        <input type="text" value={formData.jobTitle} onChange={e => setFormData({ ...formData, jobTitle: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. Staff" />
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Divisi</label>
-                                        <input type="text" value={formData.division} onChange={e => setFormData({ ...formData, division: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. IT" />
+                                        <input type="text" value={formData.division} onChange={e => setFormData({ ...formData, division: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. IT" />
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Golongan</label>
-                                        <input type="text" value={formData.grade} onChange={e => setFormData({ ...formData, grade: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. 3A" />
+                                        <input type="text" value={formData.grade} onChange={e => setFormData({ ...formData, grade: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="Cth. 3A" />
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Tgl Bergabung</label>
-                                        <input type="date" value={formData.joinDate} onChange={e => setFormData({ ...formData, joinDate: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" />
+                                        <input type="date" value={formData.joinDate} onChange={e => setFormData({ ...formData, joinDate: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" />
                                     </div>
                                     <div className="col-span-2">
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Masa Kontrak Berakhir</label>
@@ -685,28 +685,28 @@ export default function EmployeesPage() {
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Gaji Pokok</label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-400">Rp</span>
-                                            <input required type="number" value={formData.basicSalary || ''} onChange={e => setFormData({ ...formData, basicSalary: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
+                                            <input required type="number" value={formData.basicSalary || ''} onChange={e => setFormData({ ...formData, basicSalary: parseFloat(e.target.value) || 0 })} className="w-full bg-white border border-slate-300 rounded-xl py-3 pl-12 pr-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Tunjangan</label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-400">Rp</span>
-                                            <input type="number" value={formData.allowance || ''} onChange={e => setFormData({ ...formData, allowance: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
+                                            <input type="number" value={formData.allowance || ''} onChange={e => setFormData({ ...formData, allowance: parseFloat(e.target.value) || 0 })} className="w-full bg-white border border-slate-300 rounded-xl py-3 pl-12 pr-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Uang Makan</label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-400">Rp</span>
-                                            <input type="number" value={formData.mealAllowance || ''} onChange={e => setFormData({ ...formData, mealAllowance: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
+                                            <input type="number" value={formData.mealAllowance || ''} onChange={e => setFormData({ ...formData, mealAllowance: parseFloat(e.target.value) || 0 })} className="w-full bg-white border border-slate-300 rounded-xl py-3 pl-12 pr-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Overtime / Jam</label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-400">Rp</span>
-                                            <input type="number" value={formData.overtimeRate || ''} onChange={e => setFormData({ ...formData, overtimeRate: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
+                                            <input type="number" value={formData.overtimeRate || ''} onChange={e => setFormData({ ...formData, overtimeRate: parseFloat(e.target.value) || 0 })} className="w-full bg-white border border-slate-300 rounded-xl py-3 pl-12 pr-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
                                         </div>
                                     </div>
                                 </div>
@@ -751,7 +751,7 @@ export default function EmployeesPage() {
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Role Akses HRIS</label>
-                                        <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-sm text-indigo-400 font-black italic uppercase tracking-tighter outline-none cursor-pointer">
+                                        <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 font-black italic uppercase tracking-tighter outline-none cursor-pointer">
                                             <option value="OWNER">Owner (Pemilik)</option>
                                             <option value="ADMIN">Administrator HR</option>
                                             <option value="MANAGER">Manager</option>
@@ -766,7 +766,7 @@ export default function EmployeesPage() {
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Atasan Langsung</label>
-                                        <select value={formData.reportToId} onChange={e => setFormData({ ...formData, reportToId: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white outline-none cursor-pointer">
+                                        <select value={formData.reportToId} onChange={e => setFormData({ ...formData, reportToId: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 outline-none cursor-pointer">
                                             <option value="">-- Lapor ke Admin --</option>
                                             {users
                                                 .filter(u => u.id !== formData.id && (u.role === 'ADMIN' || u.role === 'MANAGER' || u.role === 'OWNER' || u.role === 'SUPERVISOR'))
@@ -777,7 +777,7 @@ export default function EmployeesPage() {
                                     </div>
                                     <div className="col-span-2">
                                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Cabang Utama</label>
-                                        <select value={formData.branchId} onChange={e => setFormData({ ...formData, branchId: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white outline-none cursor-pointer">
+                                        <select value={formData.branchId} onChange={e => setFormData({ ...formData, branchId: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 outline-none cursor-pointer">
                                             <option value="">-- Tanpa Cabang (Pusat) --</option>
                                             {availableBranches.map(b => (
                                                 <option key={b.id} value={b.id}>{b.name}</option>

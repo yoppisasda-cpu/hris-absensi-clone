@@ -528,9 +528,9 @@ export default function CompaniesPage() {
                             </div>
                         )}
                         <div className="space-y-4 border-b border-slate-50 pb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Informasi Dasar & PIC</h3>
+                            <h3 className="text-slate-800 uppercase tracking-widest mb-2 font-bold">Informasi Dasar & PIC</h3>
                             <div>
-                                <label className="mb-1 block text-sm font-medium text-slate-700">Nama Perusahaan Klien</label>
+                                <label className="mb-1 block text-slate-800 font-bold">Nama Perusahaan Klien</label>
                                 <input
                                     required
                                     type="text"
@@ -543,33 +543,33 @@ export default function CompaniesPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-700">Nama PIC</label>
+                                    <label className="mb-1 block text-slate-800 font-bold">Nama PIC</label>
                                     <input
                                         type="text"
                                         value={picName}
                                         onChange={(e) => setPicName(e.target.value)}
                                         placeholder="Nama Lengkap PIC"
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-700">No. HP PIC</label>
+                                    <label className="mb-1 block text-slate-800 font-bold">No. HP PIC</label>
                                     <input
                                         type="text"
                                         value={picPhone}
                                         onChange={(e) => setPicPhone(e.target.value)}
                                         placeholder="0812..."
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         <div className="space-y-4 border-b border-slate-50 pb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Detail Kontrak</h3>
+                            <h3 className="text-slate-800 uppercase tracking-widest mb-2 font-bold">Detail Kontrak</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-700">Jenis Kontrak</label>
+                                    <label className="mb-1 block text-slate-800 font-bold">Jenis Kontrak</label>
                                     <select
                                         value={contractType}
                                         onChange={(e) => setContractType(e.target.value)}
@@ -580,50 +580,50 @@ export default function CompaniesPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-700">Nilai Kontrak (Rp)</label>
+                                    <label className="mb-1 block text-slate-800 font-bold">Nilai Kontrak (Rp)</label>
                                     <input
                                         type="number"
                                         value={contractValue}
                                         onChange={(e) => setContractValue(e.target.value)}
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-700 text-slate-500">Mulai</label>
+                                    <label className="mb-1 block text-slate-800 font-bold text-xs">Mulai</label>
                                     <input
                                         type="date"
                                         value={contractStart}
                                         onChange={(e) => setContractStart(e.target.value)}
-                                        className="w-full rounded-md border border-slate-300 py-1.5 px-3 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-1.5 px-3 text-xs text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-700 text-slate-500">Berakhir</label>
+                                    <label className="mb-1 block text-slate-800 font-bold text-xs">Berakhir</label>
                                     <input
                                         type="date"
                                         value={contractEnd}
                                         onChange={(e) => setContractEnd(e.target.value)}
-                                        className="w-full rounded-md border border-slate-300 py-1.5 px-3 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-1.5 px-3 text-xs text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-700">Limit Karyawan</label>
+                                    <label className="mb-1 block text-slate-800 font-bold">Limit Karyawan</label>
                                     <input
                                         type="number"
                                         value={employeeLimit}
                                         onChange={(e) => setEmployeeLimit(e.target.value)}
                                         placeholder="0 = ∞"
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                                 <div>
                                      <div className="flex items-center justify-between mb-1">
-                                         <label className="text-sm font-medium text-slate-700">Slot Back-Office</label>
+                                         <label className="text-slate-800 font-bold">Slot Back-Office</label>
                                          <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold">Rp 10.000/kursi/bln</span>
                                      </div>
                                     <input
@@ -631,14 +631,14 @@ export default function CompaniesPage() {
                                         value={adminLimit}
                                         onChange={(e) => setAdminLimit(e.target.value)}
                                         placeholder="2"
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                      <div className="flex items-center justify-between mb-1">
-                                         <label className="text-sm font-medium text-slate-700">Slot Kasir (POS)</label>
+                                         <label className="text-slate-800 font-bold">Slot Kasir (POS)</label>
                                          <span className="text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-700 font-bold">Rp 10.000/unit/bln</span>
                                      </div>
                                     <input
@@ -646,7 +646,7 @@ export default function CompaniesPage() {
                                         value={posLimit}
                                         onChange={(e) => setPosLimit(e.target.value)}
                                         placeholder="1"
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                     />
                                 </div>
                                 <div className="flex items-end">
@@ -656,11 +656,11 @@ export default function CompaniesPage() {
                             <p className="mt-1 text-[10px] text-slate-400 italic">Slot Back-Office membatasi jumlah Admin, Finance, Manager, & Owner.</p>
                             
                             <div>
-                                <label className="mb-1 block text-sm font-medium text-slate-700">Paket Layanan (Subscription)</label>
+                                <label className="mb-1 block text-slate-800 font-bold">Paket Layanan (Subscription)</label>
                                 <select
                                     value={plan}
                                     onChange={(e) => setPlan(e.target.value as any)}
-                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm font-bold text-blue-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm font-bold text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 >
                                     <option value="STARTER">⬜ STARTER (Standard HR)</option>
                                     <option value="PRO">🟦 PRO (Full HR + Basic Finance)</option>
@@ -670,7 +670,7 @@ export default function CompaniesPage() {
                             </div>
                             
                             <div>
-                                <label className="mb-1 block text-sm font-medium text-slate-700">Retensi Foto (Hari)</label>
+                                <label className="mb-1 block text-slate-800 font-bold">Retensi Foto (Hari)</label>
                                 <div className="relative">
                                     <input
                                         required
@@ -678,7 +678,7 @@ export default function CompaniesPage() {
                                         value={photoRetentionDays}
                                         onChange={(e) => setPhotoRetentionDays(e.target.value)}
                                         placeholder="30"
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                     <span className="absolute right-3 top-2 text-xs text-slate-400 font-medium h-full flex items-center">hari</span>
                                 </div>
@@ -688,7 +688,7 @@ export default function CompaniesPage() {
 
                         {/* === ADD-ON: KPI, FINANCE, AI === */}
                         <div className="space-y-3 border-b border-slate-50 pb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Add-On Aktif</h3>
+                            <h3 className="text-slate-800 uppercase tracking-widest mb-2 font-bold">Add-On Aktif</h3>
                             <p className="text-[10px] text-slate-400 italic">Centang fitur tambahan yang sudah dibeli klien.</p>
                             <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-all">
                                 <input
@@ -971,7 +971,7 @@ export default function CompaniesPage() {
 
                         <div className="space-y-4">
                             <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Lokasi Kantor (Opsional)</h3>
+                                <h3 className="text-slate-800 uppercase tracking-widest mb-2 font-bold">Lokasi Kantor (Opsional)</h3>
                                 <button 
                                     type="button"
                                     onClick={() => setIsMapOpen(true)}
@@ -990,7 +990,7 @@ export default function CompaniesPage() {
                                         value={latitude}
                                         onChange={(e) => setLatitude(e.target.value)}
                                         placeholder="-6.2..."
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-xs text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                                 <div>
@@ -1001,7 +1001,7 @@ export default function CompaniesPage() {
                                         value={longitude}
                                         onChange={(e) => setLongitude(e.target.value)}
                                         placeholder="106.8..."
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-xs text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                             </div>
@@ -1035,8 +1035,8 @@ export default function CompaniesPage() {
                     <h2 className="text-lg font-semibold text-slate-900 mb-6">Daftar Klien Terdaftar</h2>
 
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm text-slate-500">
-                            <thead className="bg-slate-50 text-xs uppercase text-slate-700">
+                        <table className="w-full text-left text-sm text-slate-800">
+                            <thead className="bg-slate-50 text-xs uppercase text-slate-950">
                                 <tr>
                                     <th className="px-4 py-3 border-b">Detail Klien & PIC</th>
                                     <th className="px-4 py-3 border-b text-center">Status Kontrak</th>
