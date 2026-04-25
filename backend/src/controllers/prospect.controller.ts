@@ -9,8 +9,9 @@ export const ProspectController = {
   create: async (req: Request, res: Response) => {
     try {
       console.log('📥 [PROSPECT] Creating new prospect...');
-      const companyId = parseInt(req.headers['x-tenant-id'] as string);
-      if (!companyId) return res.status(400).json({ error: 'Missing x-tenant-id' });
+      const tenantId = req.headers['x-tenant-id'];
+      const companyId = parseInt(Array.isArray(tenantId) ? tenantId[0] : (tenantId as string || '0'));
+      if (!companyId || companyId === 0) return res.status(400).json({ error: 'Missing x-tenant-id' });
 
       const { name, phone, email, address, category, website, instagram, latitude, longitude, aiScore } = req.body;
 
@@ -41,8 +42,9 @@ export const ProspectController = {
   // Get all prospects for a company
   getAll: async (req: Request, res: Response) => {
     try {
-      const companyId = parseInt(req.headers['x-tenant-id'] as string);
-      if (!companyId) return res.status(400).json({ error: 'Missing x-tenant-id' });
+      const tenantId = req.headers['x-tenant-id'];
+      const companyId = parseInt(Array.isArray(tenantId) ? tenantId[0] : (tenantId as string || '0'));
+      if (!companyId || companyId === 0) return res.status(400).json({ error: 'Missing x-tenant-id' });
 
       const prospects = await prisma.prospect.findMany({
         where: { companyId },
@@ -202,7 +204,8 @@ export const ProspectController = {
   // SCAN LIVE FROM GOOGLE MAPS
   scan: async (req: Request, res: Response) => {
     try {
-      const companyId = parseInt(req.headers['x-tenant-id'] as string);
+      const tenantId = req.headers['x-tenant-id'];
+      const companyId = parseInt(Array.isArray(tenantId) ? tenantId[0] : (tenantId as string || '0'));
       const { latitude, longitude, radius, category } = req.body;
 
       if (!latitude || !longitude) {
