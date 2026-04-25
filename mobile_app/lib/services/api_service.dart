@@ -617,6 +617,31 @@ class ApiService {
     }
   }
 
+  // Kalkulasi total POS (Diskon Member, Voucher, Poin)
+  Future<Map<String, dynamic>> calculatePosTotal({
+    required double subtotal,
+    int? customerId,
+    String? voucherCode,
+    double pointsToUse = 0,
+  }) async {
+    try {
+      final response = await _dio.post('/pos/calculate', data: {
+        'subtotal': subtotal,
+        'customerId': customerId,
+        'voucherCode': voucherCode,
+        'pointsToUse': pointsToUse,
+      });
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data['error'] != null) {
+        throw Exception(e.response?.data['error']);
+      }
+      throw Exception('Gagal mengkalkulasi diskon/voucher.');
+    } catch (e) {
+      throw Exception('Terjadi kesalahan saat kalkulasi.');
+    }
+  }
+
   // Proses transaksi checkout POS
   Future<Map<String, dynamic>> checkoutPos({
     required List<Map<String, dynamic>> items,
@@ -629,6 +654,11 @@ class ApiService {
     String saleType = 'WALK_IN',
     double serviceFee = 0,
     double markupPercentage = 0,
+    double memberDiscountAmount = 0,
+    String? voucherCode,
+    double voucherDiscountAmount = 0,
+    double pointsUsed = 0,
+    double pointsEarned = 0,
   }) async {
     try {
       final response = await _dio.post('/pos/checkout', data: {
@@ -642,6 +672,11 @@ class ApiService {
         'saleType': saleType,
         'serviceFee': serviceFee,
         'markupPercentage': markupPercentage,
+        'memberDiscountAmount': memberDiscountAmount,
+        'voucherCode': voucherCode,
+        'voucherDiscountAmount': voucherDiscountAmount,
+        'pointsUsed': pointsUsed,
+        'pointsEarned': pointsEarned,
       });
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
@@ -796,6 +831,42 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       throw Exception('Gagal mengirim hasil penugasan.');
+    }
+  }
+
+  // --- MEMBERSHIP & OTP WA ---
+  Future<void> requestOtp(String phone) async {
+    try {
+      await _dio.post('/customers/otp-request', data: {'phone': phone});
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data['error'] != null) {
+        throw Exception(e.response?.data['error']);
+      }
+      throw Exception('Gagal mengirim OTP.');
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyOtp({
+    required String phone,
+    required String code,
+    String? name,
+    String? birthDate,
+    String? gender,
+  }) async {
+    try {
+      final response = await _dio.post('/customers/otp-verify', data: {
+        'phone': phone,
+        'code': code,
+        'name': name,
+        'birthDate': birthDate,
+        'gender': gender,
+      });
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data['error'] != null) {
+        throw Exception(e.response?.data['error']);
+      }
+      throw Exception('Gagal memverifikasi OTP.');
     }
   }
 

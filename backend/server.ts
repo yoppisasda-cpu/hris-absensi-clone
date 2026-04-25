@@ -16,6 +16,7 @@ import { compareFaces } from './faceAI';
 import { getAIChatResponse, generateSubscriptionResponse } from './chatAI';
 import { sendWhatsAppMessage } from './whatsappAPI';
 import aiRoutes from './src/routes/ai.routes';
+import prospectRoutes from './src/routes/prospect.routes';
 import { getFinancialForecast, getFinancialFlow, getPayrollProductivityInsights, getFinancialHealthScore } from './financeAI';
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
@@ -84,7 +85,11 @@ requiredFolders.forEach(folder => {
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_hris_key_123';
 
-app.use(cors());
+app.use(cors({
+  origin: '*', // Allow all for dev
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id']
+}));
 app.use(express.json());
 
 // Logger middleware to see incoming requests
@@ -999,6 +1004,7 @@ async function notifyAdmins(companyId: number, title: string, message: string) {
 }
 
 // --- 3. ENDPOINT API (ROUTES) ---
+app.use('/api/prospects', prospectRoutes);
 
 // Z. Endpoint Login Karyawan (Menghasilkan JWT)
 app.post('/api/auth/login', async (req: Request, res: Response) => {
@@ -1250,7 +1256,7 @@ app.post('/api/companies', async (req: Request, res: Response) => {
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons,
-      discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion,
+      discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion, discountProspecting,
       adminEmail, adminPassword, adminName
     } = req.body;
 
@@ -1283,7 +1289,8 @@ app.post('/api/companies', async (req: Request, res: Response) => {
           discountInventory: parseInt(discountInventory, 10) || 0,
           discountAi: parseInt(discountAi, 10) || 0,
           discountFraud: parseInt(discountFraud, 10) || 0,
-          discountExpansion: parseInt(discountExpansion, 10) || 0
+          discountExpansion: parseInt(discountExpansion, 10) || 0,
+          discountProspecting: parseInt(discountProspecting, 10) || 0
         }
       });
 
@@ -1789,7 +1796,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
     const { 
       name, latitude, longitude, radius,
       picName, picPhone, address, contractType, contractValue, contractStart, contractEnd,
-      employeeLimit, adminLimit, posLimit, photoRetentionDays, modules
+      employeeLimit, adminLimit, posLimit, photoRetentionDays, modules,
+      waApiKey, waGatewayUrl
     } = req.body;
 
     console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
@@ -1827,7 +1835,9 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         adminLimit: parseIntNum(adminLimit),
         posLimit: parseIntNum(posLimit),
         photoRetentionDays: parseIntNum(photoRetentionDays),
-        modules: modules
+        modules: modules,
+        waApiKey: waApiKey !== undefined ? waApiKey : undefined,
+        waGatewayUrl: waGatewayUrl !== undefined ? waGatewayUrl : undefined
       }
     });
 
@@ -1854,7 +1864,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       picName, picPhone, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons, purchasedInsights,
-      discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion,
+      discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion, discountProspecting,
       adminEmail, adminPassword, adminName
     } = req.body;
 
@@ -1896,7 +1906,8 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         discountInventory: safeParseInt(discountInventory),
         discountAi: safeParseInt(discountAi),
         discountFraud: safeParseInt(discountFraud),
-        discountExpansion: safeParseInt(discountExpansion)
+        discountExpansion: safeParseInt(discountExpansion),
+        discountProspecting: safeParseInt(discountProspecting)
       }
     });
 
@@ -10704,6 +10715,223 @@ app.get('/api/customers/:id/sales', tenantMiddleware, async (req: Request, res: 
   }
 });
 
+// --- MEMBERSHIP & OTP WA ---
+app.post('/api/customers/otp-request', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { phone } = req.body;
+
+    if (!phone) return res.status(400).json({ error: 'Nomor WhatsApp wajib diisi' });
+
+    console.log(`[OTP] Request masuk: ${phone}`);
+
+    // 1. Generate 4 digit OTP
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 menit
+
+    // 2. Save to DB
+    await (prisma as any).otpVerification.upsert({
+      where: { companyId_phone: { companyId: tenantId, phone } },
+      update: { code: otp, expiresAt, createdAt: new Date() },
+      create: { companyId: tenantId, phone, code: otp, expiresAt }
+    });
+
+    // 3. Get Company Info for Branding
+    const company = await prisma.company.findUnique({ where: { id: tenantId } });
+
+    // 4. Send Message via Wablas
+    const message = `Halo! Kode OTP pendaftaran Member Anda di *${company?.name || 'Aivola POS'}* adalah: *${otp}*.\n\nKode ini berlaku selama 5 menit. Mohon tidak memberikan kode ini kepada siapapun.`;
+    
+    console.log(`[OTP] Mengirim WA via Wablas...`);
+    // @ts-ignore
+    const waResult = await sendWhatsAppMessage(phone, message, company?.waGatewayUrl, company?.waApiKey);
+    console.log(`[OTP] Hasil:`, waResult);
+
+    res.json({ message: 'OTP berhasil dikirim ke WhatsApp' });
+  } catch (error: any) {
+    console.error('OTP Request Error:', error);
+    res.status(500).json({ error: 'Gagal mengirim OTP: ' + error.message });
+  }
+});
+
+app.post('/api/customers/otp-verify', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { phone, code, name, birthDate, gender } = req.body;
+
+    // 1. Check OTP
+    const verification = await (prisma as any).otpVerification.findUnique({
+      where: { companyId_phone: { companyId: tenantId, phone } }
+    });
+
+    if (!verification || verification.code !== code) {
+      return res.status(400).json({ error: 'Kode OTP salah atau tidak ditemukan' });
+    }
+
+    if (new Date() > verification.expiresAt) {
+      return res.status(400).json({ error: 'Kode OTP sudah kedaluwarsa' });
+    }
+
+    // 2. Upsert Customer & Mark as Member
+    const customer = await prisma.customer.upsert({
+      where: { companyId_phone: { companyId: tenantId, phone } },
+      update: { 
+        name: name || undefined, 
+        isMember: true, 
+        // @ts-ignore
+        birthDate: birthDate ? new Date(birthDate) : undefined,
+        // @ts-ignore
+        gender: gender 
+      },
+      create: { 
+        companyId: tenantId, 
+        phone, 
+        name: name || 'Pelanggan Baru', 
+        isMember: true,
+        // @ts-ignore
+        birthDate: birthDate ? new Date(birthDate) : null,
+        // @ts-ignore
+        gender: gender || null
+      }
+    });
+
+    // 3. Delete OTP (one time use)
+    await (prisma as any).otpVerification.delete({
+      where: { companyId_phone: { companyId: tenantId, phone } }
+    });
+
+    res.json({ message: 'Pendaftaran Member berhasil!', customer });
+  } catch (error: any) {
+    console.error('OTP Verify Error:', error);
+    res.status(500).json({ error: 'Gagal memverifikasi OTP: ' + error.message });
+  }
+});
+
+// --- MODUL LOYALTY & VOUCHER ---
+
+// L1. Get Company Loyalty Settings
+app.get('/api/company/loyalty', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const company = await prisma.company.findUnique({
+      where: { id: tenantId },
+      select: {
+        memberDiscountType: true,
+        memberDiscountValue: true,
+        pointsEarnRatio: true,
+        pointsRedeemValue: true
+      }
+    });
+    res.json(company);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// L2. Update Company Loyalty Settings
+app.patch('/api/company/loyalty', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { memberDiscountType, memberDiscountValue, pointsEarnRatio, pointsRedeemValue } = req.body;
+    const company = await prisma.company.update({
+      where: { id: tenantId },
+      data: {
+        memberDiscountType,
+        memberDiscountValue: Number(memberDiscountValue),
+        pointsEarnRatio: Number(pointsEarnRatio),
+        pointsRedeemValue: Number(pointsRedeemValue)
+      }
+    });
+    res.json(company);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// L3. Get Vouchers
+app.get('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const vouchers = await prisma.voucher.findMany({
+      where: { companyId: tenantId },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(vouchers);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// L4. Create Voucher
+app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { code, discountType, discountValue, minPurchase, maxDiscount, validFrom, validUntil, quota, isActive } = req.body;
+    const voucher = await prisma.voucher.create({
+      data: {
+        companyId: tenantId,
+        code,
+        discountType,
+        discountValue: Number(discountValue),
+        minPurchase: Number(minPurchase || 0),
+        maxDiscount: maxDiscount ? Number(maxDiscount) : null,
+        validFrom: validFrom ? new Date(validFrom) : null,
+        validUntil: validUntil ? new Date(validUntil) : null,
+        quota: Number(quota || 0),
+        isActive: isActive !== undefined ? isActive : true
+      }
+    });
+    res.status(201).json(voucher);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// L5. Update Voucher
+app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const voucherId = Number(req.params.id);
+    const { code, discountType, discountValue, minPurchase, maxDiscount, validFrom, validUntil, quota, isActive } = req.body;
+    
+    // Ensure voucher belongs to tenant
+    const existing = await prisma.voucher.findFirst({ where: { id: voucherId, companyId: tenantId } });
+    if (!existing) return res.status(404).json({ error: 'Voucher tidak ditemukan' });
+
+    const voucher = await prisma.voucher.update({
+      where: { id: voucherId },
+      data: {
+        code,
+        discountType,
+        discountValue: discountValue !== undefined ? Number(discountValue) : undefined,
+        minPurchase: minPurchase !== undefined ? Number(minPurchase) : undefined,
+        maxDiscount: maxDiscount !== undefined ? (maxDiscount ? Number(maxDiscount) : null) : undefined,
+        validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
+        validUntil: validUntil !== undefined ? (validUntil ? new Date(validUntil) : null) : undefined,
+        quota: quota !== undefined ? Number(quota) : undefined,
+        isActive: isActive !== undefined ? isActive : undefined
+      }
+    });
+    res.json(voucher);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// L6. Delete Voucher
+app.delete('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const voucherId = Number(req.params.id);
+    await prisma.voucher.deleteMany({
+      where: { id: voucherId, companyId: tenantId }
+    });
+    res.json({ message: 'Voucher deleted' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- MODUL SUPPLIER & PEMASOK ---
 
 // SP1. List Suppliers
@@ -10760,6 +10988,7 @@ app.patch('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Resp
 
 // SP4. Delete Supplier
 app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Response) => {
+
   try {
     const tenantId = Number((req as any).tenantId);
     const id = parseInt(req.params.id as string);
@@ -11601,6 +11830,103 @@ app.get('/api/pos/customers', tenantMiddleware, async (req: Request, res: Respon
   }
 });
 
+// 1.5 Calculate POS Totals (Discounts, Vouchers, Points)
+app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { customerId, voucherCode, pointsToUse = 0, subtotal = 0 } = req.body;
+
+    let finalTotal = Number(subtotal);
+    let memberDiscountAmount = 0;
+    let voucherDiscountAmount = 0;
+    let pointsUsed = Number(pointsToUse);
+    let pointsEarned = 0;
+
+    const company = await prisma.company.findUnique({ where: { id: tenantId } });
+    if (!company) return res.status(404).json({ error: 'Perusahaan tidak ditemukan' });
+
+    let customer = null;
+    if (customerId) {
+      customer = await prisma.customer.findUnique({ where: { id: Number(customerId) } });
+      
+      // Member Discount
+      if (customer && customer.isMember) {
+        if (company.memberDiscountValue > 0) {
+          if (company.memberDiscountType === 'PERCENTAGE') {
+            memberDiscountAmount = finalTotal * (company.memberDiscountValue / 100);
+          } else {
+            memberDiscountAmount = company.memberDiscountValue;
+          }
+          finalTotal -= memberDiscountAmount;
+        }
+      }
+
+      // Point Deduction
+      if (pointsUsed > 0 && customer && customer.points >= pointsUsed) {
+        const pointValue = pointsUsed * (company.pointsRedeemValue || 1);
+        finalTotal -= pointValue;
+      } else {
+        pointsUsed = 0; // Reset if invalid
+      }
+    }
+
+    // Voucher Discount
+    if (voucherCode) {
+      const voucher = await prisma.voucher.findUnique({
+        where: { companyId_code: { companyId: tenantId, code: voucherCode } }
+      });
+
+      if (!voucher || !voucher.isActive) {
+        return res.status(400).json({ error: 'Voucher tidak valid atau sudah tidak aktif.' });
+      }
+
+      const now = new Date();
+      if ((voucher.validFrom && now < voucher.validFrom) || (voucher.validUntil && now > voucher.validUntil)) {
+        return res.status(400).json({ error: 'Voucher sudah kedaluwarsa atau belum bisa digunakan.' });
+      }
+
+      if (voucher.quota > 0 && voucher.usedCount >= voucher.quota) {
+        return res.status(400).json({ error: 'Kuota voucher sudah habis.' });
+      }
+
+      if (finalTotal < voucher.minPurchase) {
+        return res.status(400).json({ error: `Minimal belanja untuk voucher ini adalah Rp ${voucher.minPurchase}` });
+      }
+
+      if (voucher.discountType === 'PERCENTAGE') {
+        voucherDiscountAmount = finalTotal * (voucher.discountValue / 100);
+        if (voucher.maxDiscount && voucherDiscountAmount > voucher.maxDiscount) {
+          voucherDiscountAmount = voucher.maxDiscount;
+        }
+      } else {
+        voucherDiscountAmount = voucher.discountValue;
+      }
+      finalTotal -= voucherDiscountAmount;
+    }
+
+    // Ensure total is not negative
+    if (finalTotal < 0) finalTotal = 0;
+
+    // Calculate Points Earned based on FINAL TOTAL
+    if (customer && customer.isMember && company.pointsEarnRatio > 0 && finalTotal >= company.pointsEarnRatio) {
+      pointsEarned = Math.floor(finalTotal / company.pointsEarnRatio);
+    }
+
+    res.json({
+      subtotal,
+      memberDiscountAmount,
+      voucherDiscountAmount,
+      pointsUsed,
+      pointValueUsed: pointsUsed * (company.pointsRedeemValue || 1),
+      finalTotal,
+      pointsEarned
+    });
+  } catch (error: any) {
+    console.error("CALCULATION ERROR:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 2. POS Checkout (Branch-Specific Stock Deduction)
 app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -11616,7 +11942,12 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       notes, 
       saleType = 'WALK_IN', 
       serviceFee = 0, 
-      markupPercentage = 0 
+      markupPercentage = 0,
+      memberDiscountAmount = 0,
+      voucherCode = null,
+      voucherDiscountAmount = 0,
+      pointsUsed = 0,
+      pointsEarned = 0
     } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
@@ -11682,9 +12013,33 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           status: 'PAID',
           saleType,
           serviceFee: Number(serviceFee),
-          markupPercentage: Number(markupPercentage)
+          markupPercentage: Number(markupPercentage),
+          memberDiscountAmount: Number(memberDiscountAmount),
+          voucherCode: voucherCode || null,
+          voucherDiscountAmount: Number(voucherDiscountAmount),
+          pointsUsed: Number(pointsUsed),
+          pointsEarned: Number(pointsEarned)
         }
       });
+
+      // 1.5 Process Points and Vouchers
+      if (finalCustomerId && (Number(pointsUsed) > 0 || Number(pointsEarned) > 0)) {
+        await tx.customer.update({
+          where: { id: finalCustomerId },
+          data: {
+            points: {
+              increment: Number(pointsEarned) - Number(pointsUsed)
+            }
+          }
+        });
+      }
+
+      if (voucherCode) {
+        await tx.voucher.update({
+          where: { companyId_code: { companyId: tenantId, code: voucherCode } },
+          data: { usedCount: { increment: 1 } }
+        });
+      }
 
         // 2. Process Items
         for (const item of items) {

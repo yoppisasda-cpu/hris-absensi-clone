@@ -34,6 +34,19 @@ class _POSScreenState extends State<POSScreen> {
   final TextEditingController _cashReceivedController = TextEditingController();
   double _cashReceived = 0;
 
+  // Loyalty variables
+  int? _activeCustomerId;
+  final TextEditingController _voucherController = TextEditingController();
+  bool _usePoints = false;
+  double _availablePoints = 0;
+  
+  double _memberDiscountAmount = 0;
+  double _voucherDiscountAmount = 0;
+  double _pointsUsed = 0;
+  double _pointsEarned = 0;
+  double _pointValueUsed = 0;
+  double _calculatedFinalTotal = 0;
+
   @override
   void initState() {
     super.initState();
@@ -151,7 +164,11 @@ class _POSScreenState extends State<POSScreen> {
   }
 
   double get _grandTotal {
-    return _subtotalAmount;
+    double total = _subtotalAmount;
+    total -= _memberDiscountAmount;
+    total -= _voucherDiscountAmount;
+    total -= _pointValueUsed;
+    return total > 0 ? total : 0;
   }
 
   void _addToCart(dynamic product, {List<Map<String, dynamic>>? modifiers}) {
@@ -195,6 +212,29 @@ class _POSScreenState extends State<POSScreen> {
         });
       }
     });
+  }
+
+  Future<void> _calculateDiscounts(StateSetter setPanelState) async {
+    try {
+      final res = await _apiService.calculatePosTotal(
+        subtotal: _subtotalAmount,
+        customerId: _activeCustomerId,
+        voucherCode: _voucherController.text.trim(),
+        pointsToUse: _usePoints ? _availablePoints : 0,
+      );
+      setPanelState(() {
+        _memberDiscountAmount = (res['memberDiscountAmount'] ?? 0).toDouble();
+        _voucherDiscountAmount = (res['voucherDiscountAmount'] ?? 0).toDouble();
+        _pointsUsed = (res['pointsUsed'] ?? 0).toDouble();
+        _pointValueUsed = (res['pointValueUsed'] ?? 0).toDouble();
+        _calculatedFinalTotal = (res['finalTotal'] ?? _subtotalAmount).toDouble();
+        _pointsEarned = (res['pointsEarned'] ?? 0).toDouble();
+      });
+      // also update main screen to reflect grand total
+      setState(() {});
+    } catch (e) {
+      print("Calc Error: $e");
+    }
   }
 
   IconData _getPaymentIcon(String name) {
@@ -267,6 +307,76 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 
+  void _showOtpDialog(String phone) {
+    final TextEditingController otpController = TextEditingController();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Verifikasi OTP WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Masukkan kode OTP yang dikirim ke $phone', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600])),
+            SizedBox(height: 20),
+            TextField(
+              controller: otpController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 12, color: Colors.blue[900]),
+              maxLength: 4,
+              decoration: InputDecoration(
+                counterText: "",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                hintText: '0000',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green[700], foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            onPressed: () async {
+              if (otpController.text.length < 4) return;
+              try {
+                final result = await _apiService.verifyOtp(
+                  phone: phone,
+                  code: otpController.text.trim(),
+                  name: _customerNameController.text.trim(),
+                );
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Member Berhasil Didaftarkan!'), backgroundColor: Colors.green));
+                setState(() {
+                  _customerNameController.text = result['customer']['name'];
+                });
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Verifikasi Gagal: $e'), backgroundColor: Colors.red));
+              }
+            },
+            child: Text('VERIFIKASI'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleOtpRequest() async {
+    final phone = _customerPhoneController.text.trim();
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Masukkan nomor WA terlebih dahulu')));
+      return;
+    }
+    
+    try {
+      await _apiService.requestOtp(phone);
+      _showOtpDialog(phone);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red));
+    }
+  }
+
   void _showCheckoutModal() {
     if (_cart.isEmpty) return;
     
@@ -289,7 +399,7 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 
-  Widget _buildCheckoutContent(BuildContext context, Function setPanelState, {bool isModal = true}) {
+  Widget _buildCheckoutContent(BuildContext context, StateSetter setPanelState, {bool isModal = true}) {
     return SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -379,7 +489,7 @@ class _POSScreenState extends State<POSScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _buildCompactSaleTypeChip('WALK_IN', 'Walk-in', Icons.person, setPanelState),
+                    _buildCompactSaleTypeChip('WALK_IN', 'Pelanggan Walk-in', Icons.person, setPanelState),
                     _buildCompactSaleTypeChip('GOFOOD', 'GoFood', Icons.delivery_dining, setPanelState),
                     _buildCompactSaleTypeChip('GRABFOOD', 'GrabFood', Icons.delivery_dining, setPanelState),
                     _buildCompactSaleTypeChip('SHOPEEFOOD', 'ShopeeFood', Icons.delivery_dining, setPanelState),
@@ -401,6 +511,9 @@ class _POSScreenState extends State<POSScreen> {
                       setPanelState(() {
                         _customerNameController.text = sel['name'];
                         _customerPhoneController.text = sel['phone'] ?? '';
+                        _activeCustomerId = sel['id'];
+                        _availablePoints = (sel['points'] ?? 0).toDouble();
+                        _calculateDiscounts(setPanelState);
                       });
                     },
                     fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
@@ -466,8 +579,69 @@ class _POSScreenState extends State<POSScreen> {
                     contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                    suffixIcon: TextButton(
+                      onPressed: _handleOtpRequest,
+                      child: Text('DAFTAR MEMBER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green[700])),
+                    ),
                   ),
                 ),
+                SizedBox(height: 24),
+
+                // Loyalty Section
+                Text('Kode Voucher', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
+                SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _voucherController,
+                        decoration: InputDecoration(
+                          hintText: 'Masukkan kode voucher',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => _calculateDiscounts(setPanelState),
+                      child: Text('Terapkan'),
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_activeCustomerId != null && _availablePoints > 0) ...[
+                  SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.orange[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.orange[200]!)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Gunakan Poin Member', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange[800])),
+                            Text('Tersedia: ${_availablePoints.toStringAsFixed(0)} Poin', style: TextStyle(fontSize: 12, color: Colors.orange[600])),
+                          ],
+                        ),
+                        Switch(
+                          value: _usePoints,
+                          activeColor: Colors.orange,
+                          onChanged: (val) {
+                            setPanelState(() {
+                              _usePoints = val;
+                              _calculateDiscounts(setPanelState);
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 SizedBox(height: 24),
                 
                 Container(
@@ -476,6 +650,12 @@ class _POSScreenState extends State<POSScreen> {
                   child: Column(
                     children: [
                       _buildSummaryRow('Subtotal Items', 'Rp ${_subtotalAmount.toStringAsFixed(0)}'),
+                      if (_memberDiscountAmount > 0)
+                        _buildSummaryRow('Diskon Member', '- Rp ${_memberDiscountAmount.toStringAsFixed(0)}', isPositive: true),
+                      if (_voucherDiscountAmount > 0)
+                        _buildSummaryRow('Voucher Dipakai', '- Rp ${_voucherDiscountAmount.toStringAsFixed(0)}', isPositive: true),
+                      if (_pointValueUsed > 0)
+                        _buildSummaryRow('Poin Ditukar', '- Rp ${_pointValueUsed.toStringAsFixed(0)}', isPositive: true),
                       Divider(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -484,6 +664,10 @@ class _POSScreenState extends State<POSScreen> {
                           Text('Rp ${_grandTotal.toStringAsFixed(0)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue[800])),
                         ],
                       ),
+                      if (_pointsEarned > 0) ...[
+                        SizedBox(height: 8),
+                        Text('+ ${_pointsEarned.toStringAsFixed(0)} Poin didapat!', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange[700])),
+                      ]
                     ],
                   ),
                 ),
@@ -692,7 +876,7 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 
-  Widget _buildCompactSaleTypeChip(String type, String label, IconData icon, Function setPanelState) {
+  Widget _buildCompactSaleTypeChip(String type, String label, IconData icon, StateSetter setPanelState) {
     bool isSelected = _saleType == type;
     return GestureDetector(
       onTap: () {
@@ -732,7 +916,7 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 
-  Widget _buildSaleTypeChip(String type, String label, IconData icon, Function setPanelState) {
+  Widget _buildSaleTypeChip(String type, String label, IconData icon, StateSetter setPanelState) {
     bool isSelected = _saleType == type;
     return Expanded(
       child: GestureDetector(
@@ -807,12 +991,18 @@ class _POSScreenState extends State<POSScreen> {
         items: checkoutItems,
         accountId: _selectedAccountId!,
         totalAmount: _grandTotal,
+        customerId: _activeCustomerId,
         customerName: _customerNameController.text.trim(),
         customerPhone: _customerPhoneController.text.trim(),
         saleType: _saleType,
         serviceFee: 0,
         markupPercentage: 0,
         notes: _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
+        memberDiscountAmount: _memberDiscountAmount,
+        voucherCode: _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
+        voucherDiscountAmount: _voucherDiscountAmount,
+        pointsUsed: _pointsUsed,
+        pointsEarned: _pointsEarned,
       );
 
       final saleData = {
@@ -829,9 +1019,20 @@ class _POSScreenState extends State<POSScreen> {
       }
       
       setState(() {
-        _cart = [];
+        _cart.clear();
         _customerNameController.clear();
         _customerPhoneController.clear();
+        _activeCustomerId = null;
+        _voucherController.clear();
+        _usePoints = false;
+        _availablePoints = 0;
+        _memberDiscountAmount = 0;
+        _voucherDiscountAmount = 0;
+        _pointsUsed = 0;
+        _pointsEarned = 0;
+        _pointValueUsed = 0;
+        _calculatedFinalTotal = 0;
+        _cashReceived = 0;
         _cashReceivedController.clear();
         _cashReceived = 0;
       });

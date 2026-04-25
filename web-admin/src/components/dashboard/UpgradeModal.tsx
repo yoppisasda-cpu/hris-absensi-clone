@@ -136,6 +136,41 @@ export const UpgradeModal: React.FC = () => {
             </div>
           ))}
         </div>
+        
+        {/* Add-ons Section */}
+        <div className="px-12 pb-12">
+            <div className="flex items-center gap-4 mb-8">
+                <div className="h-px flex-grow bg-indigo-500/20"></div>
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-amber-500 italic">Precision Add-Ons</span>
+                <div className="h-px flex-grow bg-indigo-500/20"></div>
+            </div>
+            
+            <div className="max-w-2xl mx-auto bg-amber-500/5 border border-amber-500/20 rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center gap-8 group hover:bg-amber-500/10 transition-all border-dashed">
+                <div className="h-20 w-20 shrink-0 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-500/10 group-hover:scale-110 transition-transform">
+                    <Zap className="h-10 w-10 fill-amber-400" />
+                </div>
+                
+                <div className="flex-grow text-center md:text-left">
+                    <h3 className="text-xl font-black italic tracking-tighter text-white uppercase">Prospecting AI (MAP)</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Cari ribuan prospek bisnis di Google Maps & kontak otomatis via WhatsApp.</p>
+                    <div className="mt-4 flex items-center justify-center md:justify-start gap-4">
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-2xl font-black text-amber-500 italic tracking-tighter">IDR 50k</span>
+                            <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">/ CYCLE</span>
+                        </div>
+                        <span className="h-4 w-px bg-slate-800"></span>
+                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest italic">All-In Cloud Data</span>
+                    </div>
+                </div>
+                
+                <button 
+                    onClick={() => window.open('https://wa.me/6281234567890?text=Halo%20Aivola%20Command%20Center,%20saya%20ingin%20mengaktifkan%20Add-on%20Prospecting%20AI%20(MAP)%20untuk%20perusahaan%20saya.', '_blank')}
+                    className="shrink-0 bg-amber-500 hover:bg-amber-600 text-slate-950 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] italic shadow-xl shadow-amber-500/20 transition-all active:scale-90"
+                >
+                    Interface With Command
+                </button>
+            </div>
+        </div>
 
         {/* Footer */}
         <div className="bg-slate-950/50 p-8 border-t border-white/5 text-center">

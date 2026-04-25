@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ChatWidget.css';
 
-const API_BASE_URL = 'https://api.Aivola.id.id';
+const API_BASE_URL = 'http://localhost:5000';
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,11 +55,18 @@ export function ChatWidget() {
           context: { history: historyContext } 
         })
       });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || `Server error: ${res.status}`);
+      }
+
       const data = await res.json();
       setMessages(prev => [...prev, { sender: 'AI', content: data.reply }]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Chat send error:', err);
-      setMessages(prev => [...prev, { sender: 'AI', content: 'Maaf, sepertinya saya sedang tidak bisa terhubung ke server. Mohon coba lagi nanti.' }]);
+      const errorMsg = err.message || 'Maaf, sepertinya saya sedang tidak bisa terhubung ke server.';
+      setMessages(prev => [...prev, { sender: 'AI', content: `[ERROR] ${errorMsg}` }]);
     } finally {
       setIsLoading(false);
     }

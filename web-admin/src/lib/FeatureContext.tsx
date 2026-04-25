@@ -72,6 +72,7 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const hasFeature = (feature: string) => {
+    if (feature === 'PROSPECTING_AI') return addons.includes('PROSPECTING_AI');
     if (plan === 'ENTERPRISE') return true;
     return addons.includes(feature);
   };

@@ -47,8 +47,16 @@ model Company {
   discountAi             Int                  @default(0)
   discountFraud          Int                  @default(0)
   discountExpansion      Int                  @default(0)
+  discountProspecting    Int                  @default(0)
   crmEnabled             Boolean              @default(true)
   isActive               Boolean              @default(true)
+  waGatewayUrl           String?              // URL Wablas (misal: https://solo.wablas.com)
+  waApiKey               String?              // Token API Wablas
+  memberDiscountType     String?              @default("PERCENTAGE")
+  memberDiscountValue    Float                @default(0)
+  pointsEarnRatio        Float                @default(0)
+  pointsRedeemValue      Float                @default(0)
+  vouchers               Voucher[]
   announcements          Announcement[]
   assets                 Asset[]
   assignments            Assignment[]
@@ -93,6 +101,7 @@ model Company {
   users                  User[]
   userAccess             UserAccess[]
   warehouses             Warehouse[]
+  prospects             Prospect[]
 }
 
 model FinancialAccount {
@@ -743,6 +752,9 @@ model Customer {
   createdAt   DateTime     @default(now()) @db.Timestamp(6)
   updatedAt   DateTime     @default(now()) @db.Timestamp(6)
   salesOrders SalesOrder[]
+  isMember    Boolean      @default(false)
+  birthDate   DateTime?
+  gender      String?      // L/P
 
   @@unique([companyId, phone], name: "companyId_phone")
 }
@@ -823,6 +835,11 @@ model Sale {
   isTukarFaktur    Boolean      @default(false)
   tukarFakturDate  DateTime?
   tukarFakturRef   String?
+  memberDiscountAmount   Float        @default(0)
+  voucherCode            String?
+  voucherDiscountAmount  Float        @default(0)
+  pointsUsed             Float        @default(0)
+  pointsEarned           Float        @default(0)
   branch           Branch?      @relation(fields: [branchId], references: [id])
   cashier          User?        @relation(fields: [cashierId], references: [id])
   SaleItem         SaleItem[]
@@ -1206,6 +1223,17 @@ enum ContractType {
   TAHUNAN
 }
 
+model OtpVerification {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  phone     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, phone])
+}
+
 enum AbsenceDeductionType {
   PRO_RATA
   FIXED_AMOUNT
@@ -1232,8 +1260,61 @@ enum InvoiceStatus {
 
 enum ChatSender {
   USER
-  AI
   ADMIN
+  VISITOR
+  AI
+}
+
+model Prospect {
+  id          Int            @id @default(autoincrement())
+  companyId   Int
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  category    String?
+  website     String?
+  instagram   String?
+  status      ProspectStatus @default(NEW)
+  aiScore     Float?
+  latitude    Float?
+  longitude   Float?
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+}
+
+enum ProspectStatus {
+  NEW
+  CONTACTED
+  RESPONDED
+  NO_RESPONSE
+  INTERESTED
+  DEAL
+  REJECTED
+}
+
+model Voucher {
+  id            Int       @id @default(autoincrement())
+  companyId     Int
+  code          String
+  discountType  String    @default("PERCENTAGE")
+  discountValue Float
+  minPurchase   Float     @default(0)
+  maxDiscount   Float?
+  validFrom     DateTime?
+  validUntil    DateTime?
+  quota         Int       @default(0)
+  usedCount     Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code])
 }
 
 enum WarehouseType {

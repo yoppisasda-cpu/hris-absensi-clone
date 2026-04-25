@@ -16,8 +16,13 @@ export class AIController {
       
       return res.json({ reply });
     } catch (error: any) {
-      console.error("[AI Controller Error]", error?.message || error);
-      return res.status(500).json({ error: "Internal Server Error", details: error?.message });
+      console.error("[AI Controller Error] Stack:", error?.stack);
+      console.error("[AI Controller Error] Message:", error?.message || error);
+      return res.status(500).json({ 
+        error: "Internal Server Error", 
+        details: error?.message,
+        type: error?.name
+      });
     }
   }
 }

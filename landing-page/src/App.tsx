@@ -57,7 +57,7 @@ const Hero = () => (
       </p>
       <div className="cta-group">
         <a href="https://admin.Aivola.id.id/register" className="btn-primary">Coba Gratis 14 Hari</a>
-        <a href="https://wa.me/6287882716935" className="btn-secondary">Konsultasi Gratis</a>
+        <a href="#demo" className="btn-secondary">Konsultasi Gratis</a>
       </div>
     </div>
   </section>
@@ -292,9 +292,7 @@ const PricingSection = () => {
             <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Prioritas Support 24/7</li>
           </ul>
           <a 
-            href={"https://wa.me/6287882716935?text=Halo Aivola.id, saya tertarik dengan Paket ENTERPRISE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
-            target="_blank" 
-            rel="noopener noreferrer"
+            href="#" 
             className="btn-cta-big" 
             style={{ display: 'block', width: '100%', textAlign: 'center', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '14px', color: 'white', fontWeight: 700, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}
           >
@@ -363,7 +361,7 @@ const PricingSection = () => {
             <h4 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '1rem' }}>Expansion Pack (Staff)</h4>
             <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'white', marginBottom: '1rem' }}>Rp 7.000 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>/kar /bln</span></div>
             <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.5rem' }}>Tambah kuota karyawan pada paket apapun tanpa harus ganti plan.</p>
-            <a href="https://wa.me/6287882716935" style={{ textDecoration: 'none', color: '#4ade80', fontWeight: 700, fontSize: '0.9rem' }}>Tambah Kapasitas Sekarang →</a>
+            <a href="#" style={{ textDecoration: 'none', color: '#4ade80', fontWeight: 700, fontSize: '0.9rem' }}>Tambah Kapasitas Sekarang →</a>
           </div>
         </div>
       </div>
@@ -815,8 +813,8 @@ const PrivacyPage = () => {
   );
 };
 
-function AttendancePage() {
-  const [isVideoOpen, setIsVideoOpen] = useState(false);
+const AttendancePage = () => {
+  const [showModal, setShowModal] = useState(false);
 
   return (
     <div className="app-container">
@@ -825,15 +823,15 @@ function AttendancePage() {
       <Hero />
       <AIShowcase />
       <FeaturesShowcase />
-      <DemoSection onPlay={() => setIsVideoOpen(true)} />
+      <DemoSection onPlay={() => setShowModal(true)} />
+      <PricingSection />
       <AboutSection />
       <IndustrySection />
-      <PricingSection />
       <Footer />
-      <VideoModal isOpen={isVideoOpen} onClose={() => setIsVideoOpen(false)} />
+      <VideoModal isOpen={showModal} onClose={() => setShowModal(false)} />
     </div>
   );
-}
+};
 
 import FinancePage from './FinancePage';
 import { ChatWidget } from './components/ChatWidget';

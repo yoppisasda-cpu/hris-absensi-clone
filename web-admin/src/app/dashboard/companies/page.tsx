@@ -34,6 +34,7 @@ interface Company {
     discountAi?: number;
     discountFraud?: number;
     discountExpansion?: number;
+    discountProspecting?: number;
 }
 
 export default function CompaniesPage() {
@@ -82,6 +83,7 @@ export default function CompaniesPage() {
     const [addonAi, setAddonAi] = useState(false);
     const [addonFraud, setAddonFraud] = useState(false);
     const [addonExpansion, setAddonExpansion] = useState(false);
+    const [addonProspecting, setAddonProspecting] = useState(false);
 
     // Discount States (Percent)
     const [discountKpi, setDiscountKpi] = useState('0');
@@ -90,6 +92,7 @@ export default function CompaniesPage() {
     const [discountAi, setDiscountAi] = useState('0');
     const [discountFraud, setDiscountFraud] = useState('0');
     const [discountExpansion, setDiscountExpansion] = useState('0');
+    const [discountProspecting, setDiscountProspecting] = useState('0');
 
     // Admin Account States
     const [adminName, setAdminName] = useState('');
@@ -178,6 +181,8 @@ export default function CompaniesPage() {
         setDiscountAi('0');
         setDiscountFraud('0');
         setDiscountExpansion('0');
+        setDiscountProspecting('0');
+        setAddonProspecting(false);
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
@@ -219,7 +224,8 @@ export default function CompaniesPage() {
                     ...(addonInventory ? ['INVENTORY'] : []),
                     ...(addonAi ? ['AI_ADVISOR'] : []),
                     ...(addonFraud ? ['FRAUD_DETECTION'] : []),
-                    ...(addonExpansion ? ['STAFF_EXPANSION'] : [])
+                    ...(addonExpansion ? ['STAFF_EXPANSION'] : []),
+                    ...(addonProspecting ? ['PROSPECTING_AI'] : [])
                 ],
                 discountKpi: parseInt(discountKpi) || 0,
                 discountLearning: parseInt(discountLearning) || 0,
@@ -227,6 +233,7 @@ export default function CompaniesPage() {
                 discountAi: parseInt(discountAi) || 0,
                 discountFraud: parseInt(discountFraud) || 0,
                 discountExpansion: parseInt(discountExpansion) || 0,
+                discountProspecting: parseInt(discountProspecting) || 0,
                 modules: (plan === 'PRO' || plan === 'ENTERPRISE') ? 'BOTH' : 'ABSENSI',
                 adminName, adminEmail, adminPassword
             };
@@ -301,6 +308,7 @@ export default function CompaniesPage() {
         setAddonAi(addons.includes('AI_ADVISOR'));
         setAddonFraud(addons.includes('FRAUD_DETECTION'));
         setAddonExpansion(addons.includes('STAFF_EXPANSION'));
+        setAddonProspecting(addons.includes('PROSPECTING_AI'));
 
         setDiscountKpi(company.discountKpi?.toString() || '0');
         setDiscountLearning(company.discountLearning?.toString() || '0');
@@ -308,6 +316,7 @@ export default function CompaniesPage() {
         setDiscountAi(company.discountAi?.toString() || '0');
         setDiscountFraud(company.discountFraud?.toString() || '0');
         setDiscountExpansion(company.discountExpansion?.toString() || '0');
+        setDiscountProspecting(company.discountProspecting?.toString() || '0');
         // Fetch mapped admin fields from backend
         setAdminName((company as any).adminName || '');
         setAdminEmail((company as any).adminEmail || '');
@@ -344,7 +353,8 @@ export default function CompaniesPage() {
                 INVENTORY: 20000,
                 AI: 20000,
                 FRAUD: 10000,
-                EXPANSION: 7000
+                EXPANSION: 7000,
+                PROSPECTING: 50000
             },
             planLimits: {
                 STARTER: 10,
@@ -452,6 +462,13 @@ export default function CompaniesPage() {
             const cost = unitPrice * multiplier;
             addonTotal += cost;
             detailItems.push({ name: `Add-on: Anti-Fraud Face Check ${disc > 0 ? `(Disc ${disc}%)` : ''}`, price: unitPrice, qty: periodUnit, total: cost });
+        }
+        if (addons.includes('PROSPECTING_AI')) {
+            const disc = company.discountProspecting || 0;
+            const unitPrice = applyDiscount(pricing.addons.PROSPECTING, disc);
+            const cost = unitPrice * multiplier;
+            addonTotal += cost;
+            detailItems.push({ name: `Add-on: Prospecting AI (MAP) ${disc > 0 ? `(Disc ${disc}%)` : ''}`, price: unitPrice, qty: periodUnit, total: cost });
         }
 
         // Expanded Staff Logic
@@ -835,6 +852,37 @@ export default function CompaniesPage() {
                                         </div>
                                     </label>
 
+                                    <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-amber-50 hover:border-amber-300 transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={addonProspecting}
+                                            onChange={(e) => setAddonProspecting(e.target.checked)}
+                                            className="mt-0.5 h-4 w-4 rounded accent-amber-600"
+                                        />
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                                                🎯 Prospecting AI (Lead Finder)
+                                                <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">Rp 50.000/bln</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Cari prospek bisnis di Google Maps & kontak otomatis.</div>
+                                            {addonProspecting && (
+                                                <div className="mt-2 flex items-center gap-2 bg-amber-50/50 p-1.5 rounded border border-amber-100">
+                                                    <span className="text-[10px] text-amber-700 font-bold">Diskon:</span>
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            value={discountProspecting} 
+                                                            onChange={(e) => setDiscountProspecting(e.target.value)} 
+                                                            className="w-20 h-7 text-xs border border-amber-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-amber-500 outline-none" 
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute right-2 top-1.5 text-[10px] text-amber-400 font-bold">%</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </label>
+
                                     <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition-all">
                                         <input
                                             type="checkbox"
@@ -1077,6 +1125,7 @@ export default function CompaniesPage() {
                                                                     {hasInventory && <span className="text-[8px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md border border-emerald-100" title={`Inventory ${(company.discountInventory || 0) > 0 ? `(Disc ${company.discountInventory}%)` : ''}`}>📦 INV {(company.discountInventory || 0) > 0 && `-${company.discountInventory}%`}</span>}
                                                                     {hasAi && <span className="text-[8px] font-bold bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded-md border border-violet-100" title={`AI Advisor ${(company.discountAi || 0) > 0 ? `(Disc ${company.discountAi}%)` : ''}`}>🧠 AI {(company.discountAi || 0) > 0 && `-${company.discountAi}%`}</span>}
                                                                     {hasFraud && <span className="text-[8px] font-bold bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-md border border-rose-100" title={`Anti-Fraud ${(company.discountFraud || 0) > 0 ? `(Disc ${company.discountFraud}%)` : ''}`}>🛡️ SEC {(company.discountFraud || 0) > 0 && `-${company.discountFraud}%`}</span>}
+                                                                    {addons.includes('PROSPECTING_AI') && <span className="text-[8px] font-bold bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md border border-amber-100" title={`Prospecting ${(company.discountProspecting || 0) > 0 ? `(Disc ${company.discountProspecting}%)` : ''}`}>🎯 MAP {(company.discountProspecting || 0) > 0 && `-${company.discountProspecting}%`}</span>}
                                                                     {addons.includes('STAFF_EXPANSION') && <span className="text-[8px] font-bold bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded-md border border-teal-100" title={`Expansion ${(company.discountExpansion || 0) > 0 ? `(Disc ${company.discountExpansion}%)` : ''}`}>📈 EXP {(company.discountExpansion || 0) > 0 && `-${company.discountExpansion}%`}</span>}
                                                                 </div>
                                                                 {insights.length === 0 && addons.length === 0 && (
