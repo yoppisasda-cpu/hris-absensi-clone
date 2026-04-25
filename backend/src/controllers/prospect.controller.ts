@@ -62,7 +62,7 @@ export const ProspectController = {
     try {
       const { id } = req.params;
       const { status, notes } = req.body;
-      const prospectId = parseInt(id);
+      const prospectId = parseInt(id as string);
 
       // 1. Get the prospect first to check data
       const prospectData = await prisma.prospect.findUnique({
@@ -124,7 +124,7 @@ export const ProspectController = {
 
       // 1. Get the prospect data
       const prospect = await prisma.prospect.findUnique({
-        where: { id: parseInt(id) }
+        where: { id: parseInt(id as string) }
       });
 
       if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
@@ -156,7 +156,7 @@ export const ProspectController = {
 
           // Also make sure prospect is DEAL
           await tx.prospect.update({
-            where: { id: parseInt(id) },
+            where: { id: parseInt(id as string) },
             data: { status: 'DEAL' }
           });
 
@@ -176,7 +176,7 @@ export const ProspectController = {
 
         // 3. Mark prospect as converted
         await tx.prospect.update({
-          where: { id: parseInt(id) },
+          where: { id: parseInt(id as string) },
           data: { status: 'DEAL' }
         });
 
@@ -194,7 +194,7 @@ export const ProspectController = {
   delete: async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      await prisma.prospect.delete({ where: { id: parseInt(id) } });
+      await prisma.prospect.delete({ where: { id: parseInt(id as string) } });
       res.json({ message: 'Prospect deleted' });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
