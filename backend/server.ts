@@ -3425,7 +3425,24 @@ app.get('/api/shifts', tenantMiddleware, async (req: Request, res: Response) => 
   }
 });
 
-// D3. Endpoint Menugaskan Karyawan Tertentu ke Sebuah Shift
+// D3. Endpoint Hapus Shift
+app.delete('/api/shifts/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const shiftId = parseInt(req.params.id as string);
+
+    // Validasi: shift harus milik tenant ini
+    const shift = await prisma.shift.findFirst({ where: { id: shiftId, companyId: tenantId } });
+    if (!shift) return res.status(404).json({ error: 'Shift tidak ditemukan atau bukan milik perusahaan Anda' });
+
+    await prisma.shift.delete({ where: { id: shiftId } });
+    res.json({ message: 'Shift berhasil dihapus' });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menghapus shift' });
+  }
+});
+
+// D4. Endpoint Menugaskan Karyawan Tertentu ke Sebuah Shift
 app.put('/api/users/:id/shift', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;

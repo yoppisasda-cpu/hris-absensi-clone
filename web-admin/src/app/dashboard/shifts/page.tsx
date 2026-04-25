@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { Clock, Save, Plus, Search } from "lucide-react";
+import { Clock, Save, Plus, Search, Trash2 } from "lucide-react";
 
 interface Shift {
     id: number;
@@ -51,6 +51,17 @@ export default function ShiftsPage() {
             alert(error.response?.data?.error || 'Terjadi kesalahan sistem');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleDelete = async (id: number, name: string) => {
+        if (!confirm(`Hapus shift "${name}"? Tindakan ini tidak dapat dibatalkan.`)) return;
+        try {
+            await api.delete(`/shifts/${id}`);
+            setShifts(prev => prev.filter(s => s.id !== id));
+        } catch (err: unknown) {
+            const error = err as { response?: { data?: { error?: string } } };
+            alert(error.response?.data?.error || 'Gagal menghapus shift');
         }
     };
 
@@ -135,14 +146,15 @@ export default function ShiftsPage() {
                                 <th className="px-6 py-5 italic text-center">Sesi Masuk</th>
                                 <th className="px-6 py-5 italic text-center">Sesi Pulang</th>
                                 <th className="px-6 py-5 text-center italic">Durasi</th>
+                                                <th className="px-6 py-5 text-center italic">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800 transition-all">
                             {isLoading ? (
-                                <tr><td colSpan={5} className="py-8 text-center text-slate-400">Memuat data dari server...</td></tr>
+                                <tr><td colSpan={6} className="py-8 text-center text-slate-400">Memuat data dari server...</td></tr>
                             ) : shifts.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="py-12 text-center text-slate-500">
+                                    <td colSpan={6} className="py-12 text-center text-slate-500">
                                         <Search className="h-12 w-12 text-slate-200 mx-auto mb-4" />
                                         <p className="font-medium text-lg mb-1">Tidak ada hasil ditemukan</p>
                                         <p className="text-sm">Tidak ada shift yang cocok dengan &quot;{searchQuery}&quot;</p>
@@ -164,13 +176,21 @@ export default function ShiftsPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-5 text-center text-indigo-400 font-black italic uppercase tracking-tighter text-lg">
-                                            {/* Simplified Duration Calc Logics purely for display */}
                                             {(() => {
                                                 const s = parseInt(shift.startTime.split(':')[0]);
                                                 const e = parseInt(shift.endTime.split(':')[0]);
                                                 const diff = e < s ? (24 - s + e) : (e - s);
                                                 return `${diff} Jam`;
                                             })()}
+                                        </td>
+                                        <td className="px-6 py-5 text-center">
+                                            <button
+                                                onClick={() => handleDelete(shift.id, shift.title)}
+                                                className="p-2 bg-rose-500/10 text-rose-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-rose-500/20"
+                                                title="Hapus shift ini"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))
