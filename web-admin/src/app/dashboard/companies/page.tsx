@@ -506,7 +506,7 @@ export default function CompaniesPage() {
     return (
         <DashboardLayout>
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-900">Manajemen Klien (Tenant)</h1>
+                <h1 className="text-2xl font-bold text-black">Manajemen Klien (Tenant)</h1>
                 <p className="text-sm text-slate-500">Daftarkan perusahaan baru lengkap dengan titik lokasi kantor absensinya.</p>
             </div>
 
@@ -515,7 +515,7 @@ export default function CompaniesPage() {
                 <div className="lg:col-span-1 border border-slate-200 bg-white p-6 shadow-sm rounded-xl h-fit">
                     <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
                         <Building2 className="h-5 w-5 text-blue-600" />
-                        <h2 className="text-lg font-semibold text-slate-800">
+                        <h2 className="text-lg font-semibold text-slate-900">
                             {editingCompanyId ? 'Edit Data Klien' : 'Registrasi Tenant Baru'}
                         </h2>
                     </div>
@@ -528,7 +528,7 @@ export default function CompaniesPage() {
                             </div>
                         )}
                         <div className="space-y-4 border-b border-slate-50 pb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Informasi Dasar & PIC</h3>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Informasi Dasar & PIC</h3>
                             <div>
                                 <label className="mb-1 block text-sm font-medium text-slate-700">Nama Perusahaan Klien</label>
                                 <input
@@ -537,7 +537,7 @@ export default function CompaniesPage() {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="Misal: PT Angin Ribut"
-                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                             </div>
 
@@ -566,14 +566,14 @@ export default function CompaniesPage() {
                         </div>
 
                         <div className="space-y-4 border-b border-slate-50 pb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Detail Kontrak</h3>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Detail Kontrak</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="mb-1 block text-sm font-medium text-slate-700">Jenis Kontrak</label>
                                     <select
                                         value={contractType}
                                         onChange={(e) => setContractType(e.target.value)}
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     >
                                         <option value="BULANAN">Bulanan</option>
                                         <option value="TAHUNAN">Tahunan</option>
@@ -688,7 +688,7 @@ export default function CompaniesPage() {
 
                         {/* === ADD-ON: KPI, FINANCE, AI === */}
                         <div className="space-y-3 border-b border-slate-50 pb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Add-On Aktif</h3>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Add-On Aktif</h3>
                             <p className="text-[10px] text-slate-400 italic">Centang fitur tambahan yang sudah dibeli klien.</p>
                             <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-all">
                                 <input
@@ -711,7 +711,7 @@ export default function CompaniesPage() {
                                                     type="number" 
                                                     value={discountKpi} 
                                                     onChange={(e) => setDiscountKpi(e.target.value)} 
-                                                    className="w-20 h-7 text-xs border border-indigo-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-indigo-500 outline-none" 
+                                                    className="w-20 h-7 text-xs border border-indigo-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-indigo-500 outline-none text-slate-900" 
                                                     placeholder="0"
                                                 />
                                                 <span className="absolute right-2 top-1.5 text-[10px] text-indigo-400 font-bold">%</span>
@@ -741,7 +741,7 @@ export default function CompaniesPage() {
                                                     type="number" 
                                                     value={discountLearning} 
                                                     onChange={(e) => setDiscountLearning(e.target.value)} 
-                                                    className="w-20 h-7 text-xs border border-sky-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-sky-500 outline-none" 
+                                                    className="w-20 h-7 text-xs border border-sky-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-sky-500 outline-none text-slate-900" 
                                                     placeholder="0"
                                                 />
                                                 <span className="absolute right-2 top-1.5 text-[10px] text-sky-400 font-bold">%</span>
@@ -780,7 +780,7 @@ export default function CompaniesPage() {
                                                             type="number" 
                                                             value={discountInventory} 
                                                             onChange={(e) => setDiscountInventory(e.target.value)} 
-                                                            className="w-20 h-7 text-xs border border-emerald-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none" 
+                                                            className="w-20 h-7 text-xs border border-emerald-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none text-slate-900" 
                                                             placeholder="0"
                                                         />
                                                         <span className="absolute right-2 top-1.5 text-[10px] text-emerald-400 font-bold">%</span>
@@ -811,7 +811,7 @@ export default function CompaniesPage() {
                                                             type="number" 
                                                             value={discountAi} 
                                                             onChange={(e) => setDiscountAi(e.target.value)} 
-                                                            className="w-20 h-7 text-xs border border-violet-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-violet-500 outline-none" 
+                                                            className="w-20 h-7 text-xs border border-violet-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-violet-500 outline-none text-slate-900" 
                                                             placeholder="0"
                                                         />
                                                         <span className="absolute right-2 top-1.5 text-[10px] text-violet-400 font-bold">%</span>
@@ -842,7 +842,7 @@ export default function CompaniesPage() {
                                                             type="number" 
                                                             value={discountFraud} 
                                                             onChange={(e) => setDiscountFraud(e.target.value)} 
-                                                            className="w-20 h-7 text-xs border border-rose-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-rose-500 outline-none" 
+                                                            className="w-20 h-7 text-xs border border-rose-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-rose-500 outline-none text-slate-900" 
                                                             placeholder="0"
                                                         />
                                                         <span className="absolute right-2 top-1.5 text-[10px] text-rose-400 font-bold">%</span>
@@ -873,7 +873,7 @@ export default function CompaniesPage() {
                                                             type="number" 
                                                             value={discountProspecting} 
                                                             onChange={(e) => setDiscountProspecting(e.target.value)} 
-                                                            className="w-20 h-7 text-xs border border-amber-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-amber-500 outline-none" 
+                                                            className="w-20 h-7 text-xs border border-amber-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-amber-500 outline-none text-slate-900" 
                                                             placeholder="0"
                                                         />
                                                         <span className="absolute right-2 top-1.5 text-[10px] text-amber-400 font-bold">%</span>
@@ -916,7 +916,7 @@ export default function CompaniesPage() {
                                                                 type="number" 
                                                                 value={discountExpansion} 
                                                                 onChange={(e) => setDiscountExpansion(e.target.value)} 
-                                                                className="w-20 h-7 text-xs border border-emerald-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none bg-white" 
+                                                                className="w-20 h-7 text-xs border border-emerald-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none bg-white text-slate-900" 
                                                                 placeholder="0"
                                                             />
                                                             <span className="absolute right-2 top-1.5 text-[10px] text-emerald-400 font-bold">%</span>
@@ -942,7 +942,7 @@ export default function CompaniesPage() {
                                         value={adminName}
                                         onChange={(e) => setAdminName(e.target.value)}
                                         placeholder="Nama Lengkap Admin"
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                                 <div>
@@ -971,7 +971,7 @@ export default function CompaniesPage() {
 
                         <div className="space-y-4">
                             <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Lokasi Kantor (Opsional)</h3>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Lokasi Kantor (Opsional)</h3>
                                 <button 
                                     type="button"
                                     onClick={() => setIsMapOpen(true)}
@@ -1012,7 +1012,7 @@ export default function CompaniesPage() {
                                     type="number"
                                     value={radius}
                                     onChange={(e) => setRadius(e.target.value)}
-                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                             </div>
                         </div>
@@ -1032,7 +1032,7 @@ export default function CompaniesPage() {
 
                 {/* Bagian Kanan: Tabel Data */}
                 <div className="lg:col-span-2 border border-slate-200 bg-white p-6 shadow-sm rounded-xl">
-                    <h2 className="text-lg font-semibold text-slate-800 mb-6">Daftar Klien Terdaftar</h2>
+                    <h2 className="text-lg font-semibold text-slate-900 mb-6">Daftar Klien Terdaftar</h2>
 
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm text-slate-500">
@@ -1295,7 +1295,7 @@ export default function CompaniesPage() {
                                                         type="number"
                                                         value={invoiceDiscount}
                                                         onChange={(e) => setInvoiceDiscount(e.target.value)}
-                                                        className="w-24 h-7 text-xs border border-orange-200 rounded px-2 text-right font-bold focus:ring-1 focus:ring-orange-500 outline-none bg-white"
+                                                        className="w-24 h-7 text-xs border border-orange-200 rounded px-2 text-right font-bold focus:ring-1 focus:ring-orange-500 outline-none bg-white text-slate-900"
                                                     />
                                                 </div>
                                                 <div className="flex justify-between border-t-2 border-blue-100 pt-3 text-lg font-black text-slate-900 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
