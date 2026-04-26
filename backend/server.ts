@@ -2846,6 +2846,7 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
 
 // Helper function to recalculate attendance for a specific user and date
 async function recalculateAttendanceForUserAndDate(userId: number, date: Date, tenantId: number) {
+    // Wrapped in outer try-catch so it NEVER crashes the parent route
     try {
         const todayStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
         const dateTarget = new Date(todayStr + 'T00:00:00Z');
