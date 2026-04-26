@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { PrismaClient, ProspectStatus } from '@prisma/client';
 import { GoogleMapsService } from '../services/google_maps.service';
 import { sendWhatsAppMessage } from '../../whatsappAPI';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const prisma = new PrismaClient();
 
@@ -302,6 +303,68 @@ export const ProspectController = {
     } catch (error: any) {
       console.error('Scan Error:', error.message);
       res.status(500).json({ error: error.message });
+    }
+  },
+
+  // ANALYZE MARKET INSIGHTS USING GEMINI AI
+  analyzeMarket: async (req: Request, res: Response) => {
+    try {
+      const tenantId = req.headers['x-tenant-id'];
+      const companyId = parseInt(Array.isArray(tenantId) ? tenantId[0] : (tenantId as string || '0'));
+      
+      // Get all prospects for this company to analyze
+      const prospects = await prisma.prospect.findMany({
+        where: { companyId }
+      });
+
+      if (prospects.length === 0) {
+        return res.status(400).json({ error: 'Belum ada data prospek/radar untuk dianalisa. Silakan lakukan scan radar terlebih dahulu.' });
+      }
+
+      console.log(`🧠 [AI ANALYZER] Generating market insight for Company #${companyId} based on ${prospects.length} data points...`);
+
+      // Initialize Gemini
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      // Calculate some basic stats to help the AI
+      const avgRating = prospects.reduce((acc, p) => acc + (p.aiScore || 0), 0) / prospects.length;
+      const topCompetitors = prospects
+        .filter(p => p.aiScore !== null)
+        .sort((a, b) => (b.aiScore || 0) - (a.aiScore || 0))
+        .slice(0, 5)
+        .map(p => `- ${p.name} (Rating: ${p.aiScore}, Alamat: ${p.address})`)
+        .join('\n');
+
+      const prompt = `
+        Anda adalah Konsultan Strategi Bisnis Senior untuk Aivola (Sistem Manajemen & POS Digital).
+        Anda diberikan data hasil "Scan Radar" kompetitor di sekitar lokasi bisnis klien.
+
+        STATISTIK DATA:
+        - Total Kompetitor Ditemukan: ${prospects.length}
+        - Rata-rata Rating Kompetitor: ${avgRating.toFixed(1)} / 5.0
+        
+        5 KOMPETITOR TERKUAT (BERDASARKAN RATING):
+        ${topCompetitors}
+
+        TUGAS ANDA:
+        Berikan laporan analisa pasar yang mendalam, profesional, dan persuasif dalam Bahasa Indonesia.
+        Laporan harus mencakup:
+        1. **Kepadatan Pasar**: Analisa seberapa ketat persaingan di area tersebut.
+        2. **Kekuatan Kompetitor**: Apa yang membuat kompetitor teratas unggul berdasarkan data tersebut.
+        3. **Celah Peluang (Market Gap)**: Identifikasi peluang yang bisa diambil (misal: area yang belum tercover, atau memanfaatkan kelemahan kompetitor dengan rating rendah).
+        4. **Strategi Pemenangan**: Berikan 3-5 langkah konkrit agar klien kami bisa mendominasi area tersebut menggunakan solusi digital Aivola.
+        
+        Gunakan format Markdown yang sangat rapi dan estetik. Tambahkan emoji yang relevan agar menarik dibaca oleh Owner bisnis.
+      `;
+
+      const result = await model.generateContent(prompt);
+      const analysis = result.response.text();
+
+      res.json({ analysis });
+    } catch (error: any) {
+      console.error('AI Analysis Error:', error.message);
+      res.status(500).json({ error: 'Gagal melakukan analisa AI. Pastikan GEMINI_API_KEY sudah terpasang dengan benar.' });
     }
   }
 };

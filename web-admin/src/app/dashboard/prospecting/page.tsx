@@ -47,6 +47,11 @@ export default function ProspectingPage() {
     const [radius, setRadius] = useState(1000);
     const [category, setCategory] = useState('Restoran');
     
+    // AI Analysis States
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+    const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+    
     // Map States
     const [lat, setLat] = useState(-6.2146);
     const [lng, setLng] = useState(106.8213);
@@ -287,6 +292,25 @@ export default function ProspectingPage() {
             setIsBroadcasting(null);
         }
     };
+ 
+    const handleAnalyzeMarket = async () => {
+        if (savedProspects.length === 0) {
+            alert("Database kosong. Silakan lakukan scan radar terlebih dahulu untuk mendapatkan data yang bisa dianalisa.");
+            return;
+        }
+        setIsAnalyzing(true);
+        setAnalysisResult(null);
+        setShowAnalysisModal(true);
+        try {
+            const res = await api.post('/prospects/analyze');
+            setAnalysisResult(res.data.analysis);
+        } catch (err: any) {
+            alert("Gagal melakukan analisa: " + (err.response?.data?.error || err.message));
+            setShowAnalysisModal(false);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -509,7 +533,18 @@ export default function ProspectingPage() {
                 ) : (
                     <div className="bg-slate-900/80 rounded-[40px] border border-white/5 overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-500">
                         <div className="px-10 py-8 border-b border-white/5 flex items-center justify-between bg-white/2">
-                            <div><h3 className="text-xl font-black text-white tracking-tighter uppercase italic">Lead Database</h3><p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Smart Worksheet CRM Mode</p></div>
+                            <div>
+                                <h3 className="text-xl font-black text-white tracking-tighter uppercase italic">Lead Database</h3>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Smart Worksheet CRM Mode</p>
+                            </div>
+                            <button 
+                                onClick={handleAnalyzeMarket}
+                                className="group relative flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-[1.05] active:scale-95 transition-all overflow-hidden"
+                            >
+                                <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                                <Sparkles className="h-4 w-4 animate-pulse" />
+                                GENERATE MARKET INSIGHT (AI)
+                            </button>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
@@ -620,6 +655,85 @@ export default function ProspectingPage() {
             </div>
 
             <UpgradeModal />
-        </DashboardLayout>
-    );
-}
+
+            {/* AI MARKET ANALYSIS MODAL */}
+            {showAnalysisModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-slate-900 w-full max-w-3xl max-h-[80vh] rounded-[40px] border border-white/10 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+                        <div className="px-8 py-6 border-b border-white/5 bg-gradient-to-r from-indigo-600/10 to-transparent flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center">
+                                    <Sparkles className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-white tracking-tight uppercase">Market Strategic Insight</h3>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Powered by Gemini 1.5 Pro Intelligence</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowAnalysisModal(false)} className="p-2 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-8 overflow-y-auto custom-scrollbar flex-grow">
+                            {isAnalyzing ? (
+                                <div className="flex flex-col items-center justify-center py-20 gap-6">
+                                    <div className="relative">
+                                        <div className="h-20 w-20 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="h-10 w-10 bg-indigo-500/10 rounded-full animate-pulse"></div>
+                                        </div>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-white font-black text-sm uppercase tracking-[0.3em] animate-pulse">AI Sedang Menganalisa Radar...</p>
+                                        <p className="text-slate-500 text-[10px] font-bold mt-2 uppercase">Menghitung kepadatan kompetitor & peluang pasar</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="prose prose-invert max-w-none">
+                                    <div className="bg-white/2 rounded-3xl p-8 border border-white/5 leading-relaxed text-slate-300 whitespace-pre-wrap text-sm font-medium">
+                                        {analysisResult?.split('\n').map((line, i) => {
+                                            // Basic markdown rendering simulation
+                                            if (line.startsWith('###')) return <h3 key={i} className="text-white font-black text-xl mt-6 mb-3 uppercase tracking-tight">{line.replace('###', '').trim()}</h3>;
+                                            if (line.startsWith('##')) return <h2 key={i} className="text-white font-black text-2xl mt-8 mb-4 border-b border-white/10 pb-2">{line.replace('##', '').trim()}</h2>;
+                                            if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="text-indigo-400 font-black uppercase tracking-widest text-xs mt-4">{line.replace(/\*\*/g, '').trim()}</p>;
+                                            
+                                            // Handle bold parts inside lines
+                                            const parts = line.split(/(\*\*.*?\*\*)/g);
+                                            return (
+                                                <p key={i} className="mb-2">
+                                                    {parts.map((part, j) => {
+                                                        if (part.startsWith('**') && part.endsWith('**')) {
+                                                            return <strong key={j} className="text-white font-bold">{part.replace(/\*\*/g, '')}</strong>;
+                                                        }
+                                                        return part;
+                                                    })}
+                                                </p>
+                                            );
+                                        })}
+                                    </div>
+                                    
+                                    <div className="mt-8 p-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-4">
+                                        <Info className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-xs font-black text-amber-500 uppercase tracking-widest mb-1">Catatan Strategis</p>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
+                                                Analisa ini bersifat prediktif berdasarkan data publik Google Maps. Gunakan sebagai referensi tambahan dalam pengambilan keputusan bisnis Anda.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="px-8 py-6 border-t border-white/5 bg-white/2 flex justify-end">
+                            <button 
+                                onClick={() => setShowAnalysisModal(false)}
+                                className="px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                            >
+                                Tutup Analisa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
