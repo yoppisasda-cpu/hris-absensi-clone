@@ -1,14 +1,18 @@
 import express from 'express';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// --- INITIALIZE ENVIRONMENT FIRST ---
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
 import cors from 'cors';
 import { PrismaClient, Role, AssignmentStatus } from '@prisma/client';
 import type { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
-import path from 'path';
 import fs from 'fs';
 import { uploadToSupabase } from './supabase_storage';
-import dotenv from 'dotenv';
 import { spawn } from 'child_process';
 import zlib from 'zlib';
 import { initCleanupCron, runCleanup } from './cron_jobs';
@@ -19,7 +23,6 @@ import aiRoutes from './src/routes/ai.routes';
 import prospectRoutes from './src/routes/prospect.routes';
 import { getFinancialForecast, getFinancialFlow, getPayrollProductivityInsights, getFinancialHealthScore } from './financeAI';
 
-dotenv.config({ path: path.resolve(__dirname, '.env') });
 console.log('🚀 [BOOT] Aivola Backend v1.0.6-Final-Live starting...');
 console.log(`[BOOT] Working Directory: ${process.cwd()}`);
 console.log(`[BOOT] .env Path: ${path.resolve(__dirname, '.env')}`);
@@ -1079,7 +1082,69 @@ async function notifyAdmins(companyId: number, title: string, message: string) {
 }
 
 // --- 3. ENDPOINT API (ROUTES) ---
+
+// Global Request Logger (Simplified)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  next();
+});
+
+// Direct Market Insight endpoint (Ensures reliability on localhost)
+const { GoogleGenerativeAI: GeminiAI } = require('@google/generative-ai');
+app.post('/api/prospects/market-insight', async (req: Request, res: Response) => {
+  try {
+    const { prospects: liveProspects } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY missing' });
+
+    let prospectsToAnalyze = liveProspects && Array.isArray(liveProspects) && liveProspects.length > 0 ? liveProspects : [];
+
+    if (prospectsToAnalyze.length === 0) {
+      const tenantId = req.headers['x-tenant-id'];
+      const companyId = parseInt(Array.isArray(tenantId) ? tenantId[0] : (tenantId as string || '0'));
+      prospectsToAnalyze = await prisma.prospect.findMany({ where: { companyId } });
+    }
+
+    if (prospectsToAnalyze.length === 0) {
+      return res.status(400).json({ error: 'Belum ada data prospek untuk dianalisa.' });
+    }
+
+    const genAI = new GeminiAI(apiKey);
+    const model = genAI.getGenerativeModel(
+      { model: 'gemini-2.0-flash' },
+      { apiVersion: 'v1beta' }
+    );
+
+    const avgRating = prospectsToAnalyze.reduce((acc: number, p: any) => acc + (p.aiScore || p.rating || 0), 0) / prospectsToAnalyze.length;
+    const topCompetitors = [...prospectsToAnalyze]
+      .sort((a: any, b: any) => (b.aiScore || b.rating || 0) - (a.aiScore || a.rating || 0))
+      .slice(0, 5)
+      .map((p: any) => `- ${p.name} (Rating: ${(p.aiScore || p.rating || 0).toFixed ? (p.aiScore || p.rating || 0).toFixed(1) : (p.aiScore || p.rating || 0)}, Alamat: ${p.address || '-'})`)
+      .join('\n');
+
+    const prompt = `Laporan Analisa Pasar Strategis untuk Aivola POS.
+Data Kompetitor: ${prospectsToAnalyze.length} titik. Rata-rata Rating: ${avgRating.toFixed(1)}/5.
+Top Kompetitors:
+${topCompetitors}
+
+Tugas: Berikan analisa mendalam (Bahasa Indonesia) tentang Kepadatan Pasar, Celah Peluang, dan Strategi Pemenangan menggunakan Aivola. Gunakan Markdown dan Emoji.`;
+
+    const result = await model.generateContent(prompt);
+    const analysis = result.response.text();
+    res.json({ analysis });
+  } catch (error: any) {
+    console.error('❌ [AI ERROR]:', error.message);
+    res.status(500).json({ error: 'Gagal analisa AI', details: error.message });
+  }
+});
+
 app.use('/api/prospects', prospectRoutes);
+app.post('/api/test-direct', (req, res) => {
+  console.log('🚀 [DEBUG] Hit /api/test-direct');
+  res.json({ message: 'Backend is alive and routes are working!' });
+});
+app.get('/api/test-get', (req, res) => {
+  res.json({ message: 'GET request works!' });
+});
 
 // Z. Endpoint Login Karyawan (Menghasilkan JWT)
 app.post('/api/auth/login', async (req: Request, res: Response) => {

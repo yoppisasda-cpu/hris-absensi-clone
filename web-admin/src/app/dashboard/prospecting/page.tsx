@@ -81,8 +81,10 @@ export default function ProspectingPage() {
         try {
             const res = await api.get('/prospects');
             setSavedProspects(res.data);
-        } catch (err) {
-            console.error("Failed to fetch prospects", err);
+        } catch (err: any) {
+            const errorMsg = err.response?.data?.error || "Gagal mengambil data prospek";
+            const errorDetails = err.response?.data?.details ? `\n\nDetail: ${err.response.data.details}` : "";
+            console.error("❌ [FETCH ERROR]:", errorMsg, errorDetails);
         }
     };
 
@@ -302,10 +304,35 @@ export default function ProspectingPage() {
         setAnalysisResult(null);
         setShowAnalysisModal(true);
         try {
-            const res = await api.post('/prospects/analyze');
+            const res = await api.post('/prospects/market-insight');
             setAnalysisResult(res.data.analysis);
         } catch (err: any) {
-            alert("Gagal melakukan analisa: " + (err.response?.data?.error || err.message));
+            const errorMsg = err.response?.data?.error || err.message;
+            const errorDetails = err.response?.data?.details ? `\n\nDetail: ${err.response.data.details}` : "";
+            alert(`Gagal melakukan analisa: ${errorMsg}${errorDetails}`);
+            setShowAnalysisModal(false);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const handleAnalyzeLiveMarket = async () => {
+        if (scanResults.length === 0) {
+            alert("Hasil scan kosong. Silakan lakukan scan radar terlebih dahulu.");
+            return;
+        }
+        setIsAnalyzing(true);
+        setAnalysisResult(null);
+        setShowAnalysisModal(true);
+        try {
+            const res = await api.post('/prospects/market-insight', {
+                prospects: scanResults
+            });
+            setAnalysisResult(res.data.analysis);
+        } catch (err: any) {
+            const errorMsg = err.response?.data?.error || err.message;
+            const errorDetails = err.response?.data?.details ? `\n\nDetail: ${err.response.data.details}` : "";
+            alert(`Gagal melakukan analisa: ${errorMsg}${errorDetails}`);
             setShowAnalysisModal(false);
         } finally {
             setIsAnalyzing(false);
@@ -486,6 +513,15 @@ export default function ProspectingPage() {
                             <div className="bg-slate-900/50 rounded-3xl border border-white/5 overflow-hidden shadow-2xl">
                                 <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/5">
                                     <h3 className="text-[11px] font-black text-white uppercase tracking-widest">Ditemukan ({scanResults.length})</h3>
+                                    {scanResults.length > 0 && (
+                                        <button 
+                                            onClick={handleAnalyzeLiveMarket}
+                                            className="flex items-center gap-2 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                        >
+                                            <Sparkles className="h-3.5 w-3.5" />
+                                            GENERATE LIVE MARKET INSIGHT
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">

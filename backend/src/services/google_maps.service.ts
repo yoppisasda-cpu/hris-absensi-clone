@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const getApiKey = () => process.env.GOOGLE_MAPS_API_KEY;
 
 export const GoogleMapsService = {
   /**
@@ -11,7 +11,8 @@ export const GoogleMapsService = {
    * @param type Type of place (e.g. 'restaurant', 'cafe', 'store')
    */
   nearbySearch: async (lat: number, lng: number, radius: number, type: string) => {
-    if (!GOOGLE_MAPS_API_KEY) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
       throw new Error('GOOGLE_MAPS_API_KEY is not configured in .env');
     }
 
@@ -38,7 +39,7 @@ export const GoogleMapsService = {
             radius: radius,
             type: searchConfig.type,
             keyword: searchConfig.keyword,
-            key: GOOGLE_MAPS_API_KEY
+            key: apiKey
           }
         }
       );
@@ -87,7 +88,8 @@ export const GoogleMapsService = {
    * Get detailed info for a specific place (including phone and website)
    */
   getPlaceDetails: async (placeId: string) => {
-    if (!GOOGLE_MAPS_API_KEY) throw new Error('GOOGLE_MAPS_API_KEY is not configured');
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error('GOOGLE_MAPS_API_KEY is not configured');
 
     try {
       const response = await axios.get(
@@ -96,7 +98,7 @@ export const GoogleMapsService = {
           params: {
             place_id: placeId,
             fields: 'name,formatted_phone_number,international_phone_number,website,url',
-            key: GOOGLE_MAPS_API_KEY
+            key: apiKey
           }
         }
       );

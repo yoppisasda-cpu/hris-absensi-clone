@@ -55,7 +55,11 @@ export const ProspectController = {
 
       res.json(prospects);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('❌ [PROSPECT GET ALL ERROR]:', error);
+      res.status(500).json({ 
+        error: 'Gagal mengambil data prospek dari database.',
+        details: error.message 
+      });
     }
   },
 
@@ -257,6 +261,10 @@ export const ProspectController = {
       const companyId = parseInt(Array.isArray(tenantId) ? tenantId[0] : (tenantId as string || '0'));
       const { latitude, longitude, radius, category } = req.body;
 
+      if (!companyId || isNaN(companyId)) {
+        return res.status(401).json({ error: 'Sesi anda berakhir atau ID Perusahaan tidak ditemukan. Silakan login ulang.' });
+      }
+
       if (!latitude || !longitude) {
         return res.status(400).json({ error: 'Latitude and Longitude are required' });
       }
@@ -311,29 +319,46 @@ export const ProspectController = {
     try {
       const tenantId = req.headers['x-tenant-id'];
       const companyId = parseInt(Array.isArray(tenantId) ? tenantId[0] : (tenantId as string || '0'));
+      const { prospects: liveProspects } = req.body;
       
-      // Get all prospects for this company to analyze
-      const prospects = await prisma.prospect.findMany({
-        where: { companyId }
-      });
+      let prospectsToAnalyze = [];
 
-      if (prospects.length === 0) {
+      if (liveProspects && Array.isArray(liveProspects) && liveProspects.length > 0) {
+        // Use live data from radar scan
+        const ts = new Date().toLocaleTimeString();
+        console.log(`🧠 [AI ANALYZER - ${ts}] Analyzing LIVE data (${liveProspects.length} points) for Company #${companyId}...`);
+        prospectsToAnalyze = liveProspects;
+      } else {
+        // Fallback to database leads
+        console.log(`🧠 [AI ANALYZER] Analyzing DATABASE leads for Company #${companyId}...`);
+        prospectsToAnalyze = await prisma.prospect.findMany({
+          where: { companyId }
+        });
+      }
+
+      if (prospectsToAnalyze.length === 0) {
         return res.status(400).json({ error: 'Belum ada data prospek/radar untuk dianalisa. Silakan lakukan scan radar terlebih dahulu.' });
       }
 
-      console.log(`🧠 [AI ANALYZER] Generating market insight for Company #${companyId} based on ${prospects.length} data points...`);
-
       // Initialize Gemini
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const apiKey = process.env.GEMINI_API_KEY;
+      console.log(`🔑 [DEBUG] GEMINI_API_KEY present: ${!!apiKey} (Starts with: ${apiKey?.substring(0, 5)}...)`);
+      
+      if (!apiKey) {
+        return res.status(500).json({ error: 'GEMINI_API_KEY tidak ditemukan di environment variables backend.' });
+      }
 
-      // Calculate some basic stats to help the AI
-      const avgRating = prospects.reduce((acc, p) => acc + (p.aiScore || 0), 0) / prospects.length;
-      const topCompetitors = prospects
-        .filter(p => p.aiScore !== null)
-        .sort((a, b) => (b.aiScore || 0) - (a.aiScore || 0))
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const modelName = 'gemini-1.0-pro';
+      console.log(`🤖 [DEBUG] Requesting Gemini Model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      // Calculate some basic stats
+      const avgRating = prospectsToAnalyze.reduce((acc, p) => acc + (p.aiScore || p.rating || 0), 0) / prospectsToAnalyze.length;
+      const topCompetitors = [...prospectsToAnalyze]
+        .sort((a, b) => (b.aiScore || b.rating || 0) - (a.aiScore || a.rating || 0))
         .slice(0, 5)
-        .map(p => `- ${p.name} (Rating: ${p.aiScore}, Alamat: ${p.address})`)
+        .map(p => `- ${p.name} (Rating: ${p.aiScore || p.rating}, Alamat: ${p.address})`)
         .join('\n');
 
       const prompt = `
@@ -341,7 +366,7 @@ export const ProspectController = {
         Anda diberikan data hasil "Scan Radar" kompetitor di sekitar lokasi bisnis klien.
 
         STATISTIK DATA:
-        - Total Kompetitor Ditemukan: ${prospects.length}
+        - Total Kompetitor Ditemukan: ${prospectsToAnalyze.length}
         - Rata-rata Rating Kompetitor: ${avgRating.toFixed(1)} / 5.0
         
         5 KOMPETITOR TERKUAT (BERDASARKAN RATING):
@@ -363,8 +388,11 @@ export const ProspectController = {
 
       res.json({ analysis });
     } catch (error: any) {
-      console.error('AI Analysis Error:', error.message);
-      res.status(500).json({ error: 'Gagal melakukan analisa AI. Pastikan GEMINI_API_KEY sudah terpasang dengan benar.' });
+      console.error('❌ [AI ANALYZER ERROR]:', error);
+      res.status(500).json({ 
+        error: '❌ AI ERROR [V4] - Gagal melakukan analisa AI. Pastikan GEMINI_API_KEY sudah terpasang dengan benar.',
+        details: error.message 
+      });
     }
   }
 };
