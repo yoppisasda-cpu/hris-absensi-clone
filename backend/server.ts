@@ -3268,19 +3268,30 @@ async function clockInHandler(req: Request, res: Response) {
     }
 
     // 4. CEK APAKAH SUDAH ABSEN HARI INI (Cegah Ganda)
+    // Rentang hari ini di Jakarta (WIB = UTC+7)
+    const startOfJakartaToday = new Date(todayStr + 'T00:00:00'); // Local server time context
+    // Kita buat range UTC yang mencakup 00:00 s/d 23:59 WIB
+    const startRange = new Date(new Date(todayStr + 'T00:00:00').toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    // Cara paling aman: Ambil 00:00 hari ini WIB dan 00:00 besok WIB
+    const dayStart = new Date(todayStr + 'T00:00:00Z');
+    dayStart.setHours(dayStart.getHours() - 7); // Geser ke UTC (00:00 WIB = 17:00 UTC kemarin)
+    
+    const dayEnd = new Date(dayStart);
+    dayEnd.setHours(dayEnd.getHours() + 24);
+
     const existingAttendance = await prisma.attendance.findFirst({
       where: {
         userId: userId,
         clockIn: {
-          gte: new Date(todayStr + 'T00:00:00Z'),
-          lte: new Date(todayStr + 'T23:59:59Z')
+          gte: dayStart,
+          lt: dayEnd
         }
       }
     });
 
     if (existingAttendance && !existingAttendance.clockOut) {
       return res.status(400).json({ 
-        error: 'Anda sudah melakukan Clock-In hari ini dan belum Clock-Out. Silakan lakukan Clock-Out terlebih dahulu.' 
+        error: 'Anda sudah melakukan Clock-In hari ini dan belum Clock-Out.' 
       });
     }
 
