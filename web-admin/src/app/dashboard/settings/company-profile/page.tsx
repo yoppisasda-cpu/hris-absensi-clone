@@ -24,6 +24,9 @@ interface Company {
     photoRetentionDays?: number;
     workDaysPerMonth?: number;
     lateGracePeriod?: number;
+    waApiKey?: string | null;
+    waGatewayUrl?: string | null;
+    waProspectTemplate?: string | null;
 }
 
 export default function CompanyProfilePage() {
@@ -39,7 +42,10 @@ export default function CompanyProfilePage() {
         latitude: '',
         longitude: '',
         radius: '',
-        photoRetentionDays: '30'
+        photoRetentionDays: '30',
+        waApiKey: '',
+        waGatewayUrl: '',
+        waProspectTemplate: ''
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -76,7 +82,10 @@ export default function CompanyProfilePage() {
                 latitude: response.data.latitude?.toString() || '',
                 longitude: response.data.longitude?.toString() || '',
                 radius: response.data.radius?.toString() || '100',
-                photoRetentionDays: response.data.photoRetentionDays?.toString() || '30'
+                photoRetentionDays: response.data.photoRetentionDays?.toString() || '30',
+                waApiKey: response.data.waApiKey || '',
+                waGatewayUrl: response.data.waGatewayUrl || '',
+                waProspectTemplate: response.data.waProspectTemplate || ''
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -114,7 +123,10 @@ export default function CompanyProfilePage() {
                 latitude: formData.latitude ? parseFloat(formData.latitude) : null,
                 longitude: formData.longitude ? parseFloat(formData.longitude) : null,
                 radius: formData.radius ? parseInt(formData.radius, 10) : 100,
-                photoRetentionDays: formData.photoRetentionDays ? parseInt(formData.photoRetentionDays, 10) : 30
+                photoRetentionDays: formData.photoRetentionDays ? parseInt(formData.photoRetentionDays, 10) : 30,
+                waApiKey: formData.waApiKey,
+                waGatewayUrl: formData.waGatewayUrl,
+                waProspectTemplate: formData.waProspectTemplate
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -486,6 +498,70 @@ export default function CompanyProfilePage() {
                                 </div>
                             </form>
                         </div>
+
+                        {/* === WABLAS CONFIGURATION SECTION === */}
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
+                            <div className="px-8 py-5 bg-gradient-to-r from-emerald-50 to-white border-b border-emerald-100 flex items-center justify-between">
+                                <h2 className="font-extrabold text-slate-800 tracking-tight text-lg flex items-center gap-2">
+                                    <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                    Konfigurasi WhatsApp (Wablas)
+                                </h2>
+                                <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md uppercase">Kustom Klien</span>
+                            </div>
+                            <div className="p-8 space-y-6">
+                                <p className="text-xs text-slate-500 italic font-medium">
+                                    * Masukkan API Key & Domain Wablas Anda jika ingin menggunakan nomor WhatsApp sendiri untuk pengiriman notifikasi/OTP. 
+                                    Kosongkan untuk menggunakan sistem default Aivola.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Domain / Server Wablas</label>
+                                        <input
+                                            type="text"
+                                            value={formData.waGatewayUrl}
+                                            onChange={e => setFormData({ ...formData, waGatewayUrl: e.target.value })}
+                                            className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300 placeholder:font-normal"
+                                            placeholder="Contoh: https://solo.wablas.com"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API Key Wablas (Token)</label>
+                                        <input
+                                            type="password"
+                                            value={formData.waApiKey}
+                                            onChange={e => setFormData({ ...formData, waApiKey: e.target.value })}
+                                            className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300 placeholder:font-normal"
+                                            placeholder="Masukkan Token Wablas Anda"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Template Pesan Penawaran (WA)</label>
+                                    <textarea
+                                        value={formData.waProspectTemplate}
+                                        onChange={e => setFormData({ ...formData, waProspectTemplate: e.target.value })}
+                                        rows={4}
+                                        className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300 placeholder:font-normal"
+                                        placeholder="Gunakan {{name}} untuk memasukkan nama bisnis secara otomatis..."
+                                    />
+                                    <p className="mt-2 text-[10px] text-slate-400 italic">
+                                        Tips: Gunakan tag <strong className="text-emerald-600">{"{{name}}"}</strong> agar sistem otomatis menyapa nama toko/bisnis prospek.
+                                    </p>
+                                </div>
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        disabled={isSaving}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                                    >
+                                        {isSaving ? <Loader2 className="h-3 w-3 animate-spin text-white" /> : <Save className="h-3 w-3 text-white" />}
+                                        <span className="ml-2">SIMPAN PENGATURAN WHATSAPP</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         
                         {/* Integration Section */}
                         <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-1 shadow-2xl shadow-blue-500/20">

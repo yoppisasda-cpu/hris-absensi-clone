@@ -35,6 +35,8 @@ interface Company {
     discountFraud?: number;
     discountExpansion?: number;
     discountProspecting?: number;
+    waApiKey?: string | null;
+    waGatewayUrl?: string | null;
 }
 
 export default function CompaniesPage() {
@@ -98,6 +100,8 @@ export default function CompaniesPage() {
     const [adminName, setAdminName] = useState('');
     const [adminEmail, setAdminEmail] = useState('');
     const [adminPassword, setAdminPassword] = useState('');
+    const [waApiKey, setWaApiKey] = useState('');
+    const [waGatewayUrl, setWaGatewayUrl] = useState('');
 
     const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
     const [isAiLoading, setIsAiLoading] = useState<number | null>(null);
@@ -186,6 +190,8 @@ export default function CompaniesPage() {
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
+        setWaApiKey('');
+        setWaGatewayUrl('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -235,7 +241,8 @@ export default function CompaniesPage() {
                 discountExpansion: parseInt(discountExpansion) || 0,
                 discountProspecting: parseInt(discountProspecting) || 0,
                 modules: (plan === 'PRO' || plan === 'ENTERPRISE') ? 'BOTH' : 'ABSENSI',
-                adminName, adminEmail, adminPassword
+                adminName, adminEmail, adminPassword,
+                waApiKey, waGatewayUrl
             };
 
             let res;
@@ -317,6 +324,8 @@ export default function CompaniesPage() {
         setDiscountFraud(company.discountFraud?.toString() || '0');
         setDiscountExpansion(company.discountExpansion?.toString() || '0');
         setDiscountProspecting(company.discountProspecting?.toString() || '0');
+        setWaApiKey(company.waApiKey || '');
+        setWaGatewayUrl(company.waGatewayUrl || '');
         // Fetch mapped admin fields from backend
         setAdminName((company as any).adminName || '');
         setAdminEmail((company as any).adminEmail || '');
@@ -563,7 +572,37 @@ export default function CompaniesPage() {
                                     />
                                 </div>
                             </div>
+
+                            {/* === WABLAS CONFIGURATION === */}
+                            <div className="space-y-4 border-b border-slate-50 pb-4 bg-emerald-50/50 -mx-6 px-6 pt-4 mb-4">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                                    WhatsApp Gateway (Wablas)
+                                </h3>
+                                <div>
+                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Domain / Server Wablas</label>
+                                    <input
+                                        type="text"
+                                        value={waGatewayUrl}
+                                        onChange={(e) => setWaGatewayUrl(e.target.value)}
+                                        placeholder="Contoh: https://solo.wablas.com"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-900 bg-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">API Key Wablas (Token)</label>
+                                    <input
+                                        type="text"
+                                        value={waApiKey}
+                                        onChange={(e) => setWaApiKey(e.target.value)}
+                                        placeholder="Masukkan Token Wablas Klien"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-slate-400 italic">* Kosongkan jika ingin menggunakan sistem WhatsApp default Aivola.</p>
+                            </div>
                         </div>
+
 
                         <div className="space-y-4 border-b border-slate-50 pb-4">
                             <h3 className="text-slate-800 uppercase tracking-widest mb-2 font-bold">Detail Kontrak</h3>

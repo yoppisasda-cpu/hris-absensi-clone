@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Map as MapIcon, Database, ExternalLink, MessageCircle, Phone, Globe, Trash2, CheckCircle2, ChevronDown, ListTodo, StickyNote, MapPin, Sparkles, Info, Target, Radar, ArrowRight, Download, Save, Navigation, X, Zap, Rocket, ShieldCheck } from 'lucide-react';
+import { Search, Map as MapIcon, Database, ExternalLink, MessageCircle, Phone, Globe, Trash2, CheckCircle2, ChevronDown, ListTodo, StickyNote, MapPin, Sparkles, Info, Target, Radar, ArrowRight, Download, Save, Navigation, X, Zap, Rocket, ShieldCheck, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useFeatures } from '@/lib/FeatureContext';
@@ -272,6 +272,21 @@ export default function ProspectingPage() {
             alert("Gagal konversi");
         }
     };
+ 
+    const [isBroadcasting, setIsBroadcasting] = useState<number | null>(null);
+ 
+    const handleBroadcast = async (id: number, name: string) => {
+        setIsBroadcasting(id);
+        try {
+            await api.post(`/prospects/${id}/broadcast`);
+            alert(`🚀 Penawaran otomatis telah dikirim ke ${name}!`);
+            fetchSavedProspects();
+        } catch (err: any) {
+            alert("Gagal mengirim broadcast: " + (err.response?.data?.error || err.message));
+        } finally {
+            setIsBroadcasting(null);
+        }
+    };
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -522,12 +537,21 @@ export default function ProspectingPage() {
                                                         {p.phone && (
                                                             <>
                                                                 <button 
+                                                                    onClick={() => handleBroadcast(p.id, p.name)}
+                                                                    disabled={isBroadcasting === p.id}
+                                                                    title="Kirim Penawaran Otomatis (Wablas Pusat)"
+                                                                    className="p-2.5 bg-amber-500/20 text-amber-500 rounded-xl hover:bg-amber-500 hover:text-white transition-all shadow-lg shadow-amber-500/10 disabled:opacity-50"
+                                                                >
+                                                                    {isBroadcasting === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                                                                </button>
+                                                                <button 
                                                                     onClick={() => {
                                                                         const cleanPhone = p.phone.replace(/\D/g, '').replace(/^0/, '62');
                                                                         const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Halo ${p.name}, kami dari Aivola ingin menawarkan solusi manajemen untuk bisnis Anda.`)}`;
                                                                         window.open(waUrl, '_blank');
                                                                         if (p.status === 'NEW') handleUpdateStatus(p.id, 'CONTACTED');
                                                                     }}
+                                                                    title="Hubungi via WA Manual"
                                                                     className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-lg shadow-emerald-500/10"
                                                                 >
                                                                     <MessageCircle className="h-4 w-4" />

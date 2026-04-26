@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient, ProspectStatus } from '@prisma/client';
 import { GoogleMapsService } from '../services/google_maps.service';
+import { sendWhatsAppMessage } from '../../whatsappAPI';
 
 const prisma = new PrismaClient();
 
@@ -186,6 +187,53 @@ export const ProspectController = {
       res.json({ message: 'Successfully converted to customer', customer: result });
     } catch (error: any) {
       console.error('Error converting prospect:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // BROADCAST MESSAGE VIA WABLAS (The automatic outreach!)
+  broadcast: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+
+      // 1. Get prospect
+      const prospect = await prisma.prospect.findUnique({
+        where: { id: parseInt(id as string) }
+      });
+
+      if (!prospect || !prospect.phone) {
+        return res.status(404).json({ error: 'Prospek tidak ditemukan atau tidak memiliki nomor HP' });
+      }
+
+      // 2. Get Company for template
+      const company = await prisma.company.findUnique({
+        where: { id: prospect.companyId },
+        select: { waProspectTemplate: true, name: true }
+      });
+
+      // 3. Generate message (Prefer company template, then fallback)
+      let finalMessage = company?.waProspectTemplate || `Halo *{{name}}*,\n\nKami dari *Aivola* (Sistem Manajemen & POS Digital) tertarik untuk membantu mengoptimalkan bisnis Anda.\n\nApakah Anda ada waktu sebentar untuk berdiskusi mengenai solusi digital untuk operasional Anda?\n\nTerima kasih!`;
+
+      // Replace placeholders
+      finalMessage = finalMessage.replace(/{{name}}/g, prospect.name);
+
+      console.log(`📡 [PROSPECT] Sending Auto-Broadcast to ${prospect.phone}...`);
+      
+      // 4. Send via central Wablas (passing undefined for custom credentials to use .env)
+      const result = await sendWhatsAppMessage(prospect.phone, finalMessage);
+
+      if (result?.status) {
+        // Update status to contacted
+        await prisma.prospect.update({
+          where: { id: prospect.id },
+          data: { status: 'CONTACTED' }
+        });
+      }
+
+      res.json({ message: 'Pesan otomatis berhasil dikirim', result });
+    } catch (error: any) {
+      console.error('Error broadcasting prospect:', error);
       res.status(500).json({ error: error.message });
     }
   },

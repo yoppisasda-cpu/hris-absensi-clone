@@ -15,6 +15,8 @@ interface ChatSession {
   id: string;
   visitorName: string | null;
   email: string | null;
+  phone: string | null;
+  isWhatsApp: boolean;
   updatedAt: string;
   messages: ChatMessage[];
 }
@@ -80,9 +82,13 @@ export default function CRMPage() {
                 className={`p-4 border-b border-slate-50 cursor-pointer transition-colors hover:bg-slate-50 ${selectedSessionId === s.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}`}
               >
                 <div className="flex justify-between items-start mb-1">
-                  <span className="font-semibold text-slate-800">{s.visitorName || 'Anonim'}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-800">{s.visitorName || 'Anonim'}</span>
+                    {s.isWhatsApp && <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                  </div>
                   <span className="text-[10px] text-slate-400">{new Date(s.updatedAt).toLocaleTimeString()}</span>
                 </div>
+                {s.isWhatsApp && <p className="text-[10px] text-slate-400 font-bold mb-1 tracking-wider">{s.phone}</p>}
                 <p className="text-xs text-slate-500 truncate">
                   {s.messages?.[0]?.content || 'Tidak ada pesan'}
                 </p>
@@ -98,10 +104,16 @@ export default function CRMPage() {
           <>
             <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-slate-800">{selectedSession.visitorName || 'Sesi Chat'}</h3>
-                <p className="text-xs text-slate-400">ID: {selectedSession.id}</p>
+                <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-800">{selectedSession.visitorName || 'Sesi Chat'}</h3>
+                    {selectedSession.isWhatsApp && <MessageCircle className="w-4 h-4 text-emerald-500" />}
+                </div>
+                <p className="text-xs text-slate-400">
+                    {selectedSession.isWhatsApp ? `WhatsApp: ${selectedSession.phone}` : `ID: ${selectedSession.id}`}
+                </p>
               </div>
               <div className="flex gap-2">
+                 {selectedSession.isWhatsApp && <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded">WHATSAPP</span>}
                  <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded">AI ACTIVE</span>
               </div>
             </div>

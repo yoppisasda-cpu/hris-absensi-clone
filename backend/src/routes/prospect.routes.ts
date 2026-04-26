@@ -9,6 +9,7 @@ router.get('/', ProspectController.getAll);
 router.patch('/:id/status', ProspectController.updateStatus);
 router.post('/scan', ProspectController.scan);
 router.post('/:id/convert', ProspectController.convertToCustomer);
+router.post('/:id/broadcast', ProspectController.broadcast);
 router.delete('/:id', ProspectController.delete);
 
 export default router;

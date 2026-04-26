@@ -52,6 +52,7 @@ model Company {
   isActive               Boolean              @default(true)
   waGatewayUrl           String?              // URL Wablas (misal: https://solo.wablas.com)
   waApiKey               String?              // Token API Wablas
+  waProspectTemplate     String?              // Template pesan broadcast prospek
   memberDiscountType     String?              @default("PERCENTAGE")
   memberDiscountValue    Float                @default(0)
   pointsEarnRatio        Float                @default(0)
@@ -102,6 +103,7 @@ model Company {
   userAccess             UserAccess[]
   warehouses             Warehouse[]
   prospects             Prospect[]
+  chatSessions          ChatSession[]
 }
 
 model FinancialAccount {
@@ -722,13 +724,17 @@ model GlobalSetting {
 
 model ChatSession {
   id          String        @id @default(uuid())
+  companyId   Int?          @default(1)
   visitorName String?
   email       String?
+  phone       String?
   userId      Int?
+  isWhatsApp  Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   messages    ChatMessage[]
   user        User?         @relation(fields: [userId], references: [id])
+  company     Company?      @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model ChatMessage {

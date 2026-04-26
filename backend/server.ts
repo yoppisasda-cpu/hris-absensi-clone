@@ -211,6 +211,81 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
   }
 });
 
+// --- WABLAS WEBHOOK (INBOUND MESSAGES) ---
+app.post('/api/webhook/wablas', async (req: Request, res: Response) => {
+    try {
+        const body = req.body;
+        console.log(`📩 [WABLAS WEBHOOK] Inbound Payload:`, JSON.stringify(body));
+
+        // Wablas payload: phone, message, pushName, type, etc.
+        const phone = body.phone || body.sender;
+        const message = body.message || body.text;
+        const pushName = body.pushName || body.name;
+
+        if (!phone || !message) {
+            return res.sendStatus(200); // Silent ignore
+        }
+
+        const senderPhone = phone.replace(/\D/g, '');
+
+        // 1. Identify Tenant/Company
+        // Try to find in Prospects first
+        const prospect = await prisma.prospect.findFirst({
+            where: { phone: { contains: senderPhone.slice(-8) } }, // Match last 8 digits for safety
+        });
+
+        // Try to find in Customers
+        const customer = await prisma.customer.findFirst({
+            where: { phone: { contains: senderPhone.slice(-8) } },
+        });
+
+        const targetCompanyId = prospect?.companyId || customer?.companyId || 1; // Default to central
+        const targetName = pushName || prospect?.name || customer?.name || 'WhatsApp User';
+
+        // 2. Find or Create ChatSession
+        let session = await prisma.chatSession.findFirst({
+            where: { 
+                phone: senderPhone,
+                companyId: targetCompanyId,
+                isWhatsApp: true
+            }
+        });
+
+        if (!session) {
+            session = await prisma.chatSession.create({
+                data: {
+                    id: `wa-${senderPhone}`,
+                    companyId: targetCompanyId,
+                    visitorName: targetName,
+                    phone: senderPhone,
+                    isWhatsApp: true
+                }
+            });
+        }
+
+        // 3. Save Message
+        await prisma.chatMessage.create({
+            data: {
+                sessionId: session.id,
+                sender: 'USER',
+                content: message
+            }
+        });
+
+        // 4. Update session timestamp
+        await prisma.chatSession.update({
+            where: { id: session.id },
+            data: { updatedAt: new Date() }
+        });
+
+        console.log(`✅ [WABLAS WEBHOOK] Message saved for ${targetName} (${senderPhone}) at Tenant: ${targetCompanyId}`);
+        res.sendStatus(200);
+    } catch (error: any) {
+        console.error('❌ [WABLAS WEBHOOK Error]:', error.message);
+        res.sendStatus(200); // Always return 200 to Wablas to stop retries
+    }
+});
+
 app.get('/api/setup-master', async (req: Request, res: Response) => {
 
   try {
@@ -1797,7 +1872,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       name, latitude, longitude, radius,
       picName, picPhone, address, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays, modules,
-      waApiKey, waGatewayUrl
+      waApiKey, waGatewayUrl, waProspectTemplate
     } = req.body;
 
     console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
@@ -1835,9 +1910,10 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         adminLimit: parseIntNum(adminLimit),
         posLimit: parseIntNum(posLimit),
         photoRetentionDays: parseIntNum(photoRetentionDays),
-        modules: modules,
+        modules: modules || undefined,
         waApiKey: waApiKey !== undefined ? waApiKey : undefined,
-        waGatewayUrl: waGatewayUrl !== undefined ? waGatewayUrl : undefined
+        waGatewayUrl: waGatewayUrl !== undefined ? waGatewayUrl : undefined,
+        waProspectTemplate: waProspectTemplate !== undefined ? waProspectTemplate : undefined
       }
     });
 
@@ -3011,17 +3087,21 @@ async function clockInHandler(req: Request, res: Response) {
         photoUrl: finalPhotoUrl,
         ...(() => {
             if (effectiveShift?.startTime) {
+                // Fix Timezone: Always use Asia/Jakarta for "now"
                 const now = new Date();
+                const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
                 const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
-                const shiftStartTime = new Date(now);
+                
+                // Construct shiftStartTime in Jakarta context
+                const shiftStartTime = new Date(jakartaNow);
                 shiftStartTime.setHours(sh, sm, 0, 0);
                 
                 // @ts-ignore
                 const gracePeriod = user.company.lateGracePeriod || 0;
                 const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
                 
-                if (now > threshold) {
-                    const lateMinutes = Math.floor((now.getTime() - shiftStartTime.getTime()) / 60000);
+                if (jakartaNow > threshold) {
+                    const lateMinutes = Math.floor((jakartaNow.getTime() - shiftStartTime.getTime()) / 60000);
                     return { status: 'LATE', lateMinutes };
                 }
             }
@@ -3188,8 +3268,10 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
       return res.status(400).json({ error: 'Koordinat GPS perangkat wajib dilampirkan!' });
     }
 
-    // Cari absensi terakhir hari ini yang belum clock-out
-    const today = new Date();
+    // Cari absensi terakhir hari ini yang belum clock-out (Gunakan Jakarta Time)
+    const now = new Date();
+    const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    const today = new Date(jakartaNow);
     today.setHours(0, 0, 0, 0);
 
     const attendance = await prisma.attendance.findFirst({
@@ -3314,18 +3396,18 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         isSuspicious: fraudResult.isSuspicious,
         // @ts-ignore
         deviceId: deviceId || (attendance as any).deviceId,
-        // @ts-ignore
         earlyCheckOutMinutes: (() => {
             // @ts-ignore
             if (attendance.user?.shift?.endTime) {
                 const now = new Date();
+                const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
                 // @ts-ignore
                 const [eh, em] = attendance.user.shift.endTime.split(':').map(Number);
-                const shiftEndTime = new Date(now);
+                const shiftEndTime = new Date(jakartaNow);
                 shiftEndTime.setHours(eh, em, 0, 0);
                 
-                if (now < shiftEndTime) {
-                    return Math.floor((shiftEndTime.getTime() - now.getTime()) / 60000);
+                if (jakartaNow < shiftEndTime) {
+                    return Math.floor((shiftEndTime.getTime() - jakartaNow.getTime()) / 60000);
                 }
             }
             return 0;
@@ -3375,7 +3457,10 @@ app.get('/api/attendance/status', tenantMiddleware, async (req: Request, res: Re
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
 
-    const today = new Date();
+    // Use Jakarta date for today
+    const now = new Date();
+    const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    const today = new Date(jakartaNow);
     today.setHours(0, 0, 0, 0);
 
     const attendances = await prisma.attendance.findMany({
@@ -7804,7 +7889,9 @@ app.post('/api/chat/message', async (req: Request, res: Response) => {
 // C1.3. Get All Sessions (Admin Monitoring)
 app.get('/api/chat/admin/sessions', tenantMiddleware, async (req: Request, res: Response) => {
   try {
+    const tenantId = (req as any).tenantId;
     const sessions = await prisma.chatSession.findMany({
+      where: { companyId: Number(tenantId) },
       include: {
         messages: {
            orderBy: { createdAt: 'desc' },
@@ -7823,8 +7910,12 @@ app.get('/api/chat/admin/sessions', tenantMiddleware, async (req: Request, res: 
 // C1.4. Get Session Detail
 app.get('/api/chat/admin/sessions/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
+    const tenantId = (req as any).tenantId;
     const session = await prisma.chatSession.findUnique({
-      where: { id: req.params.id as string },
+      where: { 
+        id: req.params.id as string,
+        companyId: Number(tenantId)
+      },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' }
