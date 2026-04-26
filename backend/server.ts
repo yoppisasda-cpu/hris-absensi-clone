@@ -2902,32 +2902,45 @@ async function recalculateAttendanceForUserAndDate(userId: number, date: Date, t
 
         console.log(`[RECALC DEBUG] Effective Shift Found: ${effectiveShift?.name || 'NONE'}, StartTime: ${effectiveShift?.startTime || 'MISSING'}`);
 
-        // 3. Recalculate status and lateMinutes
+        // 3. Recalculate status, lateMinutes, and earlyCheckOutMinutes
         let status = 'PRESENT';
         let lateMinutes = 0;
+        let earlyCheckOutMinutes = 0;
 
         if (isScheduledOff) {
             status = 'PRESENT';
             lateMinutes = 0;
+            earlyCheckOutMinutes = 0;
             console.log(`[RECALC DEBUG] Recalc Result: USER IS OFF`);
         } else if (effectiveShift?.startTime) {
+            // -- CLOCK IN (LATE) --
             const clockInDate = new Date(attendance.clockIn);
-            const jakartaNow = new Date(clockInDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+            const jakartaIn = new Date(clockInDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
             
             const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
-            console.log(`[RECALC DEBUG] Parsed Shift Time -> Hour: ${sh}, Min: ${sm}`);
-
-            const shiftStartTime = new Date(jakartaNow);
+            const shiftStartTime = new Date(jakartaIn);
             shiftStartTime.setHours(sh, sm, 0, 0);
             
             const gracePeriod = (user as any).company?.lateGracePeriod || 0;
             const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
             
-            console.log(`[RECALC DEBUG] Comparison -> User: ${jakartaNow.toLocaleTimeString()}, Target: ${shiftStartTime.toLocaleTimeString()}, Grace: ${gracePeriod}m`);
-
-            if (jakartaNow > threshold) {
+            if (jakartaIn > threshold) {
                 status = 'LATE';
-                lateMinutes = Math.floor((jakartaNow.getTime() - shiftStartTime.getTime()) / 60000);
+                lateMinutes = Math.max(0, Math.floor((jakartaIn.getTime() - shiftStartTime.getTime()) / 60000));
+            }
+
+            // -- CLOCK OUT (EARLY CHECKOUT) --
+            if (attendance.clockOut && effectiveShift.endTime) {
+                const clockOutDate = new Date(attendance.clockOut);
+                const jakartaOut = new Date(clockOutDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+                
+                const [eh, em] = effectiveShift.endTime.split(':').map(Number);
+                const shiftEndTime = new Date(jakartaOut);
+                shiftEndTime.setHours(eh, em, 0, 0);
+
+                if (jakartaOut < shiftEndTime) {
+                    earlyCheckOutMinutes = Math.max(0, Math.floor((shiftEndTime.getTime() - jakartaOut.getTime()) / 60000));
+                }
             }
         }
 
@@ -2936,7 +2949,8 @@ async function recalculateAttendanceForUserAndDate(userId: number, date: Date, t
             where: { id: attendance.id },
             data: {
                 status: status as any,
-                lateMinutes: lateMinutes
+                lateMinutes: lateMinutes,
+                earlyCheckOutMinutes: earlyCheckOutMinutes
             }
         });
 
