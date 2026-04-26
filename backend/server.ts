@@ -3253,7 +3253,30 @@ async function clockInHandler(req: Request, res: Response) {
         });
     }
 
-    // 3. Simpan data aman ke tabel absen
+    // 4. CEK APAKAH SUDAH ABSEN HARI INI (Cegah Ganda)
+    const existingAttendance = await prisma.attendance.findFirst({
+      where: {
+        userId: userId,
+        clockIn: {
+          gte: new Date(todayStr + 'T00:00:00Z'),
+          lte: new Date(todayStr + 'T23:59:59Z')
+        }
+      }
+    });
+
+    if (existingAttendance && !existingAttendance.clockOut) {
+      return res.status(400).json({ 
+        error: 'Anda sudah melakukan Clock-In hari ini dan belum Clock-Out. Silakan lakukan Clock-Out terlebih dahulu.' 
+      });
+    }
+
+    if (existingAttendance && existingAttendance.clockOut) {
+      return res.status(400).json({ 
+        error: 'Anda sudah menyelesaikan absensi hari ini (sudah Clock-In & Clock-Out).' 
+      });
+    }
+
+    // 5. Simpan data aman ke tabel absen
     let finalPhotoUrl = photoUrl;
     if (photoUrl) {
       try {
@@ -3275,22 +3298,23 @@ async function clockInHandler(req: Request, res: Response) {
         photoUrl: finalPhotoUrl,
         ...(() => {
             if (effectiveShift?.startTime) {
-                // Fix Timezone: Always use Asia/Jakarta for "now"
                 const now = new Date();
-                const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+                // Gunakan jam Jakarta untuk perbandingan
+                const jakartaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
                 const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
                 
-                // Construct shiftStartTime in Jakarta context
-                const shiftStartTime = new Date(jakartaNow);
+                const shiftStartTime = new Date(jakartaTime);
                 shiftStartTime.setHours(sh, sm, 0, 0);
                 
                 // @ts-ignore
                 const gracePeriod = user.company.lateGracePeriod || 0;
                 const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
                 
-                if (jakartaNow > threshold) {
-                    const lateMinutes = Math.floor((jakartaNow.getTime() - shiftStartTime.getTime()) / 60000);
-                    return { status: 'LATE', lateMinutes };
+                if (jakartaTime > threshold) {
+                    // Hanya hitung terlambat jika di hari yang sama atau setelah jam mulai
+                    const lateMinutes = Math.floor((jakartaTime.getTime() - shiftStartTime.getTime()) / 60000);
+                    // Jika lateMinutes negatif (absen kepagian banget sampai kena shift kemarin), set 0
+                    return { status: 'LATE', lateMinutes: Math.max(0, lateMinutes) };
                 }
             }
             return { status: 'PRESENT', lateMinutes: 0 };
