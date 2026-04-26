@@ -149,8 +149,15 @@ export default function POSPage() {
             const res = await api.post('/pos/checkout', payload);
             setLastSale(res.data.sale);
             toast.success("Transaksi Berhasil!");
+            
+            // OPTIMIZATION: Update local stock instantly without full re-fetch flicker
+            const cartMap = new Map(cart.map(item => [item.id, item.qty]));
+            setProducts(prev => prev.map(p => {
+                const qtySold = cartMap.get(p.id);
+                return qtySold ? { ...p, stock: p.stock - qtySold } : p;
+            }));
+
             setCart([]);
-            fetchData(); // Refresh stock
             setShowReceipt(true);
         } catch (error: any) {
             toast.error(error.response?.data?.error || "Gagal memproses transaksi");
@@ -158,6 +165,19 @@ export default function POSPage() {
             setCheckoutLoading(false);
         }
     };
+
+    // KEYBOARD SHORTCUTS
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // '/' to search
+            if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+                e.preventDefault();
+                document.getElementById('pos-search')?.focus();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     return (
         <DashboardLayout>
@@ -182,6 +202,7 @@ export default function POSPage() {
                             <div className="relative w-full xl:w-[400px] group/search">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-700 group-focus-within/search:text-blue-500 transition-colors z-10" />
                                 <input 
+                                    id="pos-search"
                                     type="text" 
                                     placeholder="SCAN_OR_SEARCH_PRODUCT..."
                                     className="w-full pl-12 pr-6 py-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black text-white focus:border-blue-500/50 outline-none transition-all italic tracking-[0.2em] uppercase placeholder:text-slate-800 shadow-inner"

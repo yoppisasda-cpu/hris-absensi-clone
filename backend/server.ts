@@ -23,7 +23,7 @@ import aiRoutes from './src/routes/ai.routes';
 import prospectRoutes from './src/routes/prospect.routes';
 import { getFinancialForecast, getFinancialFlow, getPayrollProductivityInsights, getFinancialHealthScore } from './financeAI';
 
-console.log('🚀 [BOOT] Aivola Backend v1.0.6-Final-Live starting...');
+console.log('🚀 [BOOT] Aivola Backend v1.0.7-recalc-fix starting...');
 console.log(`[BOOT] Working Directory: ${process.cwd()}`);
 console.log(`[BOOT] .env Path: ${path.resolve(__dirname, '.env')}`);
 console.log(`[BOOT] GEMINI_API_KEY Status: ${process.env.GEMINI_API_KEY ? 'LOADED (' + process.env.GEMINI_API_KEY.substring(0, 4) + '...)' : 'MISSING'}`);
@@ -31,7 +31,7 @@ console.log(`[BOOT] GEMINI_API_KEY Status: ${process.env.GEMINI_API_KEY ? 'LOADE
 if (!process.env.GEMINI_API_KEY) {
   console.error('❌ [BOOT] GEMINI_API_KEY is missing from environment variables!');
 }
-const VERSION = 'v1.0.6-final-live';
+const VERSION = 'v1.0.7-recalc-fix';
 
 // Helper for cleaning up local files after Supabase upload (Phase Cloud)
 const cleanupLocalFile = (filePath: string | null) => {
@@ -2844,6 +2844,107 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
   }
 });
 
+// Helper function to recalculate attendance for a specific user and date
+async function recalculateAttendanceForUserAndDate(userId: number, date: Date, tenantId: number) {
+    try {
+        const todayStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+        const dateTarget = new Date(todayStr + 'T00:00:00Z');
+        
+        console.log(`[RECALC DEBUG] Starting for User: ${userId}, Date: ${todayStr}`);
+
+        // 1. Get recent attendance records for this user (increased depth for past edits)
+        const recentAttendances = await prisma.attendance.findMany({
+            where: {
+                userId: userId,
+                companyId: tenantId
+            },
+            orderBy: { clockIn: 'desc' },
+            take: 100 
+        });
+
+        const attendance = recentAttendances.find(a => {
+            const attDate = new Date(a.clockIn).toLocaleDateString('en-CA');
+            return attDate === todayStr;
+        });
+
+        if (!attendance) {
+            console.log(`[RECALC DEBUG] No attendance record found for User ${userId} on ${todayStr} after checking 100 records.`);
+            return;
+        }
+
+        console.log(`[RECALC DEBUG] Found Attendance ID ${attendance.id}, ClockIn (Raw): ${attendance.clockIn}`);
+
+        // 2. Get the new effective shift
+        const [user, manualSchedule] = await Promise.all([
+            prisma.user.findUnique({
+                where: { id: userId },
+                include: { company: true, shift: true }
+            }),
+            (prisma as any).shiftSchedule.findUnique({
+                where: { 
+                    userId_date: {
+                        userId: userId, 
+                        date: dateTarget 
+                    }
+                },
+                include: { shift: true }
+            })
+        ]);
+
+        if (!user) {
+            console.log(`[RECALC DEBUG] User ${userId} not found.`);
+            return;
+        }
+
+        const effectiveShift = manualSchedule ? (manualSchedule.isOff ? null : manualSchedule.shift) : user.shift;
+        const isScheduledOff = manualSchedule?.isOff;
+
+        console.log(`[RECALC DEBUG] Effective Shift Found: ${effectiveShift?.name || 'NONE'}, StartTime: ${effectiveShift?.startTime || 'MISSING'}`);
+
+        // 3. Recalculate status and lateMinutes
+        let status = 'PRESENT';
+        let lateMinutes = 0;
+
+        if (isScheduledOff) {
+            status = 'PRESENT';
+            lateMinutes = 0;
+            console.log(`[RECALC DEBUG] Recalc Result: USER IS OFF`);
+        } else if (effectiveShift?.startTime) {
+            const clockInDate = new Date(attendance.clockIn);
+            const jakartaNow = new Date(clockInDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+            
+            const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
+            console.log(`[RECALC DEBUG] Parsed Shift Time -> Hour: ${sh}, Min: ${sm}`);
+
+            const shiftStartTime = new Date(jakartaNow);
+            shiftStartTime.setHours(sh, sm, 0, 0);
+            
+            const gracePeriod = (user as any).company?.lateGracePeriod || 0;
+            const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
+            
+            console.log(`[RECALC DEBUG] Comparison -> User: ${jakartaNow.toLocaleTimeString()}, Target: ${shiftStartTime.toLocaleTimeString()}, Grace: ${gracePeriod}m`);
+
+            if (jakartaNow > threshold) {
+                status = 'LATE';
+                lateMinutes = Math.floor((jakartaNow.getTime() - shiftStartTime.getTime()) / 60000);
+            }
+        }
+
+        // 4. Update the attendance record
+        await prisma.attendance.update({
+            where: { id: attendance.id },
+            data: {
+                status: status as any,
+                lateMinutes: lateMinutes
+            }
+        });
+
+        console.log(`[RECALC SUCCESS] User ${userId}: ${status} (${lateMinutes} mins late)`);
+    } catch (error) {
+        console.error(`[RECALC ERROR] User ${userId}:`, error);
+    }
+}
+
 // B2.1 Endpoint Mendapatkan Daftar Jadwal Shift (Kalender)
 app.get('/api/schedules', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -2890,11 +2991,13 @@ app.post('/api/schedules/bulk', tenantMiddleware, async (req: Request, res: Resp
     for (const userId of userIds) {
       let current = new Date(start);
       while (current <= end) {
+        const dateStr = current.toLocaleDateString('en-CA'); // YYYY-MM-DD
+        console.log(`[Schedule Bulk] Processing User ${userId} for Date: ${dateStr}`);
         const schedule = await (prisma as any).shiftSchedule.upsert({
           where: {
             userId_date: {
               userId: userId,
-              date: new Date(current.toISOString().split('T')[0])
+              date: new Date(dateStr + 'T00:00:00Z')
             }
           },
           update: {
@@ -2907,10 +3010,12 @@ app.post('/api/schedules/bulk', tenantMiddleware, async (req: Request, res: Resp
             userId: userId,
             shiftId: isOff ? null : (shiftId ? parseInt(shiftId) : null),
             isOff: !!isOff,
-            date: new Date(current.toISOString().split('T')[0])
+            date: new Date(dateStr + 'T00:00:00Z')
           }
         });
         results.push(schedule);
+        // --- AUTO-RECALCULATE ATTENDANCE (If they already clocked in today) ---
+        await recalculateAttendanceForUserAndDate(userId, new Date(current), tenantId);
         current.setDate(current.getDate() + 1);
       }
     }
@@ -2924,6 +3029,7 @@ app.post('/api/schedules/bulk', tenantMiddleware, async (req: Request, res: Resp
 
 // B2.2.5 Endpoint Penyesuaian Jadwal Matrix
 app.post('/api/schedules/matrix', tenantMiddleware, async (req: Request, res: Response) => {
+  console.log('[MATRIX ROUTE HIT] Saving schedule changes...');
   try {
     const tenantId = (req as any).tenantId;
     const { changes } = req.body; // Array of { userId, date, shiftId, isOff, isDefault }
@@ -2934,8 +3040,9 @@ app.post('/api/schedules/matrix', tenantMiddleware, async (req: Request, res: Re
 
     let updatedCount = 0;
     for (const change of changes) {
-      const dateTarget = new Date(change.date);
-      dateTarget.setHours(0, 0, 0, 0);
+      const dateStr = new Date(change.date).toLocaleDateString('en-CA');
+      console.log(`[Schedule Matrix] Processing User ${change.userId} for Date: ${dateStr}`);
+      const dateTarget = new Date(dateStr + 'T00:00:00Z');
 
       if (change.isDefault) {
         // Hapus jika kembali ke default
@@ -2965,6 +3072,8 @@ app.post('/api/schedules/matrix', tenantMiddleware, async (req: Request, res: Re
           }
         });
       }
+      // --- AUTO-RECALCULATE ATTENDANCE ---
+      await recalculateAttendanceForUserAndDate(change.userId, dateTarget, tenantId);
       updatedCount++;
     }
 
