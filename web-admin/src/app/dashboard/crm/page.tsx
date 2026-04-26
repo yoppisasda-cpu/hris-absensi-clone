@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MessageSquare, User, Bot, History, Search } from 'lucide-react';
+import { MessageSquare, User, Bot, History, Search, MessageCircle } from 'lucide-react';
 import api from '@/lib/api';
 
 interface ChatMessage {
