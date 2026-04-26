@@ -3084,6 +3084,19 @@ app.post('/api/schedules/matrix', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
+// B2.2.6 Endpoint Manual Recalculate Attendance (Admin Tool)
+app.post('/api/attendance/recalculate', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { userId, date } = req.body;
+    if (!userId || !date) return res.status(400).json({ error: 'userId dan date wajib diisi.' });
+    await recalculateAttendanceForUserAndDate(parseInt(userId), new Date(date), tenantId);
+    res.json({ message: `Recalculate untuk User ${userId} pada ${date} selesai.` });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal recalculate: ' + error.message });
+  }
+});
+
 // B2.3 Endpoint Hapus Jadwal Spesifik
 app.delete('/api/schedules/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
