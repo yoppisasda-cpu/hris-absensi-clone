@@ -737,3 +737,6 @@ export default function ProspectingPage() {
                     </div>
                 </div>
             )}
+        </DashboardLayout>
+    );
+}
