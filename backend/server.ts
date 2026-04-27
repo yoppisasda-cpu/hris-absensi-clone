@@ -3541,17 +3541,16 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
       return res.status(400).json({ error: 'Koordinat GPS perangkat wajib dilampirkan!' });
     }
 
-    // Cari absensi terakhir hari ini yang belum clock-out (Gunakan Jakarta Time)
-    const now = new Date();
-    const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-    const today = new Date(jakartaNow);
-    today.setHours(0, 0, 0, 0);
+    // Cari absensi terakhir hari ini yang belum clock-out
+    // Gunakan helper terpusat agar timezone konsisten dengan setting perusahaan
+    const timezone = await getCompanyTimezone(tenantId);
+    const { dayStart, dayEnd } = getDayRange(timezone);
 
     const attendance = await prisma.attendance.findFirst({
       where: {
         userId: userId,
         companyId: tenantId,
-        clockIn: { gte: today },
+        clockIn: { gte: dayStart, lte: dayEnd },
         clockOut: null
       },
       orderBy: { clockIn: 'desc' },
