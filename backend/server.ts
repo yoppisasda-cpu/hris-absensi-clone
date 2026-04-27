@@ -2844,6 +2844,49 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================
+// HELPER: Timezone-aware day range
+// Mengembalikan { dayStart, dayEnd } dalam UTC untuk 1 hari penuh
+// di timezone yang diberikan (IANA format, misal: 'Asia/Jakarta')
+// Ini adalah pusat kendali masalah timezone untuk seluruh sistem absensi.
+// ============================================================
+function getDayRange(timezone: string = 'Asia/Jakarta', date: Date = new Date()) {
+    const dateStrInTz = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date);
+    const dayStart = new Date(`${dateStrInTz}T00:00:00`);
+    const dayEnd = new Date(`${dateStrInTz}T23:59:59`);
+
+    // Convert to proper UTC by using the timezone offset
+    const startWithOffset = new Date(new Date(`${dateStrInTz}T00:00:00+00:00`).toLocaleString('en-US', { timeZone: 'UTC' }));
+    
+    // Cara paling reliable: gunakan ISO string dengan offset timezone
+    const dayStartUTC = new Date(`${dateStrInTz}T00:00:00${getTimezoneOffset(timezone, date)}`);
+    const dayEndUTC = new Date(`${dateStrInTz}T23:59:59${getTimezoneOffset(timezone, date)}`);
+    
+    return { dayStart: dayStartUTC, dayEnd: dayEndUTC, dateStr: dateStrInTz };
+}
+
+// Ambil offset timezone dalam format ±HH:MM dari IANA timezone string
+function getTimezoneOffset(timezone: string, date: Date = new Date()): string {
+    const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const tzDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+    const offsetMs = tzDate.getTime() - utcDate.getTime();
+    const offsetHours = Math.floor(Math.abs(offsetMs) / 3600000);
+    const offsetMinutes = Math.floor((Math.abs(offsetMs) % 3600000) / 60000);
+    const sign = offsetMs >= 0 ? '+' : '-';
+    return `${sign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+}
+
+// Ambil timezone dari Company (default: Asia/Jakarta)
+// Nanti diintegrasikan dengan setting di database per-perusahaan
+async function getCompanyTimezone(tenantId: number): Promise<string> {
+    try {
+        const company = await prisma.company.findUnique({ where: { id: tenantId } });
+        return (company as any)?.timezone || 'Asia/Jakarta';
+    } catch {
+        return 'Asia/Jakarta'; // Fallback aman
+    }
+}
+
 // Helper function to recalculate attendance for a specific user and date
 async function recalculateAttendanceForUserAndDate(userId: number, date: Date, tenantId: number) {
     // Wrapped in outer try-catch so it NEVER crashes the parent route
@@ -3268,16 +3311,9 @@ async function clockInHandler(req: Request, res: Response) {
     }
 
     // 4. CEK APAKAH SUDAH ABSEN HARI INI (Cegah Ganda)
-    // Rentang hari ini di Jakarta (WIB = UTC+7)
-    const startOfJakartaToday = new Date(todayStr + 'T00:00:00'); // Local server time context
-    // Kita buat range UTC yang mencakup 00:00 s/d 23:59 WIB
-    const startRange = new Date(new Date(todayStr + 'T00:00:00').toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-    // Cara paling aman: Ambil 00:00 hari ini WIB dan 00:00 besok WIB
-    const dayStart = new Date(todayStr + 'T00:00:00Z');
-    dayStart.setHours(dayStart.getHours() - 7); // Geser ke UTC (00:00 WIB = 17:00 UTC kemarin)
-    
-    const dayEnd = new Date(dayStart);
-    dayEnd.setHours(dayEnd.getHours() + 24);
+    // Gunakan helper terpusat — timezone diambil dari setting perusahaan
+    const companyTimezone = await getCompanyTimezone(tenantId);
+    const { dayStart, dayEnd } = getDayRange(companyTimezone);
 
     const existingAttendance = await prisma.attendance.findFirst({
       where: {
@@ -3694,27 +3730,20 @@ app.get('/api/attendance/status', tenantMiddleware, async (req: Request, res: Re
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
 
-    // Hitung batas hari ini di Jakarta (WIB = UTC+7)
-    // Karena server di UTC, "hari ini WIB" dimulai dari pukul 17:00 UTC kemarin
-    const todayStrJkt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
-    
-    // 00:00 WIB = 17:00 UTC hari sebelumnya
-    const dayStartUTC = new Date(todayStrJkt + 'T00:00:00+07:00'); // ISO dengan offset WIB
-    const dayEndUTC = new Date(todayStrJkt + 'T23:59:59+07:00');
+    // Ambil timezone perusahaan (terpusat — bisa diubah per-perusahaan)
+    const timezone = await getCompanyTimezone(tenantId);
+    const { dayStart, dayEnd } = getDayRange(timezone);
 
     const attendances = await prisma.attendance.findMany({
       where: {
         userId: userId,
         companyId: tenantId,
-        clockIn: { 
-          gte: dayStartUTC,
-          lte: dayEndUTC
-        }
+        clockIn: { gte: dayStart, lte: dayEnd }
       },
       orderBy: { clockIn: 'desc' }
     });
 
-    // latest attendance for button status: ambil yang belum clockOut, atau yang terbaru
+    // Prioritaskan yang belum Clock-Out sebagai status aktif
     const activeAttendance = attendances.find(a => !a.clockOut) || null;
     const attendance = activeAttendance || (attendances.length > 0 ? attendances[0] : null);
 
