@@ -27,6 +27,7 @@ interface Company {
     waApiKey?: string | null;
     waGatewayUrl?: string | null;
     waProspectTemplate?: string | null;
+    timezone: string;
     addons: string[];
 }
 
@@ -46,7 +47,8 @@ export default function CompanyProfilePage() {
         photoRetentionDays: '30',
         waApiKey: '',
         waGatewayUrl: '',
-        waProspectTemplate: ''
+        waProspectTemplate: '',
+        timezone: 'Asia/Jakarta'
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -86,7 +88,8 @@ export default function CompanyProfilePage() {
                 photoRetentionDays: response.data.photoRetentionDays?.toString() || '30',
                 waApiKey: response.data.waApiKey || '',
                 waGatewayUrl: response.data.waGatewayUrl || '',
-                waProspectTemplate: response.data.waProspectTemplate || ''
+                waProspectTemplate: response.data.waProspectTemplate || '',
+                timezone: response.data.timezone || 'Asia/Jakarta'
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -127,7 +130,8 @@ export default function CompanyProfilePage() {
                 photoRetentionDays: formData.photoRetentionDays ? parseInt(formData.photoRetentionDays, 10) : 30,
                 waApiKey: formData.waApiKey,
                 waGatewayUrl: formData.waGatewayUrl,
-                waProspectTemplate: formData.waProspectTemplate
+                waProspectTemplate: formData.waProspectTemplate,
+                timezone: formData.timezone
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -222,7 +226,7 @@ export default function CompanyProfilePage() {
         <DashboardLayout>
             <div className="mb-8 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+                    <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-blue-600 rounded-lg shadow-lg shadow-blue-200">
                             <Building2 className="h-6 w-6 text-white" />
                         </div>
@@ -406,6 +410,91 @@ export default function CompanyProfilePage() {
                                     <p className="mt-4 text-[11px] text-slate-400 font-medium italic">* Titik koordinat adalah titik pusat di mana karyawan diperbolehkan melakukan absen masuk (clock-in).</p>
                                 </div>
 
+                                <div className="pt-6 border-t border-slate-100">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-6 w-1 bg-blue-500 rounded-full"></div>
+                                            <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Regional & Waktu Internasional</h3>
+                                        </div>
+                                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">Supports IANA Timezones 🌍</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Zona Waktu Operasional</label>
+                                            <select
+                                                value={formData.timezone}
+                                                onChange={e => setFormData({ ...formData, timezone: e.target.value })}
+                                                className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none hover:border-slate-300 bg-white"
+                                            >
+                                                <optgroup label="Indonesia (Utama)">
+                                                    <option value="Asia/Jakarta">WIB - Jakarta (GMT+7)</option>
+                                                    <option value="Asia/Makassar">WITA - Makassar (GMT+8)</option>
+                                                    <option value="Asia/Jayapura">WIT - Jayapura (GMT+9)</option>
+                                                </optgroup>
+                                                <optgroup label="Dunia (Pilihan Lengkap)">
+                                                    {Intl.supportedValuesOf('timeZone').map((tz) => (
+                                                        <option key={tz} value={tz}>
+                                                            {tz.replace(/_/g, ' ')}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            </select>
+                                            <p className="mt-2 text-[10px] text-slate-400 font-medium italic">
+                                                * Zona waktu ini menentukan kapan hari dimulai (00:00) untuk perhitungan absen harian dan status "Sedang Bekerja".
+                                            </p>
+                                        </div>
+                                        <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                                            <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest mb-2">Tips Global</h4>
+                                            <p className="text-[11px] text-blue-600 leading-relaxed font-medium">
+                                                Jika Anda memiliki cabang di luar negeri, sistem akan otomatis menyesuaikan perhitungan keterlambatan dan jam pulang berdasarkan zona waktu yang Anda pilih di sini.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* --- SECTION WHATSAPP --- */}
+                                <div className="pt-8 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                                        <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">WhatsApp Gateway (Wablas)</h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Domain / Server Wablas</label>
+                                            <input
+                                                type="text"
+                                                value={formData.waGatewayUrl}
+                                                onChange={e => setFormData({ ...formData, waGatewayUrl: e.target.value })}
+                                                className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300"
+                                                placeholder="Contoh: https://solo.wablas.com"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API Key Wablas (Token)</label>
+                                            <input
+                                                type="password"
+                                                value={formData.waApiKey}
+                                                onChange={e => setFormData({ ...formData, waApiKey: e.target.value })}
+                                                className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300"
+                                                placeholder="Masukkan Token Wablas"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Template Pesan Penawaran (WA)</label>
+                                        <textarea
+                                            value={formData.waProspectTemplate}
+                                            onChange={e => setFormData({ ...formData, waProspectTemplate: e.target.value })}
+                                            rows={3}
+                                            className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300"
+                                            placeholder="Gunakan {{name}} untuk menyapa nama prospek..."
+                                        />
+                                        <p className="mt-2 text-[10px] text-slate-400 italic">
+                                            * Kosongkan jika ingin menggunakan sistem WhatsApp default Aivola.
+                                        </p>
+                                    </div>
+                                </div>
+
                                 <div className="pt-8 flex justify-end">
                                     <button
                                         type="submit"
@@ -499,71 +588,6 @@ export default function CompanyProfilePage() {
                                 </div>
                             </form>
                         </div>
-
-                        {/* === WABLAS CONFIGURATION SECTION (Bundled with Prospecting AI Add-on) === */}
-                        {company?.addons?.includes('PROSPECTING') && (
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
-                                <div className="px-8 py-5 bg-gradient-to-r from-emerald-50 to-white border-b border-emerald-100 flex items-center justify-between">
-                                    <h2 className="font-extrabold text-slate-800 tracking-tight text-lg flex items-center gap-2">
-                                        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                        Konfigurasi WhatsApp (Wablas)
-                                    </h2>
-                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md uppercase">Add-on Prospecting AI</span>
-                                </div>
-                                <div className="p-8 space-y-6">
-                                    <p className="text-xs text-slate-500 italic font-medium">
-                                        * Masukkan API Key & Domain Wablas Anda jika ingin menggunakan nomor WhatsApp sendiri untuk pengiriman notifikasi/OTP. 
-                                        Kosongkan untuk menggunakan sistem default Aivola.
-                                    </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Domain / Server Wablas</label>
-                                            <input
-                                                type="text"
-                                                value={formData.waGatewayUrl}
-                                                onChange={e => setFormData({ ...formData, waGatewayUrl: e.target.value })}
-                                                className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300 placeholder:font-normal"
-                                                placeholder="Contoh: https://solo.wablas.com"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API Key Wablas (Token)</label>
-                                            <input
-                                                type="password"
-                                                value={formData.waApiKey}
-                                                onChange={e => setFormData({ ...formData, waApiKey: e.target.value })}
-                                                className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300 placeholder:font-normal"
-                                                placeholder="Masukkan Token Wablas Anda"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Template Pesan Penawaran (WA)</label>
-                                        <textarea
-                                            value={formData.waProspectTemplate}
-                                            onChange={e => setFormData({ ...formData, waProspectTemplate: e.target.value })}
-                                            rows={4}
-                                            className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none hover:border-slate-300 placeholder:font-normal"
-                                            placeholder="Gunakan {{name}} untuk memasukkan nama bisnis secara otomatis..."
-                                        />
-                                        <p className="mt-2 text-[10px] text-slate-400 italic">
-                                            Tips: Gunakan tag <strong className="text-emerald-600">{"{{name}}"}</strong> agar sistem otomatis menyapa nama toko/bisnis prospek.
-                                        </p>
-                                    </div>
-                                    <div className="flex justify-end">
-                                        <button
-                                            type="button"
-                                            onClick={handleSubmit}
-                                            disabled={isSaving}
-                                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                                        >
-                                            {isSaving ? <Loader2 className="h-3 w-3 animate-spin text-white" /> : <Save className="h-3 w-3 text-white" />}
-                                            <span className="ml-2">SIMPAN PENGATURAN WHATSAPP</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
 
                         
                         {/* Integration Section */}

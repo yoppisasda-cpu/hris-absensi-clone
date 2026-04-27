@@ -35,6 +35,7 @@ model Company {
   address                String?
   logoUrl                String?
   lateGracePeriod        Int                  @default(0)
+  timezone               String               @default("Asia/Jakarta")
   workDaysPerMonth       Int                  @default(25)
   purchasedInsights      String[]             @default([])
   addons                 String[]             @default([])

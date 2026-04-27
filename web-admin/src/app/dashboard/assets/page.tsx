@@ -510,9 +510,9 @@ export default function AssetsPage() {
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] italic leading-none">
-                                                Financial Automation System
+                                                Sistem Otomasi Keuangan
                                             </label>
-                                            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mt-1 italic">Calculated Depreciation & Amortization</p>
+                                            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mt-1 italic">Kalkulasi Penyusutan & Amortisasi</p>
                                         </div>
                                     </div>
                                     <div className="scale-75">
@@ -528,7 +528,7 @@ export default function AssetsPage() {
                                 {formData.isDepreciating && (
                                     <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-4 duration-500">
                                         <div className="col-span-2 sm:col-span-1 space-y-2">
-                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Capital Expenditure (CAPEX)</label>
+                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Biaya Modal (CAPEX)</label>
                                             <input 
                                                 type="number"
                                                 value={formData.purchasePrice}
@@ -538,7 +538,7 @@ export default function AssetsPage() {
                                             />
                                         </div>
                                         <div className="sm:col-span-1 space-y-2">
-                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Residual Value / Salvage</label>
+                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Nilai Sisa (Residual)</label>
                                             <input 
                                                 type="number"
                                                 value={formData.residualValue}
@@ -548,7 +548,7 @@ export default function AssetsPage() {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Service Life (Months)</label>
+                                            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Masa Pakai (Bulan)</label>
                                             <input 
                                                 type="number"
                                                 value={formData.usefulLife}
@@ -559,7 +559,7 @@ export default function AssetsPage() {
                                         <div className="col-span-2 bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
                                             <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-3 italic">
                                                 <CheckCircle2 className="h-4 w-4 stroke-[3px]" /> 
-                                                Automatic monthly Expense: <span className="text-white text-sm not-italic ml-2 tracking-tighter">Rp {((parseFloat(formData.purchasePrice || '0') - parseFloat(formData.residualValue || '0')) / (parseInt(formData.usefulLife || '1') || 1)).toLocaleString()}</span>
+                                                Beban Bulanan Otomatis: <span className="text-white text-sm not-italic ml-2 tracking-tighter">Rp {((parseFloat(formData.purchasePrice || '0') - parseFloat(formData.residualValue || '0')) / (parseInt(formData.usefulLife || '1') || 1)).toLocaleString()}</span>
                                             </p>
                                         </div>
                                     </div>

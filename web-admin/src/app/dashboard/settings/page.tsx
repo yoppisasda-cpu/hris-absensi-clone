@@ -24,8 +24,13 @@ export default function SettingsPage() {
             setIsLoading(true);
             const res = await api.get('/users/me');
             setUser(res.data);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to fetch profile", error);
+            // If 404, it means the user session is invalid (likely database changed)
+            if (error.response?.status === 404) {
+                localStorage.clear();
+                window.location.href = '/login';
+            }
         } finally {
             setIsLoading(false);
         }

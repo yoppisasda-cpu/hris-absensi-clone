@@ -1348,11 +1348,16 @@ app.patch('/api/auth/change-password', tenantMiddleware, async (req: Request, re
 app.get('/api/users/me', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
+    const tenantId = (req as any).tenantId;
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { company: true, shift: true }
     });
-    if (!user) return res.status(404).json({ error: 'Profil tidak ditemukan' });
+    if (!user) {
+      console.warn(`[Profile 404] User ID ${userId} not found in tenant ${tenantId}`);
+      return res.status(404).json({ error: 'Profil tidak ditemukan' });
+    }
 
     // Jangan kirim password
     const { password, ...safeUser } = user;
