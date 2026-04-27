@@ -3694,23 +3694,29 @@ app.get('/api/attendance/status', tenantMiddleware, async (req: Request, res: Re
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
 
-    // Use Jakarta date for today
-    const now = new Date();
-    const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-    const today = new Date(jakartaNow);
-    today.setHours(0, 0, 0, 0);
+    // Hitung batas hari ini di Jakarta (WIB = UTC+7)
+    // Karena server di UTC, "hari ini WIB" dimulai dari pukul 17:00 UTC kemarin
+    const todayStrJkt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
+    
+    // 00:00 WIB = 17:00 UTC hari sebelumnya
+    const dayStartUTC = new Date(todayStrJkt + 'T00:00:00+07:00'); // ISO dengan offset WIB
+    const dayEndUTC = new Date(todayStrJkt + 'T23:59:59+07:00');
 
     const attendances = await prisma.attendance.findMany({
       where: {
         userId: userId,
         companyId: tenantId,
-        clockIn: { gte: today }
+        clockIn: { 
+          gte: dayStartUTC,
+          lte: dayEndUTC
+        }
       },
       orderBy: { clockIn: 'desc' }
     });
 
-    // latest attendance for button status
-    const attendance = attendances.length > 0 ? attendances[0] : null;
+    // latest attendance for button status: ambil yang belum clockOut, atau yang terbaru
+    const activeAttendance = attendances.find(a => !a.clockOut) || null;
+    const attendance = activeAttendance || (attendances.length > 0 ? attendances[0] : null);
 
     res.json({ attendance, logs: attendances });
   } catch (error) {
