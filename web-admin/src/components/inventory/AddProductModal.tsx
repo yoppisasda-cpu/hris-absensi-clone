@@ -83,9 +83,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     }, [isOpen, product]);
 
     const fetchRecipe = async (id: number) => {
+        let isMounted = true;
         try {
             const res = await api.get(`/inventory/products/${id}/recipe`);
-            if (res.data && res.data.length > 0) {
+            if (isMounted && res.data && res.data.length > 0) {
                 setRecipeItems(res.data.map((r: any) => ({ 
                     materialId: r.materialId.toString(), 
                     quantity: r.quantity 
@@ -95,6 +96,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         } catch (error) {
             console.error("Gagal mengambil resep", error);
         }
+        return () => { isMounted = false; };
     };
 
     // Automatic HPP (COGS) Calculation from BOM
@@ -303,6 +305,9 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     quantity: Number(item.quantity) || 0
                 }));
                 await api.post(`/inventory/products/${productId}/recipe`, { items: sanitizedRecipe });
+            } else {
+                // IMPORTANT: Clear the recipe if toggled off or empty
+                await api.post(`/inventory/products/${productId}/recipe`, { items: [] });
             }
 
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });

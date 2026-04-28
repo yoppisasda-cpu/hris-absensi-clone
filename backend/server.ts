@@ -10445,8 +10445,14 @@ app.delete('/api/inventory/products/:id', tenantMiddleware, async (req: Request,
       return res.status(404).json({ error: 'Produk tidak ditemukan' });
     }
 
-    await prisma.product.delete({
-      where: { id }
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete associated recipes first (since there's no FK constraint)
+      await tx.$executeRawUnsafe(`DELETE FROM "ProductRecipe" WHERE "productId" = $1`, id);
+      
+      // 2. Delete the product
+      await tx.product.delete({
+        where: { id }
+      });
     });
 
     res.json({ message: 'Produk berhasil dihapus' });
