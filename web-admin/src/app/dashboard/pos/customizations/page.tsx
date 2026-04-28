@@ -164,27 +164,27 @@ export default function CustomizationsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-              <h2 className="text-lg font-bold">{editingGroup ? "Edit" : "Tambah"} Kustomisasi</h2>
+              <h2 className="text-lg font-bold text-slate-800">{editingGroup ? "Edit" : "Tambah"} Kustomisasi</h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             
             <div className="p-6 overflow-y-auto">
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nama Add-on (Contoh: Level Sugar)</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2" placeholder="Nama Group Kustomisasi" />
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Nama Group Kustomisasi" />
               </div>
               
               <div className="grid grid-cols-2 gap-4 mb-4">
                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Wajib Diisi Kasir?</label>
-                    <select value={isRequired ? "true" : "false"} onChange={(e) => { setIsRequired(e.target.value === "true"); if(e.target.value === "true") setMinSelections(1); }} className="w-full border rounded-lg px-3 py-2">
+                    <select value={isRequired ? "true" : "false"} onChange={(e) => { setIsRequired(e.target.value === "true"); if(e.target.value === "true") setMinSelections(1); }} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
                       <option value="false">Tidak (Opsional)</option>
                       <option value="true">Ya (Wajib)</option>
                     </select>
                  </div>
                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Max Pilihan (Bisa pilih berapa?)</label>
-                    <input type="number" min="1" value={maxSelections} onChange={(e) => setMaxSelections(parseInt(e.target.value) || 1)} className="w-full border rounded-lg px-3 py-2" />
+                    <input type="number" min="1" value={maxSelections} onChange={(e) => setMaxSelections(parseInt(e.target.value) || 1)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none" />
                  </div>
               </div>
 
@@ -195,8 +195,8 @@ export default function CustomizationsPage() {
                 
                 {options.map((opt, i) => (
                   <div key={i} className="flex gap-2 mb-3 items-start">
-                    <input type="text" value={opt.name} onChange={(e) => updateOption(i, "name", e.target.value)} placeholder="Misal: Less Sugar" className="flex-1 border rounded-lg px-3 py-2" />
-                    <input type="number" value={opt.price} onChange={(e) => updateOption(i, "price", e.target.value)} placeholder="Harga (0 jika gratis)" className="w-32 border rounded-lg px-3 py-2" />
+                    <input type="text" value={opt.name} onChange={(e) => updateOption(i, "name", e.target.value)} placeholder="Misal: Less Sugar" className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                    <input type="number" value={opt.price} onChange={(e) => updateOption(i, "price", e.target.value)} placeholder="Harga (0 jika gratis)" className="w-32 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none" />
                     <button onClick={() => removeOption(i)} disabled={options.length <= 1} className="p-2 text-red-500 disabled:opacity-30">
                       <Trash2 size={20} />
                     </button>
