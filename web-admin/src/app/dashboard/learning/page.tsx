@@ -40,6 +40,7 @@ interface Material {
     id: number;
     title: string;
     content: string;
+    imageUrl?: string;
     category: string;
     createdAt: string;
     exams: {
@@ -78,6 +79,7 @@ export default function LearningDashboard() {
     const [sopTargetJobTitle, setSopTargetJobTitle] = useState('');
     const [sopQuestionCount, setSopQuestionCount] = useState(5);
     const [sopMinScore, setSopMinScore] = useState(70);
+    const [sopImage, setSopImage] = useState<File | null>(null);
     const [regenQuestions, setRegenQuestions] = useState(false);
     
     // Assign Target Form state
@@ -122,20 +124,29 @@ export default function LearningDashboard() {
         e.preventDefault();
         try {
             setIsSubmitting(true);
-            await api.post('/learning/materials', {
-                title: sopTitle,
-                content: sopContent,
-                category: sopCategory,
-                targetDivision: sopTargetDivision || null,
-                targetJobTitle: sopTargetJobTitle || null,
-                questionCount: sopQuestionCount,
-                minScore: sopMinScore
+            const formData = new FormData();
+            formData.append('title', sopTitle);
+            formData.append('content', sopContent);
+            formData.append('category', sopCategory);
+            formData.append('targetDivision', sopTargetDivision || '');
+            formData.append('targetJobTitle', sopTargetJobTitle || '');
+            formData.append('questionCount', sopQuestionCount.toString());
+            formData.append('minScore', sopMinScore.toString());
+            if (sopImage) {
+                formData.append('image', sopImage);
+            }
+
+            await api.post('/learning/materials', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
             alert(`SOP berhasil diupload. AI telah men-generate ${sopQuestionCount} soal ujian.`);
             setSopTitle('');
             setSopContent('');
             setSopTargetDivision('');
             setSopTargetJobTitle('');
+            setSopImage(null);
             setSopQuestionCount(5); // Reset question count
             setSopMinScore(70); // Reset min score
             setActiveTab('exams');
@@ -219,20 +230,29 @@ export default function LearningDashboard() {
             setIsSubmitting(true);
             const regenerate = regenQuestions;
             
-            await api.put(`/admin/learning/materials/${selectedMaterial.id}`, {
-                title: sopTitle,
-                content: sopContent,
-                category: sopCategory,
-                targetDivision: sopTargetDivision || null,
-                targetJobTitle: sopTargetJobTitle || null,
-                regenerateQuestions: regenerate,
-                questionCount: sopQuestionCount,
-                minScore: sopMinScore
+            const formData = new FormData();
+            formData.append('title', sopTitle);
+            formData.append('content', sopContent);
+            formData.append('category', sopCategory);
+            formData.append('targetDivision', sopTargetDivision || '');
+            formData.append('targetJobTitle', sopTargetJobTitle || '');
+            formData.append('regenerateQuestions', regenerate.toString());
+            formData.append('questionCount', sopQuestionCount.toString());
+            formData.append('minScore', sopMinScore.toString());
+            if (sopImage) {
+                formData.append('image', sopImage);
+            }
+
+            await api.put(`/admin/learning/materials/${selectedMaterial.id}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
 
             alert('SOP berhasil diperbarui.');
             setIsEditModalOpen(false);
             setSelectedMaterial(null);
+            setSopImage(null);
             fetchData();
         } catch (err) {
             alert('Gagal memperbarui SOP.');
@@ -368,7 +388,7 @@ export default function LearningDashboard() {
                                         <input 
                                             type="text" 
                                             placeholder="Cari karyawan atau target..." 
-                                            className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none !text-slate-900 dark:!text-slate-900 placeholder:text-slate-400 bg-white"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
@@ -508,7 +528,7 @@ export default function LearningDashboard() {
                                     <input 
                                         type="text" 
                                         required
-                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 placeholder:text-slate-400 bg-white"
                                         placeholder="Contoh: Barista Training - Standard Calibration"
                                         value={sopTitle}
                                         onChange={(e) => setSopTitle(e.target.value)}
@@ -517,7 +537,7 @@ export default function LearningDashboard() {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Kategori</label>
                                     <select 
-                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white !text-slate-900 dark:!text-slate-900"
                                         value={sopCategory}
                                         onChange={(e) => setSopCategory(e.target.value)}
                                     >
@@ -532,11 +552,21 @@ export default function LearningDashboard() {
                                     <textarea 
                                         required
                                         rows={8}
-                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 placeholder:text-slate-400 bg-white"
                                         placeholder="Tempelkan isi SOP di sini. AI akan membuatkan pertanyaan dari teks ini secara otomatis."
                                         value={sopContent}
                                         onChange={(e) => setSopContent(e.target.value)}
                                     ></textarea>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Lampiran (Opsional)</label>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white !text-slate-900"
+                                        onChange={(e) => setSopImage(e.target.files?.[0] || null)}
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">Gunakan gambar untuk membantu visualisasi SOP.</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -544,7 +574,7 @@ export default function LearningDashboard() {
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Divisi (Opsional)</label>
                                         <input 
                                             type="text" 
-                                            className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                            className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 placeholder:text-slate-400 bg-white"
                                             placeholder="Contoh: Barista"
                                             value={sopTargetDivision}
                                             onChange={(e) => setSopTargetDivision(e.target.value)}
@@ -554,7 +584,7 @@ export default function LearningDashboard() {
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Jabatan (Opsional)</label>
                                         <input 
                                             type="text" 
-                                            className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                            className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 placeholder:text-slate-400 bg-white"
                                             placeholder="Contoh: Senior Barista"
                                             value={sopTargetJobTitle}
                                             onChange={(e) => setSopTargetJobTitle(e.target.value)}
@@ -644,6 +674,15 @@ export default function LearningDashboard() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="space-y-4">
                                             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-2">Isi SOP</h3>
+                                            {selectedMaterial.imageUrl && (
+                                                <div className="mb-4 rounded-xl overflow-hidden border border-slate-200">
+                                                    <img 
+                                                        src={selectedMaterial.imageUrl.startsWith('/uploads') ? `http://localhost:5000${selectedMaterial.imageUrl}` : selectedMaterial.imageUrl} 
+                                                        alt={selectedMaterial.title}
+                                                        className="w-full object-contain max-h-[300px] bg-slate-100"
+                                                    />
+                                                </div>
+                                            )}
                                             <div className="bg-slate-50 p-4 rounded-xl text-sm text-slate-600 leading-relaxed max-h-[400px] overflow-y-auto whitespace-pre-wrap">
                                                 {selectedMaterial.content}
                                             </div>
@@ -711,7 +750,7 @@ export default function LearningDashboard() {
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2 font-display tracking-wider">Pilih Karyawan</label>
                                         <select 
                                             required
-                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white !text-slate-900 dark:!text-slate-900"
                                             value={assignUserId}
                                             onChange={(e) => setAssignUserId(e.target.value)}
                                         >
@@ -724,7 +763,7 @@ export default function LearningDashboard() {
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2 font-display tracking-wider">Pilih Materi SOP (Opsional)</label>
                                         <select 
-                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white !text-slate-900 dark:!text-slate-900"
                                             value={assignMaterialId}
                                             onChange={(e) => {
                                                 const mid = e.target.value;
@@ -751,7 +790,7 @@ export default function LearningDashboard() {
                                         <input 
                                             type="text" 
                                             required
-                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 placeholder:text-slate-400 bg-white"
                                             placeholder="Contoh: Mastering Latte Art"
                                             value={assignTitle}
                                             onChange={(e) => setAssignTitle(e.target.value)}
@@ -760,7 +799,7 @@ export default function LearningDashboard() {
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2 font-display tracking-wider">Kategori</label>
                                         <select 
-                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white !text-slate-900 dark:!text-slate-900"
                                             value={assignCategory}
                                             onChange={(e) => setAssignCategory(e.target.value)}
                                         >
@@ -776,7 +815,7 @@ export default function LearningDashboard() {
                                     <textarea 
                                         required
                                         rows={4}
-                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 placeholder:text-slate-400 bg-white"
                                         placeholder="Jelaskan apa yang harus dipelajari..."
                                         value={assignDescription}
                                         onChange={(e) => setAssignDescription(e.target.value)}
@@ -855,7 +894,7 @@ export default function LearningDashboard() {
                                 <input 
                                     type="text" 
                                     required
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 bg-white"
                                     value={sopTitle}
                                     onChange={(e) => setSopTitle(e.target.value)}
                                 />
@@ -863,7 +902,7 @@ export default function LearningDashboard() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Kategori</label>
                                 <select 
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white !text-slate-900 dark:!text-slate-900"
                                     value={sopCategory}
                                     onChange={(e) => setSopCategory(e.target.value)}
                                 >
@@ -878,10 +917,31 @@ export default function LearningDashboard() {
                                 <textarea 
                                     required
                                     rows={8}
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 bg-white"
                                     value={sopContent}
                                     onChange={(e) => setSopContent(e.target.value)}
                                 ></textarea>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Lampiran (Opsional)</label>
+                                {selectedMaterial?.imageUrl && !sopImage && (
+                                    <div className="mb-2 relative w-32 h-20 rounded-lg overflow-hidden border border-slate-200">
+                                        <img 
+                                            src={selectedMaterial.imageUrl.startsWith('/uploads') ? `http://localhost:5000${selectedMaterial.imageUrl}` : selectedMaterial.imageUrl} 
+                                            alt="Current SOP" 
+                                            className="w-full h-full object-cover"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                            <span className="text-[8px] text-white font-bold">Current Image</span>
+                                        </div>
+                                    </div>
+                                )}
+                                <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white !text-slate-900"
+                                    onChange={(e) => setSopImage(e.target.files?.[0] || null)}
+                                />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -889,7 +949,7 @@ export default function LearningDashboard() {
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Divisi</label>
                                     <input 
                                         type="text" 
-                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 bg-white"
                                         value={sopTargetDivision}
                                         onChange={(e) => setSopTargetDivision(e.target.value)}
                                     />
@@ -898,7 +958,7 @@ export default function LearningDashboard() {
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Jabatan</label>
                                     <input 
                                         type="text" 
-                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 !text-slate-900 dark:!text-slate-900 bg-white"
                                         value={sopTargetJobTitle}
                                         onChange={(e) => setSopTargetJobTitle(e.target.value)}
                                     />

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'exam_screen.dart';
+import 'material_detail_screen.dart';
 
 class LearningCenterScreen extends StatefulWidget {
   @override
@@ -338,42 +339,35 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.indigo[100]!),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.book, size: 16, color: Colors.indigo),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Terhubung ke SOP: ${obj['material']?['title'] ?? 'Materi'}',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.indigo[700]),
-                    ),
-                  ),
-                  if (!isDone) 
-                    TextButton(
-                      onPressed: () {
-                        // Cari exam ID yang sesuai dengan materialId ini
-                        final exam = _exams.firstWhere(
-                          (e) => e['materialId'] == obj['materialId'],
-                          orElse: () => null,
-                        );
-                        if (exam != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => ExamScreen(examId: exam['id']))
-                          ).then((_) => _loadData());
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Ujian untuk SOP ini belum tersedia.')),
-                          );
-                        }
-                      },
-                      child: Text('Buka SOP / Ujian', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        foregroundColor: Colors.indigo,
+              child: InkWell(
+                onTap: () {
+                   if (obj['material'] != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => MaterialDetailScreen(material: obj['material']))
+                      );
+                   }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  children: [
+                    Icon(Icons.book, size: 16, color: Colors.indigo),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Terhubung ke SOP: ${obj['material']?['title'] ?? 'Materi'}',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.indigo[700]),
+                          ),
+                          Text('Klik untuk baca materi', style: TextStyle(fontSize: 9, color: Colors.indigo[300])),
+                        ],
                       ),
                     ),
-                ],
+                    Icon(Icons.chevron_right, size: 16, color: Colors.indigo[300]),
+                  ],
+                ),
               ),
             ),
           ],

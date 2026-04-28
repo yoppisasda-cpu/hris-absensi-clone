@@ -57,15 +57,18 @@ export default function StockTransferModal({ product, isOpen, onClose, onSuccess
     };
 
     const fetchSourceStock = async () => {
-        try {
-            const res = await api.get(`/inventory/products/${formData.productId}/recipe`, {
-                params: { warehouseId: formData.fromWarehouseId }
-            });
-            setSourceStock(res.data.availableStock || 0);
-        } catch (error) {
-            console.error("Gagal mengambil stok gudang asal", error);
+        const currentProduct = product || products.find(p => p.id.toString() === formData.productId.toString());
+        if (!currentProduct) {
             setSourceStock(0);
+            return;
         }
+
+        // Find the stock for this product in the selected fromWarehouse
+        const ws = currentProduct.WarehouseStock?.find(
+            (ws: any) => ws.warehouseId.toString() === formData.fromWarehouseId.toString()
+        );
+        
+        setSourceStock(ws ? ws.quantity : 0);
     };
 
     if (!isOpen) return null;

@@ -515,6 +515,20 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage: storage });
+const learningStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = 'uploads/learning';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'sop-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const learningUpload = multer({ storage: learningStorage });
 
 // --- CONFIG MULTER UNTUK DOKUMEN KARYAWAN (Phase 26) ---
 const documentStorage = multer.diskStorage({
@@ -5865,6 +5879,17 @@ app.post('/api/learning/objectives', tenantMiddleware, async (req: Request, res:
         progress: 0
       }
     });
+
+    // Kirim notifikasi jika ditugaskan ke orang lain (Admin -> Karyawan)
+    if (finalUserId !== userId) {
+      await sendNotification(
+        tenantId,
+        finalUserId,
+        'Tugas Belajar Baru',
+        `Anda ditugaskan untuk mempelajari: "${title}". Silakan cek menu Learning Center.`
+      );
+    }
+
     res.status(201).json(objective);
   } catch (error) {
     console.error('Error adding learning objective:', error);
@@ -6069,7 +6094,7 @@ app.delete('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Re
 });
 
 // 9. Admin: Edit Material SOP
-app.put('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Request, res: Response) => {
+app.put('/api/admin/learning/materials/:id', tenantMiddleware, learningUpload.single('image'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
@@ -6082,12 +6107,18 @@ app.put('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Reque
 
     if (!material) return res.status(404).json({ error: 'Materi tidak ditemukan.' });
 
+    let imageUrl = material.imageUrl;
+    if (req.file) {
+      imageUrl = `/uploads/learning/${req.file.filename}`;
+    }
+
     // Update material
     const updatedMaterial = await (prisma as any).learningMaterial.update({
       where: { id },
       data: {
         title,
         content,
+        imageUrl,
         category,
         targetDivision,
         targetJobTitle
@@ -6142,10 +6173,15 @@ app.put('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Reque
 // --- FASE 39: AI-GENERATED EXAM SYSTEM (OTOMASI TES SOP) ---
 
 // 1. Admin: Upload SOP & Generate Exam
-app.post('/api/learning/materials', tenantMiddleware, async (req: Request, res: Response) => {
+app.post('/api/learning/materials', tenantMiddleware, learningUpload.single('image'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
     const { title, content, category, targetDivision, targetJobTitle, questionCount, minScore } = req.body;
+
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = `/uploads/learning/${req.file.filename}`;
+    }
 
     // Simpan Material SOP
     const material = await (prisma as any).learningMaterial.create({
@@ -6153,6 +6189,7 @@ app.post('/api/learning/materials', tenantMiddleware, async (req: Request, res: 
         companyId: tenantId,
         title,
         content,
+        imageUrl,
         category: category || 'SOP',
         targetDivision: targetDivision || null,
         targetJobTitle: targetJobTitle || null
@@ -6316,7 +6353,9 @@ app.post('/api/learning/exams/:id/submit', tenantMiddleware, async (req: Request
 
     // Auto-complete objectives linked to this material
     const passingScore = exam.minScore ?? 70;
-    if (score >= passingScore && exam.materialId) {
+    const isPassed = score >= passingScore;
+    
+    if (isPassed && exam.materialId) {
       await (prisma as any).learningObjective.updateMany({
         where: {
           userId: userId,
@@ -6329,6 +6368,16 @@ app.post('/api/learning/exams/:id/submit', tenantMiddleware, async (req: Request
         }
       });
     }
+
+    // Kirim notifikasi hasil ujian ke karyawan
+    await sendNotification(
+      tenantId,
+      userId,
+      isPassed ? '🎉 Selamat! Anda Lulus Ujian' : '📝 Hasil Ujian SOP',
+      isPassed 
+        ? `Anda lulus ujian "${exam.title}" dengan skor ${score.toFixed(0)}%. Progress belajar Anda kini 100%.` 
+        : `Skor Anda ${score.toFixed(0)}% pada ujian "${exam.title}". Silakan pelajari materi lagi dan coba kembali.`
+    );
 
     res.json({ attempt, score });
   } catch (error) {
