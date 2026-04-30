@@ -419,12 +419,14 @@ export default function POSReportsPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-1.5">
                                                 <div className={`w-fit px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                                                    sale.notes?.includes('GOFOOD') ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                    sale.notes?.includes('GRABFOOD') ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                    sale.notes?.includes('QRIS') ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('QRIS') || sale.notes?.includes('QRIS')) ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('GOFOOD') || sale.notes?.includes('GOFOOD')) ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('GRABFOOD') || sale.notes?.includes('GRABFOOD')) ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('SHOPEE') || sale.notes?.includes('SHOPEE')) ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('TRANSFER') || sale.notes?.includes('TRANSFER')) ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
                                                     'bg-slate-500/10 text-slate-400 border-slate-500/20'
                                                 }`}>
-                                                    {sale.notes?.match(/\[Metode: (.*?)\]/)?.[1] || 'REGULAR'}
+                                                    {sale.accountName || sale.notes?.match(/\[Metode: (.*?)\]/)?.[1] || 'TUNAI'}
                                                 </div>
                                                 <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest pl-1">
                                                     {sale.saleType || 'Direct'}
