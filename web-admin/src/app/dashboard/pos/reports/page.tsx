@@ -352,10 +352,11 @@ export default function POSReportsPage() {
                                 <option value="all">Semua Pembayaran</option>
                                 <option value="TUNAI">TUNAI</option>
                                 <option value="QRIS">QRIS</option>
-                                <option value="TRANSFER">TRANSFER</option>
+                                <option value="DEBIT">DEBIT / KREDIT</option>
+                                <option value="TRANSFER">TRANSFER BANK</option>
                                 <option value="GOFOOD">GOFOOD</option>
                                 <option value="GRABFOOD">GRABFOOD</option>
-                                <option value="SHOPEEFOOD">SHOPEEFOOD</option>
+                                <option value="SHOPEE">SHOPEEFOOD</option>
                             </select>
                         </div>
                     </div>
@@ -424,6 +425,7 @@ export default function POSReportsPage() {
                                                     (sale.accountName?.toUpperCase().includes('GRABFOOD') || sale.notes?.includes('GRABFOOD')) ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('SHOPEE') || sale.notes?.includes('SHOPEE')) ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('TRANSFER') || sale.notes?.includes('TRANSFER')) ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('DEBIT') || sale.accountName?.toUpperCase().includes('EDC') || sale.notes?.includes('DEBIT')) ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                                     'bg-slate-500/10 text-slate-400 border-slate-500/20'
                                                 }`}>
                                                     {sale.accountName || sale.notes?.match(/\[Metode: (.*?)\]/)?.[1] || 'TUNAI'}

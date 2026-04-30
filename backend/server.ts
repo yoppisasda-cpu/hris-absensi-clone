@@ -11624,9 +11624,19 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
       whereConditions.push(`s."date" < '${d.toISOString().split('T')[0]}'`);
     }
 
-    // Payment Method Filter
+    // Payment Method Filter (Smart Categorization)
     if (paymentMethod && paymentMethod !== 'all') {
-      whereConditions.push(`(s."notes" ILIKE '%${paymentMethod}%' OR fa."name" ILIKE '%${paymentMethod}%')`);
+      if (paymentMethod === 'TUNAI') {
+        whereConditions.push(`(s."notes" ILIKE '%TUNAI%' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%' OR fa."type" = 'CASH')`);
+      } else if (paymentMethod === 'TRANSFER') {
+        whereConditions.push(`(s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')`);
+      } else if (paymentMethod === 'QRIS') {
+        whereConditions.push(`(s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
+      } else if (paymentMethod === 'DEBIT') {
+        whereConditions.push(`(s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR fa."name" ILIKE '%MANDIRI%' OR fa."name" ILIKE '%BCA%')`);
+      } else {
+        whereConditions.push(`(s."notes" ILIKE '%${paymentMethod}%' OR fa."name" ILIKE '%${paymentMethod}%')`);
+      }
     }
 
     // Role-based Access (Non-Admin Restricted to their own branch)
@@ -11689,9 +11699,19 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
     }
 
     if (paymentMethod && paymentMethod !== 'all') {
-      whereConditions.push(`(s."notes" ILIKE $${paramIndex++} OR fa."name" ILIKE $${paramIndex++})`);
-      queryParams.push(`%${paymentMethod}%`);
-      queryParams.push(`%${paymentMethod}%`);
+      if (paymentMethod === 'TUNAI') {
+        whereConditions.push(`(s."notes" ILIKE '%TUNAI%' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%' OR fa."type" = 'CASH')`);
+      } else if (paymentMethod === 'TRANSFER') {
+        whereConditions.push(`(s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')`);
+      } else if (paymentMethod === 'QRIS') {
+        whereConditions.push(`(s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
+      } else if (paymentMethod === 'DEBIT') {
+        whereConditions.push(`(s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%')`);
+      } else {
+        whereConditions.push(`(s."notes" ILIKE $${paramIndex++} OR fa."name" ILIKE $${paramIndex++})`);
+        queryParams.push(`%${paymentMethod}%`);
+        queryParams.push(`%${paymentMethod}%`);
+      }
     }
 
     const whereClause = whereConditions.join(' AND ');
