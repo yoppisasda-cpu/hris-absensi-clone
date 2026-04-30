@@ -11993,7 +11993,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     // 1. Get user branch
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
-    const { branchId, startDate, endDate, paymentMethod } = req.query;
+    const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
 
     // 2. Build query based on branch and role
     const isPosViewer = (user?.role as string) === 'POS_VIEWER';
@@ -12043,6 +12043,11 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
       }
     }
 
+    // Sale Type Filter
+    if (saleType && saleType !== 'all') {
+      whereConditions.push(`s."saleType" = '${saleType}'`);
+    }
+
     // Role-based Access (Non-Admin Restricted to their own branch)
     const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '');
     if (!isAdmin && !isPosViewer) {
@@ -12076,7 +12081,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
     const tenantId = Number((req as any).tenantId);
     if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
 
-    const { branchId, startDate, endDate, paymentMethod } = req.query;
+    const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
 
     let whereConditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`];
     let queryParams: any[] = [tenantId];
@@ -12116,6 +12121,11 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
         queryParams.push(`%${paymentMethod}%`);
         queryParams.push(`%${paymentMethod}%`);
       }
+    }
+
+    if (saleType && saleType !== 'all') {
+      whereConditions.push(`s."saleType" = $${paramIndex++}`);
+      queryParams.push(saleType as string);
     }
 
     const whereClause = whereConditions.join(' AND ');
