@@ -87,7 +87,14 @@ class _POSScreenState extends State<POSScreen> {
         _products = prods;
         _categories = cats;
         _accounts = accs;
-        if (accs.isNotEmpty) _selectedAccountId = accs[0]['id'];
+        if (_accounts.isNotEmpty) {
+           _selectedPaymentMethod = 'Tunai';
+           final cashAcc = _accounts.firstWhere(
+             (a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), 
+             orElse: () => _accounts.first
+           );
+           _selectedAccountId = cashAcc['id'];
+        }
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

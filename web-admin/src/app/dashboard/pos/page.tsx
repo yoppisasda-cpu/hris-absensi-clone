@@ -60,9 +60,8 @@ export default function POSPage() {
             setCategories(catRes.data);
             setAccounts(accRes.data);
             
-            if (accRes.data.length > 0) {
-                setSelectedAccount(accRes.data[0].id);
-            }
+            // Force manual selection to prevent accidental usage of default account
+            setSelectedAccount(null);
         } catch (error) {
             console.error("Failed to fetch POS data", error);
             toast.error("Gagal mengambil data produk");
