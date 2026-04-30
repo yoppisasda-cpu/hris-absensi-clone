@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, CalendarCheck, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit, Sparkles, Database, Upload, Gift } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, CalendarCheck, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit, Sparkles, Database, Upload, Gift, Image as ImageIcon } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useFeatures } from '@/lib/FeatureContext';
 import api from '@/lib/api';
@@ -435,6 +435,10 @@ export default function Sidebar() {
                         <Link href="/dashboard/loyalty" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <Gift className="h-5 w-5 text-fuchsia-400" />
                             Loyalty & Promo
+                        </Link>
+                        <Link href="/dashboard/banners" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <ImageIcon className="h-5 w-5 text-orange-400" />
+                            Banner Promo
                         </Link>
                         <Link href="/dashboard/suppliers" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <Truck className="h-5 w-5 text-amber-400" />

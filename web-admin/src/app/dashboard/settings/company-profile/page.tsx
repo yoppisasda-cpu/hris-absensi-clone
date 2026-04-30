@@ -29,6 +29,8 @@ interface Company {
     waProspectTemplate?: string | null;
     timezone: string;
     addons: string[];
+    primaryColor: string | null;
+    secondaryColor: string | null;
 }
 
 export default function CompanyProfilePage() {
@@ -48,7 +50,9 @@ export default function CompanyProfilePage() {
         waApiKey: '',
         waGatewayUrl: '',
         waProspectTemplate: '',
-        timezone: 'Asia/Jakarta'
+        timezone: 'Asia/Jakarta',
+        primaryColor: '#3B82F6',
+        secondaryColor: '#1E293B'
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -89,7 +93,9 @@ export default function CompanyProfilePage() {
                 waApiKey: response.data.waApiKey || '',
                 waGatewayUrl: response.data.waGatewayUrl || '',
                 waProspectTemplate: response.data.waProspectTemplate || '',
-                timezone: response.data.timezone || 'Asia/Jakarta'
+                timezone: response.data.timezone || 'Asia/Jakarta',
+                primaryColor: response.data.primaryColor || '#3B82F6',
+                secondaryColor: response.data.secondaryColor || '#1E293B'
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -131,7 +137,9 @@ export default function CompanyProfilePage() {
                 waApiKey: formData.waApiKey,
                 waGatewayUrl: formData.waGatewayUrl,
                 waProspectTemplate: formData.waProspectTemplate,
-                timezone: formData.timezone
+                timezone: formData.timezone,
+                primaryColor: formData.primaryColor,
+                secondaryColor: formData.secondaryColor
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -346,6 +354,53 @@ export default function CompanyProfilePage() {
                                                 className="w-full rounded-xl border border-slate-200 py-3 pl-14 pr-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none hover:border-slate-300"
                                                 placeholder="8123XXX"
                                             />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <div className="h-6 w-1 bg-indigo-500 rounded-full"></div>
+                                        <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Identitas Visual (Branding)</h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Warna Utama (Primary)</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="color"
+                                                    value={formData.primaryColor}
+                                                    onChange={e => setFormData({ ...formData, primaryColor: e.target.value })}
+                                                    className="h-11 w-11 rounded-lg border border-slate-200 cursor-pointer"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={formData.primaryColor}
+                                                    onChange={e => setFormData({ ...formData, primaryColor: e.target.value })}
+                                                    className="flex-grow rounded-xl border border-slate-200 py-3 px-4 text-sm font-mono font-bold text-slate-700 transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none hover:border-slate-300"
+                                                    placeholder="#3B82F6"
+                                                />
+                                            </div>
+                                            <p className="mt-1.5 text-[10px] text-slate-400 font-medium italic">* Digunakan untuk tombol dan elemen utama di aplikasi.</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Warna Latar (Secondary)</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="color"
+                                                    value={formData.secondaryColor}
+                                                    onChange={e => setFormData({ ...formData, secondaryColor: e.target.value })}
+                                                    className="h-11 w-11 rounded-lg border border-slate-200 cursor-pointer"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={formData.secondaryColor}
+                                                    onChange={e => setFormData({ ...formData, secondaryColor: e.target.value })}
+                                                    className="flex-grow rounded-xl border border-slate-200 py-3 px-4 text-sm font-mono font-bold text-slate-700 transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none hover:border-slate-300"
+                                                    placeholder="#1E293B"
+                                                />
+                                            </div>
+                                            <p className="mt-1.5 text-[10px] text-slate-400 font-medium italic">* Digunakan untuk warna background aplikasi mobile.</p>
                                         </div>
                                     </div>
                                 </div>

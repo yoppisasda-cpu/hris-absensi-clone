@@ -86,6 +86,7 @@ export default function CompaniesPage() {
     const [addonFraud, setAddonFraud] = useState(false);
     const [addonExpansion, setAddonExpansion] = useState(false);
     const [addonProspecting, setAddonProspecting] = useState(false);
+    const [addonAivolaGo, setAddonAivolaGo] = useState(false);
 
     // Discount States (Percent)
     const [discountKpi, setDiscountKpi] = useState('0');
@@ -187,6 +188,7 @@ export default function CompaniesPage() {
         setDiscountExpansion('0');
         setDiscountProspecting('0');
         setAddonProspecting(false);
+        setAddonAivolaGo(false);
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
@@ -231,7 +233,8 @@ export default function CompaniesPage() {
                     ...(addonAi ? ['AI_ADVISOR'] : []),
                     ...(addonFraud ? ['FRAUD_DETECTION'] : []),
                     ...(addonExpansion ? ['STAFF_EXPANSION'] : []),
-                    ...(addonProspecting ? ['PROSPECTING_AI'] : [])
+                    ...(addonProspecting ? ['PROSPECTING_AI'] : []),
+                    ...(addonAivolaGo ? ['AIVOLA_GO'] : [])
                 ],
                 discountKpi: parseInt(discountKpi) || 0,
                 discountLearning: parseInt(discountLearning) || 0,
@@ -261,7 +264,8 @@ export default function CompaniesPage() {
                         ...(addonInventory ? ['INVENTORY'] : []),
                         ...(addonAi ? ['AI_ADVISOR'] : []),
                         ...(addonFraud ? ['FRAUD_DETECTION'] : []),
-                        ...(addonExpansion ? ['STAFF_EXPANSION'] : [])
+                        ...(addonExpansion ? ['STAFF_EXPANSION'] : []),
+                        ...(addonAivolaGo ? ['AIVOLA_GO'] : [])
                     ]));
                     // Trigger a storage event for other components like Sidebar to update
                     window.dispatchEvent(new Event('storage'));
@@ -316,6 +320,7 @@ export default function CompaniesPage() {
         setAddonFraud(addons.includes('FRAUD_DETECTION'));
         setAddonExpansion(addons.includes('STAFF_EXPANSION'));
         setAddonProspecting(addons.includes('PROSPECTING_AI'));
+        setAddonAivolaGo(addons.includes('AIVOLA_GO'));
 
         setDiscountKpi(company.discountKpi?.toString() || '0');
         setDiscountLearning(company.discountLearning?.toString() || '0');
@@ -478,6 +483,12 @@ export default function CompaniesPage() {
             const cost = unitPrice * multiplier;
             addonTotal += cost;
             detailItems.push({ name: `Add-on: Prospecting AI (MAP) ${disc > 0 ? `(Disc ${disc}%)` : ''}`, price: unitPrice, qty: periodUnit, total: cost });
+        }
+        if (addons.includes('AIVOLA_GO')) {
+            const unitPrice = 25000;
+            const cost = unitPrice * multiplier;
+            addonTotal += cost;
+            detailItems.push({ name: `Add-on: Aivola GO Ecosystem`, price: unitPrice, qty: periodUnit, total: cost });
         }
 
         // Expanded Staff Logic
@@ -826,6 +837,22 @@ export default function CompaniesPage() {
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start gap-3 p-3 rounded-lg border border-blue-200 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all bg-blue-50/30">
+                                        <input
+                                            type="checkbox"
+                                            checked={addonAivolaGo}
+                                            onChange={(e) => setAddonAivolaGo(e.target.checked)}
+                                            className="mt-0.5 h-4 w-4 rounded accent-blue-600"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                                                🚀 Aivola GO Ecosystem
+                                                <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded">Rp 25.000/bln</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Munculkan brand & katalog produk di aplikasi ekosistem Aivola GO.</div>
                                         </div>
                                     </label>
 
