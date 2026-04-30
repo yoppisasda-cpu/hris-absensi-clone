@@ -305,6 +305,7 @@ export default function Sidebar() {
                     EXECUTIVE INTEL
                 </Link>
 
+
                 <div 
                     onClick={() => {
                         if (!hasFeature('AI_ADVISOR')) {
@@ -516,7 +517,7 @@ export default function Sidebar() {
                         </Link>
                         <Link href="/dashboard/inventory/adjustments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <Clock className="h-5 w-5 text-slate-400" />
-                            Penyesuaian Stok
+                            Penyesuaian Stok (Stock Opname)
                         </Link>
                         <Link href="/dashboard/inventory/purchase-orders" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <ShoppingBag className="h-5 w-5 text-blue-400" />

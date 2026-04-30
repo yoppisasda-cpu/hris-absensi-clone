@@ -129,7 +129,7 @@ export default function ProductsPage() {
                     </div>
                     <div>
                         <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase leading-none">Produk & Stok</h1>
-                        <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-2 italic">Real-time Inventory & Catalog Control System</p>
+                        <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-2 italic">Sistem Kontrol Inventaris & Katalog Real-time</p>
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-3 w-full md:w-auto">
@@ -469,7 +469,7 @@ export default function ProductsPage() {
                                                                 }}
                                                                 className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
                                                             >
-                                                                <Edit3 className="h-4 w-4 text-amber-500" /> Stock Koreksi
+                                                                <Edit3 className="h-4 w-4 text-amber-500" /> Koreksi Stok (Opname)
                                                             </button>
                                                             <button 
                                                                 onClick={() => {

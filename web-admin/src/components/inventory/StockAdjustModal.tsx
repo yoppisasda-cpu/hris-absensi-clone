@@ -90,7 +90,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                             <History className="h-6 w-6 stroke-[2.5px]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Stock Sync Protocol</h3>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Protokol Sinkronisasi Stok (Opname)</h3>
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic truncate max-w-[200px]">{product?.name?.toUpperCase()}</p>
                         </div>
                     </div>
@@ -104,12 +104,12 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                     <div className="p-8 bg-slate-950 border border-white/5 rounded-[2.5rem] flex items-center justify-between shadow-inner relative overflow-hidden group">
                         <div className="absolute top-0 right-0 h-32 w-32 bg-indigo-500/5 blur-3xl -mr-16 -mt-16 rounded-full group-hover:bg-indigo-500/10 transition-colors"></div>
                         <div className="text-center flex-1 border-r border-white/5 relative z-10">
-                            <p className="text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] mb-2 italic">Current_Hand</p>
+                            <p className="text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] mb-2 italic">Stok_Saat_Ini</p>
                             <p className="text-2xl font-black text-white italic tracking-tighter uppercase">{product?.stock} <span className="text-[10px] text-slate-800 not-italic ml-1">U</span></p>
                         </div>
                         <div className="px-5 text-indigo-500/20 font-black italic relative z-10 animate-pulse">➤</div>
                         <div className="text-center flex-1 relative z-10">
-                            <p className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-2 italic">Forecasted</p>
+                            <p className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-2 italic">Estimasi_Akhir</p>
                             <p className="text-2xl font-black text-indigo-500 italic tracking-tighter">
                                 {formData.type === 'IN' ? (product?.stock || 0) + (formData.quantity || 0) :
                                  formData.type === 'OUT' ? (product?.stock || 0) - (formData.quantity || 0) :
@@ -132,7 +132,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                                         : 'text-slate-600 hover:text-white'
                                     }`}
                                 >
-                                    {t === 'IN' ? 'RECEIVE' : t === 'OUT' ? 'REDUCE' : 'OVERWRITE'}
+                                    {t === 'IN' ? 'MASUK' : t === 'OUT' ? 'KELUAR' : 'OPNAME (TOTAL)'}
                                 </button>
                             ))}
                         </div>
@@ -140,7 +140,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Effective Magnitude</label>
+                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Jumlah Perubahan</label>
                             <div className="relative">
                                 <input
                                     required
@@ -160,7 +160,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Facility Target</label>
+                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Target Lokasi</label>
                             <select
                                 required
                                 className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-4 px-6 text-[10px] font-black text-white focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer"
@@ -178,7 +178,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                     {formData.type === 'IN' && (
                         <div className="space-y-6 animate-in slide-in-from-top-4 duration-500">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Origin Node (Supplier)</label>
+                                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Sumber (Supplier)</label>
                                 <select
                                     className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-4 px-6 text-[10px] font-black text-white focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer"
                                     value={formData.supplierId}
@@ -200,7 +200,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                                                 <Wallet className="h-5 w-5 stroke-[2.5px]" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] font-black text-white uppercase italic tracking-widest leading-none">Fiscal Syncing</p>
+                                                <p className="text-[10px] font-black text-white uppercase italic tracking-widest leading-none">Integrasi Biaya Finance</p>
                                                 <p className="text-[9px] text-amber-500/60 font-black uppercase mt-2 italic tracking-[0.1em]">EST_VALUATION: Rp {(formData.quantity * product?.costPrice).toLocaleString()}</p>
                                             </div>
                                         </div>
@@ -266,7 +266,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                     )}
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Reference Memo / Directive</label>
+                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Referensi / Catatan</label>
                         <textarea
                             className="w-full rounded-[2rem] bg-slate-950 border border-slate-800 py-6 px-8 text-xs font-black text-white focus:border-amber-500/50 outline-none transition-all shadow-inner italic placeholder:text-slate-900 min-h-[120px] no-scrollbar uppercase tracking-[0.1em] resize-none"
                             placeholder="INPUT_SYNC_ANCHORS..."
@@ -281,7 +281,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                             onClick={onClose}
                             className="flex-1 rounded-2xl bg-white/5 border border-white/5 py-5 text-[10px] font-black text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-[0.3em] italic"
                         >
-                            Abort
+                            Batal
                         </button>
                         <button
                             type="submit"
@@ -291,7 +291,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                             {loading ? (
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                             ) : (
-                                <><History className="h-4 w-4 stroke-[3px]" /> Execute Stock Sync</>
+                                <><History className="h-4 w-4 stroke-[3px]" /> Laksanakan Sinkronisasi Stok</>
                             )}
                         </button>
                     </div>

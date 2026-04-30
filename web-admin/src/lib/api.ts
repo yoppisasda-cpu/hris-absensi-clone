@@ -21,8 +21,8 @@ const getBaseURL = () => {
 
         // If on Localhost
         if (host === 'localhost' || host === '127.0.0.1') {
-            console.log("[API] Hits Backend at (Localhost): http://localhost:5000/api");
-            return 'http://localhost:5000/api';
+            console.log("[API] Hits Backend at (Localhost): http://localhost:5005/api");
+            return 'http://localhost:5005/api';
         }
 
         // If on Railway, usually the API is a different service. 
@@ -32,7 +32,7 @@ const getBaseURL = () => {
     }
     
     // Default fallback to local for development if nothing else matches
-    const defaultApi = 'http://localhost:5000/api';
+    const defaultApi = 'http://localhost:5005/api';
     console.log("[API] Hits Backend at (Default):", defaultApi);
     return defaultApi; 
 };

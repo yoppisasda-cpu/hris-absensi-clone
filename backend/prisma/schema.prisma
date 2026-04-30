@@ -1160,6 +1160,33 @@ model Assignment {
   user           User             @relation("AssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Competitor {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  brand     String?
+  latitude  Float
+  longitude Float
+  category  String?
+  strength  Int?     @default(5)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MarketAnalysis {
+  id             Int      @id @default(autoincrement())
+  companyId      Int
+  company        Company  @relation(fields: [companyId], references: [id])
+  regionName     String
+  coordinates    Json
+  saturation     Float?
+  recommendation String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 enum AppModule {
   ABSENSI
   FINANCE

@@ -33,7 +33,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // Proactive: Save to backend if token exists
         const token = localStorage.getItem('token');
         if (token) {
-            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/users/me/settings`, {
+            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5005/api'}/users/me/settings`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',

@@ -55,11 +55,11 @@ export default function AdjustmentsPage() {
                         <History className="h-6 w-6 stroke-[2.5px]" />
                     </div>
                     <h1 className="text-4xl font-black italic tracking-tighter text-white uppercase text-glow-sm">
-                        Movement <span className="text-indigo-500">Analytics</span>
+                        Analisis <span className="text-indigo-500">Pergerakan</span>
                     </h1>
                 </div>
                 <p className="text-[11px] font-black text-slate-500 tracking-[0.2em] uppercase italic max-w-2xl leading-relaxed">
-                    Granular audit trail of global stock vectors. Monitor every injection, depletion, and correction across the distributed logistics network.
+                    Jalur audit rinci dari pergerakan stok global. Pantau setiap penambahan, pengurangan, dan koreksi di seluruh jaringan logistik.
                 </p>
             </div>
 
@@ -69,7 +69,7 @@ export default function AdjustmentsPage() {
                         <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400 transition-colors z-10" />
                         <input
                             type="text"
-                            placeholder="SEARCH PRODUCT, SKU, OR LOG REFERENCE..."
+                            placeholder="CARI PRODUK, SKU, ATAU REFERENSI LOG..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-6 text-[10px] font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase placeholder:text-slate-800 shadow-inner"
@@ -86,11 +86,11 @@ export default function AdjustmentsPage() {
                     <table className="w-full border-collapse text-left text-sm">
                         <thead>
                             <tr className="bg-slate-950/50">
-                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic border-b border-white/5">Temporal Marker</th>
-                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic border-b border-white/5">SKU / Descriptor</th>
-                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic border-b border-white/5">Vector Type</th>
-                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic text-center border-b border-white/5">Magnitutde</th>
-                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic border-b border-white/5">Reference Directive</th>
+                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic border-b border-white/5">Penanda Waktu</th>
+                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic border-b border-white/5">SKU / Deskripsi</th>
+                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic border-b border-white/5">Tipe Pergerakan</th>
+                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic text-center border-b border-white/5">Jumlah</th>
+                                <th className="px-8 py-5 font-black uppercase tracking-[0.2em] text-[9px] text-slate-500 italic border-b border-white/5">Referensi / Catatan</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
@@ -147,7 +147,7 @@ export default function AdjustmentsPage() {
                                             <div className="h-20 w-20 rounded-[32px] bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-800">
                                                 <History className="h-10 w-10" />
                                             </div>
-                                            NO MOVEMENT PROTOCOLS DETECTED
+                                            TIDAK ADA PROTOKOL PERGERAKAN TERDETEKSI
                                         </div>
                                     </td>
                                 </tr>
@@ -159,9 +159,9 @@ export default function AdjustmentsPage() {
 
             <div className="flex flex-col lg:flex-row items-center justify-between gap-6 py-12 border-t border-white/5 italic">
                 <div className="flex items-center gap-6 text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                    <p>© 2026 AIVOLA CORE - GLOBAL LOGISTICS ANALYTICS</p>
+                    <p>© 2026 AIVOLA CORE - ANALITIK LOGISTIK GLOBAL</p>
                     <span className="h-1 w-1 bg-indigo-500 rounded-full animate-ping"></span>
-                    <p>STOCK INTEGRITY CERTIFIED</p>
+                    <p>INTEGRITAS STOK TERVERIFIKASI</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="h-2 w-10 rounded-full bg-indigo-500/20 border border-indigo-500/30"></div>

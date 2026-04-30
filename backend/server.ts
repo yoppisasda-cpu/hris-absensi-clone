@@ -21,6 +21,7 @@ import { getAIChatResponse, generateSubscriptionResponse } from './chatAI';
 import { sendWhatsAppMessage } from './whatsappAPI';
 import aiRoutes from './src/routes/ai.routes';
 import prospectRoutes from './src/routes/prospect.routes';
+// import prospectingRoutes from './src/routes/prospecting.routes'; // Hold for now
 import { getFinancialForecast, getFinancialFlow, getPayrollProductivityInsights, getFinancialHealthScore } from './financeAI';
 
 console.log('🚀 [BOOT] Aivola Backend v1.0.7-recalc-fix starting...');
@@ -493,6 +494,7 @@ app.get('/api/debug-db', (req, res) => {
 app.use('/uploads', express.static('uploads'));
 
 app.use('/api/ai', aiRoutes);
+// app.use('/api/prospecting', tenantMiddleware, prospectingRoutes); // Hold for now
 
 // Logging Middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -12565,32 +12567,34 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
 
       // 3. Finance
-      await tx.financialAccount.update({
-        where: { id: accountId },
-        data: { balance: { increment: totalAmount } }
-      });
+      if (accountId) {
+        await tx.financialAccount.update({
+          where: { id: Number(accountId) },
+          data: { balance: { increment: Number(totalAmount) } }
+        });
 
-      // Record Income
-      const category = await tx.incomeCategory.upsert({
-        where: { companyId_name: { companyId: tenantId, name: 'Penjualan POS' } },
-        update: {},
-        create: { companyId: tenantId, name: 'Penjualan POS' }
-      });
+        // Record Income
+        const category = await tx.incomeCategory.upsert({
+          where: { companyId_name: { companyId: tenantId, name: 'Penjualan POS' } },
+          update: {},
+          create: { companyId: tenantId, name: 'Penjualan POS' }
+        });
 
-      await tx.income.create({
-        data: {
-          companyId: tenantId,
-          branchId: user?.branchId || null,
-          accountId,
-          categoryId: category.id,
-          amount: totalAmount,
-          receivedFrom: `Pelanggan POS (${saleType})`,
-          description: `POS #${invoiceNumber} (${saleType})`
-        }
-      });
+        await tx.income.create({
+          data: {
+            companyId: tenantId,
+            branchId: user?.branchId || null,
+            accountId: Number(accountId),
+            categoryId: category.id,
+            amount: Number(totalAmount),
+            receivedFrom: `Pelanggan POS (${saleType})`,
+            description: `POS #${invoiceNumber} (${saleType})`
+          }
+        });
+      }
 
       return sale;
-    });
+    }, { timeout: 30000 });
 
     res.json(result);
   } catch (error: any) {
