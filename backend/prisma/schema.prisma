@@ -105,6 +105,8 @@ model Company {
   warehouses             Warehouse[]
   prospects             Prospect[]
   chatSessions          ChatSession[]
+  competitors            Competitor[]
+  marketAnalyses         MarketAnalysis[]
 }
 
 model FinancialAccount {
