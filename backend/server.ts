@@ -1577,7 +1577,7 @@ app.post('/api/banners', tenantMiddleware, uploadBanner.single('image'), async (
 app.patch('/api/banners/:id', tenantMiddleware, uploadBanner.single('image'), async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { title, linkUrl, isActive, order } = req.body;
     let imageUrl = undefined;
 
@@ -1617,7 +1617,7 @@ app.patch('/api/banners/:id', tenantMiddleware, uploadBanner.single('image'), as
 app.delete('/api/banners/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     await prisma.banner.deleteMany({
       where: { id, companyId: tenantId }
     });
@@ -1704,7 +1704,6 @@ app.patch('/api/users/me', tenantMiddleware, async (req: Request, res: Response)
       data: {
         name: name || undefined,
         email: email || undefined,
-        phone: phone || undefined,
         avatarUrl: req.body.avatarUrl !== undefined ? req.body.avatarUrl : undefined
       }
     });
@@ -13698,7 +13697,7 @@ app.patch('/api/assignments/:id/approve', tenantMiddleware, async (req: Request,
 
 // Get Active Banners for a Company (Public)
 app.get('/api/companies/public/:id/banners', async (req: Request, res: Response) => {
-  const companyId = parseInt(req.params.id);
+  const companyId = parseInt(req.params.id as string);
   console.log(`[Banners API] Fetching for companyId: ${companyId}`);
   try {
     const banners = await prisma.banner.findMany({
@@ -13713,7 +13712,7 @@ app.get('/api/companies/public/:id/banners', async (req: Request, res: Response)
 
 // Get Active Vouchers for a Company (Public)
 app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response) => {
-  const companyId = parseInt(req.params.id);
+  const companyId = parseInt(req.params.id as string);
   console.log(`[Vouchers API] Fetching for companyId: ${companyId}`);
   try {
     const vouchers = await prisma.voucher.findMany({
