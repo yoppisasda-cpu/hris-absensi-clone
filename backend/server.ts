@@ -1409,7 +1409,7 @@ app.get('/api/companies/public', async (req: Request, res: Response) => {
 // --- GET PRODUCTS FOR SPECIFIC PUBLIC MERCHANT ---
 app.get('/api/companies/public/:id/products', async (req: Request, res: Response) => {
   try {
-    const companyId = parseInt(req.params.id);
+    const companyId = parseInt(req.params.id as string);
     const { branchId } = req.query;
 
     const products = await prisma.product.findMany({
@@ -1461,7 +1461,7 @@ app.get('/api/companies/public/:id/products', async (req: Request, res: Response
 // --- GET CATEGORIES FOR SPECIFIC PUBLIC MERCHANT ---
 app.get('/api/companies/public/:id/categories', async (req: Request, res: Response) => {
   try {
-    const companyId = parseInt(req.params.id);
+    const companyId = parseInt(req.params.id as string);
     const categories = await prisma.productCategory.findMany({
       where: { 
         companyId,
@@ -1481,7 +1481,7 @@ app.get('/api/companies/public/:id/categories', async (req: Request, res: Respon
 // --- GET BRANCHES FOR SPECIFIC PUBLIC MERCHANT ---
 app.get('/api/companies/public/:id/branches', async (req: Request, res: Response) => {
   try {
-    const companyId = parseInt(req.params.id);
+    const companyId = parseInt(req.params.id as string);
     const branches = await prisma.branch.findMany({
       where: { 
         companyId,
@@ -1501,7 +1501,7 @@ app.get('/api/companies/public/:id/branches', async (req: Request, res: Response
 // --- GET BANNERS FOR SPECIFIC PUBLIC MERCHANT ---
 app.get('/api/companies/public/:id/banners', async (req: Request, res: Response) => {
   try {
-    const companyId = parseInt(req.params.id);
+    const companyId = parseInt(req.params.id as string);
     const banners = await prisma.banner.findMany({
       where: { 
         companyId,
