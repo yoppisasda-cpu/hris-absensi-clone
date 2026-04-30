@@ -214,7 +214,7 @@ export const ProspectController = {
       // 2. Get Company for template
       const company = await prisma.company.findUnique({
         where: { id: prospect.companyId },
-        select: { waProspectTemplate: true, name: true }
+        select: { waProspectTemplate: true, name: true, waGatewayUrl: true, waApiKey: true }
       });
 
       // 3. Generate message (Prefer company template, then fallback)
@@ -225,8 +225,8 @@ export const ProspectController = {
 
       console.log(`📡 [PROSPECT] Sending Auto-Broadcast to ${prospect.phone}...`);
       
-      // 4. Send via central Wablas (passing undefined for custom credentials to use .env)
-      const result = await sendWhatsAppMessage(prospect.phone, finalMessage);
+      // 4. Send via company's Wablas (no fallback to Aivola default for marketing)
+      const result = await sendWhatsAppMessage(prospect.phone, finalMessage, company?.waGatewayUrl || undefined, company?.waApiKey || undefined, false);
 
       if (result?.status) {
         // Update status to contacted

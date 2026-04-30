@@ -78,7 +78,8 @@ export default function POSReportsPage() {
                 params: { 
                     branchId: selectedBranchId,
                     startDate,
-                    endDate
+                    endDate,
+                    paymentMethod: paymentFilter
                 }
             });
             setAnalytics(analyticsRes.data);

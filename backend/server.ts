@@ -11185,7 +11185,7 @@ app.post('/api/customers/otp-request', tenantMiddleware, async (req: Request, re
     
     console.log(`[OTP] Mengirim WA via Wablas...`);
     // @ts-ignore
-    const waResult = await sendWhatsAppMessage(phone, message, company?.waGatewayUrl, company?.waApiKey);
+    const waResult = await sendWhatsAppMessage(phone, message, company?.waGatewayUrl || undefined, company?.waApiKey || undefined, true);
     console.log(`[OTP] Hasil:`, waResult);
 
     res.json({ message: 'OTP berhasil dikirim ke WhatsApp' });
@@ -11626,7 +11626,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     // Payment Method Filter
     if (paymentMethod && paymentMethod !== 'all') {
-      whereConditions.push(`s."notes" ILIKE '%${paymentMethod}%'`);
+      whereConditions.push(`(s."notes" ILIKE '%${paymentMethod}%' OR fa."name" ILIKE '%${paymentMethod}%')`);
     }
 
     // Role-based Access (Non-Admin Restricted to their own branch)
@@ -11643,9 +11643,10 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
     
     // Use explicit column selection to avoid property name issues
     const sales = await prisma.$queryRawUnsafe(`
-      SELECT s.*, c.name as "customerName"
+      SELECT s.*, c.name as "customerName", fa.name as "accountName"
       FROM "Sale" s
       LEFT JOIN "Customer" c ON s."customerId" = c.id
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       ${whereClause}
       ORDER BY s."date" DESC
     `);
@@ -11661,7 +11662,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
     const tenantId = Number((req as any).tenantId);
     if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
 
-    const { branchId, startDate, endDate } = req.query;
+    const { branchId, startDate, endDate, paymentMethod } = req.query;
 
     let whereConditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`];
     let queryParams: any[] = [tenantId];
@@ -11687,6 +11688,12 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
       queryParams.push(d);
     }
 
+    if (paymentMethod && paymentMethod !== 'all') {
+      whereConditions.push(`(s."notes" ILIKE $${paramIndex++} OR fa."name" ILIKE $${paramIndex++})`);
+      queryParams.push(`%${paymentMethod}%`);
+      queryParams.push(`%${paymentMethod}%`);
+    }
+
     const whereClause = whereConditions.join(' AND ');
 
     // 1. Top Products
@@ -11695,6 +11702,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
       FROM "SaleItem" si
       JOIN "Sale" s ON si."saleId" = s.id
       JOIN "Product" p ON si."productId" = p.id
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       WHERE ${whereClause}
       GROUP BY p.name
       ORDER BY "totalSold" DESC
@@ -11705,6 +11713,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
     const salesTrend = await prisma.$queryRawUnsafe(`
       SELECT DATE_TRUNC('day', s."date") as "date", SUM(s."totalAmount") as "total", COUNT(s.id) as "count"
       FROM "Sale" s
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       WHERE ${whereClause}
       GROUP BY DATE_TRUNC('day', s."date")
       ORDER BY "date" ASC
@@ -11716,15 +11725,16 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
       FROM (
         SELECT 
           CASE 
-            WHEN s."notes" ILIKE '%QRIS%' THEN 'QRIS'
-            WHEN s."notes" ILIKE '%GOFOOD%' THEN 'GOFOOD'
-            WHEN s."notes" ILIKE '%GRABFOOD%' THEN 'GRABFOOD'
-            WHEN s."notes" ILIKE '%SHOPEEFOOD%' THEN 'SHOPEEFOOD'
-            WHEN s."notes" ILIKE '%TRANSFER%' THEN 'TRANSFER'
+            WHEN s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%' THEN 'QRIS'
+            WHEN s."notes" ILIKE '%GOFOOD%' OR fa."name" ILIKE '%GOFOOD%' THEN 'GOFOOD'
+            WHEN s."notes" ILIKE '%GRABFOOD%' OR fa."name" ILIKE '%GRABFOOD%' THEN 'GRABFOOD'
+            WHEN s."notes" ILIKE '%SHOPEEFOOD%' OR fa."name" ILIKE '%SHOPEEFOOD%' THEN 'SHOPEEFOOD'
+            WHEN s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' THEN 'TRANSFER'
             ELSE 'TUNAI'
           END as method,
           s."totalAmount" as totalAmount
         FROM "Sale" s
+        LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
         WHERE ${whereClause}
       ) sub
       GROUP BY method
@@ -12403,6 +12413,11 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       });
 
       if (!warehouse) throw new Error("Gudang penjualan tidak ditemukan. Hubungin admin.");
+      
+      // 0. Get Account Name for notes
+      const account = accountId ? await tx.financialAccount.findUnique({ where: { id: Number(accountId) } }) : null;
+      const paymentMethodTag = account ? `[Metode: ${account.name.toUpperCase()}]` : '';
+      const finalNotes = notes ? `${notes} ${paymentMethodTag}` : paymentMethodTag;
 
       // 0. Sync Customer if phone provided
       let finalCustomerId = customerId ? Number(customerId) : null;
@@ -12450,7 +12465,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           invoiceNumber,
           totalAmount: Number(totalAmount),
           totalCommission: Number(totalCommission),
-          notes,
+          notes: finalNotes,
           status: 'PAID',
           saleType,
           serviceFee: Number(serviceFee),

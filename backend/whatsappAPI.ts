@@ -7,13 +7,13 @@ dotenv.config();
  * Mengirim pesan via Wablas Gateway.
  * Mendukung API Key global dari .env atau API Key spesifik per-perusahaan.
  */
-export async function sendWhatsAppMessage(to: string, message: string, customDomain?: string, customToken?: string) {
-    const DOMAIN = customDomain || process.env.WA_GATEWAY_URL;
-    const TOKEN = customToken || process.env.WA_API_KEY;
+export async function sendWhatsAppMessage(to: string, message: string, customDomain?: string, customToken?: string, allowFallback: boolean = false) {
+    const DOMAIN = customDomain || (allowFallback ? process.env.WA_GATEWAY_URL : null);
+    const TOKEN = customToken || (allowFallback ? process.env.WA_API_KEY : null);
 
     if (!DOMAIN || !TOKEN) {
         console.error('❌ [WA API] Konfigurasi WhatsApp (Domain/Token) tidak ditemukan.');
-        return;
+        return { status: false, error: 'Konfigurasi WhatsApp tidak ditemukan.' };
     }
 
     // --- FORMAT NOMOR HP (Indo: 08xx -> 628xx) ---
