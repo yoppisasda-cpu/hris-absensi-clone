@@ -21,6 +21,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         showInPos: true,
         type: "FINISHED_GOOD",
         trackStock: true,
+        priceGofood: 0,
+        priceGrabfood: 0,
         priceShopeefood: 0,
         recipeYield: 0,
         imageUrl: ""
