@@ -80,9 +80,17 @@ class _POSScreenState extends State<POSScreen> {
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
     try {
-      final prods = await _apiService.getPosProducts();
-      final cats = await _apiService.getPosCategories();
-      final accs = await _apiService.getFinancialAccounts();
+      // Parallelize API calls for better performance
+      final results = await Future.wait([
+        _apiService.getPosProducts(),
+        _apiService.getPosCategories(),
+        _apiService.getFinancialAccounts(),
+      ]);
+
+      final prods = results[0];
+      final cats = results[1];
+      final accs = results[2];
+
       setState(() {
         _products = prods;
         _categories = cats;
@@ -1021,30 +1029,18 @@ class _POSScreenState extends State<POSScreen> {
         'customerName': _customerNameController.text.trim(),
       };
 
-      if (await _printerService.isAutoPrintEnabled()) {
-        _printerService.printReceipt(saleData);
-      }
-      
-      setState(() {
-        _cart.clear();
-        _customerNameController.clear();
-        _customerPhoneController.clear();
-        _activeCustomerId = null;
-        _voucherController.clear();
-        _usePoints = false;
-        _availablePoints = 0;
-        _memberDiscountAmount = 0;
-        _voucherDiscountAmount = 0;
-        _pointsUsed = 0;
-        _pointsEarned = 0;
-        _pointValueUsed = 0;
-        _calculatedFinalTotal = 0;
-        _cashReceived = 0;
-        _cashReceivedController.clear();
-        _cashReceived = 0;
+      // Print receipt in background to not block UI
+      _printerService.isAutoPrintEnabled().then((enabled) {
+        if (enabled) {
+          _printerService.printReceipt(saleData);
+        }
       });
       
-      showDialog(
+      // Unfocus any active text fields to prevent keyboard lag
+      FocusScope.of(context).unfocus();
+      
+      // Show success dialog and wait for user to click OK
+      await showDialog(
         context: context,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1098,7 +1094,6 @@ class _POSScreenState extends State<POSScreen> {
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    _fetchData();
                   },
                   child: Text('OK, KEMBALI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
                 ),
@@ -1107,6 +1102,25 @@ class _POSScreenState extends State<POSScreen> {
           ],
         ),
       );
+
+      // AFTER dialog is closed, then clear everything
+      setState(() {
+        _cart.clear();
+        _customerNameController.clear();
+        _customerPhoneController.clear();
+        _activeCustomerId = null;
+        _voucherController.clear();
+        _usePoints = false;
+        _availablePoints = 0;
+        _memberDiscountAmount = 0;
+        _voucherDiscountAmount = 0;
+        _pointsUsed = 0;
+        _pointsEarned = 0;
+        _pointValueUsed = 0;
+        _calculatedFinalTotal = 0;
+        _cashReceived = 0;
+        _cashReceivedController.clear();
+      });
     } catch (e) {
       showDialog(
         context: context,
@@ -1361,8 +1375,9 @@ class _POSScreenState extends State<POSScreen> {
                           itemBuilder: (context, i) {
                             final p = _filteredProducts[i];
                             final int cartQty = _cart.where((item) => item['productId'] == p['id']).fold(0, (sum, item) => sum + (item['quantity'] as int));
-                            final bool trackStock = p['trackStock'] ?? true;
-                            final bool isOutOfStock = trackStock && (p['stock'] ?? 0) <= 0;
+                            final bool trackStock = p['trackStock'] == true;
+                            final double currentStock = double.tryParse(p['stock']?.toString() ?? '0') ?? 0;
+                            final bool isOutOfStock = trackStock && currentStock <= 0;
 
                             return GestureDetector(
                               onTap: isOutOfStock 

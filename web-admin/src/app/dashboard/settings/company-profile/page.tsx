@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { Building2, Save, MapPin, Navigation, Loader2 } from 'lucide-react';
+import { Building2, Save, MapPin, Navigation, Loader2, Shield } from 'lucide-react';
 
 interface Company {
     id: number;
@@ -31,6 +31,7 @@ interface Company {
     addons: string[];
     primaryColor: string | null;
     secondaryColor: string | null;
+    posBlindClosing: boolean;
 }
 
 export default function CompanyProfilePage() {
@@ -52,7 +53,8 @@ export default function CompanyProfilePage() {
         waProspectTemplate: '',
         timezone: 'Asia/Jakarta',
         primaryColor: '#3B82F6',
-        secondaryColor: '#1E293B'
+        secondaryColor: '#1E293B',
+        posBlindClosing: false
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -95,7 +97,8 @@ export default function CompanyProfilePage() {
                 waProspectTemplate: response.data.waProspectTemplate || '',
                 timezone: response.data.timezone || 'Asia/Jakarta',
                 primaryColor: response.data.primaryColor || '#3B82F6',
-                secondaryColor: response.data.secondaryColor || '#1E293B'
+                secondaryColor: response.data.secondaryColor || '#1E293B',
+                posBlindClosing: response.data.posBlindClosing || false
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -139,7 +142,8 @@ export default function CompanyProfilePage() {
                 waProspectTemplate: formData.waProspectTemplate,
                 timezone: formData.timezone,
                 primaryColor: formData.primaryColor,
-                secondaryColor: formData.secondaryColor
+                secondaryColor: formData.secondaryColor,
+                posBlindClosing: formData.posBlindClosing
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -547,6 +551,31 @@ export default function CompanyProfilePage() {
                                         <p className="mt-2 text-[10px] text-slate-400 italic">
                                             * Kosongkan jika ingin menggunakan sistem WhatsApp default Aivola.
                                         </p>
+                                    </div>
+                                </div>
+
+                                <div className="pt-8 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <div className="h-6 w-1 bg-rose-500 rounded-full"></div>
+                                        <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Sistem Kasir (POS)</h3>
+                                    </div>
+                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-12 w-12 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600 shadow-sm border border-rose-200">
+                                                <Shield className="h-6 w-6" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-800">Blind Closing (Tutup Kasir Buta)</h4>
+                                                <p className="text-xs text-slate-500 max-w-sm mt-0.5">Sembunyikan target uang dari kasir saat tutup shift. Kasir wajib hitung manual tanpa tahu nominal sistem.</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, posBlindClosing: !formData.posBlindClosing })}
+                                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none ${formData.posBlindClosing ? 'bg-rose-500' : 'bg-slate-300'}`}
+                                        >
+                                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.posBlindClosing ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
                                     </div>
                                 </div>
 

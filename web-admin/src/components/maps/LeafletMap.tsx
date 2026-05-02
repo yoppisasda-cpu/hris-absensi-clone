@@ -49,6 +49,16 @@ function LocationMarker({ position, setPosition, onLocationSelect }: {
     );
 }
 
+function MapResizer() {
+    const map = useMapEvents({});
+    useEffect(() => {
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
+    }, [map]);
+    return null;
+}
+
 export default function LeafletMap({ initialLat, initialLng, onLocationSelect, markers = [], radius }: LeafletMapProps) {
     const [position, setPosition] = useState<[number, number] | null>(
         initialLat && initialLng ? [initialLat, initialLng] : [-6.2088, 106.8456] // Default Jakarta
@@ -60,6 +70,7 @@ export default function LeafletMap({ initialLat, initialLng, onLocationSelect, m
             zoom={13} 
             style={{ height: '100%', width: '100%', borderRadius: '0.5rem' }}
         >
+            <MapResizer />
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

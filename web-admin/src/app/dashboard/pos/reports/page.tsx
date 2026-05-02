@@ -43,6 +43,8 @@ export default function POSReportsPage() {
     const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [isRestricted, setIsRestricted] = useState(false);
+    const [activeTab, setActiveTab] = useState<'sales' | 'shifts'>('sales');
+    const [shiftClosings, setShiftClosings] = useState<any[]>([]);
 
     useEffect(() => {
         const role = localStorage.getItem('userRole');
@@ -112,6 +114,12 @@ export default function POSReportsPage() {
             } finally {
                 setIsAiLoading(false);
             }
+
+            // Fetch Shift Closings
+            const closingsRes = await api.get('/pos/closings', {
+                params: { branchId: selectedBranchId, startDate, endDate }
+            });
+            setShiftClosings(closingsRes.data);
         } catch (error) {
             console.error("Gagal mengambil data laporan", error);
         } finally {
@@ -419,18 +427,72 @@ export default function POSReportsPage() {
                                 <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                                      <div 
                                         className="h-full bg-emerald-500 rounded-full transition-all duration-1000 group-hover:brightness-125" 
-                                        style={{ width: `${(c.revenue / comprehensive.categories[0].revenue) * 100}%` }} 
+                                        style={{ width: `${(c.revenue / (comprehensive.categories[0]?.revenue || 1)) * 100}%` }} 
                                     />
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
+
+                {/* Payment Methods Chart */}
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm flex flex-col">
+                    <div className="mb-6 flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-black text-white flex items-center gap-2">
+                                <CreditCard className="h-5 w-5 text-blue-500" />
+                                Metode Bayar
+                            </h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sinkronisasi Kasir</p>
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-4 flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+                        {(analytics.paymentMethods || []).map((m: any, i: number) => (
+                            <div key={i} className="group cursor-default">
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <span className="text-xs font-black text-slate-300 group-hover:text-blue-400 transition-colors truncate pr-2">{m.method}</span>
+                                    <span className="text-[10px] font-black text-slate-500">Rp {m.total.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                     <div 
+                                        className="h-full bg-blue-500 rounded-full transition-all duration-1000 group-hover:brightness-125" 
+                                        style={{ width: `${(m.total / (analytics.paymentMethods[0]?.total || 1)) * 100}%` }} 
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                        {(!analytics.paymentMethods || analytics.paymentMethods.length === 0) && (
+                            <div className="flex flex-col items-center justify-center h-full opacity-50">
+                                <p className="text-[10px] font-black text-slate-600 uppercase">Belum ada data pembayaran</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Filter Section */}
-            <div className="rounded-3xl border border-slate-800 bg-slate-900 overflow-hidden shadow-2xl mb-8">
-                <div className="p-6 border-b border-slate-800/50 flex flex-wrap items-center justify-between gap-6">
+            {/* Tabs Selection */}
+            <div className="flex items-center gap-4 mb-6 border-b border-slate-800">
+                <button 
+                    onClick={() => setActiveTab('sales')}
+                    className={`pb-4 px-2 text-sm font-bold transition-all relative ${activeTab === 'sales' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    Daftar Penjualan
+                    {activeTab === 'sales' && <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-t-full" />}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('shifts')}
+                    className={`pb-4 px-2 text-sm font-bold transition-all relative ${activeTab === 'shifts' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    Riwayat Shift (Closing)
+                    {activeTab === 'shifts' && <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-t-full" />}
+                </button>
+            </div>
+
+            {activeTab === 'sales' ? (
+                <div className="bg-slate-900/50 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-md">
+                    <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex flex-wrap items-center gap-4">
                         {/* Search */}
                         <div className="relative w-full sm:w-64 group">
@@ -624,6 +686,60 @@ export default function POSReportsPage() {
                     </table>
                 </div>
             </div>
+            ) : (
+                <div className="bg-slate-900/50 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-md">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-950/50 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-slate-800">
+                            <tr>
+                                <th className="px-6 py-5">Shift & Kasir</th>
+                                <th className="px-6 py-5">Waktu</th>
+                                <th className="px-6 py-5 text-right">Penjualan Kotor</th>
+                                <th className="px-6 py-5 text-right">Expected (Tunai)</th>
+                                <th className="px-6 py-5 text-right">Actual (Laci)</th>
+                                <th className="px-6 py-5 text-right">Selisih</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50">
+                            {shiftClosings.length > 0 ? (
+                                shiftClosings.map((closing: any) => (
+                                    <tr key={closing.id} className="group hover:bg-slate-800/20 transition-all cursor-pointer">
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-white">{closing.cashier?.name}</div>
+                                            <div className="text-[10px] text-slate-500 font-bold uppercase">{closing.branch?.name}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-xs text-slate-300 font-medium">
+                                                {format(new Date(closing.startTime), 'dd MMM yyyy HH:mm', { locale: id })}
+                                            </div>
+                                            <div className="text-[10px] text-slate-500">s/d {format(new Date(closing.endTime), 'HH:mm')}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-slate-300">
+                                            Rp {closing.totalGrossSales.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-blue-400">
+                                            Rp {closing.expectedCash.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-emerald-400">
+                                            Rp {closing.actualCash.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className={`font-black text-sm ${closing.cashDifference === 0 ? 'text-slate-500' : (closing.cashDifference > 0 ? 'text-blue-400' : 'text-red-500')}`}>
+                                                {closing.cashDifference > 0 ? '+' : ''} Rp {closing.cashDifference.toLocaleString()}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-24 text-center">
+                                        <div className="text-slate-500 font-bold italic">Belum ada riwayat shift</div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             <InvoiceModal 
                 isOpen={isInvoiceModalOpen}

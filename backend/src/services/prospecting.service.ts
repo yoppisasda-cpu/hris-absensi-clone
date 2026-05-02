@@ -14,8 +14,8 @@ export class ProspectingService {
   static async addCompetitor(companyId: number, data: {
     name: string;
     brand?: string;
-    latitude: number;
-    longitude: number;
+    lat: number;
+    lng: number;
     category?: string;
     strength?: number;
     notes?: string;
@@ -49,8 +49,8 @@ export class ProspectingService {
       competitorCount: competitors.length,
       competitors: competitors.map(c => ({
         name: c.name,
-        lat: c.latitude,
-        lng: c.longitude,
+        lat: c.lat,
+        lng: c.lng,
         strength: c.strength
       })),
       currentLocation: company ? { lat: company.latitude, lng: company.longitude } : null

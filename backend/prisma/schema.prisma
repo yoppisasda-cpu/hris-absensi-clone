@@ -60,6 +60,7 @@ model Company {
   discountProspecting    Int                  @default(0)
   waProspectTemplate     String?
   timezone               String               @default("Asia/Jakarta")
+  posBlindClosing        Boolean              @default(false)
   announcements          Announcement[]
   assets                 Asset[]
   assignments            Assignment[]
@@ -236,6 +237,7 @@ model Branch {
   sales      Sale[]
   users      User[]
   warehouses Warehouse[]
+  posClosings PosClosing[]
 }
 
 model User {
@@ -995,6 +997,7 @@ model PosClosing {
   status            String   @default("COMPLETED")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  branch            Branch   @relation(fields: [branchId], references: [id])
   cashier           User     @relation(fields: [cashierId], references: [id])
   company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -1391,10 +1394,13 @@ model Competitor {
   id        Int      @id @default(autoincrement())
   companyId Int
   name      String
-  type      String?
+  brand     String?
+  category  String?
   location  String?
   lat       Float?
   lng       Float?
+  strength  Int?     @default(0)
+  notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)

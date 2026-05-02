@@ -1600,7 +1600,8 @@ app.post('/api/banners', tenantMiddleware, uploadBanner.single('image'), async (
         imageUrl: imageUrl || req.body.imageUrl,
         linkUrl,
         isActive: isActive === 'true' || isActive === true,
-        order: parseInt(order) || 0
+        order: parseInt(order) || 0,
+        updatedAt: new Date()
       }
     });
     res.json(banner);
@@ -2304,7 +2305,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       waApiKey, waGatewayUrl, waProspectTemplate,
       primaryColor, secondaryColor,
       timezone,
-      addons
+      addons,
+      posBlindClosing
     } = req.body;
 
     console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
@@ -2348,6 +2350,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         waApiKey: waApiKey !== undefined ? waApiKey : undefined,
         waGatewayUrl: waGatewayUrl !== undefined ? waGatewayUrl : undefined,
         waProspectTemplate: waProspectTemplate !== undefined ? waProspectTemplate : undefined,
+        posBlindClosing: posBlindClosing !== undefined ? !!posBlindClosing : undefined,
         timezone: timezone || undefined,
         addons: Array.isArray(addons) ? addons : undefined
       }
@@ -10311,12 +10314,17 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
 
       // If product has a recipe, sum up its materials recursively
       if (product.Recipes && product.Recipes.length > 0) {
-        return product.Recipes.reduce((sum: number, r: any) => {
+        const totalRecipeCost = product.Recipes.reduce((sum: number, r: any) => {
           // Find the material in our pre-fetched products list to get its potential recipes
           const material = allProducts.find(m => m.id === r.materialId);
           const materialUnitCost = material ? getProductCost(material, new Set(visited)) : (r.Material?.costPrice || 0);
           return sum + (Number(r.quantity) * materialUnitCost);
         }, 0);
+
+        // IMPORTANT: Divide by recipeYield to get cost PER UNIT
+        // If yield is 0 or null, default to 1 to avoid division by zero
+        const yieldAmount = product.recipeYield && product.recipeYield > 0 ? Number(product.recipeYield) : 1;
+        return totalRecipeCost / yieldAmount;
       }
 
       // Base case: return static costPrice
@@ -12362,7 +12370,7 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
         }
       },
       include: {
-        items: { include: { product: { include: { category: true } } } }
+        SaleItem: { include: { product: { include: { category: true } } } }
       }
     });
 
@@ -12371,15 +12379,15 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
     }
 
     const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
-    const topProducts = {};
-    const hourlyDistribution = {};
+    const topProducts: Record<string, number> = {};
+    const hourlyDistribution: Record<number, number> = {};
 
-    sales.forEach(s => {
+    sales.forEach((s: any) => {
       const hour = new Date(s.date).getHours();
       hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
       
-      s.items.forEach(item => {
-        const name = item.product.name;
+      s.SaleItem.forEach((item: any) => {
+        const name = item.product?.name || 'Produk Tidak Terdefinisi';
         topProducts[name] = (topProducts[name] || 0) + item.quantity;
       });
     });
@@ -12787,15 +12795,38 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
 
     const products = await prisma.product.findMany({
       where: { companyId: tenantId, showInPos: true },
-      include: { 
-        category: true,
+      select: { 
+        id: true,
+        name: true,
+        price: true,
+        priceGofood: true,
+        priceGrabfood: true,
+        priceShopeefood: true,
+        imageUrl: true,
+        categoryId: true,
+        trackStock: true,
+        recipeYield: true,
         WarehouseStock: {
-          where: { warehouseId: warehouse?.id }
+          where: { warehouseId: warehouse?.id },
+          select: { quantity: true }
         },
         customizations: {
-          include: {
+          select: {
             Group: {
-              include: { options: true }
+              select: {
+                id: true,
+                name: true,
+                isRequired: true,
+                minSelections: true,
+                maxSelections: true,
+                options: {
+                  select: {
+                    id: true,
+                    name: true,
+                    price: true
+                  }
+                }
+              }
             }
           }
         }
@@ -13156,14 +13187,47 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         });
       }
 
-        // 2. Process Items
+        // 2. Pre-fetch all recipes for items in the cart using Prisma findMany (more stable than raw SQL for Supabase)
+        const productIds = items.map((i: any) => Number(i.productId));
+        const allRecipes = await tx.productRecipe.findMany({
+            where: { productId: { in: productIds } },
+            include: { Product: { select: { recipeYield: true } } }
+        });
+
+        // Group recipes by productId for easy access
+        const recipeMap: Record<number, any[]> = {};
+        allRecipes.forEach((r: any) => {
+            if (!recipeMap[r.productId]) recipeMap[r.productId] = [];
+            recipeMap[r.productId].push({
+                ...r,
+                recipeYield: r.Product?.recipeYield || 1
+            });
+        });
+
+        // 1.7 Validate Stock before proceeding
+        const productsInCart = await tx.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, name: true, stock: true, trackStock: true }
+        });
+
+        for (const item of items) {
+            const product = productsInCart.find(p => p.id === Number(item.productId));
+            if (product && product.trackStock && product.stock < Number(item.quantity)) {
+                throw new Error(`Stok tidak mencukupi untuk produk: ${product.name}. Stok tersedia: ${product.stock}`);
+            }
+        }
+
+        // 3. Prepare all operations for parallel execution
+        const operations: Promise<any>[] = [];
+
         for (const item of items) {
             const productId = Number(item.productId);
             const quantity = Number(item.quantity);
             const price = Number(item.price);
             const originalPrice = Number(item.originalPrice || item.price);
 
-            await tx.saleItem.create({
+            // Add Sale Item creation to operations
+            operations.push(tx.saleItem.create({
                 data: {
                     saleId: sale.id,
                     productId: productId,
@@ -13173,37 +13237,51 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                     total: price * quantity,
                     modifiers: item.modifiers ? item.modifiers : null
                 }
-            });
+            }));
 
-            // --- BOM LOGIC INTEGRATION ---
-            const recipes: any[] = await tx.$queryRawUnsafe(`
-                SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr
-                JOIN "Product" p ON pr."productId" = p.id
-                WHERE pr."productId" = $1
-            `, productId);
+            // --- OPTIMIZED STOCK LOGIC ---
+            // Always decrement the main product's stock if tracked
+            operations.push(tx.product.update({
+                where: { id: productId },
+                data: { stock: { decrement: quantity } }
+            }));
 
+            operations.push(tx.warehouseStock.upsert({
+                where: { productId_warehouseId: { productId: productId, warehouseId: warehouse.id } },
+                update: { quantity: { decrement: quantity } },
+                create: { productId: productId, warehouseId: warehouse.id, quantity: -quantity }
+            }));
+
+            operations.push(tx.stockTransaction.create({
+                data: {
+                    productId: productId,
+                    warehouseId: warehouse.id,
+                    type: 'OUT',
+                    quantity: quantity,
+                    reference: `POS ${invoiceNumber}`,
+                    date: new Date()
+                }
+            }));
+
+            // If it has a recipe, ALSO decrement the MATERIALS
+            const recipes = recipeMap[productId] || [];
             if (recipes.length > 0) {
-                const yieldVal = Number(recipes[0].recipeYield) || 1;
-                // If product has a recipe, decrement the MATERIALS
                 for (const recipe of recipes) {
                     const materialId = Number(recipe.materialId);
-                    const materialQtyNeeded = (Number(recipe.quantity) / yieldVal) * quantity;
+                    const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
 
-                    // Update Material Global Stock
-                    await tx.product.update({
+                    operations.push(tx.product.update({
                         where: { id: materialId },
                         data: { stock: { decrement: materialQtyNeeded } }
-                    });
+                    }));
 
-                    // Update Material Warehouse Stock
-                    await tx.warehouseStock.upsert({
+                    operations.push(tx.warehouseStock.upsert({
                         where: { productId_warehouseId: { productId: materialId, warehouseId: warehouse.id } },
                         update: { quantity: { decrement: materialQtyNeeded } },
                         create: { productId: materialId, warehouseId: warehouse.id, quantity: -materialQtyNeeded }
-                    });
+                    }));
 
-                    // Record Transaction for Material
-                    await tx.stockTransaction.create({
+                    operations.push(tx.stockTransaction.create({
                         data: {
                             productId: materialId,
                             warehouseId: warehouse.id,
@@ -13212,42 +13290,21 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                             reference: `POS ${invoiceNumber} (BOM Result of ${sale.invoiceNumber})`,
                             date: new Date()
                         }
-                    });
+                    }));
                 }
-            } else {
-                // Normal Product (No Recipe), decrement the item itself
-                await tx.product.update({
-                    where: { id: productId },
-                    data: { stock: { decrement: quantity } }
-                });
-
-                await tx.warehouseStock.upsert({
-                    where: { productId_warehouseId: { productId: productId, warehouseId: warehouse.id } },
-                    update: { quantity: { decrement: quantity } },
-                    create: { productId: productId, warehouseId: warehouse.id, quantity: -quantity }
-                });
-
-                await tx.stockTransaction.create({
-                    data: {
-                        productId: productId,
-                        warehouseId: warehouse.id,
-                        type: 'OUT',
-                        quantity: quantity,
-                        reference: `POS ${invoiceNumber}`,
-                        date: new Date()
-                    }
-                });
             }
         }
 
-      // 3. Finance
+        // Execute all stock and item operations in parallel
+        await Promise.all(operations);
+
+      // 4. Finance
       if (accountId) {
         await tx.financialAccount.update({
           where: { id: Number(accountId) },
           data: { balance: { increment: Number(totalAmount) } }
         });
 
-        // Record Income
         const category = await tx.incomeCategory.upsert({
           where: { companyId_name: { companyId: tenantId, name: 'Penjualan POS' } },
           update: {},
@@ -13373,11 +13430,16 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
     const startTime = lastClosing ? lastClosing.endTime : defaultStartTime;
 
     // 2. Find all sales since last closing in this branch (filtered by branchId directly)
+    // We also include null branchId if the user is associated with the first branch (Head Office fallback)
     const sales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
-        branchId: user.branchId,
-        date: { gt: startTime, lte: new Date() }
+        OR: [
+          { branchId: user.branchId },
+          { branchId: null } // Include transactions that don't have a branch assigned
+        ],
+        date: { gt: startTime, lte: new Date() },
+        invoiceNumber: { startsWith: 'POS-' } // Ensure only POS transactions
       }
     });
 
@@ -13407,6 +13469,12 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       .filter(m => m.accountType?.toUpperCase() === 'CASH' || m.accountName.toLowerCase().includes('tunai') || m.accountName.toLowerCase().includes('cash'))
       .reduce((sum, m) => sum + m.expectedAmount, 0);
 
+    // 5. Get Company Settings for Blind Closing
+    const company = await prisma.company.findUnique({
+      where: { id: tenantId },
+      select: { posBlindClosing: true }
+    });
+
     res.json({
       startTime,
       endTime: new Date(),
@@ -13415,7 +13483,8 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       totalNetSales,
       totalCommission,
       expectedCash: cashTotal,
-      methodBreakdown
+      methodBreakdown,
+      blindClosing: company?.posBlindClosing ?? false
     });
   } catch (error: any) {
     console.error("CLOSING SUMMARY ERROR:", error);
@@ -13441,7 +13510,16 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
       notes
     } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
+    let user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
+    
+    // Fallback for Admins/Owners who aren't tied to a specific branch
+    if (!user?.branchId && (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER')) {
+      const firstBranch = await prisma.branch.findFirst({ where: { companyId: tenantId } });
+      if (firstBranch) {
+        user = { ...user!, branchId: firstBranch.id };
+      }
+    }
+
     if (!user?.branchId) return res.status(400).json({ error: 'User tidak terikat ke cabang.' });
 
     const closing = await prisma.posClosing.create({
@@ -13467,6 +13545,34 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
   } catch (error: any) {
     console.error("SAVE CLOSING ERROR:", error);
     res.status(500).json({ error: 'Gagal melakukan closing: ' + error.message });
+  }
+});
+
+// POS4. List POS Closings
+app.get('/api/pos/closings', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { branchId, startDate, endDate } = req.query;
+
+    const closings = await prisma.posClosing.findMany({
+      where: {
+        companyId: tenantId,
+        branchId: branchId && branchId !== 'all' ? Number(branchId) : undefined,
+        startTime: {
+          gte: startDate ? new Date(startDate as string) : undefined,
+          lte: endDate ? new Date(endDate as string) : undefined,
+        }
+      },
+      include: {
+        cashier: { select: { name: true } },
+        branch: { select: { name: true } }
+      },
+      orderBy: { endTime: 'desc' }
+    });
+
+    res.json(closings);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil riwayat closing: ' + error.message });
   }
 });
 

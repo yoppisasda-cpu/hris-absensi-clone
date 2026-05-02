@@ -53,7 +53,7 @@ export default function MapPicker({ isOpen, onClose, onSelect, initialLat, initi
 
                 {/* Map Body */}
                 <div className="p-6">
-                    <div className="relative mb-4 overflow-hidden rounded-xl border border-slate-200">
+                    <div className="relative mb-4 h-[400px] overflow-hidden rounded-xl border border-slate-200">
                         <LeafletMap 
                             initialLat={initialLat} 
                             initialLng={initialLng} 

@@ -160,10 +160,10 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
                           padding: const EdgeInsets.all(20.0),
                           child: Column(
                             children: [
-                              _buildAmountRow('Total Penjualan Kotor (Gross)', currencyFormat.format(_summary?['totalGrossSales'] ?? 0)),
-                              _buildAmountRow('Total Potongan Platform', '- ' + currencyFormat.format(_summary?['totalCommission'] ?? 0), isNegative: true),
+                              _buildAmountRow('Total Penjualan Kotor (Gross)', (_summary?['blindClosing'] == true) ? 'Rp *******' : currencyFormat.format(_summary?['totalGrossSales'] ?? 0)),
+                              _buildAmountRow('Total Potongan Platform', (_summary?['blindClosing'] == true) ? 'Rp *******' : '- ' + currencyFormat.format(_summary?['totalCommission'] ?? 0), isNegative: true),
                               Divider(height: 32),
-                              _buildAmountRow('Estimasi Dana Bersih (Net)', currencyFormat.format(_summary?['totalNetSales'] ?? 0), isTotal: true),
+                              _buildAmountRow('Estimasi Dana Bersih (Net)', (_summary?['blindClosing'] == true) ? 'Rp *******' : currencyFormat.format(_summary?['totalNetSales'] ?? 0), isTotal: true),
                             ],
                           ),
                         ),
@@ -186,7 +186,10 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
                                   leading: Icon(isCash ? Icons.money : Icons.account_balance_wallet, color: isCash ? Colors.green : Colors.blue),
                                   title: Text(m['accountName'] ?? 'Akun', style: TextStyle(fontWeight: FontWeight.bold)),
                                   subtitle: Text(isCash ? 'Uang Tunai' : 'Non-Tunai/Transfer'),
-                                  trailing: Text(currencyFormat.format(m['expectedAmount']), style: TextStyle(fontWeight: FontWeight.bold, color: isCash ? Colors.green[800] : Colors.blue[800])),
+                                  trailing: Text(
+                                    (_summary?['blindClosing'] == true) ? '*******' : currencyFormat.format(m['expectedAmount']), 
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: isCash ? Colors.green[800] : Colors.blue[800])
+                                  ),
                                 );
                               }).toList(),
                               if ((_summary?['methodBreakdown'] as List?)?.isEmpty ?? true)
@@ -213,7 +216,10 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('Expected Cash (Sistem - Tunai)', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                              Text(currencyFormat.format(_expectedCash), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              Text(
+                                (_summary?['blindClosing'] == true) ? 'Rp *******' : currencyFormat.format(_expectedCash), 
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
+                              ),
                               SizedBox(height: 20),
                               Text('Uang Fisik di Laci (Tunai)', style: TextStyle(color: Colors.blue[800], fontSize: 13, fontWeight: FontWeight.bold)),
                               SizedBox(height: 8),
@@ -229,27 +235,29 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                                 ),
                               ),
-                              SizedBox(height: 20),
-                              Container(
-                                padding: EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: _difference == 0 ? Colors.green[50] : (_difference > 0 ? Colors.blue[50] : Colors.red[50]),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('Selisih:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    Text(
-                                      currencyFormat.format(_difference),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        color: _difference == 0 ? Colors.green[700] : (_difference > 0 ? Colors.blue[700] : Colors.red[700]),
+                              if (_summary?['blindClosing'] != true) ...[
+                                SizedBox(height: 20),
+                                Container(
+                                  padding: EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _difference == 0 ? Colors.green[50] : (_difference > 0 ? Colors.blue[50] : Colors.red[50]),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Selisih:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      Text(
+                                        currencyFormat.format(_difference),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: _difference == 0 ? Colors.green[700] : (_difference > 0 ? Colors.blue[700] : Colors.red[700]),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ),
@@ -279,8 +287,9 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+          Expanded(child: Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13))),
+          SizedBox(width: 8),
+          Flexible(child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87), textAlign: TextAlign.right)),
         ],
       ),
     );
@@ -292,11 +301,14 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(
-            fontSize: isTotal ? 15 : 13, 
-            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            color: isTotal ? Colors.black : Colors.blueGrey[700]
-          )),
+          Expanded(
+            child: Text(label, style: TextStyle(
+              fontSize: isTotal ? 15 : 13, 
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              color: isTotal ? Colors.black : Colors.blueGrey[700]
+            )),
+          ),
+          SizedBox(width: 8),
           Text(value, style: TextStyle(
             fontSize: isTotal ? 18 : 14, 
             fontWeight: FontWeight.w900,
