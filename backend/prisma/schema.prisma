@@ -35,7 +35,6 @@ model Company {
   address                String?
   logoUrl                String?
   lateGracePeriod        Int                  @default(0)
-  timezone               String               @default("Asia/Jakarta")
   workDaysPerMonth       Int                  @default(25)
   purchasedInsights      String[]             @default([])
   addons                 String[]             @default([])
@@ -48,23 +47,27 @@ model Company {
   discountAi             Int                  @default(0)
   discountFraud          Int                  @default(0)
   discountExpansion      Int                  @default(0)
-  discountProspecting    Int                  @default(0)
   crmEnabled             Boolean              @default(true)
   isActive               Boolean              @default(true)
-  waGatewayUrl           String?              // URL Wablas (misal: https://solo.wablas.com)
-  waApiKey               String?              // Token API Wablas
-  waProspectTemplate     String?              // Template pesan broadcast prospek
+  waApiKey               String?
+  waGatewayUrl           String?
   memberDiscountType     String?              @default("PERCENTAGE")
   memberDiscountValue    Float                @default(0)
   pointsEarnRatio        Float                @default(0)
   pointsRedeemValue      Float                @default(0)
-  vouchers               Voucher[]
+  discountProspecting    Int                  @default(0)
+  waProspectTemplate     String?
+  timezone               String               @default("Asia/Jakarta")
+  primaryColor           String?              @default("#3B82F6")
+  secondaryColor         String?              @default("#1E293B")
   announcements          Announcement[]
   assets                 Asset[]
   assignments            Assignment[]
   attendances            Attendance[]
+  Banner                 Banner[]
   bonuses                Bonus[]
   branches               Branch[]
+  chatSessions           ChatSession[]
   customizationGroups    CustomizationGroup[]
   dividends              Dividend[]
   documents              EmployeeDocument[]
@@ -93,6 +96,7 @@ model Company {
   posClosings            PosClosing[]
   Product                Product[]
   productCategories      ProductCategory[]
+  prospects              Prospect[]
   purchaseOrders         PurchaseOrder[]
   reimbursements         Reimbursement[]
   salesOrders            SalesOrder[]
@@ -102,11 +106,8 @@ model Company {
   transfers              Transfer[]
   users                  User[]
   userAccess             UserAccess[]
+  vouchers               Voucher[]
   warehouses             Warehouse[]
-  prospects             Prospect[]
-  chatSessions          ChatSession[]
-  competitors            Competitor[]
-  marketAnalyses         MarketAnalysis[]
 }
 
 model FinancialAccount {
@@ -202,16 +203,16 @@ model Expense {
 }
 
 model Supplier {
-  id             Int             @id @default(autoincrement())
-  companyId      Int
-  name           String
-  contactPerson  String?
-  phone          String?
-  email          String?
-  address        String?
-  category       String?
-  createdAt      DateTime        @default(now()) @db.Timestamp(6)
-  updatedAt      DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+  id                Int                @id @default(autoincrement())
+  companyId         Int
+  name              String
+  contactPerson     String?
+  phone             String?
+  email             String?
+  address           String?
+  category          String?
+  createdAt         DateTime           @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime           @default(now()) @updatedAt @db.Timestamp(6)
   expenses          Expense[]
   purchaseOrders    PurchaseOrder[]
   stockTransactions StockTransaction[]
@@ -265,6 +266,7 @@ model User {
   resignDate              DateTime?
   lastDeviceId            String?
   taxStatus               String              @default("TK-0")
+  avatarUrl               String?
   assets                  Asset[]
   createdAssignments      Assignment[]        @relation("AssignmentCreator")
   assignments             Assignment[]        @relation("AssignmentUser")
@@ -646,12 +648,12 @@ model LearningMaterial {
   title              String
   content            String
   fileUrl            String?
-  imageUrl           String?
   category           String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   targetDivision     String?
   targetJobTitle     String?
+  imageUrl           String?
   exams              Exam[]
   company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   learningObjectives LearningObjective[]
@@ -728,17 +730,17 @@ model GlobalSetting {
 
 model ChatSession {
   id          String        @id @default(uuid())
-  companyId   Int?          @default(1)
   visitorName String?
   email       String?
-  phone       String?
   userId      Int?
-  isWhatsApp  Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  companyId   Int?          @default(1)
+  isWhatsApp  Boolean       @default(false)
+  phone       String?
   messages    ChatMessage[]
-  user        User?         @relation(fields: [userId], references: [id])
   company     Company?      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User?         @relation(fields: [userId], references: [id])
 }
 
 model ChatMessage {
@@ -761,10 +763,10 @@ model Customer {
   totalSpent  Float        @default(0)
   createdAt   DateTime     @default(now()) @db.Timestamp(6)
   updatedAt   DateTime     @default(now()) @db.Timestamp(6)
-  salesOrders SalesOrder[]
-  isMember    Boolean      @default(false)
   birthDate   DateTime?
-  gender      String?      // L/P
+  gender      String?
+  isMember    Boolean      @default(false)
+  salesOrders SalesOrder[]
 
   @@unique([companyId, phone], name: "companyId_phone")
 }
@@ -800,6 +802,7 @@ model Product {
   priceGrabfood      Float                  @default(0)
   priceShopeefood    Float                  @default(0)
   recipeYield        Float                  @default(1)
+  imageUrl           String?
   expenses           Expense[]
   category           ProductCategory?       @relation(fields: [categoryId], references: [id])
   Company            Company                @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -807,6 +810,7 @@ model Product {
   UsedInRecipes      ProductRecipe[]        @relation("MaterialRecipes")
   Recipes            ProductRecipe[]        @relation("ProductRecipes")
   purchaseOrderItems PurchaseOrderItem[]
+  SaleItem           SaleItem[]
   salesOrderItems    SalesOrderItem[]
   StockTransaction   StockTransaction[]
   WarehouseStock     WarehouseStock[]
@@ -823,52 +827,53 @@ model ProductRecipe {
 }
 
 model Sale {
-  id               Int          @id @default(autoincrement())
-  companyId        Int
-  branchId         Int?
-  invoiceNumber    String       @unique
-  customerId       Int?
-  customerName     String?
-  customerPhone    String?
-  date             DateTime     @default(now()) @db.Timestamp(6)
-  totalAmount      Float        @default(0)
-  status           String       @default("PAID")
-  saleType         String       @default("WALK_IN")
-  serviceFee       Float        @default(0)
-  markupPercentage Float        @default(0)
-  totalCommission  Float        @default(0)
-  accountId        Int?
-  notes            String?
-  createdAt        DateTime     @default(now()) @db.Timestamp(6)
-  updatedAt        DateTime     @default(now()) @db.Timestamp(6)
-  cashierId        Int?
-  isTukarFaktur    Boolean      @default(false)
-  tukarFakturDate  DateTime?
-  tukarFakturRef   String?
-  memberDiscountAmount   Float        @default(0)
-  voucherCode            String?
-  voucherDiscountAmount  Float        @default(0)
-  pointsUsed             Float        @default(0)
-  pointsEarned           Float        @default(0)
-  branch           Branch?      @relation(fields: [branchId], references: [id])
-  cashier          User?        @relation(fields: [cashierId], references: [id])
-  SaleItem         SaleItem[]
-  SaleReturn       SaleReturn[]
+  id                    Int          @id @default(autoincrement())
+  companyId             Int
+  branchId              Int?
+  invoiceNumber         String       @unique
+  customerId            Int?
+  customerName          String?
+  customerPhone         String?
+  date                  DateTime     @default(now()) @db.Timestamp(6)
+  totalAmount           Float        @default(0)
+  status                String       @default("PAID")
+  saleType              String       @default("WALK_IN")
+  serviceFee            Float        @default(0)
+  markupPercentage      Float        @default(0)
+  totalCommission       Float        @default(0)
+  accountId             Int?
+  notes                 String?
+  createdAt             DateTime     @default(now()) @db.Timestamp(6)
+  updatedAt             DateTime     @default(now()) @db.Timestamp(6)
+  cashierId             Int?
+  isTukarFaktur         Boolean      @default(false)
+  tukarFakturDate       DateTime?
+  tukarFakturRef        String?
+  memberDiscountAmount  Float        @default(0)
+  pointsEarned          Float        @default(0)
+  pointsUsed            Float        @default(0)
+  voucherCode           String?
+  voucherDiscountAmount Float        @default(0)
+  branch                Branch?      @relation(fields: [branchId], references: [id])
+  cashier               User?        @relation(fields: [cashierId], references: [id])
+  SaleItem              SaleItem[]
+  SaleReturn            SaleReturn[]
 
   @@index([companyId, date])
   @@index([companyId, branchId])
 }
 
 model SaleItem {
-  id            Int   @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   saleId        Int
-  productId     Int
+  productId     Int?
   quantity      Float
   price         Float
-  originalPrice Float @default(0)
+  originalPrice Float    @default(0)
   total         Float
   modifiers     Json?
-  Sale          Sale  @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Product       Product? @relation(fields: [productId], references: [id], onUpdate: NoAction)
+  Sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model SaleReturn {
@@ -907,8 +912,8 @@ model StockTransaction {
   warehouseId Int?
   supplierId  Int?
   Product     Product    @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
   supplier    Supplier?  @relation(fields: [supplierId], references: [id])
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
 }
 
 model Warehouse {
@@ -1162,31 +1167,70 @@ model Assignment {
   user           User             @relation("AssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Competitor {
+model OtpVerification {
   id        Int      @id @default(autoincrement())
   companyId Int
-  company   Company  @relation(fields: [companyId], references: [id])
-  name      String
-  brand     String?
-  latitude  Float
-  longitude Float
-  category  String?
-  strength  Int?     @default(5)
-  notes     String?
+  phone     String
+  code      String
+  expiresAt DateTime
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, phone])
 }
 
-model MarketAnalysis {
-  id             Int      @id @default(autoincrement())
-  companyId      Int
-  company        Company  @relation(fields: [companyId], references: [id])
-  regionName     String
-  coordinates    Json
-  saturation     Float?
-  recommendation String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+model Prospect {
+  id        Int            @id @default(autoincrement())
+  companyId Int
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  category  String?
+  website   String?
+  instagram String?
+  status    ProspectStatus @default(NEW)
+  aiScore   Float?
+  latitude  Float?
+  longitude Float?
+  notes     String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  company   Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+}
+
+model Voucher {
+  id            Int       @id @default(autoincrement())
+  companyId     Int
+  code          String
+  discountType  String    @default("PERCENTAGE")
+  discountValue Float
+  minPurchase   Float     @default(0)
+  maxDiscount   Float?
+  validFrom     DateTime?
+  validUntil    DateTime?
+  quota         Int       @default(0)
+  usedCount     Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code])
+}
+
+model Banner {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  title     String?
+  imageUrl  String
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 enum AppModule {
@@ -1260,17 +1304,6 @@ enum ContractType {
   TAHUNAN
 }
 
-model OtpVerification {
-  id        Int      @id @default(autoincrement())
-  companyId Int
-  phone     String
-  code      String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@unique([companyId, phone])
-}
-
 enum AbsenceDeductionType {
   PRO_RATA
   FIXED_AMOUNT
@@ -1297,31 +1330,9 @@ enum InvoiceStatus {
 
 enum ChatSender {
   USER
+  AI
   ADMIN
   VISITOR
-  AI
-}
-
-model Prospect {
-  id          Int            @id @default(autoincrement())
-  companyId   Int
-  name        String
-  phone       String?
-  email       String?
-  address     String?
-  category    String?
-  website     String?
-  instagram   String?
-  status      ProspectStatus @default(NEW)
-  aiScore     Float?
-  latitude    Float?
-  longitude   Float?
-  notes       String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId, status])
 }
 
 enum ProspectStatus {
@@ -1332,26 +1343,6 @@ enum ProspectStatus {
   INTERESTED
   DEAL
   REJECTED
-}
-
-model Voucher {
-  id            Int       @id @default(autoincrement())
-  companyId     Int
-  code          String
-  discountType  String    @default("PERCENTAGE")
-  discountValue Float
-  minPurchase   Float     @default(0)
-  maxDiscount   Float?
-  validFrom     DateTime?
-  validUntil    DateTime?
-  quota         Int       @default(0)
-  usedCount     Int       @default(0)
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, code])
 }
 
 enum WarehouseType {

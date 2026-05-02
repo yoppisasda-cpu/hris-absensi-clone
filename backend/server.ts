@@ -53,7 +53,42 @@ const cleanupLocalFile = (filePath: string | null) => {
 };
 
 const app = express();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: ['error'],
+});
+
+// --- PREPARED STATEMENT ERROR AUTO-RECOVERY ---
+// Supabase PgBouncer (port 6543) reuses connections, causing "prepared statement already exists/does not exist" errors.
+// This middleware catches those errors, deallocates all statements on that connection, and retries the query once.
+(prisma as any).$use(async (params: any, next: any) => {
+  try {
+    return await next(params);
+  } catch (e: any) {
+    const code = e?.meta?.code || e?.code;
+    const isPreparedStmtError =
+      code === '42P05' || code === '26000' ||
+      (e?.message && (e.message.includes('prepared statement') && 
+        (e.message.includes('already exists') || e.message.includes('does not exist'))));
+    if (isPreparedStmtError) {
+      console.warn('[DB] Prepared statement conflict detected. Running DEALLOCATE ALL and retrying...');
+      try {
+        await prisma.$executeRawUnsafe('DEALLOCATE ALL');
+      } catch (_) { /* ignore DEALLOCATE errors */ }
+      return await next(params);
+    }
+    throw e;
+  }
+});
+
+// --- GRACEFUL SHUTDOWN ---
+const gracefulShutdown = async (signal: string) => {
+  console.log(`[SHUTDOWN] ${signal} received. Disconnecting Prisma...`);
+  await prisma.$disconnect();
+  console.log('[SHUTDOWN] Prisma disconnected. Exiting.');
+  process.exit(0);
+};
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // --- DIRECTORY INITIALIZATION ---
 // Create required upload folders on startup (important for Railway/Cloud)
@@ -11469,18 +11504,25 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
       const invoiceNumber = `SLS/${y}/${m}/ID${tenantId}-${randomStr}`;
 
-      // 2. Calculate Total
+      // 2. Calculate Total & Commission
       let totalAmount = 0;
       for (const item of items) {
         totalAmount += parseFloat(item.quantity) * parseFloat(item.price);
       }
 
+      // Logic: If notes contain platform name, calculate 20% commission (standard)
+      let totalCommission = 0;
+      const lowerNotes = (notes || '').toLowerCase();
+      if (lowerNotes.includes('gofood') || lowerNotes.includes('grabfood') || lowerNotes.includes('shopeefood')) {
+        totalCommission = totalAmount * 0.20; // 20% Platform Fee
+      }
+
       // 3. Create Sale Record
       const saleResult: any[] = await tx.$queryRawUnsafe(`
-        INSERT INTO "Sale" ("companyId", "invoiceNumber", "customerId", "date", "totalAmount", "status", "accountId", "notes", "updatedAt")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        INSERT INTO "Sale" ("companyId", "invoiceNumber", "customerId", "date", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
         RETURNING id
-      `, tenantId, invoiceNumber, customerId ? parseInt(customerId) : null, dateVal, totalAmount, status || 'PAID', accountId ? parseInt(accountId) : null, notes);
+      `, tenantId, invoiceNumber, customerId ? parseInt(customerId) : null, dateVal, totalAmount, totalCommission, status || 'PAID', accountId ? parseInt(accountId) : null, notes);
       
       const saleId = saleResult[0].id;
 
@@ -11505,9 +11547,19 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           WHERE pr."productId" = $1
         `, productId);
 
+        // A. Always decrement the product's own stock if sold
+        await tx.$executeRawUnsafe(`
+          UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3
+        `, quantity, productId, tenantId);
+
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+          VALUES ($1, 'OUT', $2, $3, NOW())
+        `, productId, quantity, `Penjualan Invoice ${invoiceNumber}`);
+
+        // B. Additionally decrement Materials if it has a recipe (BOM Logic)
         if (recipes.length > 0) {
           const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
-          // Decrement Materials instead of Product
           for (const recipe of recipes) {
             const materialId = recipe.materialId;
             const recipeQty = parseFloat(recipe.quantity);
@@ -11522,16 +11574,6 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
               VALUES ($1, 'OUT', $2, $3, NOW())
             `, materialId, totalMaterialNeeded, `Penjualan (BOM) Inv ${invoiceNumber}`);
           }
-        } else {
-          // Original logic for Retail (Decrement Product itself)
-          await tx.$executeRawUnsafe(`
-            UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3
-          `, quantity, productId, tenantId);
-
-          await tx.$executeRawUnsafe(`
-            INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
-            VALUES ($1, 'OUT', $2, $3, NOW())
-          `, productId, quantity, `Penjualan Invoice ${invoiceNumber}`);
         }
       }
 
@@ -11642,10 +11684,10 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
     // Role-based Access (Non-Admin Restricted to their own branch)
     const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '');
     if (!isAdmin && !isPosViewer) {
-      if (user?.branchId === null) {
+      if (!user?.branchId) {
         whereConditions.push(`s."branchId" IS NULL`);
       } else {
-        whereConditions.push(`s."branchId" = ${user?.branchId}`);
+        whereConditions.push(`s."branchId" = ${Number(user.branchId)}`);
       }
     }
 
@@ -11776,6 +11818,174 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
   } catch (error: any) {
     console.error("POS Analytics Error Detail:", error);
     res.status(500).json({ error: 'Gagal menganalisa data POS: ' + error.message });
+  }
+});
+
+app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { branchId, startDate, endDate } = req.query;
+
+    const currentStart = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const currentEnd = endDate ? new Date(endDate as string) : new Date();
+    
+    // Calculate duration of current period to get previous period
+    const duration = currentEnd.getTime() - currentStart.getTime();
+    const prevStart = new Date(currentStart.getTime() - duration);
+    const prevEnd = new Date(currentStart.getTime());
+
+    const buildWhere = (start: Date, end: Date) => {
+      let conditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`, `s."date" >= $2`, `s."date" <= $3` ];
+      if (branchId && branchId !== 'all') {
+        if (branchId === 'null') conditions.push(`s."branchId" IS NULL`);
+        else conditions.push(`s."branchId" = ${parseInt(branchId as string)}`);
+      }
+      return conditions.join(' AND ');
+    };
+
+    // 1. Core Summary Metrics (Current vs Previous)
+    const getSummary = async (start: Date, end: Date) => {
+      const result: any[] = await prisma.$queryRawUnsafe(`
+        SELECT 
+          SUM(s."totalAmount") as "revenue", 
+          COUNT(s.id) as "orders",
+          AVG(s."totalAmount") as "aov"
+        FROM "Sale" s
+        WHERE ${buildWhere(start, end)}
+      `, tenantId, start, end);
+      return result[0] || { revenue: 0, orders: 0, aov: 0 };
+    };
+
+    const currentSummary = await getSummary(currentStart, currentEnd);
+    const prevSummary = await getSummary(prevStart, prevEnd);
+
+    // 2. Hourly Distribution (Peak Hours)
+    const hourlyData = await prisma.$queryRawUnsafe(`
+      SELECT 
+        EXTRACT(HOUR FROM s."date") as "hour",
+        SUM(s."totalAmount") as "revenue",
+        COUNT(s.id) as "orders"
+      FROM "Sale" s
+      WHERE ${buildWhere(currentStart, currentEnd)}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `, tenantId, currentStart, currentEnd);
+
+    // 3. Category Distribution
+    const categoryData = await prisma.$queryRawUnsafe(`
+      SELECT 
+        COALESCE(c.name, 'Uncategorized') as "category",
+        SUM(si.total) as "revenue"
+      FROM "SaleItem" si
+      JOIN "Sale" s ON si."saleId" = s.id
+      JOIN "Product" p ON si."productId" = p.id
+      LEFT JOIN "ProductCategory" c ON p."categoryId" = c.id
+      WHERE ${buildWhere(currentStart, currentEnd)}
+      GROUP BY c.name
+      ORDER BY "revenue" DESC
+    `, tenantId, currentStart, currentEnd);
+
+    // 4. Daily Trend (to compare with previous if needed)
+    const dailyTrend = await prisma.$queryRawUnsafe(`
+      SELECT DATE_TRUNC('day', s."date") as "date", SUM(s."totalAmount") as "total"
+      FROM "Sale" s
+      WHERE ${buildWhere(currentStart, currentEnd)}
+      GROUP BY DATE_TRUNC('day', s."date")
+      ORDER BY "date" ASC
+    `, tenantId, currentStart, currentEnd);
+
+    // Helper to handle BigInt serialization
+    const serialize = (data: any) => {
+      return JSON.parse(JSON.stringify(data, (key, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+      ));
+    };
+
+    res.json(serialize({
+      summary: {
+        current: currentSummary,
+        previous: prevSummary
+      },
+      hourly: hourlyData,
+      categories: categoryData,
+      trend: dailyTrend
+    }));
+  } catch (error: any) {
+    console.error("POS Comprehensive Analytics Error:", error);
+    res.status(500).json({ error: 'Gagal menganalisa data POS: ' + error.message });
+  }
+});
+
+app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { branchId, startDate, endDate } = req.query;
+
+    // Fetch same data as comprehensive to provide to AI
+    // (Simplified for prompt context)
+    const sales = await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        invoiceNumber: { startsWith: 'POS-' },
+        date: {
+          gte: startDate ? new Date(startDate as string) : undefined,
+          lte: endDate ? new Date(endDate as string) : undefined,
+        }
+      },
+      include: {
+        items: { include: { product: { include: { category: true } } } }
+      }
+    });
+
+    if (sales.length === 0) {
+      return res.json({ insight: "Belum ada data penjualan POS untuk dianalisa periode ini." });
+    }
+
+    const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
+    const topProducts = {};
+    const hourlyDistribution = {};
+
+    sales.forEach(s => {
+      const hour = new Date(s.date).getHours();
+      hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
+      
+      s.items.forEach(item => {
+        const name = item.product.name;
+        topProducts[name] = (topProducts[name] || 0) + item.quantity;
+      });
+    });
+
+    const sortedProducts = Object.entries(topProducts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3);
+    const peakHour = Object.entries(hourlyDistribution).sort((a: any, b: any) => b[1] - a[1])[0];
+
+    // Initialize Gemini
+    const genAI = new GeminiAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `
+      Anda adalah konsultan bisnis retail profesional kelas dunia.
+      Analisa data penjualan POS berikut dan berikan 3 poin insight strategis singkat (maks 2 kalimat per poin) dalam Bahasa Indonesia yang santun tapi profesional.
+      
+      Data:
+      - Total Omzet: Rp ${totalRevenue.toLocaleString()}
+      - Total Transaksi: ${sales.length}
+      - Produk Terlaris: ${sortedProducts.map(p => `${p[0]} (${p[1]} terjual)`).join(', ')}
+      - Jam Teramai: Jam ${peakHour?.[0]}:00
+      
+      Format output: JSON dengan field "insights" (array string).
+    `;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    
+    // Clean JSON from response if Gemini adds markdown code blocks
+    const jsonMatch = responseText.match(/\{.*\}/s);
+    const finalData = jsonMatch ? JSON.parse(jsonMatch[0]) : { insights: ["Gagal menganalisa data."] };
+
+    res.json(finalData);
+  } catch (error: any) {
+    console.error("AI Insights Error:", error);
+    res.json({ insights: ["Maaf, AI sedang istirahat sejenak. Silakan coba lagi nanti."] });
   }
 });
 

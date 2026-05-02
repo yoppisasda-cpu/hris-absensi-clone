@@ -7,7 +7,7 @@ class ApiService {
   // PENTING: Jika menggunakan HP asli (Debug), ganti IP di bawah jika tidak menggunakan emulator
   static const String baseUrl = kReleaseMode
       ? 'https://api.aivola.id/api' // PRODUCTION SERVER
-      : 'http://10.0.2.2:5000/api'; // LOCAL TESTING - EMULATOR
+      : 'http://192.168.6.206:5005/api'; // LOCAL TESTING - ACTUAL MACHINE IP
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   ApiService() {

@@ -8,7 +8,7 @@ import {
     Search, Monitor, Download, Eye, Printer, 
     Building2, Calendar, Filter, CreditCard, 
     TrendingUp, ShoppingCart, ArrowUpRight, ArrowDownRight,
-    Trophy, Sparkles, Receipt
+    Trophy, Sparkles, Receipt, BrainCircuit
 } from "lucide-react";
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -25,6 +25,9 @@ export default function POSReportsPage() {
         salesTrend: [],
         paymentMethods: []
     });
+    const [comprehensive, setComprehensive] = useState<any>(null);
+    const [aiInsights, setAiInsights] = useState<string[]>([]);
+    const [isAiLoading, setIsAiLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [branches, setBranches] = useState<any[]>([]);
     
@@ -73,7 +76,7 @@ export default function POSReportsPage() {
             });
             setSales(salesRes.data);
 
-            // Fetch Analytics Summary
+            // Fetch Analytics Summary (needed for topProducts and salesTrend)
             const analyticsRes = await api.get('/pos/analytics/summary', {
                 params: { 
                     branchId: selectedBranchId,
@@ -83,6 +86,29 @@ export default function POSReportsPage() {
                 }
             });
             setAnalytics(analyticsRes.data);
+
+            // Fetch Comprehensive Analytics
+            const compRes = await api.get('/pos/analytics/comprehensive', {
+                params: { 
+                    branchId: selectedBranchId,
+                    startDate,
+                    endDate
+                }
+            });
+            setComprehensive(compRes.data);
+
+            // Fetch AI Insights
+            setIsAiLoading(true);
+            try {
+                const aiRes = await api.get('/pos/analytics/ai-insights', {
+                    params: { branchId: selectedBranchId, startDate, endDate }
+                });
+                setAiInsights(aiRes.data.insights || []);
+            } catch (err) {
+                console.error("AI Insights fail", err);
+            } finally {
+                setIsAiLoading(false);
+            }
         } catch (error) {
             console.error("Gagal mengambil data laporan", error);
         } finally {
@@ -163,76 +189,153 @@ export default function POSReportsPage() {
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+                {/* Revenue Card */}
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform">
-                        <TrendingUp className="h-24 w-24 text-blue-500" />
+                    <div className="absolute -right-4 -top-4 p-8 opacity-[0.03] group-hover:scale-110 group-hover:opacity-[0.05] transition-all duration-500">
+                        <TrendingUp className="h-32 w-32 text-blue-500" />
                     </div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        Total Omzet (Gross)
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" />
+                            Total Omzet
+                        </div>
+                        {comprehensive && (
+                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black ${
+                                comprehensive.summary.current.revenue >= comprehensive.summary.previous.revenue 
+                                ? 'bg-emerald-500/10 text-emerald-400' 
+                                : 'bg-red-500/10 text-red-400'
+                            }`}>
+                                {comprehensive.summary.current.revenue >= comprehensive.summary.previous.revenue ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                {Math.abs(((comprehensive.summary.current.revenue - comprehensive.summary.previous.revenue) / (comprehensive.summary.previous.revenue || 1)) * 100).toFixed(1)}%
+                            </div>
+                        )}
                     </div>
-                    <p className="text-2xl font-black text-white tracking-tight">Rp {stats.gross.toLocaleString()}</p>
-                    <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                    <p className="text-3xl font-black text-white tracking-tight leading-none mb-2">Rp {stats.gross.toLocaleString()}</p>
+                    <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
                         <ArrowUpRight className="h-3 w-3 text-emerald-500" />
-                        Dari {stats.count} Transaksi
+                        Periode Ini ({stats.count} Transaksi)
                     </div>
                 </div>
 
+                {/* Platform Fee Card */}
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform">
-                        <Filter className="h-24 w-24 text-red-500" />
+                    <div className="absolute -right-4 -top-4 p-8 opacity-[0.03] group-hover:scale-110 group-hover:opacity-[0.05] transition-all duration-500">
+                        <Filter className="h-32 w-32 text-red-500" />
                     </div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                        Potongan Platform
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
+                            Fee & Komisi
+                        </div>
                     </div>
-                    <p className="text-2xl font-black text-red-400 tracking-tight">Rp {stats.commission.toLocaleString()}</p>
-                    <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                        Platform Fee & Komisi
+                    <p className="text-3xl font-black text-red-400 tracking-tight leading-none mb-2">Rp {stats.commission.toLocaleString()}</p>
+                    <div className="text-[10px] font-bold text-slate-500">
+                        Potongan Platform Pihak Ke-3
                     </div>
                 </div>
 
+                {/* Net Profit Card */}
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform">
-                        <Sparkles className="h-24 w-24 text-emerald-500" />
+                    <div className="absolute -right-4 -top-4 p-8 opacity-[0.03] group-hover:scale-110 group-hover:opacity-[0.05] transition-all duration-500">
+                        <Sparkles className="h-32 w-32 text-emerald-500" />
                     </div>
-                    <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" />
-                        Net Settlement
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+                            Net Settlement
+                        </div>
                     </div>
-                    <p className="text-3xl font-black text-emerald-400 tracking-tight">Rp {stats.net.toLocaleString()}</p>
-                    <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                        Dana Bersih Cabang
+                    <div className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                        <p className="text-4xl font-black tracking-tight leading-none mb-2">Rp {stats.net.toLocaleString()}</p>
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-500">
+                        Dana Bersih Siap Cair
                     </div>
                 </div>
 
+                {/* AOV Card */}
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform">
-                        <ShoppingCart className="h-24 w-24 text-purple-500" />
+                    <div className="absolute -right-4 -top-4 p-8 opacity-[0.03] group-hover:scale-110 group-hover:opacity-[0.05] transition-all duration-500">
+                        <ShoppingCart className="h-32 w-32 text-purple-500" />
                     </div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                        Rerata per Struk
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-purple-500 shadow-[0_0_8px_#8b5cf6]" />
+                            Average Order Value
+                        </div>
+                        {comprehensive && (
+                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black ${
+                                comprehensive.summary.current.aov >= comprehensive.summary.previous.aov 
+                                ? 'bg-emerald-500/10 text-emerald-400' 
+                                : 'bg-red-500/10 text-red-400'
+                            }`}>
+                                {comprehensive.summary.current.aov >= comprehensive.summary.previous.aov ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                {Math.abs(((comprehensive.summary.current.aov - comprehensive.summary.previous.aov) / (comprehensive.summary.previous.aov || 1)) * 100).toFixed(1)}%
+                            </div>
+                        )}
                     </div>
-                    <p className="text-2xl font-black text-white tracking-tight">Rp {Math.round(stats.avgValue).toLocaleString()}</p>
-                    <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                        AOV (Average Order Value)
+                    <p className="text-3xl font-black text-white tracking-tight leading-none mb-2">Rp {Math.round(stats.avgValue).toLocaleString()}</p>
+                    <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                        {comprehensive && comprehensive.summary.current.orders >= comprehensive.summary.previous.orders ? (
+                            <ArrowUpRight className="h-3 w-3 text-emerald-500" />
+                        ) : (
+                            <ArrowDownRight className="h-3 w-3 text-red-500" />
+                        )}
+                        Rata-rata belanja per pelanggan
                     </div>
                 </div>
             </div>
 
-            {/* Middle Section: Trends & Top Products */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* AI Smart Insights Section */}
+            {(aiInsights.length > 0 || isAiLoading) && (
+                <div className="mb-8 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-6 backdrop-blur-md relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 p-4 opacity-10">
+                        <Sparkles className="h-24 w-24 text-emerald-400 animate-pulse" />
+                    </div>
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-emerald-500 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.4)]">
+                            <BrainCircuit className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-black text-white tracking-tight">Aivola AI <span className="text-emerald-400 text-xs font-black ml-2 px-2 py-0.5 border border-emerald-400/30 rounded-full">BETA</span></h2>
+                            <p className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-widest">Smart Business Recommendations</p>
+                        </div>
+                    </div>
+
+                    {isAiLoading ? (
+                        <div className="flex flex-col gap-3">
+                            <div className="h-4 w-3/4 bg-emerald-500/20 animate-pulse rounded-full" />
+                            <div className="h-4 w-1/2 bg-emerald-500/20 animate-pulse rounded-full" />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {aiInsights.map((insight, idx) => (
+                                <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all flex gap-3 group/item">
+                                    <div className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5 text-emerald-400 text-[10px] font-black group-hover/item:bg-emerald-500 group-hover/item:text-white transition-all">
+                                        {idx + 1}
+                                    </div>
+                                    <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                                        {insight}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Middle Section: Trends & Insights */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
                 {/* Sales Trend Chart */}
                 <div className="lg:col-span-2 rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h3 className="text-lg font-black text-white">Tren Penjualan</h3>
+                            <h3 className="text-lg font-black text-white">Tren Pendapatan</h3>
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Revenue harian sepanjang periode</p>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                            <TrendingUp className="h-3 w-3 text-emerald-400" />
-                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Active Trend</span>
+                        <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
+                            <TrendingUp className="h-3 w-3 text-blue-400" />
+                            <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Revenue Flow</span>
                         </div>
                     </div>
                     <div className="h-[300px] w-full mt-4">
@@ -240,8 +343,8 @@ export default function POSReportsPage() {
                             <AreaChart data={analytics.salesTrend}>
                                 <defs>
                                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
@@ -258,50 +361,66 @@ export default function POSReportsPage() {
                                     formatter={(val: any) => [`Rp ${val.toLocaleString()}`, 'Omzet']}
                                     labelFormatter={(val) => format(new Date(val), 'dd MMMM yyyy', { locale: id })}
                                 />
-                                <Area type="monotone" dataKey="total" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" />
+                                <Area type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* Best Selling Products */}
+                {/* Peak Hours Analysis */}
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm">
+                    <div className="mb-8">
+                        <h3 className="text-lg font-black text-white">Jam Sibuk</h3>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Distribusi transaksi per jam</p>
+                    </div>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={comprehensive?.hourly || []}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                <XAxis dataKey="hour" stroke="#475569" fontSize={10} fontWeight="bold" tickFormatter={(h) => `${h}:00`} />
+                                <YAxis hide />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}
+                                    formatter={(val: any) => [`${val} Pesanan`, 'Volume']}
+                                    labelFormatter={(val) => `Jam ${val}:00`}
+                                />
+                                <Bar dataKey="orders" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
+                                    {(comprehensive?.hourly || []).map((entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={entry.orders > 10 ? '#8b5cf6' : '#475569'} opacity={0.8} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Category Contribution */}
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm flex flex-col">
                     <div className="mb-6 flex items-center justify-between">
                         <div>
                             <h3 className="text-lg font-black text-white flex items-center gap-2">
-                                <Trophy className="h-5 w-5 text-yellow-500" />
-                                Produk Laris
+                                <Sparkles className="h-5 w-5 text-emerald-500" />
+                                Kategori
                             </h3>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Top 5 Berdasarkan Qty</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Kontribusi Pendapatan</p>
                         </div>
                     </div>
                     
-                    <div className="space-y-4 flex-1">
-                        {analytics.topProducts.map((p: any, i: number) => (
+                    <div className="space-y-4 flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+                        {(comprehensive?.categories || []).map((c: any, i: number) => (
                             <div key={i} className="group cursor-default">
                                 <div className="flex justify-between items-center mb-1.5">
-                                    <span className="text-xs font-black text-slate-300 group-hover:text-emerald-400 transition-colors truncate pr-4">{p.name}</span>
-                                    <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">{p.totalSold} terjual</span>
+                                    <span className="text-xs font-black text-slate-300 group-hover:text-emerald-400 transition-colors truncate pr-2">{c.category}</span>
+                                    <span className="text-[10px] font-black text-slate-500">Rp {c.revenue.toLocaleString()}</span>
                                 </div>
-                                <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                                      <div 
                                         className="h-full bg-emerald-500 rounded-full transition-all duration-1000 group-hover:brightness-125" 
-                                        style={{ width: `${(p.totalSold / analytics.topProducts[0].totalSold) * 100}%` }} 
+                                        style={{ width: `${(c.revenue / comprehensive.categories[0].revenue) * 100}%` }} 
                                     />
                                 </div>
                             </div>
                         ))}
-                    </div>
-
-                    <div className="mt-6 pt-6 border-t border-slate-800/50">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Kontribusi Rank 1</span>
-                            <span className="text-xs font-black text-white">
-                                {analytics.topProducts.length > 0 ? (
-                                    (analytics.topProducts[0].totalRevenue / stats.gross * 100).toFixed(1)
-                                ) : '0'}% Omzet
-                            </span>
-                        </div>
                     </div>
                 </div>
             </div>
