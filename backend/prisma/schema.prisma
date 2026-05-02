@@ -60,8 +60,6 @@ model Company {
   discountProspecting    Int                  @default(0)
   waProspectTemplate     String?
   timezone               String               @default("Asia/Jakarta")
-  primaryColor           String?              @default("#3B82F6")
-  secondaryColor         String?              @default("#1E293B")
   announcements          Announcement[]
   assets                 Asset[]
   assignments            Assignment[]
@@ -110,11 +108,8 @@ model Company {
   userAccess             UserAccess[]
   vouchers               Voucher[]
   warehouses             Warehouse[]
-  prospects             Prospect[]
-  chatSessions          ChatSession[]
   competitors            Competitor[]
   marketAnalyses         MarketAnalysis[]
-  banners               Banner[]
 }
 
 model FinancialAccount {
@@ -274,7 +269,6 @@ model User {
   resignDate              DateTime?
   lastDeviceId            String?
   taxStatus               String              @default("TK-0")
-  avatarUrl               String?
   assets                  Asset[]
   createdAssignments      Assignment[]        @relation("AssignmentCreator")
   assignments             Assignment[]        @relation("AssignmentUser")
@@ -822,7 +816,6 @@ model Product {
   salesOrderItems    SalesOrderItem[]
   StockTransaction   StockTransaction[]
   WarehouseStock     WarehouseStock[]
-  SaleItem           SaleItem[]
 }
 
 model ProductRecipe {
@@ -1394,14 +1387,24 @@ enum AssignmentStatus {
   CANCELLED
 }
 
-model Banner {
+model Competitor {
   id        Int      @id @default(autoincrement())
   companyId Int
-  title     String?
-  imageUrl  String
-  linkUrl   String?
-  isActive  Boolean  @default(true)
-  order     Int      @default(0)
+  name      String
+  type      String?
+  location  String?
+  lat       Float?
+  lng       Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model MarketAnalysis {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  title     String
+  content   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)

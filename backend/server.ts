@@ -11885,15 +11885,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
       const invoiceNumber = `SLS/${y}/${m}/ID${tenantId}-${randomStr}`;
 
-      // 2. Calculate Total & Commission
-      let totalAmount = 0;
-      if (items && Array.isArray(items)) {
-        for (const item of items) {
-          totalAmount += parseFloat(item.quantity) * parseFloat(item.price);
-        }
-      }
-
-      // Logic: If notes contain platform name, calculate 20% commission (standard)
+      // 2. Calculate Commission (Logic: If notes contain platform name, calculate 20%)
       let totalCommission = 0;
       const lowerNotes = (notes || '').toLowerCase();
       if (lowerNotes.includes('gofood') || lowerNotes.includes('grabfood') || lowerNotes.includes('shopeefood')) {
