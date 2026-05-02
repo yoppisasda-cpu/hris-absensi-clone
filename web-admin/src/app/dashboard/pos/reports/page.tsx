@@ -37,6 +37,7 @@ export default function POSReportsPage() {
     const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [paymentFilter, setPaymentFilter] = useState("all");
+    const [saleTypeFilter, setSaleTypeFilter] = useState("all");
     
     // UI State
     const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
@@ -71,7 +72,8 @@ export default function POSReportsPage() {
                     branchId: selectedBranchId,
                     startDate,
                     endDate,
-                    paymentMethod: paymentFilter
+                    paymentMethod: paymentFilter,
+                    saleType: saleTypeFilter
                 }
             });
             setSales(salesRes.data);
@@ -82,7 +84,8 @@ export default function POSReportsPage() {
                     branchId: selectedBranchId,
                     startDate,
                     endDate,
-                    paymentMethod: paymentFilter
+                    paymentMethod: paymentFilter,
+                    saleType: saleTypeFilter
                 }
             });
             setAnalytics(analyticsRes.data);
@@ -122,7 +125,7 @@ export default function POSReportsPage() {
 
     useEffect(() => {
         fetchData();
-    }, [selectedBranchId, startDate, endDate, paymentFilter]);
+    }, [selectedBranchId, startDate, endDate, paymentFilter, saleTypeFilter]);
 
     const stats = useMemo(() => {
         const gross = sales.reduce((sum, s) => sum + s.totalAmount, 0);
@@ -146,7 +149,7 @@ export default function POSReportsPage() {
 
     const handleExport = () => {
         const token = localStorage.getItem('jwt_token');
-        const url = `${api.defaults.baseURL}/sales/export?branchId=${selectedBranchId}&startDate=${startDate}&endDate=${endDate}&paymentMethod=${paymentFilter}&token=${token}`;
+        const url = `${api.defaults.baseURL}/sales/export?branchId=${selectedBranchId}&startDate=${startDate}&endDate=${endDate}&paymentMethod=${paymentFilter}&saleType=${saleTypeFilter}&token=${token}`;
         window.open(url, '_blank');
     };
 
@@ -460,6 +463,22 @@ export default function POSReportsPage() {
                             </select>
                         </div>
 
+                        {/* Sale Type Filter */}
+                        <div className="relative w-full sm:w-48 group">
+                            <ShoppingCart className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors pointer-events-none z-10" />
+                            <select
+                                value={saleTypeFilter}
+                                onChange={(e) => setSaleTypeFilter(e.target.value)}
+                                className="w-full appearance-none rounded-xl border border-slate-800 bg-slate-950/50 py-2.5 pl-10 pr-10 text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all font-bold cursor-pointer hover:bg-slate-800"
+                            >
+                                <option value="all">Semua Tipe Jual</option>
+                                <option value="WALK_IN">WALK-IN</option>
+                                <option value="GOFOOD">GOFOOD</option>
+                                <option value="GRABFOOD">GRABFOOD</option>
+                                <option value="SHOPEEFOOD">SHOPEEFOOD</option>
+                            </select>
+                        </div>
+
                         {/* Payment Filter */}
                         <div className="relative w-full sm:w-48 group">
                             <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors pointer-events-none z-10" />
@@ -468,14 +487,11 @@ export default function POSReportsPage() {
                                 onChange={(e) => setPaymentFilter(e.target.value)}
                                 className="w-full appearance-none rounded-xl border border-slate-800 bg-slate-950/50 py-2.5 pl-10 pr-10 text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all font-bold cursor-pointer hover:bg-slate-800"
                             >
-                                <option value="all">Semua Pembayaran</option>
+                                <option value="all">Semua Bayar</option>
                                 <option value="TUNAI">TUNAI</option>
                                 <option value="QRIS">QRIS</option>
                                 <option value="DEBIT">DEBIT / KREDIT</option>
                                 <option value="TRANSFER">TRANSFER BANK</option>
-                                <option value="GOFOOD">GOFOOD</option>
-                                <option value="GRABFOOD">GRABFOOD</option>
-                                <option value="SHOPEE">SHOPEEFOOD</option>
                             </select>
                         </div>
                     </div>

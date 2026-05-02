@@ -1361,9 +1361,13 @@ class _POSScreenState extends State<POSScreen> {
                           itemBuilder: (context, i) {
                             final p = _filteredProducts[i];
                             final int cartQty = _cart.where((item) => item['productId'] == p['id']).fold(0, (sum, item) => sum + (item['quantity'] as int));
+                            final bool trackStock = p['trackStock'] ?? true;
+                            final bool isOutOfStock = trackStock && (p['stock'] ?? 0) <= 0;
 
                             return GestureDetector(
-                              onTap: () => _handleProductTap(p),
+                              onTap: isOutOfStock 
+                                ? () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Stok habis!'), duration: Duration(milliseconds: 500))) 
+                                : () => _handleProductTap(p),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white,
@@ -1427,6 +1431,26 @@ class _POSScreenState extends State<POSScreen> {
                                           radius: 10,
                                           backgroundColor: Colors.blue[800],
                                           child: Text('$cartQty', style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                    if (isOutOfStock)
+                                      Positioned.fill(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.7),
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: Center(
+                                            child: Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red[600],
+                                                borderRadius: BorderRadius.circular(8),
+                                                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+                                              ),
+                                              child: Text('HABIS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                   ],

@@ -34,6 +34,8 @@ model Company {
   modules                AppModule            @default(ABSENSI)
   address                String?
   logoUrl                String?
+  primaryColor           String?              @default("#3B82F6")
+  secondaryColor         String?              @default("#1E293B")
   lateGracePeriod        Int                  @default(0)
   workDaysPerMonth       Int                  @default(25)
   purchasedInsights      String[]             @default([])
@@ -108,6 +110,11 @@ model Company {
   userAccess             UserAccess[]
   vouchers               Voucher[]
   warehouses             Warehouse[]
+  prospects             Prospect[]
+  chatSessions          ChatSession[]
+  competitors            Competitor[]
+  marketAnalyses         MarketAnalysis[]
+  banners               Banner[]
 }
 
 model FinancialAccount {
@@ -261,6 +268,7 @@ model User {
   contractEndDate         DateTime?
   language                String              @default("id")
   faceReferenceUrl        String?
+  avatarUrl               String?
   isActive                Boolean             @default(true)
   reportToId              Int?
   resignDate              DateTime?
@@ -814,6 +822,7 @@ model Product {
   salesOrderItems    SalesOrderItem[]
   StockTransaction   StockTransaction[]
   WarehouseStock     WarehouseStock[]
+  SaleItem           SaleItem[]
 }
 
 model ProductRecipe {
@@ -872,8 +881,8 @@ model SaleItem {
   originalPrice Float    @default(0)
   total         Float
   modifiers     Json?
-  Product       Product? @relation(fields: [productId], references: [id], onUpdate: NoAction)
-  Sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product       Product? @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  Sale          Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model SaleReturn {
@@ -1383,4 +1392,17 @@ enum AssignmentStatus {
   COMPLETED
   REJECTED
   CANCELLED
+}
+
+model Banner {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  title     String?
+  imageUrl  String
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }

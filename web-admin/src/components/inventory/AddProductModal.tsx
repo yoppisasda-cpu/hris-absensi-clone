@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { X, Package, Tag, Box, AlertCircle, Layers, Plus, Trash2, ChefHat, ScanLine, MapPin, Save, Info, TrendingUp, Calculator } from "lucide-react";
+import { X, Package, Tag, Box, AlertCircle, Layers, Plus, Trash2, ChefHat, ScanLine, MapPin, Save, Info, TrendingUp, Calculator, Image as ImageIcon, Upload, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import SearchableSelect from "../common/SearchableSelect";
@@ -24,8 +24,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         priceGofood: 0,
         priceGrabfood: 0,
         priceShopeefood: 0,
-        recipeYield: 0
+        recipeYield: 0,
+        imageUrl: ""
     });
+    const [uploading, setUploading] = useState(false);
     const [warehouses, setWarehouses] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [hasRecipe, setHasRecipe] = useState(false);
@@ -63,7 +65,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     priceGofood: product.priceGofood || 0,
                     priceGrabfood: product.priceGrabfood || 0,
                     priceShopeefood: product.priceShopeefood || 0,
-                    recipeYield: product.recipeYield !== undefined ? product.recipeYield : 0
+                    recipeYield: product.recipeYield !== undefined ? product.recipeYield : 0,
+                    imageUrl: product.imageUrl || ""
                 });
                 fetchRecipe(product.id);
                 if (product.customizations) {
@@ -73,7 +76,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 }
             } else {
                 setFormData({
-                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: ""
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
@@ -257,6 +260,27 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             setFormData(prev => ({ ...prev, sku: suggested }));
         }
     }, [isOpen, product, productList, formData.type]);
+    const handleImageUpload = async (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const res = await api.post('/inventory/products/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setFormData(prev => ({ ...prev, imageUrl: res.data.imageUrl }));
+            toast.success("Foto berhasil diunggah");
+        } catch (error: any) {
+            console.error("Gagal unggah foto", error);
+            toast.error("Gagal unggah foto");
+        } finally {
+            setUploading(false);
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -313,7 +337,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
 
             setFormData({
-                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: ""
             });
             setHasRecipe(false);
             setRecipeItems([]);
@@ -352,6 +376,52 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto flex-grow custom-scrollbar bg-slate-950/20">
+                    {/* Image Upload Section - Only show if visible in POS */}
+                    {formData.showInPos && (
+                        <div className="flex flex-col items-center justify-center py-4 animate-in fade-in zoom-in duration-300">
+                            <div className="relative group">
+                                <div className="h-40 w-40 rounded-[2.5rem] bg-slate-900 border-2 border-dashed border-slate-800 flex items-center justify-center overflow-hidden transition-all group-hover:border-indigo-500/50 shadow-2xl">
+                                    {formData.imageUrl ? (
+                                        <img 
+                                            src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${formData.imageUrl}`} 
+                                            alt="Product" 
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="text-center p-4">
+                                            <ImageIcon className="h-10 w-10 text-slate-700 mx-auto mb-2" />
+                                            <p className="text-[8px] font-black uppercase text-slate-600 tracking-widest italic">No Visual Data</p>
+                                        </div>
+                                    )}
+                                    
+                                    {uploading && (
+                                        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center">
+                                            <Loader2 className="h-8 w-8 text-indigo-400 animate-spin" />
+                                        </div>
+                                    )}
+                                    
+                                    <label className="absolute inset-0 cursor-pointer flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-500/20 backdrop-blur-[2px]">
+                                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                                        <div className="bg-white text-slate-950 rounded-xl px-4 py-2 flex items-center gap-2 shadow-xl transform scale-90 group-hover:scale-100 transition-transform">
+                                            <Upload className="h-4 w-4" />
+                                            <span className="text-[10px] font-black uppercase italic">Upload Foto</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                {formData.imageUrl && (
+                                    <button 
+                                        type="button"
+                                        onClick={() => setFormData({...formData, imageUrl: ""})}
+                                        className="absolute -top-2 -right-2 h-8 w-8 rounded-xl bg-red-500 text-white flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <p className="mt-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic">Visual Identification Asset</p>
+                        </div>
+                    )}
+
                     <div className="space-y-6">
                         {/* Section 1: Basic Info */}
                         <div className="grid grid-cols-2 gap-6">

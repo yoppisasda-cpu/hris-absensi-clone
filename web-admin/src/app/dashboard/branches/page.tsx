@@ -146,7 +146,7 @@ export default function BranchesPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                         <label className="block text-xs font-bold text-slate-500 mb-1">Nama Cabang / Kedai</label>
-                                        <input required value={newBranch.name} onChange={e => setNewBranch({ ...newBranch, name: e.target.value })} type="text" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:bg-white outline-none" placeholder="Misal: Kedai Dharmawangsa" />
+                                        <input required value={newBranch.name} onChange={e => setNewBranch({ ...newBranch, name: e.target.value })} type="text" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:border-blue-500 focus:bg-white outline-none" placeholder="Misal: Kedai Dharmawangsa" />
                                     </div>
                                     <div className="md:col-span-2 flex items-center justify-between bg-blue-50/50 p-2 rounded-lg border border-blue-100">
                                         <div className="flex items-center gap-2">
@@ -163,15 +163,15 @@ export default function BranchesPage() {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Latitude</label>
-                                        <input value={newBranch.latitude} onChange={e => setNewBranch({ ...newBranch, latitude: e.target.value })} type="number" step="any" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:bg-white outline-none" placeholder="-6.123456" />
+                                        <input value={newBranch.latitude} onChange={e => setNewBranch({ ...newBranch, latitude: e.target.value })} type="number" step="any" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:border-blue-500 focus:bg-white outline-none" placeholder="-6.123456" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Longitude</label>
-                                        <input value={newBranch.longitude} onChange={e => setNewBranch({ ...newBranch, longitude: e.target.value })} type="number" step="any" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:bg-white outline-none" placeholder="106.123456" />
+                                        <input value={newBranch.longitude} onChange={e => setNewBranch({ ...newBranch, longitude: e.target.value })} type="number" step="any" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:border-blue-500 focus:bg-white outline-none" placeholder="106.123456" />
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-xs font-bold text-slate-500 mb-1">Berlaku Absen dalam Radius Radius (Meter)</label>
-                                        <input required value={newBranch.radius} onChange={e => setNewBranch({ ...newBranch, radius: Number(e.target.value) })} type="number" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:bg-white outline-none" placeholder="100" />
+                                        <input required value={newBranch.radius} onChange={e => setNewBranch({ ...newBranch, radius: Number(e.target.value) })} type="number" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:border-blue-500 focus:bg-white outline-none" placeholder="100" />
                                     </div>
                                 </div>
                                 <div className="pt-4 flex justify-end gap-3">

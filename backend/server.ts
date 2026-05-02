@@ -96,7 +96,9 @@ const requiredFolders = [
   path.join(process.cwd(), 'uploads'),
   path.join(process.cwd(), 'uploads/attendance'),
   path.join(process.cwd(), 'uploads/face_references'),
-  path.join(process.cwd(), 'uploads/reimbursements')
+  path.join(process.cwd(), 'uploads/reimbursements'),
+  path.join(process.cwd(), 'uploads/banners'),
+  path.join(process.cwd(), 'uploads/announcements')
 ];
 
 requiredFolders.forEach(folder => {
@@ -613,6 +615,9 @@ const uploadAttendance = multer({ dest: path.join(process.cwd(), 'uploads/attend
 const uploadFaceReference = multer({ dest: path.join(process.cwd(), 'uploads/face_references/') });
 const uploadAnnouncement = multer({ dest: path.join(process.cwd(), 'uploads/announcements/') });
 const uploadLogo = multer({ dest: path.join(process.cwd(), 'uploads/logos/') });
+const uploadBanner = multer({ dest: path.join(process.cwd(), 'uploads/banners/') });
+const uploadProduct = multer({ dest: path.join(process.cwd(), 'uploads/products/') });
+const uploadAvatar = multer({ dest: path.join(process.cwd(), 'uploads/avatars/') });
 
 // --- 1. MIDDLEWARE MULTI-TENANT & AUTH (CRITICAL) ---
 // Middleware ini mengekstrak profil Karyawan dari token JWT.
@@ -1211,7 +1216,18 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 
     const user = await prisma.user.findFirst({ 
       where: { email: { equals: trimmedEmail, mode: 'insensitive' } },
-      include: { company: { select: { plan: true, addons: true } } }
+      include: { 
+        company: { 
+          select: { 
+            name: true,
+            logoUrl: true,
+            primaryColor: true,
+            secondaryColor: true,
+            plan: true, 
+            addons: true 
+          } 
+        } 
+      }
     });
     if (!user) {
       console.log(`[LOGIN FAILED] User not found: "${trimmedEmail}"`);
@@ -1263,6 +1279,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
         branchId: user.branchId,
         role: user.role,
         language: user.language,
+        company: user.company,
         plan: (user as any).company?.plan,
         addons: (user as any).company?.addons || []
       }
@@ -1395,6 +1412,256 @@ app.patch('/api/auth/change-password', tenantMiddleware, async (req: Request, re
   }
 });
 
+// --- GET ALL PUBLIC MERCHANTS (For Ecosystem Selection) ---
+app.get('/api/companies/public', async (req: Request, res: Response) => {
+  try {
+    const companies = await prisma.company.findMany({
+      where: { 
+        isActive: true,
+        addons: {
+          has: 'AIVOLA_GO'
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        primaryColor: true,
+        secondaryColor: true,
+        address: true,
+        picPhone: true,
+        latitude: true,
+        longitude: true,
+        branches: true
+      }
+    });
+    res.json(companies);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil daftar merchant' });
+  }
+});
+
+// --- GET PRODUCTS FOR SPECIFIC PUBLIC MERCHANT ---
+app.get('/api/companies/public/:id/products', async (req: Request, res: Response) => {
+  try {
+    const companyId = parseInt(req.params.id as string);
+    const { branchId } = req.query;
+
+    const products = await prisma.product.findMany({
+      where: { 
+        companyId, 
+        showInPos: true,
+        // Only show products if company is active and has GO addon (additional safety)
+        Company: {
+          isActive: true,
+          addons: { has: 'AIVOLA_GO' }
+        }
+      },
+      include: { 
+        category: true,
+        WarehouseStock: {
+          include: { warehouse: true }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    // Filter stock based on branch if provided
+    const productsWithStock = products.map(p => {
+      let displayStock = p.stock;
+      const bId = branchId ? parseInt(branchId as string) : NaN;
+
+      if (!isNaN(bId) && branchId !== 'all') {
+        const branchWarehouses = p.WarehouseStock.filter((ws: any) => ws.warehouse.branchId === bId);
+        displayStock = branchWarehouses.reduce((sum: number, ws: any) => sum + ws.quantity, 0);
+      } else if (!branchId || branchId === 'all') {
+        // If no branch specified, we can either show global stock or 0. 
+        // POS usually shows global if no branch filter, but for ecosystem 
+        // it might be better to stay as is (global).
+        displayStock = p.stock;
+      }
+      
+      // Clean up the response
+      const { WarehouseStock, ...cleanProduct } = p as any;
+      return { ...cleanProduct, stock: displayStock };
+    });
+
+    res.json(productsWithStock);
+  } catch (error: any) {
+    console.error("PUBLIC PRODUCTS ERROR:", error);
+    res.status(500).json({ error: 'Gagal mengambil data produk ekosistem' });
+  }
+});
+
+// --- GET CATEGORIES FOR SPECIFIC PUBLIC MERCHANT ---
+app.get('/api/companies/public/:id/categories', async (req: Request, res: Response) => {
+  try {
+    const companyId = parseInt(req.params.id as string);
+    const categories = await prisma.productCategory.findMany({
+      where: { 
+        companyId,
+        company: {
+          isActive: true,
+          addons: { has: 'AIVOLA_GO' }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(categories);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil kategori ekosistem' });
+  }
+});
+
+// --- GET BRANCHES FOR SPECIFIC PUBLIC MERCHANT ---
+app.get('/api/companies/public/:id/branches', async (req: Request, res: Response) => {
+  try {
+    const companyId = parseInt(req.params.id as string);
+    const branches = await prisma.branch.findMany({
+      where: { 
+        companyId,
+        company: {
+          isActive: true,
+          addons: { has: 'AIVOLA_GO' }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(branches);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil cabang ekosistem' });
+  }
+});
+
+// --- GET BANNERS FOR SPECIFIC PUBLIC MERCHANT ---
+app.get('/api/companies/public/:id/banners', async (req: Request, res: Response) => {
+  try {
+    const companyId = parseInt(req.params.id as string);
+    const banners = await prisma.banner.findMany({
+      where: { 
+        companyId,
+        isActive: true
+      },
+      orderBy: { order: 'asc' }
+    });
+    res.json(banners);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil banner promo' });
+  }
+});
+
+// --- ADMIN: MANAGE BANNERS ---
+app.get('/api/banners', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const banners = await prisma.banner.findMany({
+      where: { companyId: tenantId },
+      orderBy: { order: 'asc' }
+    });
+    res.json(banners);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal mengambil data banner admin' });
+  }
+});
+
+app.post('/api/banners', tenantMiddleware, uploadBanner.single('image'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { title, linkUrl, isActive, order } = req.body;
+    let imageUrl = '';
+
+    if (req.file) {
+      try {
+        const fullLocalPath = path.join(process.cwd(), 'uploads/banners', req.file.filename);
+        // Use 'announcements' bucket as a safer default if 'banners' bucket doesn't exist
+        imageUrl = await uploadToSupabase(fullLocalPath, 'announcements');
+        
+        // If uploadToSupabase returned a relative local path (fallback), prepend the host
+        if (imageUrl.startsWith('/uploads/')) {
+           const protocol = req.protocol;
+           const host = req.get('host');
+           imageUrl = `${protocol}://${host}${imageUrl}`;
+        }
+        
+        cleanupLocalFile(fullLocalPath);
+      } catch (uploadError) {
+        console.error('Failed to upload banner image:', uploadError);
+      }
+    }
+
+    if (!imageUrl && !req.body.imageUrl) {
+      return res.status(400).json({ error: 'Gambar banner wajib diunggah.' });
+    }
+
+    const banner = await prisma.banner.create({
+      data: {
+        companyId: tenantId,
+        title,
+        imageUrl: imageUrl || req.body.imageUrl,
+        linkUrl,
+        isActive: isActive === 'true' || isActive === true,
+        order: parseInt(order) || 0
+      }
+    });
+    res.json(banner);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal membuat banner baru' });
+  }
+});
+
+app.patch('/api/banners/:id', tenantMiddleware, uploadBanner.single('image'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id as string);
+    const { title, linkUrl, isActive, order } = req.body;
+    let imageUrl = undefined;
+
+    if (req.file) {
+      try {
+        const fullLocalPath = path.join(process.cwd(), 'uploads/banners', req.file.filename);
+        imageUrl = await uploadToSupabase(fullLocalPath, 'announcements');
+        
+        if (imageUrl.startsWith('/uploads/')) {
+           const protocol = req.protocol;
+           const host = req.get('host');
+           imageUrl = `${protocol}://${host}${imageUrl}`;
+        }
+        
+        cleanupLocalFile(fullLocalPath);
+      } catch (uploadError) {
+        console.error('Failed to upload banner image:', uploadError);
+      }
+    }
+
+    await prisma.banner.updateMany({
+      where: { id, companyId: tenantId },
+      data: {
+        title,
+        imageUrl,
+        linkUrl,
+        isActive: isActive !== undefined ? (isActive === 'true' || isActive === true) : undefined,
+        order: order !== undefined ? parseInt(order) : undefined
+      }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal memperbarui banner' });
+  }
+});
+
+app.delete('/api/banners/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id as string);
+    await prisma.banner.deleteMany({
+      where: { id, companyId: tenantId }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menghapus banner' });
+  }
+});
+
 // B3. Endpoint Mendapatkan Detail Profil Diri (Mobile/Self)
 app.get('/api/users/me', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -1441,6 +1708,47 @@ app.patch('/api/users/me/settings', tenantMiddleware, async (req: Request, res: 
     });
   } catch (error) {
     res.status(500).json({ error: 'Gagal memperbarui pengaturan.' });
+  }
+});
+
+// U1. Upload Avatar
+app.post('/api/users/me/avatar', tenantMiddleware, uploadAvatar.single('avatar'), async (req: Request, res: Response) => {
+  console.log(`[AVATAR] Upload attempt by user: ${(req as any).userId}`);
+  try {
+    if (!req.file) {
+      console.error("[AVATAR] No file in request");
+      return res.status(400).json({ error: 'Tidak ada file yang diunggah' });
+    }
+    console.log(`[AVATAR] Received file: ${req.file.filename}, Size: ${req.file.size}`);
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    res.json({ avatarUrl });
+  } catch (error: any) {
+    console.error("[AVATAR] Upload Error:", error);
+    res.status(500).json({ error: 'Gagal mengunggah foto profil: ' + error.message });
+  }
+});
+
+app.patch('/api/users/me', tenantMiddleware, async (req: Request, res: Response) => {
+  console.log(`[PROFILE] Update attempt by user: ${(req as any).userId}, Body:`, req.body);
+  try {
+    const userId = (req as any).userId;
+    const { name, email, phone, avatarUrl } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: name || undefined,
+        email: email || undefined,
+        avatarUrl: req.body.avatarUrl !== undefined ? req.body.avatarUrl : undefined
+      }
+    });
+
+    const { password, ...safeUser } = updatedUser;
+    console.log(`[PROFILE] Success for user: ${userId}`);
+    res.json(safeUser);
+  } catch (error: any) {
+    console.error("[PROFILE] Update Error:", error);
+    res.status(500).json({ error: 'Gagal memperbarui profil: ' + (error.message || 'Error tidak diketahui') });
   }
 });
 
@@ -1993,7 +2301,10 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       name, latitude, longitude, radius,
       picName, picPhone, address, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays, modules,
-      waApiKey, waGatewayUrl, waProspectTemplate
+      waApiKey, waGatewayUrl, waProspectTemplate,
+      primaryColor, secondaryColor,
+      timezone,
+      addons
     } = req.body;
 
     console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
@@ -2023,6 +2334,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         picName,
         picPhone,
         address,
+        primaryColor,
+        secondaryColor,
         contractType,
         contractValue: parseNum(contractValue),
         contractStart: contractStart ? new Date(contractStart) : undefined,
@@ -2034,7 +2347,9 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         modules: modules || undefined,
         waApiKey: waApiKey !== undefined ? waApiKey : undefined,
         waGatewayUrl: waGatewayUrl !== undefined ? waGatewayUrl : undefined,
-        waProspectTemplate: waProspectTemplate !== undefined ? waProspectTemplate : undefined
+        waProspectTemplate: waProspectTemplate !== undefined ? waProspectTemplate : undefined,
+        timezone: timezone || undefined,
+        addons: Array.isArray(addons) ? addons : undefined
       }
     });
 
@@ -7229,10 +7544,25 @@ app.get('/api/stats/financial-flow', tenantMiddleware, async (req: Request, res:
   }
 });
 
+// Cache for AI Insights to prevent 429 Too Many Requests
+const insightCache: { [key: string]: { data: any, timestamp: number } } = {};
+const INSIGHT_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+const getCachedInsight = async (key: string, fetcher: () => Promise<any>) => {
+  const cached = insightCache[key];
+  if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_TTL) {
+    return cached.data;
+  }
+  const data = await fetcher();
+  insightCache[key] = { data, timestamp: Date.now() };
+  return data;
+};
+
 app.get('/api/stats/predictive-insights', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const forecast = await getFinancialForecast(tenantId);
+    const cacheKey = `forecast_${tenantId}`;
+    const forecast = await getCachedInsight(cacheKey, () => getFinancialForecast(tenantId));
     res.json(forecast);
   } catch (error) {
     console.error('[Predictive Error]:', error);
@@ -7243,7 +7573,8 @@ app.get('/api/stats/predictive-insights', tenantMiddleware, async (req: Request,
 app.get('/api/stats/payroll-productivity', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const insights = await getPayrollProductivityInsights(tenantId);
+    const cacheKey = `payroll_${tenantId}`;
+    const insights = await getCachedInsight(cacheKey, () => getPayrollProductivityInsights(tenantId));
     res.json(insights);
   } catch (error) {
     console.error('[Payroll Impact Error]:', error);
@@ -7254,7 +7585,8 @@ app.get('/api/stats/payroll-productivity', tenantMiddleware, async (req: Request
 app.get('/api/stats/financial-health', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const health = await getFinancialHealthScore(tenantId);
+    const cacheKey = `health_${tenantId}`;
+    const health = await getCachedInsight(cacheKey, () => getFinancialHealthScore(tenantId));
     res.json(health);
   } catch (error) {
     console.error('[Financial Health Error]:', error);
@@ -10343,7 +10675,7 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield } = req.body;
+    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield, imageUrl } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create Product
@@ -10366,6 +10698,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           priceGrabfood: Number(priceGrabfood) || 0,
           priceShopeefood: Number(priceShopeefood) || 0,
           recipeYield: Number(recipeYield) || 1,
+          imageUrl: imageUrl || null,
           updatedAt: new Date()
         }
       });
@@ -10493,6 +10826,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
         priceGrabfood: priceGrabfood !== undefined ? Number(priceGrabfood) : existingProduct.priceGrabfood,
         priceShopeefood: priceShopeefood !== undefined ? Number(priceShopeefood) : existingProduct.priceShopeefood,
         recipeYield: recipeYield !== undefined ? Number(recipeYield) : existingProduct.recipeYield,
+        imageUrl: req.body.imageUrl !== undefined ? req.body.imageUrl : existingProduct.imageUrl,
         updatedAt: new Date()
       }
     });
@@ -10599,6 +10933,19 @@ app.post('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Req
     res.json({ message: 'Resep berhasil diperbarui' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal menyimpan resep: ' + error.message });
+  }
+});
+
+// I6. Upload Product Image
+app.post('/api/inventory/products/upload', tenantMiddleware, uploadProduct.single('image'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Tidak ada file yang diunggah' });
+    }
+    const imageUrl = `/uploads/products/${req.file.filename}`;
+    res.json({ imageUrl });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengunggah gambar: ' + error.message });
   }
 });
 
@@ -11485,7 +11832,8 @@ app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Res
 app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { items, accountId, customerId, status, notes, date } = req.body;
+    const { items, accountId, customerId, status, notes, date, branchId, voucherId, deliveryMethod, pointsUsed } = req.body;
+    const userId = Number((req as any).userId);
 
     // --- CHECK CLOSING ---
     if (await isPeriodClosed(tenantId, date || new Date())) {
@@ -11497,7 +11845,40 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Generate Invoice Number: SLS/2026/03/ID4-XXXX
+      // 1. Calculate Total & Voucher Discount
+      let subtotal = 0;
+      for (const item of items) {
+        subtotal += parseFloat(item.quantity) * parseFloat(item.price);
+      }
+
+      let voucherDiscountAmount = 0;
+      let voucherCode = null;
+
+      if (voucherId) {
+        const voucher = await tx.voucher.findUnique({ where: { id: parseInt(voucherId) } });
+        if (voucher && voucher.isActive && subtotal >= voucher.minPurchase) {
+          voucherCode = voucher.code;
+          if (voucher.discountType === 'PERCENTAGE') {
+            voucherDiscountAmount = subtotal * (voucher.discountValue / 100);
+            if (voucher.maxDiscount && voucherDiscountAmount > voucher.maxDiscount) {
+              voucherDiscountAmount = voucher.maxDiscount;
+            }
+          } else {
+            voucherDiscountAmount = voucher.discountValue;
+          }
+          
+          // Increment used count
+          await tx.voucher.update({
+            where: { id: voucher.id },
+            data: { usedCount: { increment: 1 } }
+          });
+        }
+      }
+
+      const pointsUsedNum = pointsUsed ? parseInt(pointsUsed) : 0;
+      const totalAmount = Math.max(0, subtotal - voucherDiscountAmount - pointsUsedNum);
+
+      // 2. Generate Invoice Number
       const dateVal = date ? new Date(date) : new Date();
       const y = dateVal.getFullYear();
       const m = (dateVal.getMonth() + 1).toString().padStart(2, '0');
@@ -11506,8 +11887,10 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
       // 2. Calculate Total & Commission
       let totalAmount = 0;
-      for (const item of items) {
-        totalAmount += parseFloat(item.quantity) * parseFloat(item.price);
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          totalAmount += parseFloat(item.quantity) * parseFloat(item.price);
+        }
       }
 
       // Logic: If notes contain platform name, calculate 20% commission (standard)
@@ -11517,12 +11900,27 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         totalCommission = totalAmount * 0.20; // 20% Platform Fee
       }
 
-      // 3. Create Sale Record
+      // 3. Create Sale Record (Merged with GitHub's new fields)
       const saleResult: any[] = await tx.$queryRawUnsafe(`
-        INSERT INTO "Sale" ("companyId", "invoiceNumber", "customerId", "date", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13, $14, $15)
         RETURNING id
-      `, tenantId, invoiceNumber, customerId ? parseInt(customerId) : null, dateVal, totalAmount, totalCommission, status || 'PAID', accountId ? parseInt(accountId) : null, notes);
+      `, 
+      tenantId, 
+      branchId ? parseInt(branchId) : null, 
+      userId, 
+      invoiceNumber, 
+      customerId ? parseInt(customerId) : null, 
+      dateVal, 
+      totalAmount, 
+      totalCommission, 
+      status || 'PAID', 
+      accountId ? parseInt(accountId) : null, 
+      notes, 
+      voucherCode, 
+      voucherDiscountAmount, 
+      deliveryMethod || 'WALK_IN', 
+      pointsUsedNum);
       
       const saleId = saleResult[0].id;
 
@@ -11624,6 +12022,35 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 });
 
 // S2. List Sales
+// S0. Get My Orders (For Customers/Aivola GO)
+app.get('/api/sales/my-orders', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+
+    const orders = await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        cashierId: userId, // In Aivola GO, the customer is the one who initiates (cashierId)
+      },
+      include: {
+        branch: { select: { name: true } },
+        SaleItem: {
+          include: {
+            product: { select: { name: true } }
+          }
+        }
+      },
+      orderBy: { date: 'desc' }
+    });
+
+    res.json(orders);
+  } catch (error: any) {
+    console.error("MY ORDERS ERROR:", error);
+    res.status(500).json({ error: 'Gagal mengambil riwayat pesanan: ' + error.message });
+  }
+});
+
 app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
@@ -11631,7 +12058,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     // 1. Get user branch
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
-    const { branchId, startDate, endDate, paymentMethod } = req.query;
+    const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
 
     // 2. Build query based on branch and role
     const isPosViewer = (user?.role as string) === 'POS_VIEWER';
@@ -11681,6 +12108,11 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
       }
     }
 
+    // Sale Type Filter
+    if (saleType && saleType !== 'all') {
+      whereConditions.push(`s."saleType" = '${saleType}'`);
+    }
+
     // Role-based Access (Non-Admin Restricted to their own branch)
     const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '');
     if (!isAdmin && !isPosViewer) {
@@ -11714,7 +12146,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
     const tenantId = Number((req as any).tenantId);
     if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
 
-    const { branchId, startDate, endDate, paymentMethod } = req.query;
+    const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
 
     let whereConditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`];
     let queryParams: any[] = [tenantId];
@@ -11754,6 +12186,11 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
         queryParams.push(`%${paymentMethod}%`);
         queryParams.push(`%${paymentMethod}%`);
       }
+    }
+
+    if (saleType && saleType !== 'all') {
+      whereConditions.push(`s."saleType" = $${paramIndex++}`);
+      queryParams.push(saleType as string);
     }
 
     const whereClause = whereConditions.join(' AND ');
@@ -13494,6 +13931,44 @@ app.patch('/api/assignments/:id/approve', tenantMiddleware, async (req: Request,
   } catch (error: any) {
     console.error("APPROVE ERROR:", error);
     res.status(500).json({ error: 'Gagal proses persetujuan: ' + error.message });
+  }
+});
+
+// ==========================================
+// PUBLIC API FOR MOBILE APP
+// ==========================================
+
+// Get Active Banners for a Company (Public)
+app.get('/api/companies/public/:id/banners', async (req: Request, res: Response) => {
+  const companyId = parseInt(req.params.id as string);
+  console.log(`[Banners API] Fetching for companyId: ${companyId}`);
+  try {
+    const banners = await prisma.banner.findMany({
+      where: { companyId, isActive: true },
+      orderBy: { order: 'asc' }
+    });
+    res.json(banners);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch banners.' });
+  }
+});
+
+// Get Active Vouchers for a Company (Public)
+app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response) => {
+  const companyId = parseInt(req.params.id as string);
+  console.log(`[Vouchers API] Fetching for companyId: ${companyId}`);
+  try {
+    const vouchers = await prisma.voucher.findMany({
+      where: { 
+        companyId, 
+        isActive: true
+        // Date check is disabled for now to ensure visibility during testing
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(vouchers);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch vouchers.' });
   }
 });
 
