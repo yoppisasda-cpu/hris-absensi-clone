@@ -82,7 +82,9 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
         if (field === 'productId') {
             const product = products.find(p => p.id === parseInt(value));
             if (product) {
-                newItems[index].price = product.costPrice || 0;
+                // If we have a purchaseFactor, the vendor price is usually costPrice * factor
+                // e.g. costPrice is 100/gram, purchaseFactor is 1000, vendor price is 100,000/kg
+                newItems[index].price = (product.costPrice || 0) * (product.purchaseFactor || 1);
             }
         }
         
@@ -256,19 +258,24 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                                 value={item.quantity}
                                                 onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                                             />
-                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[7px] font-black text-indigo-500/40 uppercase tracking-widest italic pointer-events-none">
-                                                {products.find(p => p.id.toString() === item.productId.toString())?.unit || 'MOD'}
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[7px] font-black text-amber-500 uppercase tracking-widest italic pointer-events-none">
+                                                {products.find(p => p.id.toString() === item.productId.toString())?.purchaseUnit || products.find(p => p.id.toString() === item.productId.toString())?.unit || 'UNIT'}
                                             </div>
                                         </div>
                                         <div className="flex-[1.8]">
-                                            <input
-                                                required
-                                                type="number"
-                                                placeholder="0"
-                                                className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 px-4 text-[10px] font-black text-indigo-400 text-right focus:border-indigo-500/50 outline-none transition-all shadow-inner tracking-widest"
-                                                value={item.price}
-                                                onChange={(e) => updateItem(index, 'price', e.target.value)}
-                                            />
+                                            <div className="relative group/price">
+                                                <input
+                                                    required
+                                                    type="number"
+                                                    placeholder="0"
+                                                    className="w-full rounded-xl bg-slate-950 border border-slate-800 py-3 pl-3 pr-12 text-[10px] font-black text-indigo-400 text-right focus:border-indigo-500/50 outline-none transition-all shadow-inner tracking-widest"
+                                                    value={item.price}
+                                                    onChange={(e) => updateItem(index, 'price', e.target.value)}
+                                                />
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[6px] font-black text-slate-600 uppercase italic pointer-events-none">
+                                                    / {products.find(p => p.id.toString() === item.productId.toString())?.purchaseUnit || products.find(p => p.id.toString() === item.productId.toString())?.unit || 'UNT'}
+                                                </div>
+                                            </div>
                                         </div>
                                         <button 
                                             type="button"

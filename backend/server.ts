@@ -2198,14 +2198,17 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
           // Fetch current stock and cost price for WAC (Weighted Average Cost) calculation
           const currentProduct = await tx.product.findUnique({
             where: { id: item.productId },
-            select: { stock: true, costPrice: true }
+            select: { stock: true, costPrice: true, purchaseFactor: true }
           });
 
           if (currentProduct) {
+            const factor = currentProduct.purchaseFactor || 1;
             const currentStock = Math.max(0, currentProduct.stock);
             const currentCost = currentProduct.costPrice || 0;
-            const incomingQty = item.quantity;
-            const incomingPrice = item.price;
+            
+            // CONVERSION LOGIC
+            const incomingQty = item.quantity * factor;
+            const incomingPrice = item.price / factor; // Price per base unit
 
             const newTotalStock = currentStock + incomingQty;
             
@@ -2239,8 +2242,8 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
             data: {
               productId: item.productId,
               type: 'IN',
-              quantity: item.quantity,
-              reference: `PO #${poData.orderNumber} (Approved)`,
+              quantity: incomingQty,
+              reference: `PO #${poData.orderNumber} (Approved - Converted)`,
               date: new Date(),
               warehouseId: warehouseId || null
             }
@@ -10683,7 +10686,7 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield, imageUrl } = req.body;
+    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create Product
@@ -10707,6 +10710,8 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           priceShopeefood: Number(priceShopeefood) || 0,
           recipeYield: Number(recipeYield) || 1,
           imageUrl: imageUrl || null,
+          purchaseUnit: String(purchaseUnit || unit || "Pcs"),
+          purchaseFactor: Number(purchaseFactor) || 1,
           updatedAt: new Date()
         }
       });
@@ -10805,7 +10810,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
   try {
     const tenantId = Number((req as any).tenantId);
     const id = parseInt(req.params.id as string);
-    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield } = req.body;
+    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield, purchaseUnit, purchaseFactor } = req.body;
 
     // Verify ownership
     const existingProduct = await prisma.product.findFirst({
@@ -10835,6 +10840,8 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
         priceShopeefood: priceShopeefood !== undefined ? Number(priceShopeefood) : existingProduct.priceShopeefood,
         recipeYield: recipeYield !== undefined ? Number(recipeYield) : existingProduct.recipeYield,
         imageUrl: req.body.imageUrl !== undefined ? req.body.imageUrl : existingProduct.imageUrl,
+        purchaseUnit: purchaseUnit !== undefined ? String(purchaseUnit) : existingProduct.purchaseUnit,
+        purchaseFactor: purchaseFactor !== undefined ? Number(purchaseFactor) : existingProduct.purchaseFactor,
         updatedAt: new Date()
       }
     });

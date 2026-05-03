@@ -25,7 +25,9 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         priceGrabfood: 0,
         priceShopeefood: 0,
         recipeYield: 0,
-        imageUrl: ""
+        imageUrl: "",
+        purchaseUnit: "Pcs",
+        purchaseFactor: 1
     });
     const [uploading, setUploading] = useState(false);
     const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -66,7 +68,9 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     priceGrabfood: product.priceGrabfood || 0,
                     priceShopeefood: product.priceShopeefood || 0,
                     recipeYield: product.recipeYield !== undefined ? product.recipeYield : 0,
-                    imageUrl: product.imageUrl || ""
+                    imageUrl: product.imageUrl || "",
+                    purchaseUnit: product.purchaseUnit || product.unit || "Pcs",
+                    purchaseFactor: product.purchaseFactor || 1
                 });
                 fetchRecipe(product.id);
                 if (product.customizations) {
@@ -76,7 +80,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 }
             } else {
                 setFormData({
-                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: ""
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
@@ -312,7 +316,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             priceGofood: Number(formData.priceGofood) || 0,
             priceGrabfood: Number(formData.priceGrabfood) || 0,
             priceShopeefood: Number(formData.priceShopeefood) || 0,
-            recipeYield: formData.recipeYield !== undefined ? Number(formData.recipeYield) : 0
+            recipeYield: formData.recipeYield !== undefined ? Number(formData.recipeYield) : 0,
+            purchaseFactor: Number(formData.purchaseFactor) || 1
         };
 
         try {
@@ -337,7 +342,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
 
             setFormData({
-                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: ""
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
             });
             setHasRecipe(false);
             setRecipeItems([]);
@@ -480,6 +485,52 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     <option value="Karung">KARUNG</option>
                                     <option value="Jerigen">JERIGEN</option>
                                 </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Purchase Unit (Vendor)</label>
+                                <select
+                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-5 text-sm font-black text-amber-500 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 outline-none transition-all italic"
+                                    value={formData.purchaseUnit || ""}
+                                    onChange={(e) => {
+                                        const newPurchaseUnit = e.target.value;
+                                        // Auto-set factor for common conversions
+                                        let factor = formData.purchaseFactor;
+                                        if (newPurchaseUnit === 'Kg' && formData.unit === 'Gram') factor = 1000;
+                                        if (newPurchaseUnit === 'Liter' && formData.unit === 'ml') factor = 1000;
+                                        if (newPurchaseUnit === formData.unit) factor = 1;
+                                        
+                                        setFormData({ ...formData, purchaseUnit: newPurchaseUnit, purchaseFactor: factor });
+                                    }}
+                                >
+                                    <option value="Pcs">PIECES (PCS)</option>
+                                    <option value="Box">BOX / DUS</option>
+                                    <option value="Carton">CARTON (KARTON)</option>
+                                    <option value="Pack">PACK / BUNGKUS</option>
+                                    <option value="Kg">KILOGRAM (KG)</option>
+                                    <option value="Gram">GRAM (G)</option>
+                                    <option value="Liter">LITER (L)</option>
+                                    <option value="ml">MILLILITER (ML)</option>
+                                    <option value="Tabung">TABUNG</option>
+                                    <option value="Butir">BUTIR</option>
+                                    <option value="Karung">KARUNG</option>
+                                    <option value="Jerigen">JERIGEN</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Conversion Factor</label>
+                                <div className="relative group">
+                                    <Calculator className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 group-focus-within:text-amber-400" />
+                                    <input
+                                        type="number"
+                                        placeholder="1000"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-4 text-sm font-black text-amber-400 focus:border-amber-500/50 outline-none transition-all italic"
+                                        value={formData.purchaseFactor || ""}
+                                        onChange={(e) => setFormData({ ...formData, purchaseFactor: parseFloat(e.target.value) || 1 })}
+                                    />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600 uppercase italic">
+                                        1 {formData.purchaseUnit} = {formData.purchaseFactor} {formData.unit}
+                                    </div>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Product Classification</label>

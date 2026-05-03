@@ -799,6 +799,8 @@ model Product {
   createdAt          DateTime               @default(now())
   updatedAt          DateTime
   unit               String                 @default("Pcs")
+  purchaseUnit       String?                @default("Pcs")
+  purchaseFactor     Float                  @default(1)
   showInPos          Boolean                @default(true)
   type               ProductType            @default(FINISHED_GOOD)
   trackStock         Boolean                @default(true)
