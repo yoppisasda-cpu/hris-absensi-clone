@@ -302,6 +302,7 @@ export default function ProductsPage() {
                                 <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Market Price</th>
                                 <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Margin</th>
                                 <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Stock Level</th>
+                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-amber-500 italic text-right bg-amber-500/5">Total Nilai</th>
                                 <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Integrity</th>
                                 <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Menu</th>
                             </tr>
@@ -420,6 +421,14 @@ export default function ProductsPage() {
                                                     ON-DEMAND
                                                 </span>
                                             )}
+                                        </td>
+                                        <td className="px-6 py-6 text-right bg-amber-500/5">
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-sm font-black text-amber-500 italic tracking-tighter">
+                                                    Rp {((product.stock || 0) * (product.recipeCogs > 0 ? product.recipeCogs : product.costPrice)).toLocaleString('id-ID')}
+                                                </span>
+                                                <span className="text-[7px] text-slate-500 uppercase font-black tracking-widest mt-1">Asset Value</span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-6 text-center">
                                             {!product.trackStock ? (
