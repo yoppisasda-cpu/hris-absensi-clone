@@ -384,7 +384,29 @@ export default function ProductsPage() {
                                             {product.trackStock ? (
                                                 <div className="flex flex-col items-center group/tooltip relative text-center">
                                                      <span className={`text-lg font-black italic tracking-tighter ${product.stock <= 0 ? 'text-red-500' : product.stock <= product.minStock ? 'text-amber-500' : 'text-white'}`}>
-                                                        {product.stock} <span className="text-[9px] not-italic text-slate-600 font-black uppercase tracking-widest ml-1">{product.unit}</span>
+                                                        {(() => {
+                                                            const qty = product.stock;
+                                                            const unit = product.unit;
+                                                            if (unit === 'Gram' && Math.abs(qty) >= 1000) {
+                                                                return (
+                                                                    <>
+                                                                        {(qty / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} <span className="text-[9px] not-italic text-amber-500 font-black uppercase tracking-widest ml-1">Kg</span>
+                                                                    </>
+                                                                );
+                                                            }
+                                                            if (unit === 'ml' && Math.abs(qty) >= 1000) {
+                                                                return (
+                                                                    <>
+                                                                        {(qty / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} <span className="text-[9px] not-italic text-amber-500 font-black uppercase tracking-widest ml-1">Liter</span>
+                                                                    </>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <>
+                                                                    {qty.toLocaleString('id-ID')} <span className="text-[9px] not-italic text-slate-600 font-black uppercase tracking-widest ml-1">{unit}</span>
+                                                                </>
+                                                            );
+                                                        })()}
                                                      </span>
                                                     {product.stock < 0 && (
                                                         <span className="text-[7px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-lg font-black uppercase mt-2 tracking-widest border border-red-500/20 animate-pulse">
@@ -407,7 +429,19 @@ export default function ProductsPage() {
                                                                     {product.WarehouseStock.map((ws: any) => (
                                                                         <div key={ws.warehouseId} className="flex justify-between items-center text-[10px]">
                                                                             <span className="text-slate-500 font-black uppercase tracking-widest truncate pr-3 italic">{ws.warehouse.name}</span>
-                                                                            <span className="font-black text-white italic tracking-tighter">{ws.quantity} {product.unit}</span>
+                                                                            <span className="font-black text-white italic tracking-tighter">
+                                                                                {(() => {
+                                                                                    const qty = ws.quantity;
+                                                                                    const unit = product.unit;
+                                                                                    if (unit === 'Gram' && Math.abs(qty) >= 1000) {
+                                                                                        return `${(qty / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} Kg`;
+                                                                                    }
+                                                                                    if (unit === 'ml' && Math.abs(qty) >= 1000) {
+                                                                                        return `${(qty / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} L`;
+                                                                                    }
+                                                                                    return `${qty.toLocaleString('id-ID')} ${unit}`;
+                                                                                })()}
+                                                                            </span>
                                                                         </div>
                                                                     ))}
                                                                 </div>
