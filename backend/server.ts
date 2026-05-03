@@ -2235,19 +2235,19 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
                 DO UPDATE SET "quantity" = "WarehouseStock"."quantity" + $3, "updatedAt" = NOW()
               `, item.productId, warehouseId, incomingQty);
             }
-          }
 
-          // Record Stock Transaction
-          await tx.stockTransaction.create({
-            data: {
-              productId: item.productId,
-              type: 'IN',
-              quantity: incomingQty,
-              reference: `PO #${poData.orderNumber} (Approved - Converted)`,
-              date: new Date(),
-              warehouseId: warehouseId || null
-            }
-          });
+            // Record Stock Transaction
+            await tx.stockTransaction.create({
+              data: {
+                productId: item.productId,
+                type: 'IN',
+                quantity: incomingQty,
+                reference: `PO #${poData.orderNumber} (Approved - Converted)`,
+                date: new Date(),
+                warehouseId: warehouseId || null
+              }
+            });
+          }
         }
       }
 
