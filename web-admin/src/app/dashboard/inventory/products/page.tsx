@@ -295,16 +295,16 @@ export default function ProductsPage() {
                     <table className="w-full border-collapse text-left">
                         <thead>
                             <tr className="bg-[#050505]">
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic">Identitas & Deskripsi</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic">Global SKU</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">CAPEX / HPP</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">POS</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Market Price</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Margin</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Stock Level</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-amber-500 italic text-right bg-amber-500/5">Total Nilai</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Integrity</th>
-                                <th className="px-6 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Menu</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic min-w-[250px]">Identitas & Deskripsi</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic">Global SKU</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">CAPEX / HPP</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">POS</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Market Price</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Margin</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Stock Level</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-amber-500 italic text-right bg-amber-500/5 min-w-[120px]">Total Nilai</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">Integrity</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Menu</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/50 transition-all">
@@ -317,7 +317,7 @@ export default function ProductsPage() {
                             ) : filteredProducts.length > 0 ? (
                                 filteredProducts.map((product) => (
                                     <tr key={product.id} className="hover:bg-slate-800/30 transition-colors group">
-                                        <td className="px-6 py-6">
+                                        <td className="px-4 py-6">
                                             <div className="flex items-center gap-5">
                                                 <div className="h-14 w-14 flex-shrink-0 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
                                                     <Package className="h-6 w-6 text-indigo-500" />
@@ -347,8 +347,8 @@ export default function ProductsPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-6 font-mono text-[11px] text-slate-600 font-black italic tracking-widest">{product.sku || '-----------'}</td>
-                                        <td className="px-6 py-6 text-right">
+                                        <td className="px-4 py-6 font-mono text-[11px] text-slate-600 font-black italic tracking-widest">{product.sku || '-----------'}</td>
+                                        <td className="px-4 py-6 text-right">
                                             <div className="flex flex-col items-end">
                                                  <span className="text-xs font-black text-slate-500 italic tracking-tighter">
                                                     { (product.recipeCogs > 0 || product.costPrice > 0) ? `Rp ${(product.recipeCogs > 0 ? product.recipeCogs : product.costPrice).toLocaleString('id-ID')}` : 'N/A' }
@@ -360,7 +360,7 @@ export default function ProductsPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-6 text-center">
+                                        <td className="px-4 py-6 text-center">
                                             {product.showInPos ? (
                                                 <div className="h-2 w-2 rounded-full bg-indigo-500 mx-auto shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
                                             ) : (
@@ -368,7 +368,7 @@ export default function ProductsPage() {
                                             )}
                                         </td>
                                         <td className="px-6 py-6 text-right font-black text-white italic tracking-tighter text-sm uppercase">Rp {product.price.toLocaleString('id-ID')}</td>
-                                        <td className="px-6 py-6 text-center">
+                                        <td className="px-4 py-6 text-center">
                                             {(() => {
                                                 const hpp = product.recipeCogs > 0 ? product.recipeCogs : product.costPrice;
                                                 if (product.price <= 0 || hpp <= 0) return <span className="text-slate-800 font-black text-[10px]">--</span>;
@@ -380,7 +380,7 @@ export default function ProductsPage() {
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-6 py-6 text-center">
+                                        <td className="px-4 py-6 text-center">
                                             {product.trackStock ? (
                                                 <div className="flex flex-col items-center group/tooltip relative text-center">
                                                      <span className={`text-lg font-black italic tracking-tighter ${product.stock <= 0 ? 'text-red-500' : product.stock <= product.minStock ? 'text-amber-500' : 'text-white'}`}>
@@ -430,7 +430,7 @@ export default function ProductsPage() {
                                                 <span className="text-[7px] text-slate-500 uppercase font-black tracking-widest mt-1">Asset Value</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-6 text-center">
+                                        <td className="px-4 py-6 text-center">
                                             {!product.trackStock ? (
                                                 <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest italic border-b border-indigo-500/20 pb-1">MTO SYSTEM</span>
                                             ) : product.stock <= product.minStock ? (
@@ -445,7 +445,7 @@ export default function ProductsPage() {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-6 py-6 text-right relative">
+                                        <td className="px-4 py-6 text-right relative">
                                             <div className="flex items-center justify-end">
                                                 <button 
                                                     onClick={() => setOpenMenuId(openMenuId === product.id ? null : product.id)}
