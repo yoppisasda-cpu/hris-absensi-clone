@@ -75,6 +75,8 @@ export default function AttendancePage() {
             'Status Presensi': att.status === 'LATE' ? 'Terlambat' : 'Hadir',
             'Menit Terlambat': att.lateMinutes || 0,
             'Menit Pulang Cepat': att.earlyCheckOutMinutes || 0,
+            'Kecocokan Wajah (%)': att.faceSimilarityScore ? (att.faceSimilarityScore * 100).toFixed(0) + '%' : '-',
+            'ID Perangkat': att.deviceId || '-',
             'Fraud Score': att.fraudScore || 0,
             'Suspicious': att.isSuspicious ? 'YES' : 'NO'
         }));
@@ -244,8 +246,8 @@ export default function AttendancePage() {
                                     <th className="px-6 py-5 text-center">Clock-Out</th>
                                     <th className="px-6 py-5 text-center">Presensi</th>
                                     <th className="px-6 py-5 text-center">Mood</th>
-                                    <th className="px-6 py-5 text-center">Verifikasi</th>
-                                    <th className="px-6 py-5 text-center">Risiko</th>
+                                    <th className="px-6 py-5 text-center">Kecocokan</th>
+                                    <th className="px-6 py-5 text-center">ID Perangkat</th>
                                     <th className="px-6 py-5 text-center">Status</th>
                                 </tr>
                             </thead>
