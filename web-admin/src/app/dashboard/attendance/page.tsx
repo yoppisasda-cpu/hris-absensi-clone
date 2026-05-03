@@ -239,15 +239,13 @@ export default function AttendancePage() {
                             <thead className="bg-[#050505] border-b border-slate-800 text-slate-500 uppercase text-[10px] font-black tracking-[0.2em]">
                                 <tr>
                                     <th className="px-6 py-5">Karyawan</th>
-                                    <th className="px-6 py-5 text-nowrap">Tanggal</th>
-                                    <th className="px-6 py-5 text-center">Foto Masuk</th>
-                                    <th className="px-6 py-5 text-center">Foto Pulang</th>
-                                    <th className="px-6 py-5 text-center">Clock-In</th>
-                                    <th className="px-6 py-5 text-center">Clock-Out</th>
-                                    <th className="px-6 py-5 text-center">Presensi</th>
-                                    <th className="px-6 py-5 text-center">Mood</th>
                                     <th className="px-6 py-5 text-center">Kecocokan</th>
                                     <th className="px-6 py-5 text-center">ID Perangkat</th>
+                                    <th className="px-6 py-5 text-nowrap">Tanggal</th>
+                                    <th className="px-6 py-5 text-center">Foto Masuk</th>
+                                    <th className="px-6 py-5 text-center">Clock-In</th>
+                                    <th className="px-6 py-5 text-center">Clock-Out</th>
+                                    <th className="px-6 py-5 text-center">Mood</th>
                                     <th className="px-6 py-5 text-center">Status</th>
                                 </tr>
                             </thead>
@@ -262,6 +260,44 @@ export default function AttendancePage() {
                                                 <span className="font-black italic text-white uppercase tracking-tighter">{att.user.name}</span>
                                                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{att.user.email}</span>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {att.faceSimilarityScore !== null ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {att.isFaceVerified ? (
+                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">
+                                                            <ShieldCheck className="h-3 w-3" /> VERIFIED
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-100">
+                                                            <ShieldAlert className="h-3 w-3" /> MISMATCH
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] text-slate-400 font-mono">Score: {(att.faceSimilarityScore * 100).toFixed(0)}%</span>
+                                                </div>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full text-[10px] font-medium border border-slate-100">
+                                                    <Shield className="h-3 w-3 opacity-30" /> No Ref
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {att.deviceId ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {att.isSuspicious ? (
+                                                        <span className="inline-flex items-center gap-1 text-red-700 bg-red-100 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-200 animate-pulse">
+                                                            <ShieldAlert className="h-3 w-3" /> 🚨 TINGGI
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">
+                                                            <ShieldCheck className="h-3 w-3" /> AMAN
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] text-slate-400 font-mono">ID: {att.deviceId.substring(0, 8)}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-300">-</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-5 text-nowrap">
                                             <div className="flex items-center gap-2 text-slate-400 font-black italic text-[11px] uppercase tracking-widest">
@@ -291,27 +327,6 @@ export default function AttendancePage() {
                                             )}
                                         </td>
                                         <td className="px-6 py-5 text-center">
-                                            {att.clockOutPhotoUrl ? (
-                                                <button
-                                                    onClick={() => setSelectedPhoto({ url: getFullImageUrl(att.clockOutPhotoUrl), title: 'Foto Clock-Out' })}
-                                                    className="group relative h-12 w-12 overflow-hidden rounded-xl border border-slate-700 bg-[#050505] inline-block shadow-lg"
-                                                >
-                                                    <img
-                                                        src={getFullImageUrl(att.clockOutPhotoUrl)}
-                                                        alt="Out"
-                                                        className="h-full w-full object-cover transition duration-500 group-hover:scale-125 group-hover:rotate-6"
-                                                    />
-                                                    <div className="absolute inset-0 flex items-center justify-center bg-indigo-600/40 opacity-0 transition group-hover:opacity-100">
-                                                        <Search className="h-5 w-5 text-white" />
-                                                    </div>
-                                                </button>
-                                            ) : (
-                                                <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-xl bg-slate-800 text-slate-600 border border-slate-700">
-                                                    <User className="h-6 w-6" />
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-5 text-center">
                                             <div className="inline-flex items-center gap-1.5 font-black text-indigo-400 italic bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20 shadow-lg">
                                                 <Clock className="h-3.5 w-3.5" />
                                                 {formatTime(att.clockIn)}
@@ -324,34 +339,8 @@ export default function AttendancePage() {
                                                     {formatTime(att.clockOut)}
                                                 </div>
                                             ) : (
-                                                <span className="text-[10px] text-slate-600 italic font-black uppercase tracking-widest">Belum Pulang</span>
+                                                <span className="text-[10px] text-slate-600 italic font-black uppercase tracking-widest">Working</span>
                                             )}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex flex-col items-center gap-1">
-                                                {att.status === 'LATE' && (
-                                                    <div className="flex flex-col items-center gap-0.5">
-                                                        <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2.5 py-1 rounded-full text-[11px] font-bold border border-red-100">
-                                                            <AlertCircle className="h-3 w-3" /> TERLAMBAT
-                                                        </span>
-                                                        <span className="text-[10px] text-red-500 font-medium">{att.lateMinutes} Menit</span>
-                                                    </div>
-                                                )}
-                                                {att.earlyCheckOutMinutes && att.earlyCheckOutMinutes > 0 ? (
-                                                    <div className="flex flex-col items-center gap-0.5">
-                                                        <span className="inline-flex items-center gap-1 text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full text-[11px] font-bold border border-orange-100">
-                                                            <Clock className="h-3 w-3" /> PULANG CEPAT
-                                                        </span>
-                                                        <span className="text-[10px] text-orange-500 font-medium">{att.earlyCheckOutMinutes} Menit</span>
-                                                    </div>
-                                                ) : (
-                                                    att.status === 'PRESENT' && (
-                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2.5 py-1 rounded-full text-[11px] font-bold border border-green-100">
-                                                            <Clock className="h-3 w-3" /> HADIR
-                                                        </span>
-                                                    )
-                                                )}
-                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {att.mood === 'Senang' && <span className="flex items-center justify-center gap-1 text-green-600"><Smile className="h-5 w-5" /> <span className="text-xs font-medium">Senang</span></span>}
@@ -361,50 +350,8 @@ export default function AttendancePage() {
                                             {!att.mood && <span className="text-slate-300">-</span>}
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            {att.faceSimilarityScore !== null ? (
-                                                <div className="flex flex-col items-center gap-1">
-                                                    {att.isFaceVerified ? (
-                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">
-                                                            <ShieldCheck className="h-3 w-3" /> VERIFIED
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-100">
-                                                            <ShieldAlert className="h-3 w-3" /> MISMATCH
-                                                        </span>
-                                                    )}
-                                                    <span className="text-[10px] text-slate-400 font-mono">Score: {(att.faceSimilarityScore * 100).toFixed(0)}%</span>
-                                                </div>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full text-[10px] font-medium border border-slate-100">
-                                                    <Shield className="h-3 w-3 opacity-30" /> No Reference
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            {att.fraudScore !== null ? (
-                                                <div className="flex flex-col items-center gap-1">
-                                                    {att.isSuspicious ? (
-                                                        <span className="inline-flex items-center gap-1 text-red-700 bg-red-100 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-200 animate-pulse">
-                                                            <ShieldAlert className="h-3 w-3" /> 🚨 TINGGI
-                                                        </span>
-                                                    ) : att.fraudScore > 30 ? (
-                                                        <span className="inline-flex items-center gap-1 text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-orange-100">
-                                                            <Shield className="h-3 w-3" /> SEDANG
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">
-                                                            <ShieldCheck className="h-3 w-3" /> RENDAH
-                                                        </span>
-                                                    )}
-                                                    <span className="text-[10px] text-slate-400 font-mono">ID: {att.deviceId?.substring(0, 8) || 'N/A'}</span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-slate-300">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
                                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${att.clockOut ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                                {att.clockOut ? 'Lengkap' : 'Sedang Bekerja'}
+                                                {att.clockOut ? 'Lengkap' : 'Active'}
                                             </span>
                                         </td>
                                     </tr>
