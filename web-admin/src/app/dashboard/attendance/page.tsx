@@ -238,15 +238,16 @@ export default function AttendancePage() {
                         <table className="w-full text-left text-sm">
                             <thead className="bg-[#050505] border-b border-slate-800 text-slate-500 uppercase text-[10px] font-black tracking-[0.2em]">
                                 <tr>
-                                    <th className="px-6 py-5">Karyawan</th>
-                                    <th className="px-6 py-5 text-center">Kecocokan</th>
-                                    <th className="px-6 py-5 text-center">ID Perangkat</th>
-                                    <th className="px-6 py-5 text-nowrap">Tanggal</th>
-                                    <th className="px-6 py-5 text-center">Foto Masuk</th>
-                                    <th className="px-6 py-5 text-center">Clock-In</th>
-                                    <th className="px-6 py-5 text-center">Clock-Out</th>
-                                    <th className="px-6 py-5 text-center">Mood</th>
-                                    <th className="px-6 py-5 text-center">Status</th>
+                                    <th className="px-4 py-5">Karyawan</th>
+                                    <th className="px-2 py-5 text-center">Verifikasi</th>
+                                    <th className="px-2 py-5 text-center">Perangkat</th>
+                                    <th className="px-4 py-5 text-nowrap">Tanggal</th>
+                                    <th className="px-2 py-5 text-center">Foto In</th>
+                                    <th className="px-2 py-5 text-center">Foto Out</th>
+                                    <th className="px-4 py-5 text-center">Clock-In</th>
+                                    <th className="px-4 py-5 text-center">Clock-Out</th>
+                                    <th className="px-4 py-5 text-center">Mood</th>
+                                    <th className="px-4 py-5 text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800 transition-all">
@@ -255,48 +256,46 @@ export default function AttendancePage() {
                                     a.user.email.toLowerCase().includes(searchQuery.toLowerCase())
                                 ).map((att) => (
                                     <tr key={att.id} className="hover:bg-slate-800/50 transition-colors group">
-                                        <td className="px-6 py-5">
+                                        <td className="px-4 py-5">
                                             <div className="flex flex-col">
-                                                <span className="font-black italic text-white uppercase tracking-tighter">{att.user.name}</span>
-                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{att.user.email}</span>
+                                                <span className="font-black italic text-white uppercase tracking-tighter text-xs">{att.user.name}</span>
+                                                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest leading-none">{att.user.email}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="px-2 py-4 text-center">
                                             {att.faceSimilarityScore !== null ? (
-                                                <div className="flex flex-col items-center gap-1">
+                                                <div className="flex flex-col items-center gap-0.5">
                                                     {att.isFaceVerified ? (
-                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">
-                                                            <ShieldCheck className="h-3 w-3" /> VERIFIED
+                                                        <span className="inline-flex items-center gap-0.5 text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full text-[8px] font-black border border-green-100">
+                                                            <ShieldCheck className="h-2.5 w-2.5" /> OK
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-100">
-                                                            <ShieldAlert className="h-3 w-3" /> MISMATCH
+                                                        <span className="inline-flex items-center gap-0.5 text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full text-[8px] font-black border border-red-100">
+                                                            <ShieldAlert className="h-2.5 w-2.5" /> FAIL
                                                         </span>
                                                     )}
-                                                    <span className="text-[10px] text-slate-400 font-mono">Score: {(att.faceSimilarityScore * 100).toFixed(0)}%</span>
+                                                    <span className="text-[8px] text-slate-500 font-bold">{(att.faceSimilarityScore * 100).toFixed(0)}%</span>
                                                 </div>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full text-[10px] font-medium border border-slate-100">
-                                                    <Shield className="h-3 w-3 opacity-30" /> No Ref
-                                                </span>
+                                                <span className="text-[8px] text-slate-500 font-bold">-</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="px-2 py-4 text-center">
                                             {att.deviceId ? (
-                                                <div className="flex flex-col items-center gap-1">
+                                                <div className="flex flex-col items-center gap-0.5">
                                                     {att.isSuspicious ? (
-                                                        <span className="inline-flex items-center gap-1 text-red-700 bg-red-100 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-200 animate-pulse">
-                                                            <ShieldAlert className="h-3 w-3" /> 🚨 TINGGI
+                                                        <span className="inline-flex items-center gap-0.5 text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full text-[8px] font-black border border-red-200">
+                                                            <AlertCircle className="h-2.5 w-2.5" /> RISK
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">
-                                                            <ShieldCheck className="h-3 w-3" /> AMAN
+                                                        <span className="inline-flex items-center gap-0.5 text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full text-[8px] font-black border border-green-100">
+                                                            <ShieldCheck className="h-2.5 w-2.5" /> SAFE
                                                         </span>
                                                     )}
-                                                    <span className="text-[10px] text-slate-400 font-mono">ID: {att.deviceId.substring(0, 8)}</span>
+                                                    <span className="text-[8px] text-slate-500 font-bold">{att.deviceId.substring(0, 4)}</span>
                                                 </div>
                                             ) : (
-                                                <span className="text-slate-300">-</span>
+                                                <span className="text-slate-600 text-[8px]">-</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-5 text-nowrap">
@@ -305,11 +304,11 @@ export default function AttendancePage() {
                                                 <span>{formatDate(att.clockIn)}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-5 text-center">
+                                        <td className="px-2 py-5 text-center">
                                             {att.photoUrl ? (
                                                 <button
                                                     onClick={() => setSelectedPhoto({ url: getFullImageUrl(att.photoUrl), title: 'Foto Clock-In' })}
-                                                    className="group relative h-12 w-12 overflow-hidden rounded-xl border border-slate-700 bg-[#050505] inline-block shadow-lg"
+                                                    className="group relative h-10 w-10 overflow-hidden rounded-lg border border-slate-700 bg-[#050505] inline-block shadow-lg"
                                                 >
                                                     <img
                                                         src={getFullImageUrl(att.photoUrl)}
@@ -317,12 +316,33 @@ export default function AttendancePage() {
                                                         className="h-full w-full object-cover transition duration-500 group-hover:scale-125 group-hover:rotate-6"
                                                     />
                                                     <div className="absolute inset-0 flex items-center justify-center bg-indigo-600/40 opacity-0 transition group-hover:opacity-100">
-                                                        <Search className="h-5 w-5 text-white" />
+                                                        <Search className="h-4 w-4 text-white" />
                                                     </div>
                                                 </button>
                                             ) : (
-                                                <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-xl bg-slate-800 text-slate-600 border border-slate-700">
-                                                    <User className="h-6 w-6" />
+                                                <div className="mx-auto h-10 w-10 flex items-center justify-center rounded-lg bg-slate-800 text-slate-600 border border-slate-700">
+                                                    <User className="h-5 w-5" />
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-2 py-5 text-center">
+                                            {att.clockOutPhotoUrl ? (
+                                                <button
+                                                    onClick={() => setSelectedPhoto({ url: getFullImageUrl(att.clockOutPhotoUrl), title: 'Foto Clock-Out' })}
+                                                    className="group relative h-10 w-10 overflow-hidden rounded-lg border border-slate-700 bg-[#050505] inline-block shadow-lg"
+                                                >
+                                                    <img
+                                                        src={getFullImageUrl(att.clockOutPhotoUrl)}
+                                                        alt="Out"
+                                                        className="h-full w-full object-cover transition duration-500 group-hover:scale-125 group-hover:rotate-6"
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-emerald-600/40 opacity-0 transition group-hover:opacity-100">
+                                                        <Search className="h-4 w-4 text-white" />
+                                                    </div>
+                                                </button>
+                                            ) : (
+                                                <div className="mx-auto h-10 w-10 flex items-center justify-center rounded-lg bg-slate-800 text-slate-600 border border-slate-700 opacity-30">
+                                                    <User className="h-5 w-5" />
                                                 </div>
                                             )}
                                         </td>
