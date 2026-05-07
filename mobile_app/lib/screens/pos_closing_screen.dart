@@ -203,6 +203,56 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
                       ),
                       SizedBox(height: 24),
 
+                      // Items Sold Summary for Stock Check
+                      Text('RINGKASAN PRODUK TERJUAL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey, letterSpacing: 1.2)),
+                      SizedBox(height: 4),
+                      Text('(untuk pengecekan stok)', style: TextStyle(fontSize: 11, color: Colors.grey[500], fontStyle: FontStyle.italic)),
+                      SizedBox(height: 8),
+                      Card(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            children: [
+                              ...(_summary?['itemsSummary'] as List<dynamic>? ?? []).map((item) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue[50],
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            '${item['totalQty'].toStringAsFixed(item['totalQty'] % 1 == 0 ? 0 : 1)}',
+                                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[800], fontSize: 13),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(item['productName'] ?? '-', style: TextStyle(fontWeight: FontWeight.w500)),
+                                      ),
+                                      Text('terjual', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              if ((_summary?['itemsSummary'] as List?)?.isEmpty ?? true)
+                                Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Text('Belum ada produk terjual di shift ini.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 24),
+
                       // Cash Reconciliation Section
                       Text('REKONSILIASI KAS (UANG TUNAI SAJA)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey, letterSpacing: 1.2)),
                       SizedBox(height: 8),

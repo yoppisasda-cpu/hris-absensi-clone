@@ -13942,6 +13942,25 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       select: { posBlindClosing: true }
     });
 
+    // 6. Aggregate items sold during this shift for stock checking
+    const saleIds = sales.map(s => s.id);
+    let itemsSummary: { productId: number; productName: string; totalQty: number }[] = [];
+    if (saleIds.length > 0) {
+      const saleItems: any[] = await prisma.$queryRawUnsafe(`
+        SELECT si."productId", p.name as "productName", SUM(si.quantity) as "totalQty"
+        FROM "SaleItem" si
+        JOIN "Product" p ON si."productId" = p.id
+        WHERE si."saleId" = ANY($1::int[])
+        GROUP BY si."productId", p.name
+        ORDER BY "totalQty" DESC
+      `, saleIds);
+      itemsSummary = saleItems.map(i => ({
+        productId: Number(i.productId),
+        productName: i.productName,
+        totalQty: Number(i.totalQty),
+      }));
+    }
+
     res.json({
       startTime,
       endTime: new Date(),
@@ -13951,7 +13970,8 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       totalCommission,
       expectedCash: cashTotal,
       methodBreakdown,
-      blindClosing: company?.posBlindClosing ?? false
+      blindClosing: company?.posBlindClosing ?? false,
+      itemsSummary,
     });
   } catch (error: any) {
     console.error("CLOSING SUMMARY ERROR:", error);
