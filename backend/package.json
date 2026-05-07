@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx watch server.ts",
     "build": "npx prisma generate && tsc",
-    "start": "npx prisma db push --accept-data-loss && node dist/server.js",
+    "start": "npx prisma migrate deploy || true && node dist/server.js",
     "serve": "tsx server.ts"
   },
   "keywords": [],
