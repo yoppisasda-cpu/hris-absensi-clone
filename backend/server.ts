@@ -11983,7 +11983,7 @@ app.get('/api/customers/me/vouchers', tenantMiddleware, async (req: Request, res
 // Claim a voucher
 app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const voucherId = parseInt(req.params.id);
+    const voucherId = parseInt(String(req.params.id));
     const userId = Number((req as any).userId);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     
