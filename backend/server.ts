@@ -13874,16 +13874,16 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
 
     let user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
     
-    // Robustness for Admins/SuperAdmins who might not be tied to a specific branch
-    if (!user?.branchId && (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE' || (user?.role as string) === 'POS_VIEWER')) {
+    // Robustness for ALL roles: fallback to first branch if branchId is null
+    if (!user?.branchId) {
       const firstBranch = await prisma.branch.findFirst({ where: { companyId: tenantId } });
       if (firstBranch) {
         user = { ...user!, branchId: firstBranch.id };
-        console.log(`[POS] Admin/Viewer viewing summary for Branch ${firstBranch.id} (Auto-fallback)`);
+        console.log(`[POS Closing] No branchId for user ${userId}, using fallback Branch ${firstBranch.id}`);
       }
     }
 
-    if (!user?.branchId) return res.status(400).json({ error: 'User tidak terikat ke cabang manapun.' });
+    if (!user?.branchId) return res.status(400).json({ error: 'User tidak terikat ke cabang manapun. Hubungi admin untuk mengatur cabang.' });
 
     // 1. Get last closing for this branch
     const lastClosing = await prisma.posClosing.findFirst({
