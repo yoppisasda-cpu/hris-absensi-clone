@@ -11,6 +11,8 @@ import ProductionModal from "@/components/inventory/ProductionModal";
 import CategoryModal from "@/components/inventory/CategoryModal";
 import WarehouseModal from "@/components/inventory/WarehouseModal";
 import StockTransferModal from "@/components/inventory/StockTransferModal";
+import ImportProductModal from "@/components/inventory/ImportProductModal";
+import { Download } from "lucide-react";
 
 export default function ProductsPage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -22,6 +24,7 @@ export default function ProductsPage() {
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState(false);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [selectedType, setSelectedType] = useState<string>("all");
@@ -153,6 +156,12 @@ export default function ProductsPage() {
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-indigo-400/80 hover:bg-indigo-500/10 hover:text-indigo-400 transition-all uppercase tracking-widest italic"
                     >
                         <Truck className="h-4 w-4" /> Mutasi Stok
+                    </button>
+                    <button 
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-400 transition-all uppercase tracking-widest italic"
+                    >
+                        <Download className="h-4 w-4" /> Import Produk
                     </button>
                     <button 
                         onClick={() => {
@@ -637,6 +646,12 @@ export default function ProductsPage() {
                 }}
                 onSuccess={fetchProducts}
                 product={selectedProduct}
+            />
+
+            <ImportProductModal 
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={fetchProducts}
             />
         </DashboardLayout>
     );

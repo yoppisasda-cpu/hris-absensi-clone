@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../providers/auth_provider.dart';
 import 'package:intl/intl.dart';
+import '../services/printer_service.dart';
 
 class PosOrderHistoryScreen extends StatefulWidget {
   @override
@@ -89,6 +90,28 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
     );
   }
 
+  void _updateStatus(int saleId, String newStatus) async {
+    showDialog(context: context, builder: (context) => Center(child: CircularProgressIndicator()));
+    try {
+      await _apiService.patch('/sales/$saleId/status', {'status': newStatus});
+      Navigator.pop(context); // Close loading
+      
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context); // Close detail bottomsheet if open
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Status diperbarui menjadi $newStatus'), backgroundColor: Colors.green),
+      );
+      _fetchOrders(); // Refresh list
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal update status: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   void _processRefund(int saleId, List<dynamic> items, int accountId) async {
     showDialog(context: context, builder: (context) => Center(child: CircularProgressIndicator()));
     try {
@@ -150,6 +173,12 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
               ),
               Divider(),
               Text('Invoice: ${detail['invoiceNumber']}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[900])),
+              Row(
+                children: [
+                  Text('Status: '),
+                  _buildStatusBadge(detail['status'] ?? 'PAID'),
+                ],
+              ),
               Text('Waktu: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(detail['date']))}'),
               Text('Tipe: ${detail['saleType']}'),
               SizedBox(height: 16),
@@ -160,8 +189,18 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                     final item = detail['items'][index];
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(item['product_name'] ?? 'Produk'),
-                      subtitle: Text('${item['quantity']} x Rp ${item['price']}'),
+                      title: Text(item['product_name'] ?? 'Produk', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${item['quantity']} x Rp ${item['price']}'),
+                          if (item['modifiers'] != null && (item['modifiers'] as List).isNotEmpty)
+                            ...((item['modifiers'] as List)).map((mod) => Text(
+                              ' - ${mod['optionName'] ?? mod['name']}',
+                              style: TextStyle(fontSize: 12, color: Colors.blueGrey[600], fontStyle: FontStyle.italic),
+                            )).toList(),
+                        ],
+                      ),
                       trailing: Text('Rp ${item['total']}', style: TextStyle(fontWeight: FontWeight.bold)),
                     );
                   },
@@ -182,23 +221,94 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                   ],
                 ),
               ],
-              if (isAdmin) ...[
+               if (isAdmin) ...[
                 SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[800],
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          // Prepare data for printer
+                          final printData = {
+                            ...detail,
+                            'items': (detail['items'] as List).map((it) => {
+                              ...it,
+                              'name': it['product_name'],
+                              'modifiers': it['modifiers'],
+                            }).toList(),
+                          };
+                          final printer = Provider.of<PrinterService>(context, listen: false);
+                          printer.printReceipt(printData);
+                        },
+                        icon: Icon(Icons.print),
+                        label: Text('CETAK STRUK', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange[800],
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          final printData = {
+                            ...detail,
+                            'items': (detail['items'] as List).map((it) => {
+                              ...it,
+                              'name': it['product_name'],
+                              'modifiers': it['modifiers'],
+                            }).toList(),
+                          };
+                          final printer = Provider.of<PrinterService>(context, listen: false);
+                          printer.printKitchenReceipt(printData);
+                        },
+                        icon: Icon(Icons.restaurant),
+                        label: Text('DAPUR', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red[50],
+                          foregroundColor: Colors.red[800],
+                          side: BorderSide(color: Colors.red[200]!),
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () => _handleRefund(detail),
+                        icon: Icon(Icons.undo),
+                        label: Text('REFUND FULL', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              
+              // Status Action Buttons
+              if (detail['status'] == 'PROCESSING' || detail['status'] == 'READY') ...[
+                SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[50],
-                      foregroundColor: Colors.red[800],
-                      side: BorderSide(color: Colors.red[200]!),
-                      padding: EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed: () => _handleRefund(detail),
-                    icon: Icon(Icons.undo),
-                    label: Text('REFUND FULL PESANAN', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () => _updateStatus(detail['id'], 'PAID'),
+                    icon: Icon(Icons.check_circle),
+                    label: Text('PESANAN SELESAI / DIAMBIL', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
+              
               SizedBox(height: 20),
             ],
           ),
@@ -230,6 +340,23 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
           )),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color color;
+    switch (status) {
+      case 'PENDING': color = Colors.orange; break;
+      case 'PROCESSING': color = Colors.blue; break;
+      case 'READY': color = Colors.purple; break;
+      case 'PAID': color = Colors.green; break;
+      case 'CANCELLED': color = Colors.red; break;
+      default: color = Colors.grey;
+    }
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: color.withOpacity(0.5))),
+      child: Text(status, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -266,11 +393,8 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text('Rp ${order['totalAmount']}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[700])),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(4)),
-                              child: Text(order['saleType'], style: TextStyle(fontSize: 10, color: Colors.blue[800], fontWeight: FontWeight.bold)),
-                            ),
+                            SizedBox(height: 4),
+                            _buildStatusBadge(order['status'] ?? 'PAID'),
                           ],
                         ),
                       ),

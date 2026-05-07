@@ -9,6 +9,8 @@ import '../providers/branding_provider.dart';
 import '../providers/branch_provider.dart';
 import '../providers/product_provider.dart';
 import 'home_screen.dart';
+import 'login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MerchantSelectionScreen extends StatefulWidget {
   @override
@@ -87,9 +89,9 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
   Future<void> _fetchMerchants() async {
     try {
       final response = await ApiService.get('/companies/public');
-      if (response != null) {
+      if (response.statusCode == 200) {
         setState(() {
-          _merchants = (response as List).map((m) => Merchant.fromJson(m)).toList();
+          _merchants = (response.data as List).map((m) => Merchant.fromJson(m)).toList();
           _isLoading = false;
         });
       }
@@ -122,8 +124,13 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
     );
   }
 
-  void _logout() {
-    Navigator.of(context).pushReplacementNamed('/login');
+  void _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => LoginScreen()),
+      (route) => false,
+    );
   }
 
   @override
@@ -288,10 +295,8 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
                                               ),
                                               child: merchant.logoUrl != null && merchant.logoUrl!.isNotEmpty
                                                   ? ClipOval(
-                                                      child: Image.network(
-                                                        merchant.logoUrl!.startsWith('http') 
-                                                          ? merchant.logoUrl! 
-                                                          : "http://10.0.2.2:5000${merchant.logoUrl!}",
+                                                        child: Image.network(
+                                                          ApiService.resolveUrl(merchant.logoUrl),
                                                         fit: BoxFit.cover,
                                                         loadingBuilder: (context, child, loadingProgress) {
                                                           if (loadingProgress == null) return child;

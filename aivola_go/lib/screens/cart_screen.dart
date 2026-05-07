@@ -27,6 +27,29 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   String _deliveryMethod = "Dine-in"; // Default
+  String _paymentMethod = "Bayar di Kasir"; // Default
+  List<Voucher> _claimedVouchers = [];
+  bool _loadingVouchers = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchClaimedVouchers();
+  }
+
+  Future<void> _fetchClaimedVouchers() async {
+    setState(() => _loadingVouchers = true);
+    try {
+      final data = await ApiService.fetchClaimedVouchers();
+      setState(() {
+        _claimedVouchers = data.map((v) => Voucher.fromJson(v)).toList();
+      });
+    } catch (e) {
+      print("Error fetching vouchers: $e");
+    } finally {
+      setState(() => _loadingVouchers = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +85,9 @@ class _CartScreenState extends State<CartScreen> {
                       _buildPointsRedemption(cartProvider, primaryColor),
                       SizedBox(height: 25),
                       _buildVoucherSelector(cartProvider, brandingProvider, primaryColor),
+                      SizedBox(height: 25),
+                      _buildSectionTitle("Metode Pembayaran"),
+                      _buildPaymentOptions(primaryColor),
                     ],
                   ),
                 ),
@@ -247,6 +273,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _showVoucherPicker(BuildContext context, CartProvider cartProvider, BrandingProvider brandingProvider) {
+    final primaryColor = brandingProvider.primaryColor;
     showModalBottomSheet(
       context: context,
       backgroundColor: brandingProvider.secondaryColor,
@@ -372,6 +399,7 @@ class _CartScreenState extends State<CartScreen> {
       branchId: branchProvider.selectedBranch?.id,
       voucherId: cartProvider.selectedVoucher?.id, 
       deliveryMethod: _deliveryMethod,
+      paymentMethod: _paymentMethod,
       pointsUsed: cartProvider.isUsingPoints ? cartProvider.availablePoints : 0,
     );
 
@@ -391,8 +419,8 @@ class _CartScreenState extends State<CartScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        title: Column(children: [Icon(Icons.check_circle_outline_rounded, color: Colors.greenAccent, size: 70), SizedBox(height: 20), Text("Pesanan Berhasil!", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
-        content: Text("Pesanan Anda sedang diproses. Mohon tunggu sebentar ya!", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF94A3B8))),
+        title: Column(children: [Icon(Icons.hourglass_empty_rounded, color: Colors.orangeAccent, size: 70), SizedBox(height: 20), Text("Pesanan Terkirim!", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+        content: Text("Pesanan Anda sedang menunggu konfirmasi dari Toko. Mohon tunggu notifikasi selanjutnya ya!", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF94A3B8))),
         actions: [Center(child: TextButton(onPressed: () { Navigator.pop(context); Navigator.pop(context); }, child: Text("OK", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 18))))],
       ),
     );
@@ -405,6 +433,42 @@ class _CartScreenState extends State<CartScreen> {
         padding: EdgeInsets.all(6),
         decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withOpacity(0.1))),
         child: Icon(icon, color: Colors.white, size: 16),
+      ),
+    );
+  }
+
+  Widget _buildPaymentOptions(Color primaryColor) {
+    return Column(
+      children: [
+        _buildPaymentItem("Bayar di Kasir", Icons.payments_outlined, primaryColor),
+        SizedBox(height: 10),
+        _buildPaymentItem("Transfer Bank", Icons.account_balance_outlined, primaryColor),
+        SizedBox(height: 10),
+        _buildPaymentItem("QRIS", Icons.qr_code_scanner_rounded, primaryColor),
+      ],
+    );
+  }
+
+  Widget _buildPaymentItem(String label, IconData icon, Color primaryColor) {
+    bool isSelected = _paymentMethod == label;
+    return GestureDetector(
+      onTap: () => setState(() => _paymentMethod = label),
+      child: Container(
+        padding: EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryColor.withOpacity(0.1) : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: isSelected ? primaryColor : Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isSelected ? primaryColor : Color(0xFF94A3B8)),
+            SizedBox(width: 15),
+            Text(label, style: TextStyle(color: isSelected ? Colors.white : Color(0xFF94A3B8), fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+            Spacer(),
+            if (isSelected) Icon(Icons.check_circle, color: primaryColor, size: 20),
+          ],
+        ),
       ),
     );
   }

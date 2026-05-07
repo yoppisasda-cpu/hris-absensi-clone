@@ -192,6 +192,14 @@ class PrinterService {
         PosColumn(text: '${item['quantity']} x ${item['price']}', width: 8),
         PosColumn(text: (item['quantity'] * item['price']).toStringAsFixed(0), width: 4, styles: PosStyles(align: PosAlign.right)),
       ]);
+      
+      // Add Modifiers/Customizations
+      final List? modifiers = item['modifiers'];
+      if (modifiers != null && modifiers.isNotEmpty) {
+        for (var mod in modifiers) {
+          bytes += generator.text(' - ${mod['optionName'] ?? mod['name']}', styles: PosStyles(fontType: PosFontType.fontB));
+        }
+      }
     }
     bytes += generator.hr();
 
@@ -216,6 +224,47 @@ class PrinterService {
 
     return await PrintBluetoothThermal.writeBytes(bytes);
   }
+
+  Future<bool> printKitchenReceipt(Map<String, dynamic> saleData) async {
+    if (!_isConnected) return false;
+
+    List<int> bytes = [];
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+
+    // Header
+    bytes += generator.text('*** KITCHEN ORDER ***', styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    bytes += generator.feed(1);
+    
+    bytes += generator.text('Inv: ${saleData['invoiceNumber'] ?? '-'}', styles: PosStyles(bold: true));
+    if (saleData['customerName'] != null && saleData['customerName'].toString().isNotEmpty) {
+      bytes += generator.text('Pelanggan: ${saleData['customerName']}');
+    }
+    bytes += generator.text('Waktu: ${DateFormat('dd-MM HH:mm').format(DateTime.now())}');
+    bytes += generator.text('Tipe : ${saleData['deliveryMethod'] ?? 'Dine-in'}', styles: PosStyles(bold: true));
+    bytes += generator.hr();
+
+    // Items
+    final List items = saleData['items'] ?? [];
+    for (var item in items) {
+       bytes += generator.text('${item['quantity']}x ${item['name']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+       
+       // Add Modifiers
+       final List? modifiers = item['modifiers'];
+       if (modifiers != null && modifiers.isNotEmpty) {
+         for (var mod in modifiers) {
+           bytes += generator.text('  [ ] ${mod['optionName'] ?? mod['name']}', styles: PosStyles(fontType: PosFontType.fontB));
+         }
+       }
+       bytes += generator.feed(1);
+    }
+    bytes += generator.hr();
+    bytes += generator.feed(3);
+    bytes += generator.cut();
+
+    return await PrintBluetoothThermal.writeBytes(bytes);
+  }
+
 
   Future<bool> printStickerLabels(Map<String, dynamic> saleData) async {
     final prefs = await SharedPreferences.getInstance();
@@ -316,6 +365,14 @@ class PrinterService {
                         pw.Text((item['quantity'] * item['price']).toStringAsFixed(0), style: pw.TextStyle(fontSize: 8)),
                       ],
                     ),
+                    // Add Modifiers/Customizations
+                    if (item['modifiers'] != null && (item['modifiers'] as List).isNotEmpty)
+                      ...((item['modifiers'] as List)).map((mod) {
+                        return pw.Padding(
+                          padding: const pw.EdgeInsets.only(left: 8.0),
+                          child: pw.Text('- ${mod['optionName'] ?? mod['name']}', style: pw.TextStyle(fontSize: 7, fontStyle: pw.FontStyle.italic)),
+                        );
+                      }).toList(),
                   ],
                 );
               }).toList(),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../models/voucher.dart';
 
@@ -13,7 +14,17 @@ class CartProvider with ChangeNotifier {
   final Map<int, CartItem> _items = {};
   Voucher? _selectedVoucher;
   bool _isUsingPoints = false;
-  int _availablePoints = 2450;
+  int _availablePoints = 0;
+
+  CartProvider() {
+    _loadPoints();
+  }
+
+  Future<void> _loadPoints() async {
+    final prefs = await SharedPreferences.getInstance();
+    _availablePoints = prefs.getInt('userPoints') ?? 0;
+    notifyListeners();
+  }
 
   Map<int, CartItem> get items => _items;
   Voucher? get selectedVoucher => _selectedVoucher;

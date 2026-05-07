@@ -7,6 +7,8 @@ import 'pos_order_history_screen.dart';
 import 'pos_pending_bills_screen.dart';
 import 'pos_closing_screen.dart';
 import 'printer_settings_screen.dart';
+import '../services/socket_service.dart';
+import 'package:provider/provider.dart';
 
 class POSScreen extends StatefulWidget {
   @override
@@ -1079,6 +1081,17 @@ class _POSScreenState extends State<POSScreen> {
                   ),
                 ),
                 SizedBox(height: 8),
+                ElevatedButton.icon(
+                  onPressed: () => _printerService.printKitchenReceipt(saleData),
+                  icon: Icon(Icons.restaurant, color: Colors.white),
+                  label: Text('CETAK DAPUR', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.orange[800],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: () => _printerService.generateReceiptPreview(saleData),
                   icon: Icon(Icons.remove_red_eye_outlined),
@@ -1247,6 +1260,24 @@ class _POSScreenState extends State<POSScreen> {
         elevation: 0,
         foregroundColor: Colors.black,
         actions: [
+          Consumer<SocketService>(
+            builder: (context, socket, _) => IconButton(
+              icon: Badge(
+                label: Text(socket.newOrders.length.toString()),
+                isLabelVisible: socket.newOrders.isNotEmpty,
+                child: Icon(Icons.shopping_bag_outlined, color: Colors.orange[800]),
+              ),
+              onPressed: () => _showIncomingOrdersModal(context),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.volume_up, color: Colors.blue[800]),
+            tooltip: 'Tes Suara',
+            onPressed: () {
+              Provider.of<SocketService>(context, listen: false).testNotificationSound();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Mencoba suara...')));
+            },
+          ),
           IconButton(
             icon: Icon(Icons.refresh, color: Colors.blue[800]),
             tooltip: 'Sinkronisasi Data',
@@ -1526,6 +1557,219 @@ class _POSScreenState extends State<POSScreen> {
               : SizedBox();
         },
       ),
+    );
+  }
+
+  void _updateMobileOrderStatus(int orderId, String newStatus) async {
+    showDialog(
+      context: context,
+      builder: (context) => Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      Map<String, dynamic> data = {'status': newStatus};
+      if (newStatus == 'PAID' || newStatus == 'PROCESSING') {
+        data['accountId'] = _selectedAccountId;
+      }
+
+      await _apiService.patch('/sales/$orderId/status', data);
+      Navigator.pop(context); // Close loading
+
+      final socketService = Provider.of<SocketService>(context, listen: false);
+      
+      if (newStatus == 'PAID' || newStatus == 'CANCELLED') {
+        socketService.removeOrder(orderId);
+      } else {
+        // Update local status in the list so UI reflects the change
+        final index = socketService.newOrders.indexWhere((o) => o['id'] == orderId);
+        if (index != -1) {
+          socketService.newOrders[index]['status'] = newStatus;
+          socketService.notifyListeners(); // Trigger UI update
+        }
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Pesanan diperbarui ke $newStatus'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _showIncomingOrdersModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (context) => Consumer<SocketService>(
+        builder: (context, socket, _) => Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Pesanan Mobile Aktif', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close)),
+                ],
+              ),
+              Divider(),
+              if (socket.newOrders.isEmpty)
+                Expanded(child: Center(child: Text('Belum ada pesanan mobile aktif.')))
+              else
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: socket.newOrders.length,
+                    itemBuilder: (context, i) {
+                      final order = socket.newOrders[i];
+                      final status = order['status'] ?? 'PENDING';
+                      
+                      return Card(
+                        margin: EdgeInsets.only(bottom: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        elevation: 2,
+                        color: status == 'READY' ? Colors.green[50] : (status == 'PROCESSING' ? Colors.blue[50] : Colors.white),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(order['invoiceNumber'] ?? 'No Inv', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[800])),
+                                  Text('Rp ${order['totalAmount']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              SizedBox(height: 8),
+                              Text('Pelanggan: ${order['customerName']}', style: TextStyle(color: Colors.grey[600])),
+                              SizedBox(height: 4),
+                              _buildStatusBadge(status),
+                              SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.payment, size: 16, color: Colors.grey[600]),
+                                  SizedBox(width: 8),
+                                  Text('Pembayaran: ${order['paymentMethod'] ?? 'Bayar di Kasir'}', 
+                                    style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                              SizedBox(height: 12),
+                              // NEW: Items List Display
+                              Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.grey[200]!),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('ITEM PESANAN:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[600])),
+                                    SizedBox(height: 8),
+                                    ...((order['items'] as List?) ?? []).map((item) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 8.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(child: Text('${item['name']}', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                                              Text('x${item['quantity']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            ],
+                                          ),
+                                          if (item['modifiers'] != null && (item['modifiers'] as List).isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 8.0, top: 2),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: (item['modifiers'] as List).map((mod) => Text(
+                                                  '- ${mod['optionName'] ?? mod['name']}',
+                                                  style: TextStyle(fontSize: 11, color: Colors.blueGrey[600], fontStyle: FontStyle.italic),
+                                                )).toList(),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    )).toList(),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Icon(Icons.restaurant, size: 16, color: Colors.grey[600]),
+                                  SizedBox(width: 8),
+                                  Text('Pengambilan: ${order['deliveryMethod'] ?? 'Dine-in'}', 
+                                    style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                              SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  if (status == 'PENDING') ...[
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => _updateMobileOrderStatus(order['id'], 'CANCELLED'),
+                                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: BorderSide(color: Colors.red)),
+                                        child: Text('TOLAK'),
+                                      ),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () => _updateMobileOrderStatus(order['id'], 'PROCESSING'),
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green[700], foregroundColor: Colors.white),
+                                        child: Text('TERIMA'),
+                                      ),
+                                    ),
+                                  ] else if (status == 'PROCESSING' || status == 'READY') ...[
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _updateMobileOrderStatus(order['id'], 'PAID'),
+                                        icon: Icon(Icons.check_circle),
+                                        label: Text('SELESAI / DIAMBIL'),
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color color;
+    switch (status) {
+      case 'PENDING': color = Colors.orange; break;
+      case 'PROCESSING': color = Colors.blue; break;
+      case 'READY': color = Colors.purple; break;
+      case 'PAID': color = Colors.green; break;
+      case 'CANCELLED': color = Colors.red; break;
+      default: color = Colors.grey;
+    }
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: color.withOpacity(0.5))),
+      child: Text(status, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 }

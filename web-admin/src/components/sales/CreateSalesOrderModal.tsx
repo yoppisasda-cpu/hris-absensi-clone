@@ -31,6 +31,8 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
   const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -66,16 +68,21 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
 
 
 
-  const handleProductSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const pId = e.target.value;
+  const handleProductSelect = (pId: string) => {
     setSelectedProduct(pId);
+    setIsProductDropdownOpen(false);
     const prod = products.find(p => p.id.toString() === pId);
     if (prod) {
-      setPrice(prod.price.toString()); // Default to standard price initially
+      setPrice(prod.price.toString());
     } else {
       setPrice("");
     }
   };
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
+    (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase()))
+  );
 
   const handleAddItem = () => {
     if (!selectedProduct || !quantity || !price) return toast.error("Lengkapi data item");
@@ -206,18 +213,60 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end bg-slate-950 p-6 rounded-[2rem] border border-white/5 shadow-inner">
-                <div className="md:col-span-6 space-y-2">
+                <div className="md:col-span-6 space-y-2 relative">
                   <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Module Mapping</label>
-                  <select
-                    value={selectedProduct}
-                    onChange={handleProductSelect}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-black italic text-white outline-none focus:border-indigo-500/50 uppercase appearance-none cursor-pointer"
-                  >
-                    <option value="">-- UNIT RESOLUTION --</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.name.toUpperCase()} (AVL: {p.stock})</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsProductDropdownOpen(!isProductDropdownOpen)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-black italic text-white outline-none focus:border-indigo-500/50 uppercase text-left flex justify-between items-center"
+                    >
+                      <span>
+                        {selectedProduct 
+                          ? products.find(p => p.id.toString() === selectedProduct)?.name.toUpperCase() 
+                          : "-- UNIT RESOLUTION --"}
+                      </span>
+                      <Search className={`h-4 w-4 transition-transform ${isProductDropdownOpen ? 'rotate-180 text-indigo-400' : 'text-slate-600'}`} />
+                    </button>
+
+                    {isProductDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-[#0A0A0B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="p-3 border-b border-white/5 bg-white/5">
+                          <input
+                            type="text"
+                            placeholder="SEARCH UNIT..."
+                            autoFocus
+                            value={productSearch}
+                            onChange={(e) => setProductSearch(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-[10px] font-black italic text-white outline-none focus:border-indigo-500/50 uppercase tracking-widest"
+                          />
+                        </div>
+                        <div className="max-h-60 overflow-y-auto no-scrollbar py-2">
+                          {filteredProducts.length === 0 ? (
+                            <div className="px-5 py-4 text-[9px] font-black text-slate-700 italic uppercase tracking-widest text-center">No matching units</div>
+                          ) : (
+                            filteredProducts.map(p => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => handleProductSelect(p.id.toString())}
+                                className="w-full px-5 py-3 text-left hover:bg-indigo-500/10 group transition-all"
+                              >
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-black text-slate-400 group-hover:text-white uppercase italic transition-colors">
+                                    {p.name}
+                                  </span>
+                                  <span className="text-[8px] font-black text-slate-600 uppercase italic">
+                                    AVL: {p.stock}
+                                  </span>
+                                </div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Vol</label>

@@ -1,4 +1,6 @@
 import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -53,6 +55,39 @@ const cleanupLocalFile = (filePath: string | null) => {
 };
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Store active branch sockets: branchId -> socketId
+const branchSockets = new Map<string, string>();
+
+io.on('connection', (socket) => {
+  console.log(`[Socket] New connection: ${socket.id}`);
+
+  socket.on('register_branch', (branchId) => {
+    const bKey = branchId ? branchId.toString() : 'null';
+    console.log(`[Socket] Registering branch: "${bKey}" for socket: ${socket.id}`);
+    branchSockets.set(bKey, socket.id);
+    console.log(`[Socket] Total branches connected: ${branchSockets.size} (${Array.from(branchSockets.keys()).join(', ')})`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket] Disconnected: ${socket.id}`);
+    // Remove from map
+    for (const [bid, sid] of branchSockets.entries()) {
+      if (sid === socket.id) {
+        branchSockets.delete(bid);
+        break;
+      }
+    }
+  });
+});
+
 const prisma = new PrismaClient({
   log: ['error'],
 });
@@ -1268,6 +1303,11 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       { expiresIn: '90d' }
     );
 
+    // Find associated customer data
+    const customer = await prisma.customer.findUnique({
+      where: { email: user.email }
+    });
+
     res.json({
       message: 'Login Berhasil',
       token,
@@ -1281,7 +1321,13 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
         language: user.language,
         company: user.company,
         plan: (user as any).company?.plan,
-        addons: (user as any).company?.addons || []
+        addons: (user as any).company?.addons || [],
+        customerData: customer ? {
+          id: customer.id,
+          points: customer.points,
+          isMember: customer.isMember,
+          totalSpent: customer.totalSpent
+        } : null
       }
     });
 
@@ -2067,8 +2113,21 @@ app.get('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request,
 app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const userId = (req as any).userId;
-    const { supplierId, date, items, notes, warehouseId } = req.body;
+    const userId = Number((req as any).userId);
+    const { supplierId, date, items, notes, warehouseId, customerId } = req.body;
+    let finalCustomerId = customerId ? parseInt(customerId) : null;
+
+    // --- SECURITY & SYNC FIX ---
+    // If we have a userId (from token), always override customerId with the one linked to user email
+    if (userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        const linkedCustomer = await prisma.customer.findUnique({ where: { email: user.email } });
+        if (linkedCustomer) {
+          finalCustomerId = linkedCustomer.id;
+        }
+      }
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Minimal harus ada 1 barang yang dipesan.' });
@@ -10601,6 +10660,88 @@ app.delete('/api/pos/categories/:id', tenantMiddleware, async (req: Request, res
 
 // --- MODUL INVENTORI ---
 
+// P13. Import/Clone Products from another company
+app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { sourceCompanyId, productIds } = req.body;
+    const targetCompanyId = Number((req as any).tenantId);
+
+    if (!sourceCompanyId) return res.status(400).json({ error: 'Source company ID is required' });
+
+    // 1. Fetch source products
+    const sourceProducts = await prisma.product.findMany({
+      where: {
+        companyId: Number(sourceCompanyId),
+        id: productIds ? { in: productIds.map(Number) } : undefined
+      },
+      include: { category: true }
+    });
+
+    if (sourceProducts.length === 0) return res.status(404).json({ error: 'No products found to import' });
+
+    let importedCount = 0;
+    let skippedCount = 0;
+
+    // 2. Process each product
+    for (const sourceProduct of sourceProducts) {
+      try {
+        // Handle Category
+        let targetCategoryId = null;
+        if (sourceProduct.category) {
+          let targetCategory = await prisma.productCategory.findFirst({
+            where: { companyId: targetCompanyId, name: sourceProduct.category.name }
+          });
+
+          if (!targetCategory) {
+            targetCategory = await prisma.productCategory.create({
+              data: { companyId: targetCompanyId, name: sourceProduct.category.name }
+            });
+          }
+          targetCategoryId = targetCategory.id;
+        }
+
+        // Check SKU uniqueness before creating
+        if (sourceProduct.sku) {
+          const existingSku = await prisma.product.findUnique({ where: { sku: sourceProduct.sku } });
+          if (existingSku) {
+            skippedCount++;
+            continue; // Skip if SKU exists globally
+          }
+        }
+
+        // Create new product
+        await prisma.product.create({
+          data: {
+            companyId: targetCompanyId,
+            name: sourceProduct.name,
+            sku: sourceProduct.sku,
+            description: sourceProduct.description,
+            price: sourceProduct.price,
+            costPrice: sourceProduct.costPrice,
+            unit: sourceProduct.unit,
+            type: sourceProduct.type,
+            imageUrl: sourceProduct.imageUrl,
+            categoryId: targetCategoryId,
+            updatedAt: new Date()
+          }
+        });
+        importedCount++;
+      } catch (err) {
+        console.error(`Failed to import product ${sourceProduct.name}:`, err);
+        skippedCount++;
+      }
+    }
+
+    res.json({
+      message: `Successfully imported ${importedCount} products.`,
+      skipped: skippedCount
+    });
+
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to import products: ' + error.message });
+  }
+});
+
 // I1. List Products
 // I1. List Products (Updated with Warehouse Stock)
 app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
@@ -11484,15 +11625,20 @@ app.get('/api/customers', tenantMiddleware, async (req: Request, res: Response) 
 app.post('/api/customers', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, phone, email, address } = req.body;
+    let { name, phone, email, address } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Nama pelanggan wajib diisi' });
+
+    // Handle empty strings as NULL for unique constraint
+    const sanitizedPhone = (phone && phone.trim() !== '') ? phone.trim() : null;
+    const sanitizedEmail = (email && email.trim() !== '') ? email.trim() : null;
+    const sanitizedAddress = (address && address.trim() !== '') ? address.trim() : null;
 
     const result: any[] = await prisma.$queryRawUnsafe(`
       INSERT INTO "Customer" ("companyId", "name", "phone", "email", "address", "updatedAt")
       VALUES ($1, $2, $3, $4, $5, NOW())
       RETURNING id
-    `, tenantId, name, phone, email, address);
+    `, tenantId, name, sanitizedPhone, sanitizedEmail, sanitizedAddress);
 
     res.status(201).json({ id: result[0].id, message: 'Pelanggan berhasil ditambahkan' });
   } catch (error: any) {
@@ -11770,6 +11916,119 @@ app.delete('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Resp
   }
 });
 
+// --- LOYALTY & MEMBERSHIP ENDPOINTS (Aivola GO) ---
+
+// Get current customer profile
+app.get('/api/customers/me', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = Number((req as any).userId);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const customer = await prisma.customer.findUnique({ where: { email: user.email } });
+    if (!customer) return res.status(404).json({ error: 'Customer profile not found' });
+
+    res.json(customer);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch customer profile' });
+  }
+});
+
+// Get current customer point history
+app.get('/api/customers/me/points', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = Number((req as any).userId);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const customer = await prisma.customer.findUnique({ where: { email: user.email } });
+    if (!customer) return res.json([]); // Return empty if no customer profile yet
+
+    const history = await prisma.pointHistory.findMany({
+      where: { customerId: customer.id },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch point history' });
+  }
+});
+
+// Get claimed vouchers
+app.get('/api/customers/me/vouchers', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = Number((req as any).userId);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const customer = await prisma.customer.findUnique({ where: { email: user.email } });
+    if (!customer) return res.json([]);
+
+    const claimed = await prisma.customerVoucher.findMany({
+      where: { customerId: customer.id, isUsed: false },
+      include: { voucher: true }
+    });
+    res.json(claimed.map(c => ({ ...c.voucher, claimedId: c.id })));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch claimed vouchers' });
+  }
+});
+
+// Claim a voucher
+app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const voucherId = parseInt(req.params.id);
+    const userId = Number((req as any).userId);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    let customer = await prisma.customer.findUnique({ where: { email: user.email } });
+    
+    // Create customer profile if doesn't exist (Auto-Member)
+    if (!customer) {
+      customer = await prisma.customer.create({
+        data: {
+          companyId: user.companyId,
+          name: user.name,
+          email: user.email,
+          isMember: true
+        }
+      });
+    }
+
+    // Check if already claimed
+    const existing = await prisma.customerVoucher.findUnique({
+      where: { 
+        customerId_voucherId: { customerId: customer.id, voucherId } 
+      }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: 'Voucher sudah diklaim sebelumnya' });
+    }
+
+    const claimed = await prisma.customerVoucher.create({
+      data: {
+        customerId: customer.id,
+        voucherId: voucherId
+      }
+    });
+
+    res.status(201).json(claimed);
+  } catch (error) {
+    console.error('[CLAIM ERROR]', error);
+    res.status(500).json({ error: 'Gagal mengklaim voucher' });
+  }
+});
+
 // --- MODUL SUPPLIER & PEMASOK ---
 
 // SP1. List Suppliers
@@ -11847,8 +12106,21 @@ app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Res
 app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { items, accountId, customerId, status, notes, date, branchId, voucherId, deliveryMethod, pointsUsed } = req.body;
+    const { items, accountId, customerId, status, notes, date, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod } = req.body;
     const userId = Number((req as any).userId);
+    let finalCustomerId = customerId ? parseInt(customerId) : null;
+
+    // --- SECURITY & SYNC FIX ---
+    // If we have a userId (from token), always override customerId with the one linked to user email
+    if (userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        const linkedCustomer = await prisma.customer.findUnique({ where: { email: user.email } });
+        if (linkedCustomer) {
+          finalCustomerId = linkedCustomer.id;
+        }
+      }
+    }
 
     // --- CHECK CLOSING ---
     if (await isPeriodClosed(tenantId, date || new Date())) {
@@ -11907,17 +12179,19 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         totalCommission = totalAmount * 0.20; // 20% Platform Fee
       }
 
+      const finalCustomerId = customerId ? parseInt(customerId) : null;
+
       // 3. Create Sale Record (Merged with GitHub's new fields)
       const saleResult: any[] = await tx.$queryRawUnsafe(`
-        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13, $14, $15)
+        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13, $14, $15, $16, $17)
         RETURNING id
       `, 
       tenantId, 
       branchId ? parseInt(branchId) : null, 
       userId, 
       invoiceNumber, 
-      customerId ? parseInt(customerId) : null, 
+      finalCustomerId, 
       dateVal, 
       totalAmount, 
       totalCommission, 
@@ -11926,10 +12200,70 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       notes, 
       voucherCode, 
       voucherDiscountAmount, 
-      deliveryMethod || 'WALK_IN', 
-      pointsUsedNum);
+      saleType || 'WALK_IN', 
+      pointsUsedNum,
+      deliveryMethod || 'Dine-in',
+      paymentMethod || 'Bayar di Kasir');
       
       const saleId = saleResult[0].id;
+
+      // --- SKIP LOYALTY & INVENTORY FOR PENDING ORDERS ---
+      if (status === 'PENDING') {
+        // Just create Sale Items without updating stock/points
+        for (const item of items) {
+          const productId = parseInt(item.productId);
+          const quantity = parseFloat(item.quantity);
+          const price = parseFloat(item.price);
+          const total = quantity * price;
+
+          await tx.$executeRawUnsafe(`
+            INSERT INTO "SaleItem" ("saleId", "productId", "quantity", "price", "total")
+            VALUES ($1, $2, $3, $4, $5)
+          `, saleId, productId, quantity, price, total);
+        }
+        return { id: saleId, invoiceNumber, status: 'PENDING' };
+      }
+
+      // --- LOYALTY LOGIC: Earn & Redeem Points ---
+      if (finalCustomerId) {
+        const custId = finalCustomerId;
+        
+        // 1. Redeem Points
+        if (pointsUsedNum > 0) {
+          await tx.customer.update({
+            where: { id: custId },
+            data: { points: { decrement: pointsUsedNum } }
+          });
+          await tx.pointHistory.create({
+            data: {
+              customerId: custId,
+              amount: pointsUsedNum,
+              type: 'REDEEM',
+              description: `Tukar poin untuk pesanan ${invoiceNumber}`
+            }
+          });
+        }
+
+        // 2. Earn Points (e.g., 1 point for every Rp 1,000 spent)
+        const earnedPoints = Math.floor(totalAmount / 1000);
+        if (earnedPoints > 0) {
+          await tx.customer.update({
+            where: { id: custId },
+            data: { 
+              points: { increment: earnedPoints },
+              totalSpent: { increment: totalAmount }
+            }
+          });
+          await tx.pointHistory.create({
+            data: {
+              customerId: custId,
+              amount: earnedPoints,
+              type: 'EARN',
+              description: `Poin dari pesanan ${invoiceNumber}`
+            }
+          });
+        }
+      }
 
       // 4. Create Sale Items & Update Inventory
       for (const item of items) {
@@ -12022,9 +12356,124 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     });
 
     res.status(201).json(result);
+
+    // --- SOCKET NOTIFICATION ---
+    const orderStatus = req.body.status;
+    const targetBranchId = req.body.branchId;
+    
+    console.log(`[Socket Debug] Order created with status: ${orderStatus}, target branch: ${targetBranchId}`);
+
+    if (orderStatus === 'PENDING' && targetBranchId) {
+      const bKey = targetBranchId.toString();
+      const socketId = branchSockets.get(bKey);
+      
+      if (socketId) {
+        console.log(`[Socket] SUCCESS: Sending new order alert to branch ${bKey}`);
+        const finalTotal = result.totalAmount ? Number(result.totalAmount) : (req.body.totalAmount ? Number(req.body.totalAmount) : 0);
+        
+        io.to(socketId).emit('new_mobile_order', {
+          id: result.id,
+          invoiceNumber: result.invoiceNumber,
+          totalAmount: finalTotal,
+          customerName: (req as any).user?.name || req.body.customerName || 'Customer',
+          paymentMethod: req.body.paymentMethod || 'Bayar di Kasir',
+          deliveryMethod: req.body.deliveryMethod || 'Dine-in'
+        });
+      } else {
+        console.log(`[Socket] FAIL: Branch ${bKey} not connected. Connected keys: ${Array.from(branchSockets.keys()).join(', ')}`);
+      }
+    }
   } catch (error: any) {
     console.error("DEBUG SALE CREATE ERROR:", error);
     res.status(500).json({ error: 'Gagal mencatat penjualan: ' + error.message });
+  }
+});
+
+// S3. Update Sale Status (For Online Orders)
+app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = parseInt(req.params.id as string);
+    const { status, accountId } = req.body; // e.g., PROCESSING, READY, COMPLETED, CANCELLED
+
+    const sale = await prisma.sale.findUnique({
+      where: { id, companyId: tenantId },
+      include: { SaleItem: true }
+    });
+
+    if (!sale) return res.status(404).json({ error: 'Sale not found' });
+    const oldStatus = sale.status;
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Update Status
+      await tx.sale.update({
+        where: { id },
+        data: { status, accountId: accountId ? parseInt(accountId) : sale.accountId, updatedAt: new Date() }
+      });
+
+      // 2. If transitioning from PENDING to PROCESSING/PAID, run inventory & loyalty
+      if (oldStatus === 'PENDING' && (status === 'PROCESSING' || status === 'PAID')) {
+        const totalAmount = sale.totalAmount;
+        const invoiceNumber = sale.invoiceNumber;
+        const finalCustomerId = sale.customerId;
+        const pointsUsedNum = (sale as any).pointsUsed || 0;
+
+        // --- LOYALTY LOGIC ---
+        if (finalCustomerId) {
+          if (pointsUsedNum > 0) {
+            await tx.customer.update({
+              where: { id: finalCustomerId },
+              data: { points: { decrement: pointsUsedNum } }
+            });
+            await tx.pointHistory.create({
+              data: { customerId: finalCustomerId, amount: pointsUsedNum, type: 'REDEEM', description: `Tukar poin untuk pesanan ${invoiceNumber}` }
+            });
+          }
+          const earnedPoints = Math.floor(totalAmount / 1000);
+          if (earnedPoints > 0) {
+            await tx.customer.update({
+              where: { id: finalCustomerId },
+              data: { points: { increment: earnedPoints }, totalSpent: { increment: totalAmount } }
+            });
+            await tx.pointHistory.create({
+              data: { customerId: finalCustomerId, amount: earnedPoints, type: 'EARN', description: `Poin dari pesanan ${invoiceNumber}` }
+            });
+          }
+        }
+
+        // --- INVENTORY LOGIC ---
+        for (const item of sale.SaleItem) {
+          if (!item.productId) continue;
+          const productId = item.productId;
+          const quantity = item.quantity;
+
+          // Decrement product stock
+          await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2`, quantity, productId);
+          await tx.$executeRawUnsafe(`INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date") VALUES ($1, 'OUT', $2, $3, NOW())`, productId, quantity, `Penjualan Online ${invoiceNumber}`);
+
+          // BOM Logic
+          const recipes: any[] = await tx.$queryRawUnsafe(`SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr JOIN "Product" p ON pr."productId" = p.id WHERE pr."productId" = $1`, productId);
+          if (recipes.length > 0) {
+            const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
+            for (const recipe of recipes) {
+              const totalMaterialNeeded = (recipe.quantity / yieldVal) * quantity;
+              await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2`, totalMaterialNeeded, recipe.materialId);
+              await tx.$executeRawUnsafe(`INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date") VALUES ($1, 'OUT', $2, $3, NOW())`, recipe.materialId, totalMaterialNeeded, `Penjualan Online (BOM) ${invoiceNumber}`);
+            }
+          }
+        }
+
+        // --- FINANCE LOGIC (If PAID) ---
+        const finalAccountId = accountId || sale.accountId;
+        if (status === 'PAID' && finalAccountId) {
+            // (Finance logic here if needed, similar to POST /api/sales)
+        }
+      }
+    });
+
+    res.json({ message: `Status updated to ${status}` });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal update status: ' + error.message });
   }
 });
 
@@ -12072,7 +12521,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
     
     let whereConditions = [`s."companyId" = ${tenantId}`];
     if (isPosViewer) {
-      whereConditions.push(`s."invoiceNumber" LIKE 'POS-%'`);
+      whereConditions.push(`(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`);
     }
 
     // Branch Filter
@@ -12118,6 +12567,17 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
     // Sale Type Filter
     if (saleType && saleType !== 'all') {
       whereConditions.push(`s."saleType" = '${saleType}'`);
+    }
+
+    // Status Filter
+    if (req.query.status && req.query.status !== 'all') {
+      const statusValue = req.query.status as string;
+      if (statusValue.includes(',')) {
+        const statuses = statusValue.split(',').map(s => `'${s.trim()}'`).join(',');
+        whereConditions.push(`s."status" IN (${statuses})`);
+      } else {
+        whereConditions.push(`s."status" = '${statusValue}'`);
+      }
     }
 
     // Role-based Access (Non-Admin Restricted to their own branch)
@@ -14077,7 +14537,7 @@ app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response
   }
 });
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
   console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);
   initCleanupCron(); // Start the background cleanup job

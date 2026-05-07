@@ -15,6 +15,7 @@ import 'wallet_screen.dart';
 import 'profile_screen.dart';
 import 'merchant_selection_screen.dart';
 import '../providers/branding_provider.dart';
+import '../services/api_service.dart';
 import '../models/voucher.dart' as model;
 
 class CurrencyFormat {
@@ -191,7 +192,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 itemBuilder: (context, index) {
                   final v = brandingProvider.vouchers[index];
                   String title = v.discountType == 'PERCENTAGE' ? "${v.discountValue.toInt()}% OFF" : CurrencyFormat.convertToIdr(v.discountValue, 0);
-                  return _buildVoucherCard(title, "Min. belanja ${CurrencyFormat.convertToIdr(v.minPurchase, 0)}", index % 2 == 0 ? Colors.orangeAccent : Colors.blueAccent);
+                  return GestureDetector(
+                    onTap: () => _confirmClaimVoucher(context, v),
+                    child: _buildVoucherCard(title, "Min. belanja ${CurrencyFormat.convertToIdr(v.minPurchase, 0)}", index % 2 == 0 ? Colors.orangeAccent : Colors.blueAccent)
+                  );
                 },
               ),
             ),
@@ -332,5 +336,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showSwitchBrandDialog(BuildContext context, BrandingProvider brandingProvider) {
     showDialog(context: context, builder: (context) => AlertDialog(backgroundColor: Color(0xFF1E293B), title: Text("Switch Brand?", style: GoogleFonts.outfit(color: Colors.white)), content: Text("This will clear your current selection and return to the brand discovery ecosystem.", style: TextStyle(color: Color(0xFF94A3B8))), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text("Cancel", style: TextStyle(color: Color(0xFF94A3B8)))), ElevatedButton(onPressed: () { brandingProvider.clearMerchant(); Navigator.pop(context); Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => MerchantSelectionScreen())); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent), child: Text("Switch", style: TextStyle(color: Colors.white)))]));
+  }
+
+  void _confirmClaimVoucher(BuildContext context, model.Voucher voucher) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Color(0xFF1E293B),
+        title: Text("Klaim Voucher?", style: GoogleFonts.outfit(color: Colors.white)),
+        content: Text("Voucher ini akan disimpan ke akun Anda dan bisa digunakan saat checkout.", style: TextStyle(color: Color(0xFF94A3B8))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text("Batal", style: TextStyle(color: Color(0xFF94A3B8)))),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final success = await ApiService.claimVoucher(voucher.id);
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: Colors.green, content: Text("Voucher berhasil diklaim! Cek di profil Anda.")));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: Colors.redAccent, content: Text("Gagal mengklaim voucher (mungkin sudah pernah diklaim).")));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Provider.of<BrandingProvider>(context).primaryColor),
+            child: Text("Klaim Sekarang", style: TextStyle(color: Colors.white)),
+          )
+        ],
+      ),
+    );
   }
 }

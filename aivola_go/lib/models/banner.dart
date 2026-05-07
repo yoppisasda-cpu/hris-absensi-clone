@@ -1,3 +1,5 @@
+import '../services/api_service.dart';
+
 class PromoBanner {
   final int id;
   final String? title;
@@ -16,14 +18,7 @@ class PromoBanner {
   });
 
   factory PromoBanner.fromJson(Map<String, dynamic> json) {
-    String imageUrl = json['imageUrl'] ?? '';
-    
-    // Handle local development URLs for Android Emulator
-    if (imageUrl.startsWith('/uploads/')) {
-      imageUrl = "http://10.0.2.2:5000$imageUrl";
-    } else if (imageUrl.contains('localhost')) {
-      imageUrl = imageUrl.replaceAll('localhost', '10.0.2.2');
-    }
+    String imageUrl = ApiService.resolveUrl(json['imageUrl']);
 
     return PromoBanner(
       id: json['id'],

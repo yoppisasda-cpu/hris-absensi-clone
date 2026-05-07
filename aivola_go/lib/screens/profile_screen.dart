@@ -3,10 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../providers/branding_provider.dart';
+import '../services/api_service.dart';
 import 'order_history_screen.dart';
 import 'edit_profile_screen.dart';
 import 'inbox_screen.dart';
+import 'my_vouchers_screen.dart';
+import 'point_history_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -17,7 +21,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userName = "Coffee Lover";
   String _userEmail = "customer@aivola.id";
   String? _userAvatar;
-  int _points = 2450;
+  int _points = 0;
+  int? _customerId;
+  bool _isMember = false;
 
   @override
   void initState() {
@@ -27,11 +33,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Initial load from cache
     setState(() {
       _userName = prefs.getString('userName') ?? "Coffee Lover";
-      _userEmail = "customer@aivola.id"; 
+      _userEmail = prefs.getString('userEmail') ?? "customer@aivola.id"; 
       _userAvatar = prefs.getString('userAvatar');
+      _points = prefs.getInt('userPoints') ?? 0;
+      _customerId = prefs.getInt('customerId');
+      _isMember = prefs.getBool('isMember') ?? false;
     });
+
+    // Fetch latest from API
+    try {
+      final res = await ApiService.get('/customers/me');
+      if (res.statusCode == 200) {
+        final data = res.data;
+        setState(() {
+          _userName = data['name'] ?? _userName;
+          _userEmail = data['email'] ?? _userEmail;
+          _points = (data['points'] ?? 0).toInt();
+          _isMember = data['isMember'] ?? _isMember;
+          _customerId = data['id'];
+        });
+
+        // Update cache
+        await prefs.setString('userName', _userName);
+        await prefs.setString('userEmail', _userEmail);
+        await prefs.setInt('userPoints', _points);
+        await prefs.setBool('isMember', _isMember);
+      }
+    } catch (e) {
+      print("Error fetching profile: $e");
+    }
   }
 
   @override
@@ -98,11 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               border: Border.all(color: primaryColor, width: 2),
               image: DecorationImage(
                 image: (_userAvatar != null && _userAvatar!.isNotEmpty)
-                    ? CachedNetworkImageProvider(
-                        _userAvatar!.startsWith('http') 
-                            ? _userAvatar! 
-                            : "http://10.0.2.2:5000${_userAvatar!}"
-                      )
+                    ? CachedNetworkImageProvider(ApiService.resolveUrl(_userAvatar))
                     : NetworkImage("https://ui-avatars.com/api/?name=$_userName&background=random") as ImageProvider,
                 fit: BoxFit.cover,
               ),
@@ -167,7 +197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Icon(Icons.stars_rounded, color: Colors.white, size: 16),
                       SizedBox(width: 6),
-                      Text("Gold Member", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text(_isMember ? "Gold Member" : "Reguler Member", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 )
@@ -177,9 +207,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildLoyaltyAction(Icons.confirmation_number_outlined, "Voucher Saya"),
-                _buildLoyaltyAction(Icons.history_rounded, "Riwayat Poin"),
-                _buildLoyaltyAction(Icons.qr_code_2_rounded, "ID Member"),
+                _buildLoyaltyAction(Icons.confirmation_number_outlined, "Voucher Saya", () {
+                   Navigator.push(context, MaterialPageRoute(builder: (context) => MyVouchersScreen()));
+                }),
+                _buildLoyaltyAction(Icons.history_rounded, "Riwayat Poin", () {
+                   Navigator.push(context, MaterialPageRoute(builder: (context) => PointHistoryScreen()));
+                }),
+                _buildLoyaltyAction(Icons.qr_code_2_rounded, "ID Member", () {
+                   _showMemberIdQr(context, primaryColor);
+                }),
               ],
             )
           ],
@@ -188,9 +224,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLoyaltyAction(IconData icon, String label) {
+  Widget _buildLoyaltyAction(IconData icon, String label, VoidCallback onTap) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       child: Column(
         children: [
           Icon(icon, color: Colors.white.withOpacity(0.9), size: 22),
@@ -248,6 +284,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15), side: BorderSide(color: Colors.redAccent.withOpacity(0.3))),
         ),
         child: Text("Keluar Akun", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  void _showMemberIdQr(BuildContext context, Color primaryColor) {
+    if (_customerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Profil Member belum lengkap.")));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("ID Member Anda", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 10),
+            Text("Tunjukkan QR ini ke kasir", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+            SizedBox(height: 25),
+            Container(
+              padding: EdgeInsets.all(15),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+              child: QrImageView(
+                data: "AIVOLA_CUST_$_customerId",
+                version: QrVersions.auto,
+                size: 200.0,
+                foregroundColor: Color(0xFF1E293B),
+              ),
+            ),
+            SizedBox(height: 20),
+            Text("#$_customerId", style: GoogleFonts.outfit(color: primaryColor, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text("Tutup", style: TextStyle(color: Color(0xFF94A3B8)))),
+        ],
       ),
     );
   }

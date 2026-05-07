@@ -7,7 +7,7 @@ class ApiService {
   // PENTING: Jika menggunakan HP asli (Debug), ganti IP di bawah jika tidak menggunakan emulator
   static const String baseUrl = kReleaseMode
       ? 'https://api.aivola.id/api' // PRODUCTION SERVER
-      : 'http://192.168.6.111:5005/api'; // LOCAL TESTING - ACTUAL MACHINE IP
+      : 'http://192.168.1.165:5005/api'; // LOCAL TESTING - ACTUAL MACHINE IP
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   ApiService() {
@@ -576,6 +576,16 @@ class ApiService {
   // --- FASE POS: POINT OF SALE (KASIR) ---
 
   // Tarik daftar produk untuk POS
+  Future<List<dynamic>> getBranches() async {
+    try {
+      final response = await _dio.get('/branches');
+      return response.data;
+    } catch (e) {
+      print('Error fetching branches: $e');
+      return [];
+    }
+  }
+
   Future<List<dynamic>> getPosProducts() async {
     try {
       final response = await _dio.get('/pos/products');
@@ -695,6 +705,19 @@ class ApiService {
       return response.data as List<dynamic>;
     } catch (e) {
       throw Exception('Gagal mengambil riwayat pesanan.');
+    }
+  }
+
+  // Tarik pesanan yang masih aktif (PENDING, PROCESSING, READY)
+  Future<List<dynamic>> getActiveOrders() async {
+    try {
+      final response = await _dio.get('/sales', queryParameters: {
+        'status': 'PENDING,PROCESSING,READY'
+      });
+      return response.data as List<dynamic>;
+    } catch (e) {
+      print('Gagal mengambil pesanan aktif: $e');
+      return [];
     }
   }
 

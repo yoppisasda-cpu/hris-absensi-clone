@@ -30,7 +30,10 @@ class AuthProvider with ChangeNotifier {
     await prefs.setString('companyId', user['companyId'].toString());
     await prefs.setInt('userId', user['id']);
     await prefs.setString('userName', user['name']);
-    await prefs.setString('userRole', user['role']);
+    await prefs.setString('userRole', user['userRole'] ?? user['role']);
+    if (user['branchId'] != null) {
+      await prefs.setInt('branchId', user['branchId']);
+    }
 
     _companyId = user['companyId'].toString();
     _userId = user['id'];

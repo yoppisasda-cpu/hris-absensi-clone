@@ -31,4 +31,17 @@ class Voucher {
       isActive: json['isActive'] ?? true,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'code': code,
+      'discountType': discountType,
+      'discountValue': discountValue,
+      'minPurchase': minPurchase,
+      'maxDiscount': maxDiscount,
+      'validUntil': validUntil?.toIso8601String(),
+      'isActive': isActive,
+    };
+  }
 }

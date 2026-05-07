@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_app/l10n/generated/app_localizations.dart';
 import 'package:mobile_app/providers/auth_provider.dart';
+import 'package:mobile_app/services/socket_service.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -21,6 +22,11 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
         listen: false,
       ).login(_emailController.text, _passwordController.text);
+      
+      // Re-init socket after successful login to register branchId
+      if (mounted) {
+        Provider.of<SocketService>(context, listen: false).reconnect();
+      }
     } catch (e) {
       final String msg = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(

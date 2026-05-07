@@ -761,7 +761,7 @@ model Customer {
   companyId   Int
   name        String
   phone       String?
-  email       String?
+  email       String?      @unique
   address     String?
   points      Float        @default(0)
   totalSpent  Float        @default(0)
@@ -771,8 +771,34 @@ model Customer {
   gender      String?
   isMember    Boolean      @default(false)
   salesOrders SalesOrder[]
+  pointHistory PointHistory[]
+  claimedVouchers CustomerVoucher[]
 
   @@unique([companyId, phone], name: "companyId_phone")
+  @@index([email])
+}
+
+model PointHistory {
+  id          Int      @id @default(autoincrement())
+  customerId  Int
+  amount      Float
+  type        String   // "EARN" or "REDEEM"
+  description String
+  createdAt   DateTime @default(now())
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model CustomerVoucher {
+  id          Int      @id @default(autoincrement())
+  customerId  Int
+  voucherId   Int
+  isUsed      Boolean  @default(false)
+  claimedAt   DateTime @default(now())
+  usedAt      DateTime?
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, voucherId])
 }
 
 model ProductCategory {
@@ -844,6 +870,8 @@ model Sale {
   totalAmount           Float        @default(0)
   status                String       @default("PAID")
   saleType              String       @default("WALK_IN")
+  paymentMethod         String?      @default("Bayar di Kasir")
+  deliveryMethod        String?      @default("Dine-in")
   serviceFee            Float        @default(0)
   markupPercentage      Float        @default(0)
   totalCommission       Float        @default(0)
@@ -1223,6 +1251,7 @@ model Voucher {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  claimedBy     CustomerVoucher[]
 
   @@unique([companyId, code])
 }

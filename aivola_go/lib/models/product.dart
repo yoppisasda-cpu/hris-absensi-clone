@@ -1,3 +1,5 @@
+import '../services/api_service.dart';
+
 class CustomizationOption {
   final int id;
   final String name;
@@ -84,14 +86,7 @@ class Product {
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
-    String? imageUrl = json['imageUrl'];
-    if (imageUrl != null) {
-      if (imageUrl.startsWith('/uploads/')) {
-        imageUrl = "http://10.0.2.2:5000$imageUrl";
-      } else if (imageUrl.contains('localhost')) {
-        imageUrl = imageUrl.replaceAll('localhost', '10.0.2.2');
-      }
-    }
+    String? imageUrl = ApiService.resolveUrl(json['imageUrl']);
 
     var customList = json['customizations'] as List? ?? [];
 

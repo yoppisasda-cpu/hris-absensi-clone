@@ -36,7 +36,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() => _isLoading = true);
     
-    final userData = await ApiService.get("/users/me");
+    final res = await ApiService.get("/users/me");
+    final userData = res.statusCode == 200 ? res.data : null;
     
     setState(() {
       if (userData != null) {
@@ -187,11 +188,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       )
                     : DecorationImage(
                         image: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
-                            ? CachedNetworkImageProvider(
-                                _avatarUrl!.startsWith('http') 
-                                    ? _avatarUrl! 
-                                    : "http://10.0.2.2:5000${_avatarUrl!}"
-                              )
+                            ? CachedNetworkImageProvider(ApiService.resolveUrl(_avatarUrl))
                             : NetworkImage("https://ui-avatars.com/api/?name=${_nameController.text}&background=random&size=200") as ImageProvider,
                         fit: BoxFit.cover,
                       ),

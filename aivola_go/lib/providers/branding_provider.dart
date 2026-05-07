@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../models/banner.dart';
 import '../models/voucher.dart';
+import '../services/api_service.dart';
 
 class BrandingProvider with ChangeNotifier {
   Color _primaryColor = const Color(0xFF3B82F6); // Default Blue
@@ -23,9 +24,7 @@ class BrandingProvider with ChangeNotifier {
   List<Voucher> get vouchers => _vouchers;
 
   String? get fullLogoUrl {
-    if (_logoUrl == null || _logoUrl!.isEmpty) return null;
-    if (_logoUrl!.startsWith('http')) return _logoUrl;
-    return "http://10.0.2.2:5000$_logoUrl";
+    return ApiService.resolveUrl(_logoUrl);
   }
 
   BrandingProvider() {
@@ -58,7 +57,7 @@ class BrandingProvider with ChangeNotifier {
   Future<void> fetchBanners() async {
     if (_selectedMerchantId == null) return;
     try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:5000/api/companies/public/$_selectedMerchantId/banners'));
+      final response = await http.get(Uri.parse('${ApiService.baseUrl}/companies/public/$_selectedMerchantId/banners'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         _banners = data.map((json) => PromoBanner.fromJson(json)).toList();
@@ -73,7 +72,7 @@ class BrandingProvider with ChangeNotifier {
     if (_selectedMerchantId == null) return;
     print("DEBUG: Fetching vouchers for company ID: $_selectedMerchantId");
     try {
-      final url = 'http://10.0.2.2:5000/api/companies/public/$_selectedMerchantId/vouchers';
+      final url = '${ApiService.baseUrl}/companies/public/$_selectedMerchantId/vouchers';
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
