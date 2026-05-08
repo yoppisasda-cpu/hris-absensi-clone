@@ -179,7 +179,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                   _buildStatusBadge(detail['status'] ?? 'PAID'),
                 ],
               ),
-              Text('Waktu: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(detail['date']))}'),
+              Text('Waktu: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(detail['date']).toLocal())}'),
               Text('Tipe: ${detail['saleType']}'),
               SizedBox(height: 16),
               Expanded(
@@ -380,7 +380,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                   itemCount: _orders.length,
                   itemBuilder: (context, index) {
                     final order = _orders[index];
-                    final date = DateTime.parse(order['date']);
+                    final date = DateTime.parse(order['date']).toLocal();
                     return Card(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       margin: EdgeInsets.only(bottom: 12),

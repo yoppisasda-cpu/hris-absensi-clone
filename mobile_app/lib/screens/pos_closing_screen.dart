@@ -142,8 +142,8 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
                           padding: const EdgeInsets.all(20.0),
                           child: Column(
                             children: [
-                              _buildDetailRow('Shift Dimulai', _summary?['startTime'] != null ? DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(_summary!['startTime'])) : 'Baru (Hari Ini)'),
-                              _buildDetailRow('Waktu Closing', _summary?['endTime'] != null ? DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(_summary!['endTime'])) : DateFormat('dd MMM yyyy, HH:mm').format(DateTime.now())),
+                              _buildDetailRow('Shift Dimulai', _summary?['startTime'] != null ? DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(_summary!['startTime']).toLocal()) : 'Baru (Hari Ini)'),
+                              _buildDetailRow('Waktu Closing', _summary?['endTime'] != null ? DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(_summary!['endTime']).toLocal()) : DateFormat('dd MMM yyyy, HH:mm').format(DateTime.now())),
                               _buildDetailRow('Total Transaksi', '${_summary?['totalTransactions'] ?? 0} Pesanan'),
                             ],
                           ),

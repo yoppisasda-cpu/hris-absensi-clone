@@ -94,7 +94,7 @@ class _PosPendingBillsScreenState extends State<PosPendingBillsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('${items.length} item - Rp ${total.toStringAsFixed(0)}'),
-                            Text('Dibuat: ${DateFormat('HH:mm').format(DateTime.parse(bill['createdAt']))} oleh ${bill['user']['name']}', style: TextStyle(fontSize: 11)),
+                            Text('Dibuat: ${DateFormat('HH:mm').format(DateTime.parse(bill['createdAt']).toLocal())} oleh ${bill['user']['name']}', style: TextStyle(fontSize: 11)),
                           ],
                         ),
                         trailing: Row(
