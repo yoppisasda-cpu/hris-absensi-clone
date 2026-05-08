@@ -1422,7 +1422,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     );
 
     // Find associated customer data
-    const customer = await prisma.customer.findUnique({
+    const customer = await prisma.customer.findFirst({
       where: { email: user.email }
     });
 
@@ -2240,7 +2240,7 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
     if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
-        const linkedCustomer = await prisma.customer.findUnique({ where: { email: user.email } });
+        const linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
         if (linkedCustomer) {
           finalCustomerId = linkedCustomer.id;
         }
@@ -12045,7 +12045,7 @@ app.get('/api/customers/me', tenantMiddleware, async (req: Request, res: Respons
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const customer = await prisma.customer.findUnique({ where: { email: user.email } });
+    const customer = await prisma.customer.findFirst({ where: { email: user.email } });
     if (!customer) return res.status(404).json({ error: 'Customer profile not found' });
 
     res.json(customer);
@@ -12063,7 +12063,7 @@ app.get('/api/customers/me/points', tenantMiddleware, async (req: Request, res: 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const customer = await prisma.customer.findUnique({ where: { email: user.email } });
+    const customer = await prisma.customer.findFirst({ where: { email: user.email } });
     if (!customer) return res.json([]); // Return empty if no customer profile yet
 
     const history = await prisma.pointHistory.findMany({
@@ -12085,7 +12085,7 @@ app.get('/api/customers/me/vouchers', tenantMiddleware, async (req: Request, res
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const customer = await prisma.customer.findUnique({ where: { email: user.email } });
+    const customer = await prisma.customer.findFirst({ where: { email: user.email } });
     if (!customer) return res.json([]);
 
     const claimed = await prisma.customerVoucher.findMany({
@@ -12108,7 +12108,7 @@ app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    let customer = await prisma.customer.findUnique({ where: { email: user.email } });
+    let customer = await prisma.customer.findFirst({ where: { email: user.email } });
     
     // Create customer profile if doesn't exist (Auto-Member)
     if (!customer) {
@@ -12233,7 +12233,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
-        const linkedCustomer = await prisma.customer.findUnique({ where: { email: user.email } });
+        const linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
         if (linkedCustomer) {
           finalCustomerId = linkedCustomer.id;
         }
