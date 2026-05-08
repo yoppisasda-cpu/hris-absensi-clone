@@ -98,6 +98,7 @@ model Company {
   Product                Product[]
   productCategories      ProductCategory[]
   prospects              Prospect[]
+  customers              Customer[]
   purchaseOrders         PurchaseOrder[]
   reimbursements         Reimbursement[]
   salesOrders            SalesOrder[]
@@ -775,6 +776,7 @@ model Customer {
   salesOrders SalesOrder[]
   pointHistory PointHistory[]
   claimedVouchers CustomerVoucher[]
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, phone], name: "companyId_phone")
   @@index([email])
