@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -108,7 +109,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _showSnack('Pendaftaran berhasil! Selamat datang di Aivola!', isError: false);
         await Future.delayed(const Duration(milliseconds: 800));
         if (mounted) {
-          Navigator.pushReplacementNamed(context, '/home');
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => HomeScreen()),
+            (route) => false,
+          );
         }
       } else {
         _showSnack(result['message'] ?? 'Pendaftaran gagal');
