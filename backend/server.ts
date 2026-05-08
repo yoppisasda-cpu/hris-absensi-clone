@@ -1383,7 +1383,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     const trimmedEmail = email.trim();
     console.log(`[LOGIN ATTEMPT] Email: ${trimmedEmail}`);
 
-    const user = await prisma.user.findFirst({ 
+    let user = await prisma.user.findFirst({ 
       where: { email: { equals: trimmedEmail, mode: 'insensitive' } },
       include: { 
         company: { 
@@ -1398,54 +1398,73 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
         } 
       }
     });
+
+    let finalAuthData: any = null;
+
     if (!user) {
-      console.log(`[LOGIN FAILED] User not found: "${trimmedEmail}"`);
-      // DEBUG: Find similar emails to see if there's a typo
-      const similar = await prisma.user.findMany({
-        where: { email: { contains: trimmedEmail.split('@')[0], mode: 'insensitive' } },
-        select: { email: true, id: true, companyId: true, role: true }
+      // Jika tidak ditemukan di User, cek di Customer (Aivola GO)
+      const customer = await prisma.customer.findFirst({
+        where: { email: { equals: trimmedEmail, mode: 'insensitive' } },
+        include: {
+          company: {
+            select: {
+              name: true,
+              logoUrl: true,
+              primaryColor: true,
+              secondaryColor: true,
+              plan: true,
+              addons: true
+            }
+          }
+        }
       });
-      console.log(`[DEBUG LOG] Similar users for lookup:`, JSON.stringify(similar, null, 2));
-      return res.status(401).json({ error: 'Email atau password salah.' });
-    }
 
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      console.log(`[LOGIN FAILED] Invalid password for: ${trimmedEmail}`);
-      return res.status(401).json({ error: 'Email atau password salah.' });
-    }
+      if (!customer) {
+        console.log(`[LOGIN FAILED] User/Customer not found: "${trimmedEmail}"`);
+        return res.status(401).json({ error: 'Email atau password salah.' });
+      }
 
-    // --- ENFORCE ACTIVE STATUS ---
-    if (!user.isActive) {
-      console.log(`[LOGIN FAILED] Account inactive for: ${trimmedEmail}`);
-      return res.status(403).json({ error: 'Akun Anda sudah dinonaktifkan (Ex-Employee). Hubungi HR jika ini kesalahan.' });
-    }
+      if (!customer.password) {
+        return res.status(401).json({ error: 'Akun pelanggan ini belum memiliki password. Silakan daftar via Aivola GO.' });
+      }
 
-    console.log(`[LOGIN SUCCESS] User: ${user.email}, Company ID: ${user.companyId}`);
+      const isValidPassword = await bcrypt.compare(password, customer.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: 'Email atau password salah.' });
+      }
 
-    // Buat JWT Token yang membungkus rahasia perusahaan milik karyawan terkait
-    const token = jwt.sign(
-      { 
-        userId: user.id, 
-        companyId: user.companyId, 
-        role: user.role, 
-        name: user.name,
-        plan: (user as any).company?.plan,
-        addons: (user as any).company?.addons || []
-      },
-      JWT_SECRET,
-      { expiresIn: '90d' }
-    );
+      finalAuthData = {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        companyId: customer.companyId,
+        role: 'CUSTOMER',
+        isActive: customer.isActive,
+        company: customer.company,
+        customerData: {
+          id: customer.id,
+          points: customer.points,
+          isMember: customer.isMember,
+          totalSpent: customer.totalSpent
+        }
+      };
+    } else {
+      // Found as User (Employee)
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        console.log(`[LOGIN FAILED] Invalid password for: ${trimmedEmail}`);
+        return res.status(401).json({ error: 'Email atau password salah.' });
+      }
 
-    // Find associated customer data
-    const customer = await prisma.customer.findFirst({
-      where: { email: user.email }
-    });
+      if (!user.isActive) {
+        return res.status(403).json({ error: 'Akun Anda sudah dinonaktifkan.' });
+      }
 
-    res.json({
-      message: 'Login Berhasil',
-      token,
-      user: {
+      const customer = await prisma.customer.findFirst({
+        where: { email: user.email }
+      });
+
+      finalAuthData = {
         id: user.id,
         name: user.name,
         email: user.email,
@@ -1454,15 +1473,34 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
         role: user.role,
         language: user.language,
         company: user.company,
-        plan: (user as any).company?.plan,
-        addons: (user as any).company?.addons || [],
         customerData: customer ? {
           id: customer.id,
           points: customer.points,
           isMember: customer.isMember,
           totalSpent: customer.totalSpent
         } : null
-      }
+      };
+    }
+
+    console.log(`[LOGIN SUCCESS] ${finalAuthData.role}: ${finalAuthData.email}`);
+
+    const token = jwt.sign(
+      { 
+        userId: finalAuthData.id, 
+        companyId: finalAuthData.companyId, 
+        role: finalAuthData.role, 
+        name: finalAuthData.name,
+        plan: finalAuthData.company?.plan,
+        addons: finalAuthData.company?.addons || []
+      },
+      JWT_SECRET,
+      { expiresIn: '90d' }
+    );
+
+    res.json({
+      message: 'Login Berhasil',
+      token,
+      user: finalAuthData
     });
 
   } catch (error: any) {
