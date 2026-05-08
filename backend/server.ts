@@ -1241,6 +1241,22 @@ app.get('/api/test-get', (req, res) => {
 // AIVOLA GO: CUSTOMER REGISTRATION ENDPOINTS (PUBLIC)
 // ==========================================
 
+// Diagnostik IP Server untuk Whitelist Wablas
+app.get('/api/diag/ip', async (req: Request, res: Response) => {
+  try {
+    const axios = require('axios');
+    const response = await axios.get('https://api.ipify.org?format=json');
+    res.json({ 
+      success: true, 
+      server_public_ip: response.data.ip,
+      note: "Gunakan IP ini untuk daftar putih (whitelist) di dashboard Wablas."
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 // In-memory OTP store: { phone: { otp: string, expiry: Date } }
 const customerOtpStore = new Map<string, { otp: string; expiry: Date }>();
 
