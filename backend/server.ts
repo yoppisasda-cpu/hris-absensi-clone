@@ -1679,6 +1679,15 @@ app.get('/api/companies/public/:id/products', async (req: Request, res: Response
         category: true,
         WarehouseStock: {
           include: { warehouse: true }
+        },
+        customizations: {
+          include: {
+            Group: {
+              include: {
+                options: true
+              }
+            }
+          }
         }
       },
       orderBy: { name: 'asc' }
