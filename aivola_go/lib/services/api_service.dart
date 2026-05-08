@@ -7,15 +7,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   static String get host {
     if (kIsWeb) return "localhost";
-    if (Platform.isAndroid) {
-      // Check if running on emulator or real device
-      // For now, let's use the local IP to be safe for both
-      return "192.168.1.165";
-    }
     return "192.168.1.165";
   }
 
-  static String get baseUrl => "http://$host:5005/api";
+  // Gunakan domain live jika Release (di HP), gunakan IP lokal jika Debug (di Emulator)
+  static String get baseUrl => kReleaseMode 
+      ? "https://api.aivola.id/api"
+      : "http://$host:5005/api";
 
   // Helper for images and other direct URLs
   static String resolveUrl(String? path) {
@@ -25,7 +23,8 @@ class ApiService {
     // Ensure path starts with a slash
     String cleanPath = path.startsWith('/') ? path : "/$path";
     
-    return "http://$host:5005$cleanPath";
+    final domain = kReleaseMode ? "https://api.aivola.id" : "http://$host:5005";
+    return "$domain$cleanPath";
   }
 
   static Future<String?> getToken() async {
