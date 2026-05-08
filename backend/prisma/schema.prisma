@@ -761,7 +761,7 @@ model Customer {
   companyId   Int
   name        String
   phone       String?
-  email       String?      @unique
+  email       String?      
   address     String?
   points      Float        @default(0)
   totalSpent  Float        @default(0)
