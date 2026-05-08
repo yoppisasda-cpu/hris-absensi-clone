@@ -770,6 +770,8 @@ model Customer {
   birthDate   DateTime?
   gender      String?
   isMember    Boolean      @default(false)
+  password    String?      // For Aivola GO self-registration
+  isActive    Boolean      @default(true)
   salesOrders SalesOrder[]
   pointHistory PointHistory[]
   claimedVouchers CustomerVoucher[]
