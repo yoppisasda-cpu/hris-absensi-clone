@@ -102,6 +102,9 @@ class Product {
       stock: (json['stock'] as num?)?.toDouble() ?? 0,
       customizations: customList.map((c) {
         // Handle junction table structure if necessary
+        if (c['Group'] != null) {
+          return CustomizationGroup.fromJson(c['Group']);
+        }
         if (c['CustomizationGroup'] != null) {
           return CustomizationGroup.fromJson(c['CustomizationGroup']);
         }
