@@ -1237,6 +1237,105 @@ app.get('/api/test-get', (req, res) => {
   res.json({ message: 'GET request works!' });
 });
 
+// ==========================================
+// AIVOLA GO: CUSTOMER REGISTRATION ENDPOINTS (PUBLIC)
+// ==========================================
+
+// In-memory OTP store: { phone: { otp: string, expiry: Date } }
+const customerOtpStore = new Map<string, { otp: string; expiry: Date }>();
+
+// 1. Send OTP via WhatsApp
+app.post('/api/customer/send-otp', async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Nomor HP wajib diisi.' });
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 menit
+
+    // Simpan OTP
+    customerOtpStore.set(phone.trim(), { otp, expiry });
+
+    // Kirim via WhatsApp (Wablas)
+    const message = `🔐 *Kode OTP Aivola Anda*\n\nKode: *${otp}*\n\nBerlaku 5 menit. Jangan bagikan kode ini kepada siapapun.`;
+    await sendWhatsAppMessage(phone.trim(), message, undefined, undefined, true);
+
+    console.log(`[Customer OTP] Sent OTP ${otp} to ${phone}`);
+    res.json({ success: true, message: 'OTP telah dikirim ke WhatsApp Anda.' });
+  } catch (error: any) {
+    console.error('[Customer OTP Error]', error.message);
+    res.status(500).json({ error: 'Gagal mengirim OTP: ' + error.message });
+  }
+});
+
+// 2. Register Customer with OTP verification
+app.post('/api/customer/register', async (req: Request, res: Response) => {
+  try {
+    const { name, email, phone, password, otp } = req.body;
+
+    if (!name || !email || !phone || !password || !otp) {
+      return res.status(400).json({ error: 'Semua field wajib diisi.' });
+    }
+
+    // Validasi OTP
+    const stored = customerOtpStore.get(phone.trim());
+    if (!stored) return res.status(400).json({ error: 'OTP tidak ditemukan. Kirim ulang OTP.' });
+    if (new Date() > stored.expiry) {
+      customerOtpStore.delete(phone.trim());
+      return res.status(400).json({ error: 'OTP sudah kadaluarsa. Kirim ulang OTP.' });
+    }
+    if (stored.otp !== otp.trim()) {
+      return res.status(400).json({ error: 'Kode OTP salah.' });
+    }
+
+    // Hapus OTP setelah dipakai
+    customerOtpStore.delete(phone.trim());
+
+    // Cek duplikasi email di Customer
+    const existingByEmail = await prisma.customer.findFirst({ where: { email: email.trim() } });
+    if (existingByEmail) return res.status(400).json({ error: 'Email sudah terdaftar.' });
+
+    // Cek duplikasi phone di Customer
+    const existingByPhone = await prisma.customer.findFirst({ where: { phone: phone.trim() } });
+    if (existingByPhone) return res.status(400).json({ error: 'Nomor HP sudah terdaftar.' });
+
+    // Buat customer baru (companyId = 0 untuk customer publik Aivola GO)
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const customer = await prisma.customer.create({
+      data: {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password: hashedPassword,
+        companyId: 1, // Aivola System Owner company
+        isActive: true,
+      }
+    });
+
+    // Auto-login: generate JWT
+    const token = jwt.sign(
+      { customerId: customer.id, email: customer.email, role: 'CUSTOMER' },
+      process.env.JWT_SECRET || 'supersecretjwtkey',
+      { expiresIn: '30d' }
+    );
+
+    console.log(`[Customer Register] New customer: ${customer.email}`);
+    res.status(201).json({
+      token,
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+      }
+    });
+  } catch (error: any) {
+    console.error('[Customer Register Error]', error.message);
+    res.status(500).json({ error: 'Gagal mendaftar: ' + error.message });
+  }
+});
+
 // Z. Endpoint Login Karyawan (Menghasilkan JWT)
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {

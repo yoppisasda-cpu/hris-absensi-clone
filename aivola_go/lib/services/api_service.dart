@@ -71,6 +71,57 @@ class ApiService {
     await prefs.clear();
   }
 
+  // --- REGISTRASI CUSTOMER AIVOLA GO ---
+
+  static Future<Map<String, dynamic>> sendOtp(String phone) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/customer/send-otp"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"phone": phone}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) return {"success": true};
+      return {"success": false, "message": data['error'] ?? "Gagal mengirim OTP"};
+    } catch (e) {
+      return {"success": false, "message": "Koneksi gagal: $e"};
+    }
+  }
+
+  static Future<Map<String, dynamic>> registerCustomer({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+    required String otp,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/customer/register"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "name": name,
+          "email": email,
+          "phone": phone,
+          "password": password,
+          "otp": otp,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 201) {
+        // Auto-save token & user data
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', data['token']);
+        await prefs.setInt('customerId', data['customer']['id']);
+        await prefs.setString('userName', data['customer']['name']);
+        await prefs.setString('userEmail', data['customer']['email']);
+        return {"success": true, "data": data};
+      }
+      return {"success": false, "message": data['error'] ?? "Pendaftaran gagal"};
+    } catch (e) {
+      return {"success": false, "message": "Koneksi gagal: $e"};
+    }
+  }
 
   static Future<List<dynamic>> fetchProducts({int? branchId, int? companyId}) async {
     try {

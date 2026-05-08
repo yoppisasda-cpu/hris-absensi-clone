@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'merchant_selection_screen.dart';
 import 'home_screen.dart';
+import 'register_screen.dart';
 import '../providers/branding_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -227,16 +228,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   
                   SizedBox(height: 40),
                   Center(
-                    child: RichText(
-                      text: TextSpan(
-                        text: "Don't have an account? ",
-                        style: TextStyle(color: Color(0xFF94A3B8)),
-                        children: [
-                          TextSpan(
-                            text: "Register Now",
-                            style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                    child: GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                      ),
+                      child: RichText(
+                        text: TextSpan(
+                          text: "Don't have an account? ",
+                          style: TextStyle(color: Color(0xFF94A3B8)),
+                          children: [
+                            TextSpan(
+                              text: "Register Now",
+                              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
