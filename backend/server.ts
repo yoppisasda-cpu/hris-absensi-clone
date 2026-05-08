@@ -1259,10 +1259,21 @@ app.post('/api/customer/send-otp', async (req: Request, res: Response) => {
 
     // Kirim via WhatsApp (Wablas)
     const message = `🔐 *Kode OTP Aivola Anda*\n\nKode: *${otp}*\n\nBerlaku 5 menit. Jangan bagikan kode ini kepada siapapun.`;
-    await sendWhatsAppMessage(phone.trim(), message, undefined, undefined, true);
+    
+    if (!process.env.WA_GATEWAY_URL || !process.env.WA_API_KEY) {
+      console.error('❌ [Customer OTP] WA_GATEWAY_URL atau WA_API_KEY belum diset di .env');
+      return res.status(500).json({ error: 'Sistem WhatsApp belum dikonfigurasi oleh Admin.' });
+    }
 
-    console.log(`[Customer OTP] Sent OTP ${otp} to ${phone}`);
-    res.json({ success: true, message: 'OTP telah dikirim ke WhatsApp Anda.' });
+    const waResult = await sendWhatsAppMessage(phone.trim(), message, undefined, undefined, true);
+
+    if (waResult.status === true || waResult.status === 'success') {
+      console.log(`✅ [Customer OTP] OTP ${otp} berhasil dikirim ke ${phone}`);
+      res.json({ success: true, message: 'OTP telah dikirim ke WhatsApp Anda.' });
+    } else {
+      console.error(`❌ [Customer OTP] Wablas Error:`, waResult);
+      res.status(500).json({ error: 'Gagal mengirim WhatsApp. Pastikan nomor HP benar.' });
+    }
   } catch (error: any) {
     console.error('[Customer OTP Error]', error.message);
     res.status(500).json({ error: 'Gagal mengirim OTP: ' + error.message });
@@ -1300,15 +1311,23 @@ app.post('/api/customer/register', async (req: Request, res: Response) => {
     const existingByPhone = await prisma.customer.findFirst({ where: { phone: phone.trim() } });
     if (existingByPhone) return res.status(400).json({ error: 'Nomor HP sudah terdaftar.' });
 
-    // Buat customer baru (companyId = 0 untuk customer publik Aivola GO)
+    // Buat customer baru (companyId = fallback ke company pertama jika ID 1 tidak ada)
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    let targetCompanyId = 1;
+    const checkCompany = await prisma.company.findUnique({ where: { id: 1 } });
+    if (!checkCompany) {
+      const firstCompany = await prisma.company.findFirst();
+      if (firstCompany) targetCompanyId = firstCompany.id;
+    }
+
     const customer = await prisma.customer.create({
       data: {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
         password: hashedPassword,
-        companyId: 1, // Aivola System Owner company
+        companyId: targetCompanyId,
         isActive: true,
       }
     });
