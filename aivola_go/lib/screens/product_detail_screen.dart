@@ -110,9 +110,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Divider(color: Colors.white.withOpacity(0.1), height: 50),
                   
                   // Customizations
-                  if (widget.product.customizations.isEmpty)
-                    _buildDummyCustomization(primaryColor)
-                  else
+                  if (widget.product.customizations.isNotEmpty)
                     ...widget.product.customizations.map((group) => _buildCustomizationGroup(group, primaryColor)),
 
                   SizedBox(height: 120),
@@ -186,29 +184,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildDummyCustomization(Color primaryColor) {
-    // Show a sample customization if product doesn't have any yet (for demo)
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildCustomizationGroup(
-          CustomizationGroup(
-            id: 0,
-            name: "Pilih Level Pedas",
-            isRequired: true,
-            minSelection: 1,
-            maxSelection: 1,
-            options: [
-              CustomizationOption(id: 1, name: "Tidak Pedas", price: 0),
-              CustomizationOption(id: 2, name: "Sedang", price: 0),
-              CustomizationOption(id: 3, name: "Pedas Banget (+5rb)", price: 5000),
-            ],
-          ),
-          primaryColor,
-        ),
-      ],
-    );
-  }
 
   Widget _buildBottomBar(Color primaryColor, CartProvider cartProvider) {
     return Container(
