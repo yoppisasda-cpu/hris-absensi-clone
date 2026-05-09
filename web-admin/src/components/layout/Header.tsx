@@ -187,6 +187,16 @@ export default function Header() {
                     )}
                 </div>
 
+                {/* COMPANY IDENTIFIER BADGE */}
+                <div className="flex-1 flex justify-center px-4">
+                    <div className="flex items-center gap-2 px-4 py-1.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 shadow-sm animate-pulse-slow">
+                        <Globe className="h-4 w-4 text-indigo-400" />
+                        <span className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em]">
+                            {companyName || 'Loading...'}
+                        </span>
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-4">
                     <div className="flex items-center bg-slate-100 dark:bg-white/5 rounded-2xl p-1 border border-white/5">
                         <button

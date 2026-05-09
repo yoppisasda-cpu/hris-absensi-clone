@@ -31,7 +31,7 @@ class Order {
     return Order(
       id: json['id'] ?? 0,
       invoiceNumber: json['invoiceNumber'] ?? "INV-UNKNOWN",
-      date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
+      date: json['date'] != null ? DateTime.parse(json['date']).toLocal() : DateTime.now(),
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
       status: json['status'] ?? "UNKNOWN",
       branchName: json['branch'] != null ? json['branch']['name'] : null,

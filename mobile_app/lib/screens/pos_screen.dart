@@ -1255,9 +1255,14 @@ class _POSScreenState extends State<POSScreen> {
     return Scaffold(
       backgroundColor: Color(0xFFF7F8FA),
       appBar: AppBar(
-        title: Text('Aivola.id POS', style: TextStyle(fontWeight: FontWeight.w900)),
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text('POS', style: TextStyle(fontWeight: FontWeight.w900)),
         backgroundColor: Colors.white,
-        elevation: 0,
+        elevation: 0.5,
         foregroundColor: Colors.black,
         actions: [
           Consumer<SocketService>(
@@ -1269,24 +1274,6 @@ class _POSScreenState extends State<POSScreen> {
               ),
               onPressed: () => _showIncomingOrdersModal(context),
             ),
-          ),
-          IconButton(
-            icon: Icon(Icons.volume_up, color: Colors.blue[800]),
-            tooltip: 'Tes Suara',
-            onPressed: () {
-              Provider.of<SocketService>(context, listen: false).testNotificationSound();
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Mencoba suara...')));
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh, color: Colors.blue[800]),
-            tooltip: 'Sinkronisasi Data',
-            onPressed: () {
-              _fetchData();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Data berhasil disinkronkan'), duration: Duration(seconds: 1)),
-              );
-            },
           ),
           IconButton(
             icon: Icon(Icons.print_outlined, color: Colors.blue[800]),
@@ -1309,17 +1296,21 @@ class _POSScreenState extends State<POSScreen> {
           ),
           IconButton(
             icon: Icon(_isWaiterMode ? Icons.person_outline : Icons.point_of_sale),
-            tooltip: _isWaiterMode ? 'Pindah ke Mode Kasir' : 'Pindah ke Mode Pelayan',
             onPressed: () => _toggleWaiterMode(!_isWaiterMode),
           ),
-          IconButton(
-            icon: Icon(Icons.history),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => PosOrderHistoryScreen())),
-          ),
-          IconButton(
-            icon: Icon(Icons.lock_clock),
-            tooltip: 'Tutup Kasir (Closing)',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => PosClosingScreen())),
+          PopupMenuButton<String>(
+            onSelected: (val) {
+              if (val == 'history') Navigator.push(context, MaterialPageRoute(builder: (context) => PosOrderHistoryScreen()));
+              if (val == 'closing') Navigator.push(context, MaterialPageRoute(builder: (context) => PosClosingScreen()));
+              if (val == 'refresh') _fetchData();
+              if (val == 'test_sound') Provider.of<SocketService>(context, listen: false).testNotificationSound();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text('Riwayat Pesanan'), dense: true)),
+              PopupMenuItem(value: 'closing', child: ListTile(leading: Icon(Icons.lock_clock), title: Text('Tutup Kasir (Closing)'), dense: true)),
+              PopupMenuItem(value: 'refresh', child: ListTile(leading: Icon(Icons.refresh), title: Text('Sinkronisasi Data'), dense: true)),
+              PopupMenuItem(value: 'test_sound', child: ListTile(leading: Icon(Icons.volume_up), title: Text('Tes Suara'), dense: true)),
+            ],
           ),
         ],
       ),
