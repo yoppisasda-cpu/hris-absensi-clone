@@ -42,6 +42,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     const [calcData, setCalcData] = useState({ total: 0, qty: 1000 });
     const [totalBatchCost, setTotalBatchCost] = useState(0);
     const [unitHpp, setUnitHpp] = useState(0);
+    const [vendorPrice, setVendorPrice] = useState<number | string>("");
 
     useEffect(() => {
         if (isOpen) {
@@ -78,6 +79,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 } else {
                     setSelectedCustomizations([]);
                 }
+                setVendorPrice((product.costPrice || 0) * (product.purchaseFactor || 1));
             } else {
                 setFormData({
                     name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
@@ -85,6 +87,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 setHasRecipe(false);
                 setRecipeItems([]);
                 setSelectedCustomizations([]);
+                setVendorPrice("");
             }
         }
     }, [isOpen, product]);
@@ -525,7 +528,16 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                         placeholder="1000"
                                         className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-4 text-sm font-black text-amber-400 focus:border-amber-500/50 outline-none transition-all italic"
                                         value={formData.purchaseFactor || ""}
-                                        onChange={(e) => setFormData({ ...formData, purchaseFactor: e.target.value === "" ? 0 : parseFloat(e.target.value) })}
+                                        onChange={(e) => {
+                                            const factor = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                            setFormData(prev => {
+                                                const updates: any = { purchaseFactor: factor };
+                                                if (vendorPrice && vendorPrice !== "" && factor > 0) {
+                                                    updates.costPrice = Number((Number(vendorPrice) / factor).toFixed(2));
+                                                }
+                                                return { ...prev, ...updates };
+                                            });
+                                        }}
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600 uppercase italic">
                                         1 {formData.purchaseUnit} = {formData.purchaseFactor} {formData.unit}
@@ -637,6 +649,32 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                         Calculator
                                     </button>
                                 </div>
+
+                                {/* NEW: Vendor Price Input (Auto-calculated) */}
+                                {formData.purchaseUnit !== formData.unit && (
+                                    <div className="mb-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                                        <div className="relative group">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-amber-500/50 italic">VENDOR</div>
+                                            <input
+                                                type="number"
+                                                placeholder={`Price per ${formData.purchaseUnit}`}
+                                                className="w-full rounded-2xl bg-amber-500/5 border border-amber-500/20 py-2.5 pl-14 pr-4 text-xs font-black text-amber-500 focus:border-amber-500/50 outline-none transition-all italic"
+                                                value={vendorPrice}
+                                                onChange={(e) => {
+                                                    const val = e.target.value === "" ? "" : parseFloat(e.target.value);
+                                                    setVendorPrice(val);
+                                                    if (val !== "") {
+                                                        const calculatedUnitCost = val / (formData.purchaseFactor || 1);
+                                                        setFormData(prev => ({ ...prev, costPrice: Number(calculatedUnitCost.toFixed(2)) }));
+                                                    }
+                                                }}
+                                            />
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black text-amber-500/40 uppercase italic">
+                                                Per {formData.purchaseUnit}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 
                                 {showCalc && (
                                     <div className="absolute bottom-full mb-3 left-0 right-0 bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-2xl z-50 animate-in slide-in-from-bottom-2 duration-200">
@@ -685,8 +723,11 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-5 text-sm font-black text-indigo-400 focus:border-indigo-500/50 outline-none transition-all shadow-inner italic"
                                     value={formData.costPrice || ""}
                                     onChange={(e) => {
-                                        const val = e.target.value;
-                                        setFormData({ ...formData, costPrice: val === "" ? 0 : parseFloat(val) });
+                                        const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                        setFormData(prev => ({ ...prev, costPrice: val }));
+                                        if (val !== "") {
+                                            setVendorPrice(Number((val * (formData.purchaseFactor || 1)).toFixed(2)));
+                                        }
                                     }}
                                 />
                             </div>
@@ -758,8 +799,11 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                                 className={`w-full rounded-2xl bg-slate-900 border border-slate-800 py-3.5 px-5 text-sm font-black text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner ${hasRecipe ? 'opacity-70 cursor-not-allowed bg-slate-950 border-amber-500/20 text-amber-500' : ''}`}
                                                 value={formData.costPrice || ""}
                                                 onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setFormData({ ...formData, costPrice: val === "" ? 0 : parseFloat(val) || 0 });
+                                                    const val = e.target.value === "" ? 0 : parseFloat(e.target.value) || 0;
+                                                    setFormData(prev => ({ ...prev, costPrice: val }));
+                                                    if (val !== "") {
+                                                        setVendorPrice(Number((val * (formData.purchaseFactor || 1)).toFixed(2)));
+                                                    }
                                                 }}
                                             />
                                             {hasRecipe && <ChefHat className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500/50" />}
