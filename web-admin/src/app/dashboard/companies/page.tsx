@@ -1018,7 +1018,7 @@ export default function CompaniesPage() {
                                         value={adminEmail}
                                         onChange={(e) => setAdminEmail(e.target.value)}
                                         placeholder="hrd@perusahaan.com"
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                                 <div>
@@ -1030,7 +1030,7 @@ export default function CompaniesPage() {
                                         value={adminPassword}
                                         onChange={(e) => setAdminPassword(e.target.value)}
                                         placeholder="••••••••"
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
                                 </div>
                             </div>

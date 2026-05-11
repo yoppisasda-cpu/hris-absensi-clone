@@ -525,7 +525,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                         placeholder="1000"
                                         className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-4 text-sm font-black text-amber-400 focus:border-amber-500/50 outline-none transition-all italic"
                                         value={formData.purchaseFactor || ""}
-                                        onChange={(e) => setFormData({ ...formData, purchaseFactor: parseFloat(e.target.value) || 1 })}
+                                        onChange={(e) => setFormData({ ...formData, purchaseFactor: e.target.value === "" ? 0 : parseFloat(e.target.value) })}
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600 uppercase italic">
                                         1 {formData.purchaseUnit} = {formData.purchaseFactor} {formData.unit}
