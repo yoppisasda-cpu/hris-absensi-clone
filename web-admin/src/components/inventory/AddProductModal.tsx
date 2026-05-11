@@ -725,7 +725,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     onChange={(e) => {
                                         const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
                                         setFormData(prev => ({ ...prev, costPrice: val }));
-                                        if (val !== "") {
+                                        if (val !== 0) {
                                             setVendorPrice(Number((val * (formData.purchaseFactor || 1)).toFixed(2)));
                                         }
                                     }}
@@ -801,7 +801,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                                 onChange={(e) => {
                                                     const val = e.target.value === "" ? 0 : parseFloat(e.target.value) || 0;
                                                     setFormData(prev => ({ ...prev, costPrice: val }));
-                                                    if (val !== "") {
+                                                    if (val !== 0) {
                                                         setVendorPrice(Number((val * (formData.purchaseFactor || 1)).toFixed(2)));
                                                     }
                                                 }}
