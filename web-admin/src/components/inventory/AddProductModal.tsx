@@ -655,26 +655,24 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                 {/* NEW: Vendor Price Input (Auto-calculated) */}
                                 {formData.purchaseUnit !== formData.unit && (
                                     <div className="mb-2 animate-in fade-in slide-in-from-top-1 duration-300">
-                                        <div className="relative group">
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-amber-500/50 italic">VENDOR</div>
-                                            <input
-                                                type="number"
-                                                placeholder={`Price per ${formData.purchaseUnit}`}
-                                                className="w-full rounded-2xl bg-amber-500/5 border border-amber-500/20 py-2.5 pl-20 pr-24 text-xs font-black text-amber-500 focus:border-amber-500/50 outline-none transition-all italic"
-                                                value={vendorPrice}
-                                                onChange={(e) => {
-                                                    const val = e.target.value === "" ? "" : parseFloat(e.target.value);
-                                                    setVendorPrice(val);
-                                                    if (val !== "") {
-                                                        const calculatedUnitCost = val / (formData.purchaseFactor || 1);
-                                                        setFormData(prev => ({ ...prev, costPrice: Number(calculatedUnitCost.toFixed(2)) }));
-                                                    }
-                                                }}
-                                            />
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black text-amber-500/40 uppercase italic">
-                                                Per {formData.purchaseUnit}
-                                            </div>
+                                        <div className="flex items-center justify-between mb-1 px-1">
+                                            <span className="text-[9px] font-black text-amber-500/60 uppercase italic tracking-wider">⚡ Vendor Price</span>
+                                            <span className="text-[9px] font-black text-amber-500/40 uppercase italic">Per {formData.purchaseUnit}</span>
                                         </div>
+                                        <input
+                                            type="number"
+                                            placeholder={`Harga beli per ${formData.purchaseUnit}`}
+                                            className="w-full rounded-2xl bg-amber-500/5 border border-amber-500/20 py-2.5 px-5 text-sm font-black text-amber-400 focus:border-amber-500/50 outline-none transition-all italic"
+                                            value={vendorPrice}
+                                            onChange={(e) => {
+                                                const val = e.target.value === "" ? "" : parseFloat(e.target.value);
+                                                setVendorPrice(val);
+                                                if (val !== "") {
+                                                    const calculatedUnitCost = Number(val) / (formData.purchaseFactor || 1);
+                                                    setFormData(prev => ({ ...prev, costPrice: Number(calculatedUnitCost.toFixed(2)) }));
+                                                }
+                                            }}
+                                        />
                                     </div>
                                 )}
                                 
