@@ -483,6 +483,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     <option value="Gram">GRAM (G)</option>
                                     <option value="Liter">LITER (L)</option>
                                     <option value="ml">MILLILITER (ML)</option>
+                                    <option value="Galon">GALON</option>
                                     <option value="Tabung">TABUNG</option>
                                     <option value="Butir">BUTIR</option>
                                     <option value="Karung">KARUNG</option>
@@ -513,6 +514,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     <option value="Gram">GRAM (G)</option>
                                     <option value="Liter">LITER (L)</option>
                                     <option value="ml">MILLILITER (ML)</option>
+                                    <option value="Galon">GALON</option>
                                     <option value="Tabung">TABUNG</option>
                                     <option value="Butir">BUTIR</option>
                                     <option value="Karung">KARUNG</option>
@@ -658,7 +660,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                             <input
                                                 type="number"
                                                 placeholder={`Price per ${formData.purchaseUnit}`}
-                                                className="w-full rounded-2xl bg-amber-500/5 border border-amber-500/20 py-2.5 pl-14 pr-4 text-xs font-black text-amber-500 focus:border-amber-500/50 outline-none transition-all italic"
+                                                className="w-full rounded-2xl bg-amber-500/5 border border-amber-500/20 py-2.5 pl-20 pr-24 text-xs font-black text-amber-500 focus:border-amber-500/50 outline-none transition-all italic"
                                                 value={vendorPrice}
                                                 onChange={(e) => {
                                                     const val = e.target.value === "" ? "" : parseFloat(e.target.value);
