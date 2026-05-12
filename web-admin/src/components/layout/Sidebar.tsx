@@ -564,6 +564,10 @@ export default function Sidebar() {
                             <Building2 className="h-5 w-5" />
                             Manajemen Klien
                         </Link>
+                        <Link href="/dashboard/owner-settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors border border-blue-500/20">
+                            <Settings className="h-5 w-5" />
+                            Owner Settings
+                        </Link>
                         <Link href="/dashboard/admin/billing" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-indigo-600/10 text-indigo-400 hover:bg-slate-800 transition-colors">
                             <CreditCard className="h-5 w-5" />
                             Billing SaaS
