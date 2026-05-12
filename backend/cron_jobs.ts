@@ -99,8 +99,8 @@ async function deleteFromSupabase(url: string, folder: string) {
         }
 
         const { error } = await supabase.storage
-            .from(process.env.SUPABASE_BUCKET_NAME || 'hris-bucket')
-            .remove([`${folder}/${filename}`]);
+            .from(folder) // folder is actually the bucket name (e.g., 'attendance')
+            .remove([filename]);
 
         if (error) {
             console.error(`[CRON] Failed to delete file ${filename} from Supabase:`, error.message);

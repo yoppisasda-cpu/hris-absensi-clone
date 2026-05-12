@@ -8659,14 +8659,15 @@ app.patch('/api/admin/settings', tenantMiddleware, async (req: Request, res: Res
 // Manual trigger for testing cleanup
 app.post('/api/admin/cleanup-photos', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    if ((req as any).userRole !== 'SUPERADMIN') {
-      return res.status(403).json({ error: 'Akses terbatas untuk Super Admin' });
+    if ((req as any).userRole !== 'SUPERADMIN' && (req as any).userRole !== 'OWNER') {
+      return res.status(403).json({ error: 'Akses terbatas untuk Admin' });
     }
 
     console.log('[MANUAL] Triggering Photo Cleanup...');
     await runCleanup();
     res.json({ message: 'Proses pembersihan foto selesai dijalankan.' });
   } catch (error) {
+    console.error('Cleanup error:', error);
     res.status(500).json({ error: 'Gagal menjalankan pembersihan foto' });
   }
 });
