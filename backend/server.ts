@@ -12162,6 +12162,114 @@ app.get('/api/customers/me/vouchers', tenantMiddleware, async (req: Request, res
   }
 });
 
+// --- CUSTOMER ADDRESSES ---
+
+// Get all saved addresses for current customer
+app.get('/api/customers/me/addresses', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = Number((req as any).userId);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const customer = await prisma.customer.findFirst({ where: { email: user.email } });
+    if (!customer) return res.json([]);
+
+    const addresses = await prisma.customerAddress.findMany({
+      where: { customerId: customer.id },
+      orderBy: { isDefault: 'desc' }
+    });
+    res.json(addresses);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch addresses' });
+  }
+});
+
+// Add new address
+app.post('/api/customers/me/addresses', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = Number((req as any).userId);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const customer = await prisma.customer.findFirst({ where: { email: user.email } });
+    if (!customer) return res.status(404).json({ error: 'Customer profile not found' });
+
+    const { label, recipientName, phoneNumber, fullAddress, isDefault } = req.body;
+
+    // If this is the first address or set as default, unset other defaults
+    if (isDefault) {
+      await prisma.customerAddress.updateMany({
+        where: { customerId: customer.id },
+        data: { isDefault: false }
+      });
+    }
+
+    const address = await prisma.customerAddress.create({
+      data: {
+        customerId: customer.id,
+        label,
+        recipientName,
+        phoneNumber,
+        fullAddress,
+        isDefault: isDefault || false
+      }
+    });
+
+    res.json(address);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create address' });
+  }
+});
+
+// Update address
+app.patch('/api/customers/me/addresses/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = Number((req as any).userId);
+    const { id } = req.params;
+    const { label, recipientName, phoneNumber, fullAddress, isDefault } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const customer = await prisma.customer.findFirst({ where: { email: user?.email } });
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+    if (isDefault) {
+      await prisma.customerAddress.updateMany({
+        where: { customerId: customer.id },
+        data: { isDefault: false }
+      });
+    }
+
+    const updated = await prisma.customerAddress.update({
+      where: { id: Number(id), customerId: customer.id },
+      data: { label, recipientName, phoneNumber, fullAddress, isDefault }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update address' });
+  }
+});
+
+// Delete address
+app.delete('/api/customers/me/addresses/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = Number((req as any).userId);
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const customer = await prisma.customer.findFirst({ where: { email: user?.email } });
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+    await prisma.customerAddress.delete({
+      where: { id: Number(id), customerId: customer.id }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete address' });
+  }
+});
+
 // Claim a voucher
 app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -12859,11 +12967,11 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
 
     // 2. Sales Trend (Daily)
     const salesTrend = await prisma.$queryRawUnsafe(`
-      SELECT DATE_TRUNC('day', s."date") as "date", SUM(s."totalAmount") as "total", COUNT(s.id) as "count"
+      SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "date", SUM(s."totalAmount") as "total", COUNT(s.id) as "count"
       FROM "Sale" s
       LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       WHERE ${whereClause}
-      GROUP BY DATE_TRUNC('day', s."date")
+      GROUP BY DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')
       ORDER BY "date" ASC
     `, ...queryParams);
 
@@ -12948,7 +13056,7 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     // 2. Hourly Distribution (Peak Hours)
     const hourlyData = await prisma.$queryRawUnsafe(`
       SELECT 
-        EXTRACT(HOUR FROM s."date") as "hour",
+        EXTRACT(HOUR FROM s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "hour",
         SUM(s."totalAmount") as "revenue",
         COUNT(s.id) as "orders"
       FROM "Sale" s
@@ -12973,10 +13081,10 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
 
     // 4. Daily Trend (to compare with previous if needed)
     const dailyTrend = await prisma.$queryRawUnsafe(`
-      SELECT DATE_TRUNC('day', s."date") as "date", SUM(s."totalAmount") as "total"
+      SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "date", SUM(s."totalAmount") as "total"
       FROM "Sale" s
       WHERE ${buildWhere(currentStart, currentEnd)}
-      GROUP BY DATE_TRUNC('day', s."date")
+      GROUP BY DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')
       ORDER BY "date" ASC
     `, tenantId, currentStart, currentEnd);
 
