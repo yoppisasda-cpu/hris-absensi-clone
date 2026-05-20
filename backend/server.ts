@@ -9896,6 +9896,30 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
 
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
     const grossProfit = totalRevenue - totalCOGS;
+
+    // 4b. Calculate Asset Depreciations/Amortizations for this month (such as Prepaid Rent / Sewa Kantor)
+    const assets = await prisma.asset.findMany({
+      where: {
+        companyId: tenantId,
+        isDepreciating: true
+      }
+    });
+
+    assets.forEach(asset => {
+      if (asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
+        const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
+        // Calculate months between purchaseDate and the target P&L month/year
+        const monthsFromPurchase = (year - purchaseDate.getFullYear()) * 12 + (month - 1 - purchaseDate.getMonth());
+        
+        if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
+          const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+          const depName = `Penyusutan: ${asset.name}`;
+          opexByCategory[depName] = (opexByCategory[depName] || 0) + monthlyDepreciation;
+          totalOpEx += monthlyDepreciation;
+        }
+      }
+    });
+
     const netProfit = grossProfit - totalOpEx;
 
     res.json({
@@ -9972,6 +9996,30 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
 
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
     const grossProfit = totalRevenue - totalCOGS;
+
+    // Calculate Asset Depreciations/Amortizations for this month (such as Prepaid Rent / Sewa Kantor)
+    const assets = await prisma.asset.findMany({
+      where: {
+        companyId: tenantId,
+        isDepreciating: true
+      }
+    });
+
+    assets.forEach(asset => {
+      if (asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
+        const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
+        // Calculate months between purchaseDate and the target P&L month/year
+        const monthsFromPurchase = (year - purchaseDate.getFullYear()) * 12 + (month - 1 - purchaseDate.getMonth());
+        
+        if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
+          const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+          const depName = `Penyusutan: ${asset.name}`;
+          opexByCategory[depName] = (opexByCategory[depName] || 0) + monthlyDepreciation;
+          totalOpEx += monthlyDepreciation;
+        }
+      }
+    });
+
     const netProfit = grossProfit - totalOpEx;
 
     // --- CREATE EXCEL ---
@@ -10078,7 +10126,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
             const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
             const now = new Date();
             const monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
-            const monthlyDepreciation = (Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife);
+            const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
             const accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
         bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
         }
@@ -10116,6 +10164,27 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     // 5. Equity: Assets - Liabilities
     const totalEquity = totalAssets - totalLiabilities;
 
+    // 5b. Equity Splits: Modal Disetor vs Laba Berjalan
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    const endOfToday = new Date();
+
+    const revenueRes = await prisma.income.aggregate({
+      where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
+      _sum: { amount: true }
+    });
+    const ytdRevenue = revenueRes._sum.amount || 0;
+
+    const expenseRes = await prisma.expense.aggregate({
+      where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
+      _sum: { amount: true }
+    });
+    const ytdExpense = expenseRes._sum.amount || 0;
+
+    const ytdSalesCogs = await calculateSalesCOGS(tenantId, startOfYear, endOfToday);
+    const ytdNetProfit = ytdRevenue - (ytdExpense + ytdSalesCogs);
+    const modalDisetor = totalEquity - ytdNetProfit;
+
     res.json({
       assets: {
         total: totalAssets,
@@ -10129,7 +10198,11 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         loans: activeLoans
       },
       liabilities: { total: totalLiabilities, details: pendingExpenses },
-      equity: { total: totalEquity }
+      equity: { 
+        total: totalEquity,
+        modalDisetor,
+        labaBerjalan: ytdNetProfit
+      }
     });
   } catch (error: any) {
     console.error("BALANCE SHEET ERROR:", error);
@@ -10156,7 +10229,7 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
             const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
             const now = new Date();
             const monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
-            const monthlyDepreciation = (Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife);
+            const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
             const accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
             bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
         }
@@ -10181,6 +10254,27 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     const pendingExpenses = await prisma.expense.findMany({ where: { companyId: tenantId, status: 'PENDING' } });
     const totalLiabilities = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
     const totalEquity = totalAssets - totalLiabilities;
+
+    // Equity Splits
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    const endOfToday = new Date();
+
+    const revenueRes = await prisma.income.aggregate({
+      where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
+      _sum: { amount: true }
+    });
+    const ytdRevenue = revenueRes._sum.amount || 0;
+
+    const expenseRes = await prisma.expense.aggregate({
+      where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
+      _sum: { amount: true }
+    });
+    const ytdExpense = expenseRes._sum.amount || 0;
+
+    const ytdSalesCogs = await calculateSalesCOGS(tenantId, startOfYear, endOfToday);
+    const ytdNetProfit = ytdRevenue - (ytdExpense + ytdSalesCogs);
+    const modalDisetor = totalEquity - ytdNetProfit;
 
     // --- CREATE EXCEL ---
     const workbook = new ExcelJS.Workbook();
@@ -10247,7 +10341,9 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     worksheet.getCell(`A${currentRow}`).value = 'EKUITAS (MODAL)';
     worksheet.getCell(`A${currentRow}`).font = { bold: true };
     currentRow++;
-    worksheet.addRow(['Modal Pemilik / Laba Ditahan (Estimasi)', '', totalEquity]);
+    worksheet.addRow(['Modal Disetor (Paid-in Capital)', '', modalDisetor]);
+    currentRow++;
+    worksheet.addRow(['Laba Tahun Berjalan (YTD Net Profit)', '', ytdNetProfit]);
     currentRow++;
     worksheet.addRow(['TOTAL EKUITAS', '', totalEquity]);
     worksheet.getRow(currentRow).font = { bold: true };

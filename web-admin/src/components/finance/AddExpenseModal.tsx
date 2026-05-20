@@ -322,9 +322,9 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                                     >
                                         <option value="">-- PILIH BARANG --</option>
                                         {products
-                                            .filter(p => p.type === 'RAW_MATERIAL')
+                                            .filter(p => p.type === 'RAW_MATERIAL' || p.type === 'FINISHED_GOOD')
                                             .map(p => (
-                                                <option key={p.id} value={p.id} className="bg-slate-900">{p.name.toUpperCase()} ({p.sku})</option>
+                                                <option key={p.id} value={p.id} className="bg-slate-900">{p.name.toUpperCase()} ({p.type === 'FINISHED_GOOD' ? 'Finished Good' : 'Raw Material'}) ({p.sku})</option>
                                             ))
                                         }
                                     </select>

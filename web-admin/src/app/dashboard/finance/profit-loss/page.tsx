@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Calendar, Download, TrendingUp, TrendingDown, PieChart, ChevronDown, ChevronRight, Calculator, FileText, Printer, BarChart3 } from "lucide-react";
+import { Calendar, Download, TrendingUp, TrendingDown, FileText, Printer } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
+
+const fmtRp = (val: number) =>
+    (val ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 export default function ProfitLossPage() {
     const [data, setData] = useState<any>(null);
@@ -77,13 +80,13 @@ export default function ProfitLossPage() {
                     <p className="mt-1 text-sm text-slate-400 font-medium">Ringkasan performa keuangan perusahaan periode {months[month-1]} {year}.</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    <button 
+                    <button
                         onClick={() => window.print()}
                         className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
                     >
                         <Printer className="h-4 w-4" /> Cetak
                     </button>
-                    <button 
+                    <button
                         onClick={handleExport}
                         className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
                     >
@@ -97,8 +100,8 @@ export default function ProfitLossPage() {
                     <Calendar className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     <span className="text-sm font-black uppercase tracking-tight text-slate-900 dark:text-white">Periode:</span>
                 </div>
-                <select 
-                    value={month} 
+                <select
+                    value={month}
                     onChange={(e) => setMonth(parseInt(e.target.value))}
                     className="rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
@@ -106,8 +109,8 @@ export default function ProfitLossPage() {
                         <option key={i} value={i + 1}>{m}</option>
                     ))}
                 </select>
-                <select 
-                    value={year} 
+                <select
+                    value={year}
                     onChange={(e) => setYear(parseInt(e.target.value))}
                     className="rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
@@ -123,20 +126,20 @@ export default function ProfitLossPage() {
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-4 mb-8">
                     <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-emerald-500">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pendapatan</p>
-                        <p className="text-xl font-black text-white italic">Rp {data?.revenue.total.toLocaleString()}</p>
+                        <p className="text-xl font-black text-white italic">Rp {fmtRp(data?.revenue.total)}</p>
                     </div>
                     <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-red-500">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total HPP (Bahan)</p>
-                        <p className="text-xl font-black text-red-500 italic">Rp {data?.cogs.total.toLocaleString()}</p>
+                        <p className="text-xl font-black text-red-500 italic">Rp {fmtRp(data?.cogs.total)}</p>
                     </div>
                     <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 shadow-sm border-l-4 border-l-blue-500">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Beban Operasional</p>
-                        <p className="text-xl font-black text-blue-500 italic">Rp {data?.opex.total.toLocaleString()}</p>
+                        <p className="text-xl font-black text-blue-500 italic">Rp {fmtRp(data?.opex.total)}</p>
                     </div>
                     <div className={`rounded-2xl border border-slate-700 p-5 shadow-sm border-l-4 ${data?.netProfit >= 0 ? 'bg-emerald-900/30 border-l-emerald-600' : 'bg-red-900/30 border-l-red-600'}`}>
                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">Laba Bersih</p>
                         <p className={`text-xl font-black italic ${data?.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            Rp {data?.netProfit.toLocaleString()}
+                            Rp {fmtRp(data?.netProfit)}
                         </p>
                     </div>
                 </div>
@@ -148,7 +151,7 @@ export default function ProfitLossPage() {
                             <FileText className="h-4 w-4 text-emerald-400" /> Rincian Laporan Operasional
                         </h2>
                     </div>
-                    
+
                     <table className="w-full border-collapse text-left">
                         <tbody className="divide-y divide-slate-100 italic">
                             {/* Section: Pendapatan */}
@@ -159,12 +162,12 @@ export default function ProfitLossPage() {
                             {Object.entries(data?.revenue.categories || {}).map(([name, amount]: [string, any]) => (
                                 <tr key={name} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-10 py-3 text-sm font-semibold text-slate-600">{name}</td>
-                                    <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {amount.toLocaleString()}</td>
+                                    <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {fmtRp(amount)}</td>
                                 </tr>
                             ))}
                             <tr className="not-italic bg-emerald-50/30">
                                 <td className="px-6 py-4 font-bold text-emerald-700 text-sm">TOTAL PENDAPATAN</td>
-                                <td className="px-6 py-4 text-right font-black text-emerald-700 text-base underline decoration-double">Rp {data?.revenue.total.toLocaleString()}</td>
+                                <td className="px-6 py-4 text-right font-black text-emerald-700 text-base underline decoration-double">Rp {fmtRp(data?.revenue.total)}</td>
                             </tr>
 
                             <tr className="h-4 bg-white border-none"><td></td><td></td></tr>
@@ -177,18 +180,18 @@ export default function ProfitLossPage() {
                             {Object.entries(data?.cogs.categories || {}).map(([name, amount]: [string, any]) => (
                                 <tr key={name} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-10 py-3 text-sm font-semibold text-slate-600 font-mono tracking-tighter text-red-500/80">{name}</td>
-                                    <td className="px-6 py-3 text-right text-sm font-bold text-red-600">(Rp {amount.toLocaleString()})</td>
+                                    <td className="px-6 py-3 text-right text-sm font-bold text-red-600">(Rp {fmtRp(amount)})</td>
                                 </tr>
                             ))}
                             <tr className="not-italic bg-red-50/20">
                                 <td className="px-6 py-4 font-bold text-red-700 text-sm italic">TOTAL HARGA POKOK PENJUALAN</td>
-                                <td className="px-6 py-4 text-right font-black text-red-700 text-base">(Rp {data?.cogs.total.toLocaleString()})</td>
+                                <td className="px-6 py-4 text-right font-black text-red-700 text-base">(Rp {fmtRp(data?.cogs.total)})</td>
                             </tr>
 
                             {/* Gross Profit Row */}
                             <tr className="bg-slate-900 not-italic">
                                 <td className="px-6 py-5 font-black text-white text-base tracking-tight uppercase">LABA KOTOR (GROSS PROFIT)</td>
-                                <td className="px-6 py-5 text-right font-black text-emerald-400 text-xl italic underline">Rp {data?.grossProfit.toLocaleString()}</td>
+                                <td className="px-6 py-5 text-right font-black text-emerald-400 text-xl italic underline">Rp {fmtRp(data?.grossProfit)}</td>
                             </tr>
 
                             <tr className="h-4 bg-white border-none"><td></td><td></td></tr>
@@ -201,12 +204,12 @@ export default function ProfitLossPage() {
                             {Object.entries(data?.opex.categories || {}).map(([name, amount]: [string, any]) => (
                                 <tr key={name} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-10 py-3 text-sm font-semibold text-slate-600 font-mono tracking-tighter text-blue-500/80">{name}</td>
-                                    <td className="px-6 py-3 text-right text-sm font-bold text-blue-600">(Rp {amount.toLocaleString()})</td>
+                                    <td className="px-6 py-3 text-right text-sm font-bold text-blue-600">(Rp {fmtRp(amount)})</td>
                                 </tr>
                             ))}
                             <tr className="not-italic bg-blue-50/20">
                                 <td className="px-6 py-4 font-bold text-blue-700 text-sm">TOTAL BEBAN OPERASIONAL</td>
-                                <td className="px-6 py-4 text-right font-black text-blue-700 text-base underline">(Rp {data?.opex.total.toLocaleString()})</td>
+                                <td className="px-6 py-4 text-right font-black text-blue-700 text-base underline">(Rp {fmtRp(data?.opex.total)})</td>
                             </tr>
 
                             <tr className="h-8 bg-white border-none"><td></td><td></td></tr>
@@ -218,7 +221,7 @@ export default function ProfitLossPage() {
                                     LABA / (RUGI) BERSIH TAHUN BERJALAN
                                 </td>
                                 <td className="px-6 py-6 text-right font-black text-white text-2xl drop-shadow-lg shadow-black italic">
-                                    Rp {data?.netProfit.toLocaleString()}
+                                    Rp {fmtRp(data?.netProfit)}
                                 </td>
                             </tr>
                         </tbody>
@@ -241,5 +244,3 @@ export default function ProfitLossPage() {
         </DashboardLayout>
     );
 }
-
-

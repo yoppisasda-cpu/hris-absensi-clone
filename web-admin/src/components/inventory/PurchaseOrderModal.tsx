@@ -237,10 +237,10 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
                                         <div className="flex-[3.5]">
                                             <SearchableSelect
                                                 options={products
-                                                    .filter(p => p.type === 'RAW_MATERIAL')
+                                                    .filter(p => p.type === 'RAW_MATERIAL' || p.type === 'FINISHED_GOOD')
                                                     .map((p) => ({
                                                         id: p.id.toString(),
-                                                        name: p.name
+                                                        name: `${p.name} (${p.type === 'FINISHED_GOOD' ? 'Finished Good' : 'Raw Material'})`
                                                     }))
                                                 }
                                                 value={item.productId}

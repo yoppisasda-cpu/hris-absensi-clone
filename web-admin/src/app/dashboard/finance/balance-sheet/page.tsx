@@ -261,11 +261,15 @@ export default function BalanceSheetPage() {
                                         <td></td>
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Ekuitas / Modal Bersih</td>
-                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.equity.total.toLocaleString()}</td>
+                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Modal Disetor (Paid-in Capital)</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(data?.equity.modalDisetor || 0).toLocaleString()}</td>
+                                    </tr>
+                                    <tr className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Laba Tahun Berjalan (YTD Net Profit)</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(data?.equity.labaBerjalan || 0).toLocaleString()}</td>
                                     </tr>
                                     <tr className="bg-slate-50">
-                                        <td className="px-6 py-3 font-bold text-slate-700 text-xs italic not-italic">TOTAL MODAL</td>
+                                        <td className="px-6 py-3 font-bold text-slate-700 text-xs italic not-italic">TOTAL EKUITAS</td>
                                         <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {data?.equity.total.toLocaleString()}</td>
                                     </tr>
 
@@ -283,7 +287,7 @@ export default function BalanceSheetPage() {
                         <div className="p-4 rounded-xl bg-indigo-50/50 flex gap-3 items-start border border-indigo-100">
                             <HandCoins className="h-4 w-4 text-indigo-500 mt-0.5" />
                             <p className="text-[11px] font-medium text-slate-500 italic">
-                                Kewajiban dihitung dari Tagihan Pending. Modal otomatis menyesuaikan berdasarkan selisih seluruh aset (termasuk piutang keryawan) dan kewajiban.
+                                Kewajiban dihitung dari Tagihan Pending. Modal disajikan terpisah antara Laba Tahun Berjalan (diambil dari laporan Laba Rugi berjalan) dan Modal Disetor (balancing modal bersih).
                             </p>
                         </div>
                     </div>
