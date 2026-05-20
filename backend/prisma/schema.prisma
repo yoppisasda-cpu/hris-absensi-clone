@@ -1149,6 +1149,7 @@ model SalesOrder {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   saleId      Int?             @unique
+  shippedAt   DateTime?
   company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customer    Customer         @relation(fields: [customerId], references: [id])
   items       SalesOrderItem[]

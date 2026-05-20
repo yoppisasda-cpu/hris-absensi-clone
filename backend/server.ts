@@ -979,9 +979,14 @@ app.patch('/api/sales/orders/:id/status', tenantMiddleware, async (req: Request,
 
     if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan atau bukan milik Anda' });
 
+    const updateData: any = { status };
+    if (status === 'SHIPPED') {
+      updateData.shippedAt = new Date();
+    }
+
     const updated = await prisma.salesOrder.update({
       where: { id: orderId },
-      data: { status }
+      data: updateData
     });
     res.json(updated);
   } catch (error: any) {
@@ -13538,15 +13543,21 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
       }
     }
 
+    // Retrieve associated SalesOrder to get shippedAt (delivery date)
+    const associatedOrder = await prisma.salesOrder.findFirst({
+      where: { saleId: sale.id, companyId: tenantId }
+    });
+    const shippedAt = associatedOrder?.shippedAt || null;
+
     if (company.length > 0) {
       const comp = company[0];
       if (comp.logoUrl && comp.logoUrl.startsWith('/uploads')) {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         comp.logoUrl = `${baseUrl}${comp.logoUrl}`;
       }
-      res.json({ ...sales[0], items, company: comp, bankAccounts, customer: customerObj });
+      res.json({ ...sales[0], items, company: comp, bankAccounts, customer: customerObj, shippedAt });
     } else {
-      res.json({ ...sales[0], items, company: null, bankAccounts, customer: customerObj });
+      res.json({ ...sales[0], items, company: null, bankAccounts, customer: customerObj, shippedAt });
     }
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil detail penjualan: ' + error.message });

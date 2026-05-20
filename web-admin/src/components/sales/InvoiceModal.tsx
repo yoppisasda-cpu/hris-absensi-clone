@@ -179,6 +179,14 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                             </span>
                                         </div>
                                     )}
+                                    {sale.shippedAt && (
+                                        <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
+                                            <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">TANGGAL KIRIM:</span>
+                                            <span className="font-bold text-slate-950 col-span-2 print:text-black">
+                                                {format(new Date(sale.shippedAt), 'dd/MM/yyyy')}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
                                         <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">METODE BAYAR:</span>
                                         <span className="font-bold text-slate-950 col-span-2 print:text-black">
