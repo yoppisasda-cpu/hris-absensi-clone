@@ -14,6 +14,8 @@ interface AddAccountModalProps {
         type: string;
         balance: number;
         branchId?: number | null;
+        bankName?: string | null;
+        accountNumber?: string | null;
     } | null;
 }
 
@@ -22,7 +24,9 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
         name: initialData?.name || '',
         type: initialData?.type || 'BANK',
         balance: initialData?.balance.toString() || '0',
-        branchId: initialData?.branchId?.toString() || ''
+        branchId: initialData?.branchId?.toString() || '',
+        bankName: initialData?.bankName || '',
+        accountNumber: initialData?.accountNumber || ''
     });
     const [branches, setBranches] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -47,10 +51,12 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
                 name: initialData.name,
                 type: initialData.type,
                 balance: initialData.balance.toString(),
-                branchId: initialData.branchId?.toString() || ''
+                branchId: initialData.branchId?.toString() || '',
+                bankName: initialData.bankName || '',
+                accountNumber: initialData.accountNumber || ''
             });
         } else {
-            setFormData({ name: '', type: 'BANK', balance: '0', branchId: '' });
+            setFormData({ name: '', type: 'BANK', balance: '0', branchId: '', bankName: '', accountNumber: '' });
         }
     }, [initialData, isOpen]);
 
@@ -62,7 +68,9 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
                 name: formData.name,
                 type: formData.type,
                 balance: formData.balance,
-                branchId: formData.branchId ? parseInt(formData.branchId) : null
+                branchId: formData.branchId ? parseInt(formData.branchId) : null,
+                bankName: formData.type === 'BANK' ? formData.bankName : null,
+                accountNumber: formData.type === 'BANK' ? formData.accountNumber : null
             };
 
             if (initialData) {
@@ -74,7 +82,7 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
             }
             onSuccess();
             onClose();
-            if (!initialData) setFormData({ name: '', type: 'BANK', balance: '0', branchId: '' });
+            if (!initialData) setFormData({ name: '', type: 'BANK', balance: '0', branchId: '', bankName: '', accountNumber: '' });
         } catch (error: any) {
             console.error("Gagal menyimpan akun", error);
             alert(error.response?.data?.error || "Gagal menyimpan akun keuangan.");
@@ -161,6 +169,33 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
                                 </button>
                             </div>
                         </div>
+
+                        {formData.type === 'BANK' && (
+                            <>
+                                <div className="space-y-2 animate-in slide-in-from-top-3 duration-200">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Bank Name / Issuer</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="EX: BCA // MANDIRI // BNI..."
+                                        value={formData.bankName}
+                                        onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-slate-900"
+                                    />
+                                </div>
+                                <div className="space-y-2 animate-in slide-in-from-top-3 duration-200">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Account Number (No. Rekening)</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="EX: 8001234567..."
+                                        value={formData.accountNumber}
+                                        onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-slate-900"
+                                    />
+                                </div>
+                            </>
+                        )}
 
                         <div className={`space-y-2 transition-all ${initialData ? 'opacity-40 filter blur-[0.5px]' : 'opacity-100'}`}>
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">

@@ -42,16 +42,16 @@ export default function PayablesPage() {
         }
     };
 
-    const handlePay = async (accountId: string) => {
+    const handlePay = async (accountId: string, paymentAmount?: number) => {
         if (!selectedExpense) return;
         setPayLoading(true);
         try {
-            await api.post(`/finance/expense/${selectedExpense.id}/pay`, { accountId });
-            alert("Hutang berhasil dilunasi!");
+            await api.post(`/finance/expense/${selectedExpense.id}/pay`, { accountId, paymentAmount });
+            alert("Pembayaran berhasil dicatat!");
             setIsPayModalOpen(false);
-            fetchPayables(); // Refresh list (paid item will disappear from this view)
+            fetchPayables(); // Refresh list
         } catch (error: any) {
-            alert(error.response?.data?.error || "Gagal melunasi hutang");
+            alert(error.response?.data?.error || "Gagal mencatat pembayaran");
         } finally {
             setPayLoading(false);
         }
@@ -63,7 +63,7 @@ export default function PayablesPage() {
         (p.paidTo?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    const totalHutang = filteredData.reduce((sum, p) => sum + p.amount, 0);
+    const totalHutang = filteredData.reduce((sum, p) => sum + (p.amount - (p.paidAmount || 0)), 0);
 
     return (
         <DashboardLayout>
@@ -115,7 +115,9 @@ export default function PayablesPage() {
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier / Penerima</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Jatuh Tempo</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kategori</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Jumlah</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Hutang</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Telah Dibayar</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Sisa Hutang</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aksi</th>
                             </tr>
@@ -124,12 +126,12 @@ export default function PayablesPage() {
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan={6} className="px-6 py-4"><div className="h-10 bg-slate-100 rounded-lg w-full"></div></td>
+                                        <td colSpan={8} className="px-6 py-4"><div className="h-10 bg-slate-100 rounded-lg w-full"></div></td>
                                     </tr>
                                 ))
                             ) : filteredData.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center">
+                                    <td colSpan={8} className="px-6 py-12 text-center">
                                         <div className="flex flex-col items-center gap-2">
                                             <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center">
                                                 <AlertCircle className="h-6 w-6 text-slate-300" />
@@ -141,6 +143,7 @@ export default function PayablesPage() {
                             ) : (
                                 filteredData.map((p) => {
                                     const isOverdue = p.dueDate && new Date(p.dueDate) < new Date();
+                                    const remaining = p.amount - (p.paidAmount || 0);
                                     return (
                                         <tr key={p.id} className="hover:bg-slate-50/80 transition-colors group">
                                             <td className="px-6 py-4">
@@ -168,7 +171,13 @@ export default function PayablesPage() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <p className="text-sm font-black text-red-600">Rp {p.amount.toLocaleString()}</p>
+                                                <p className="text-sm font-black text-slate-800">Rp {p.amount.toLocaleString()}</p>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <p className="text-sm font-bold text-slate-500">Rp {(p.paidAmount || 0).toLocaleString()}</p>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <p className="text-sm font-black text-red-600">Rp {remaining.toLocaleString()}</p>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
@@ -186,7 +195,7 @@ export default function PayablesPage() {
                                                     }}
                                                     className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95 shadow-lg shadow-emerald-100 flex items-center gap-2 mx-auto"
                                                 >
-                                                    <CheckCircle className="h-3 w-3" /> Bayar
+                                                    <CheckCircle className="h-3 w-3" /> Bayar / Cicil
                                                 </button>
                                             </td>
                                         </tr>

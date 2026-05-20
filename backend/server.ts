@@ -8897,7 +8897,7 @@ app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Res
 // F1.2. Create Account
 app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, type, balance, branchId } = req.body;
+    const { name, type, balance, branchId, bankName, accountNumber } = req.body;
     const tenantId = Number((req as any).tenantId);
 
     if (!name || !type) {
@@ -8914,7 +8914,9 @@ app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Re
         branchId: branchId ? parseInt(branchId.toString()) : null,
         name: name.toString(),
         type: type.toString(),
-        balance: balance ? parseFloat(balance.toString()) : 0
+        balance: balance ? parseFloat(balance.toString()) : 0,
+        bankName: type === 'BANK' ? (bankName?.toString() || null) : null,
+        accountNumber: type === 'BANK' ? (accountNumber?.toString() || null) : null
       }
     });
 
@@ -8930,12 +8932,17 @@ app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Re
 app.patch('/api/finance/accounts/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, type } = req.body;
+    const { name, type, bankName, accountNumber } = req.body;
     const tenantId = (req as any).tenantId;
 
     const account = await prisma.financialAccount.update({
       where: { id: parseInt(id as string), companyId: tenantId },
-      data: { name, type }
+      data: { 
+        name, 
+        type,
+        bankName: type === 'BANK' ? (bankName || null) : null,
+        accountNumber: type === 'BANK' ? (accountNumber || null) : null
+      }
     });
     res.json(account);
   } catch (error: any) {
@@ -9476,11 +9483,11 @@ app.post('/api/finance/transfer', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
-// F5.3. Pay Pending Expense
+// F5.3. Pay Pending Expense (Support Partial / Installment)
 app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const expenseId = parseInt(req.params.id as string);
-    const { accountId } = req.body; // New: pick account at payment time
+    const { accountId, paymentAmount } = req.body; // New: support paymentAmount
     const tenantId = Number((req as any).tenantId);
 
     if (!accountId) return res.status(400).json({ error: 'Pilih akun pembayaran' });
@@ -9498,30 +9505,48 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
         throw new Error('Periode buku sudah ditutup. Tidak dapat mengubah transaksi pada tanggal ini.');
       }
 
-      const res = await tx.$queryRawUnsafe<any[]>(
-        `UPDATE "Expense" SET "status" = 'PAID'::"ExpenseStatus", "accountId" = $1, "updatedAt" = NOW()
-         WHERE "id" = $2 AND "companyId" = $3
-         RETURNING "id", "status", "accountId"`,
-        parseInt(accountId), expenseId, tenantId
-      );
-      const updatedExpense = res[0];
+      const remainingBalance = parseFloat((expense.amount - (expense.paidAmount || 0)).toFixed(2));
+      const amountToPay = paymentAmount !== undefined 
+        ? Math.min(parseFloat(paymentAmount.toString()), remainingBalance) 
+        : remainingBalance;
 
-      // Decrement account balance now
-      await tx.financialAccount.update({
-        where: { id: parseInt(accountId) },
+      if (amountToPay <= 0) throw new Error('Nominal pembayaran tidak valid.');
+
+      const newPaidAmount = (expense.paidAmount || 0) + amountToPay;
+      const isFullyPaid = newPaidAmount >= expense.amount - 0.01; // handle floating precision
+      const newStatus = isFullyPaid ? 'PAID' : 'PENDING';
+
+      // Update Expense using safe Prisma client
+      const updatedExpense = await tx.expense.update({
+        where: { id: expenseId },
         data: {
-          balance: { decrement: expense.amount }
+          status: newStatus as any,
+          paidAmount: newPaidAmount,
+          accountId: parseInt(accountId),
+          updatedAt: new Date()
         }
       });
 
-      return updatedExpense;
+      // Decrement account balance by the payment amount
+      await tx.financialAccount.update({
+        where: { id: parseInt(accountId) },
+        data: {
+          balance: { decrement: amountToPay }
+        }
+      });
+
+      return {
+        ...updatedExpense,
+        amountPaidThisTime: amountToPay,
+        isFullyPaid
+      };
     });
 
     res.json(result);
   } catch (error: any) {
     console.error("DEBUG EXPENSE PAY ERROR:", error);
     fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] EXPENSE PAY ERROR: ${error.message}\n${error.stack}\n`);
-    res.status(500).json({ error: 'Gagal melunasi pengeluaran: ' + error.message });
+    res.status(500).json({ error: 'Gagal mencatat pembayaran hutang: ' + error.message });
   }
 });
 
@@ -10672,7 +10697,7 @@ app.get('/api/finance/reports/receivable', tenantMiddleware, async (req: Request
       SELECT s.*, c."name" as "customerName"
       FROM "Sale" s
       LEFT JOIN "Customer" c ON s."customerId" = c.id
-      WHERE s."companyId" = $1 AND s."status" = 'UNPAID'
+      WHERE s."companyId" = $1 AND s."status" != 'PAID'
       ORDER BY s."isTukarFaktur" ASC, s."date" ASC
     `, tenantId);
 
@@ -10710,17 +10735,17 @@ app.patch('/api/finance/sales/:id/tukar-faktur', tenantMiddleware, async (req: R
   }
 });
 
-// F16.4. Lunasi Piutang (Mark Sale as PAID)
+// F16.4. Lunasi Piutang (Mark Sale as PAID / PARTIALLY_PAID)
 app.patch('/api/finance/sales/:id/pay', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
     const id = parseInt(req.params.id as string);
-    const { accountId, paymentDate } = req.body;
+    const { accountId, paymentDate, paymentAmount } = req.body;
 
     if (!accountId) return res.status(400).json({ error: 'Pilih akun pembayaran (Kas/Bank).' });
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Get Sale using Prisma (as any to handle type syncing)
+      // 1. Get Sale using Prisma
       const sale = await (tx as any).sale.findFirst({
         where: { id, companyId: tenantId }
       });
@@ -10728,13 +10753,24 @@ app.patch('/api/finance/sales/:id/pay', tenantMiddleware, async (req: Request, r
       if (!sale) throw new Error('Penjualan tidak ditemukan.');
       if (sale.status === 'PAID') throw new Error('Penjualan sudah lunas.');
 
-      const dateVal = paymentDate ? new Date(paymentDate) : new Date();
+      const remainingBalance = parseFloat((sale.totalAmount - (sale.paidAmount || 0)).toFixed(2));
+      const amountToPay = paymentAmount !== undefined 
+        ? Math.min(parseFloat(paymentAmount.toString()), remainingBalance) 
+        : remainingBalance;
 
-      // 2. Update Status using Prisma (much safer than raw SQL)
+      if (amountToPay <= 0) throw new Error('Nominal pembayaran tidak valid.');
+
+      const dateVal = paymentDate ? new Date(paymentDate) : new Date();
+      const newPaidAmount = (sale.paidAmount || 0) + amountToPay;
+      const isFullyPaid = newPaidAmount >= sale.totalAmount - 0.01; // handle floating precision
+      const newStatus = isFullyPaid ? 'PAID' : 'PARTIALLY_PAID';
+
+      // 2. Update Status and paidAmount using Prisma
       await (tx as any).sale.update({
         where: { id },
         data: {
-          status: 'PAID',
+          status: newStatus,
+          paidAmount: newPaidAmount,
           accountId: parseInt(accountId),
           updatedAt: new Date()
         }
@@ -10754,14 +10790,18 @@ app.patch('/api/finance/sales/:id/pay', tenantMiddleware, async (req: Request, r
         category = { id: catResult[0].id };
       }
 
+      const desc = isFullyPaid 
+        ? `Pelunasan Piutang Inv ${sale.invoiceNumber}` 
+        : `Cicilan Piutang Inv ${sale.invoiceNumber}`;
+
       await tx.income.create({
         data: {
           companyId: tenantId,
           accountId: parseInt(accountId),
           categoryId: category.id,
-          amount: parseFloat(sale.totalAmount.toString()),
+          amount: amountToPay,
           date: dateVal,
-          description: `Pelunasan Piutang Inv ${sale.invoiceNumber}`,
+          description: desc,
           receivedFrom: 'Customer'
         }
       });
@@ -10769,16 +10809,16 @@ app.patch('/api/finance/sales/:id/pay', tenantMiddleware, async (req: Request, r
       // 4. Update Financial Account Balance
       await tx.financialAccount.update({
         where: { id: parseInt(accountId) },
-        data: { balance: { increment: parseFloat(sale.totalAmount.toString()) } }
+        data: { balance: { increment: amountToPay } }
       });
 
-      return { id, status: 'PAID', invoiceNumber: sale.invoiceNumber };
+      return { id, status: newStatus, paidAmount: newPaidAmount, invoiceNumber: sale.invoiceNumber, amountPaidThisTime: amountToPay };
     });
 
-    res.json({ message: 'Piutang berhasil dilunasi.', result });
+    res.json({ message: result.status === 'PAID' ? 'Piutang berhasil dilunasi.' : 'Cicilan piutang berhasil dicatat.', result });
   } catch (error: any) {
     console.error("PAY DEBT ERROR:", error);
-    res.status(500).json({ error: 'Gagal melunasi piutang: ' + error.message });
+    res.status(500).json({ error: 'Gagal mencatat pembayaran piutang: ' + error.message });
   }
 });
 
@@ -13334,15 +13374,26 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
     `, saleId);
 
     const company: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Company" WHERE id = $1`, tenantId);
+    
+    // Fetch active bank accounts of the company to display on invoice
+    const bankAccounts = await prisma.financialAccount.findMany({
+      where: {
+        companyId: tenantId,
+        type: 'BANK',
+        accountNumber: { not: null }
+      },
+      orderBy: { name: 'asc' }
+    });
+
     if (company.length > 0) {
       const comp = company[0];
       if (comp.logoUrl && comp.logoUrl.startsWith('/uploads')) {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         comp.logoUrl = `${baseUrl}${comp.logoUrl}`;
       }
-      res.json({ ...sales[0], items, company: comp });
+      res.json({ ...sales[0], items, company: comp, bankAccounts });
     } else {
-      res.json({ ...sales[0], items, company: null });
+      res.json({ ...sales[0], items, company: null, bankAccounts });
     }
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil detail penjualan: ' + error.message });

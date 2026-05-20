@@ -120,6 +120,8 @@ model FinancialAccount {
   name          String
   type          String
   balance       Float      @default(0)
+  bankName      String?
+  accountNumber String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   branchId      Int?
@@ -184,6 +186,7 @@ model Expense {
   accountId   Int?
   categoryId  Int
   amount      Float
+  paidAmount  Float             @default(0)
   date        DateTime          @default(now())
   description String?
   paidTo      String?
@@ -873,6 +876,7 @@ model Sale {
   customerPhone         String?
   date                  DateTime     @default(now()) @db.Timestamp(6)
   totalAmount           Float        @default(0)
+  paidAmount            Float        @default(0)
   status                String       @default("PAID")
   saleType              String       @default("WALK_IN")
   paymentMethod         String?      @default("Bayar di Kasir")

@@ -80,7 +80,7 @@ class _CartScreenState extends State<CartScreen> {
                       ...cartProvider.items.values.map((item) => _buildCartItem(item, cartProvider, primaryColor)).toList(),
                       SizedBox(height: 20),
                       _buildSectionTitle("Metode Pengambilan"),
-                      _buildDeliveryOptions(primaryColor),
+                      _buildDeliveryOptions(brandingProvider, primaryColor),
                       SizedBox(height: 25),
                       _buildPointsRedemption(cartProvider, primaryColor),
                       SizedBox(height: 25),
@@ -167,20 +167,84 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildDeliveryOptions(Color primaryColor) {
-    return Row(
+
+
+  Widget _buildDeliveryOptions(BrandingProvider branding, Color primaryColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildOptionChip("Dine-in", Icons.restaurant, primaryColor),
-        SizedBox(width: 10),
-        _buildOptionChip("Take-away", Icons.shopping_bag, primaryColor),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildOptionChip("Dine-in", Icons.restaurant, primaryColor),
+            _buildOptionChip("Pick-up", Icons.shopping_bag, primaryColor),
+            _buildOptionChip("Delivery", Icons.local_shipping, primaryColor),
+          ],
+        ),
+        if (_deliveryMethod == "Delivery") ...[
+          SizedBox(height: 15),
+          _buildShippingInstruction(branding, primaryColor),
+        ],
       ],
     );
   }
 
+  void _onDeliveryMethodChanged(String method) {
+    setState(() {
+      _deliveryMethod = method;
+      // Set default payment based on delivery method
+      if (method == "Dine-in") {
+        _paymentMethod = "Bayar di Kasir";
+      } else {
+        _paymentMethod = "Midtrans (Online Payment)";
+      }
+    });
+  }
+
+  Widget _buildShippingInstruction(BrandingProvider branding, Color primaryColor) {
+    final branchProvider = Provider.of<BranchProvider>(context, listen: false);
+    final branch = branchProvider.selectedBranch;
+
+    return Container(
+      padding: EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.orangeAccent.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: Colors.orangeAccent, size: 20),
+              SizedBox(width: 10),
+              Text("Instruksi Pengiriman", style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          SizedBox(height: 10),
+          Text(
+            "Silakan pesan kurir Anda sendiri (Grab/Gojek/Lalamove) untuk mengambil pesanan di outlet kami setelah pesanan dikonfirmasi.",
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.5),
+          ),
+          if (branch != null) ...[
+            Divider(color: Colors.orangeAccent.withOpacity(0.1), height: 20),
+            Text("Alamat Pengambilan:", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+            SizedBox(height: 5),
+            Text("${branch.name}\n${branch.location ?? 'Alamat tidak tersedia'}", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+          ],
+        ],
+      ),
+    );
+  }
+
+
+
   Widget _buildOptionChip(String label, IconData icon, Color primaryColor) {
     bool isSelected = _deliveryMethod == label;
     return GestureDetector(
-      onTap: () => setState(() => _deliveryMethod = label),
+      onTap: () => _onDeliveryMethodChanged(label),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
@@ -438,15 +502,38 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildPaymentOptions(Color primaryColor) {
-    return Column(
-      children: [
-        _buildPaymentItem("Bayar di Kasir", Icons.payments_outlined, primaryColor),
-        SizedBox(height: 10),
-        _buildPaymentItem("Transfer Bank", Icons.account_balance_outlined, primaryColor),
-        SizedBox(height: 10),
-        _buildPaymentItem("QRIS", Icons.qr_code_scanner_rounded, primaryColor),
-      ],
-    );
+    if (_deliveryMethod == "Dine-in") {
+      return Column(
+        children: [
+          _buildPaymentItem("Bayar di Kasir", Icons.payments_outlined, primaryColor),
+          SizedBox(height: 10),
+          _buildPaymentItem("Transfer Bank", Icons.account_balance_outlined, primaryColor),
+          SizedBox(height: 10),
+          _buildPaymentItem("QRIS", Icons.qr_code_scanner_rounded, primaryColor),
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          _buildPaymentItem("Midtrans (Online Payment)", Icons.language_rounded, primaryColor),
+          SizedBox(height: 10),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: primaryColor.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lock_outline_rounded, color: primaryColor, size: 16),
+                SizedBox(width: 10),
+                Expanded(child: Text("Pembayaran online aman & terverifikasi otomatis.", style: TextStyle(color: primaryColor, fontSize: 11))),
+              ],
+            ),
+          )
+        ],
+      );
+    }
   }
 
   Widget _buildPaymentItem(String label, IconData icon, Color primaryColor) {

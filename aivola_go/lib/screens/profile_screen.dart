@@ -11,6 +11,11 @@ import 'edit_profile_screen.dart';
 import 'inbox_screen.dart';
 import 'my_vouchers_screen.dart';
 import 'point_history_screen.dart';
+import 'address_screen.dart';
+import 'security_screen.dart';
+import 'help_center_screen.dart';
+import 'about_screen.dart';
+import 'payment_methods_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -96,13 +101,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     final updated = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditProfileScreen()));
                     if (updated == true) _loadUserData();
                   }),
-                  _buildMenuItem(Icons.location_on_outlined, "Alamat Saya", "Kelola alamat pengiriman", () {}),
-                  _buildMenuItem(Icons.lock_outline_rounded, "Keamanan & Password", "Ubah kata sandi akun", () {}),
+                  _buildMenuItem(Icons.location_on_outlined, "Alamat Saya", "Kelola alamat pengiriman", () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => AddressScreen()));
+                  }),
+                  _buildMenuItem(Icons.payment_rounded, "Metode Pembayaran", "Lihat opsi pembayaran tersedia", () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => PaymentMethodsScreen()));
+                  }),
+                  _buildMenuItem(Icons.lock_outline_rounded, "Keamanan & Password", "Ubah kata sandi akun", () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => SecurityScreen()));
+                  }),
                 ]),
                 SizedBox(height: 25),
                 _buildMenuSection("Dukungan", [
-                  _buildMenuItem(Icons.help_outline_rounded, "Pusat Bantuan", "Tanya jawab dan bantuan", () {}),
-                  _buildMenuItem(Icons.info_outline_rounded, "Tentang Aivola GO", "Versi 1.0.7", () {}),
+                  _buildMenuItem(Icons.help_outline_rounded, "Pusat Bantuan", "Tanya jawab dan bantuan", () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => HelpCenterScreen()));
+                  }),
+                  _buildMenuItem(Icons.info_outline_rounded, "Tentang Aivola GO", "Versi 1.0.7", () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => AboutScreen()));
+                  }),
                 ]),
                 SizedBox(height: 40),
                 _buildLogoutButton(context),

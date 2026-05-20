@@ -80,6 +80,12 @@ body {
   Instruksi ini memaksa invoice/PO tampil di pratinjau cetak browser.
 */
 @media print {
+  /* Paksa seluruh body disembunyikan saat cetak, kecuali printable area */
+  body {
+    visibility: hidden !important;
+    background: white !important;
+  }
+
   /* 1. Sembunyikan semua elemen UI Dashboard yang mengganggu */
   aside, 
   header, 
@@ -89,7 +95,8 @@ body {
   #main-sidebar,
   #main-header,
   [role="dialog"] > div:not([id*="printable"]),
-  .print-hidden {
+  .print-hidden,
+  .print\:hidden {
     display: none !important;
     visibility: hidden !important;
   }
@@ -121,14 +128,14 @@ body {
     border: none !important;
     background: white !important;
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 1.5cm !important;
     margin: 0 !important;
   }
 
   /* 4. Pastikan semua anak di dalamnya juga terlihat TANPA merusak tata letak (flex/grid) */
-  #printable-invoice *,
-  #po-printable-area *,
-  .printable-content * {
+  #printable-invoice *:not(.print-hidden):not(.print\:hidden),
+  #po-printable-area *:not(.print-hidden):not(.print\:hidden),
+  .printable-content *:not(.print-hidden):not(.print\:hidden) {
     visibility: visible !important;
   }
 
@@ -152,9 +159,16 @@ body {
     color-adjust: exact !important;
   }
 
+  /* 6. Paksa semua teks non-status menjadi hitam solid untuk keterbacaan tingkat tinggi pada cetak kertas */
+  #printable-invoice *:not(.text-emerald-500):not(.text-amber-500):not(.text-rose-500):not(.bg-gradient-to-br):not(svg):not(path),
+  #po-printable-area *:not(.text-emerald-500):not(.text-amber-500):not(.text-rose-500):not(.bg-gradient-to-br):not(svg):not(path),
+  .printable-content *:not(.text-emerald-500):not(.text-amber-500):not(.text-rose-500):not(.bg-gradient-to-br):not(svg):not(path) {
+    color: black !important;
+  }
+
   @page {
     size: auto;
-    margin: 10mm;
+    margin: 0;
   }
 }
 

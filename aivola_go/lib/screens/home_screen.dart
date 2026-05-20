@@ -87,18 +87,34 @@ class _HomeScreenState extends State<HomeScreen> {
         title: GestureDetector(
           onTap: () => _showBranchPicker(context, Provider.of<BranchProvider>(context, listen: false)),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              if (brandingProvider.fullLogoUrl != null)
+              if (brandingProvider.fullLogoUrl != null && brandingProvider.fullLogoUrl!.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(right: 12.0),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(brandingProvider.fullLogoUrl!, height: 35, width: 35, fit: BoxFit.contain),
+                    child: Image.network(
+                      brandingProvider.fullLogoUrl!, 
+                      height: 35, 
+                      width: 35, 
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 35,
+                        width: 35,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.storefront, color: primaryColor, size: 20),
+                      ),
+                    ),
                   ),
                 ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -106,13 +122,24 @@ class _HomeScreenState extends State<HomeScreen> {
                         Flexible(
                           child: Text(
                             Provider.of<BranchProvider>(context).selectedBranch?.name ?? "Select Branch", 
-                            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold, 
+                              fontSize: 16, 
+                              color: Colors.white,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         Icon(Icons.keyboard_arrow_down_rounded, color: primaryColor, size: 20),
                       ],
                     ),
-                    Text("Hi, Coffee Lover!", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                    Text(
+                      "Hi, Coffee Lover!", 
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ],
                 ),
               ),

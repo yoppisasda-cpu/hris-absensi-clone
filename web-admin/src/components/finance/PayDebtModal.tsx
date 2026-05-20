@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, CheckCircle2, Wallet } from "lucide-react";
 
 interface PayDebtModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (accountId: string) => void;
+    onConfirm: (accountId: string, paymentAmount?: number) => void;
     accounts: any[];
     expense: any;
     loading: boolean;
@@ -14,8 +14,24 @@ interface PayDebtModalProps {
 
 export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, expense, loading }: PayDebtModalProps) {
     const [selectedId, setSelectedId] = useState('');
+    const [paymentAmount, setPaymentAmount] = useState('');
+
+    const remainingAmount = expense ? (expense.amount - (expense.paidAmount || 0)) : 0;
+
+    useEffect(() => {
+        if (expense) {
+            setSelectedId('');
+            setPaymentAmount(remainingAmount.toFixed(0));
+        }
+    }, [expense, remainingAmount]);
 
     if (!isOpen || !expense) return null;
+
+    const handleConfirm = () => {
+        if (!selectedId) return;
+        const amt = paymentAmount ? parseFloat(paymentAmount) : remainingAmount;
+        onConfirm(selectedId, amt);
+    };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -42,8 +58,44 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
                             <CheckCircle2 className="h-20 w-20 text-emerald-500" />
                         </div>
                         <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-3 italic">LIFECYCLE PAYLOAD</p>
-                        <p className="text-sm font-black text-white italic truncate pr-12">{expense.category?.name} - {expense.paidTo || 'Vendor'}</p>
-                        <p className="text-3xl font-black text-white mt-2 tracking-tighter italic text-glow-sm">Rp {expense.amount.toLocaleString()}</p>
+                        <p className="text-sm font-black text-white italic truncate pr-12">{expense.categoryName || expense.category?.name || 'Kategori'} - {expense.supplierName || expense.paidTo || 'Vendor'}</p>
+                        <div className="flex justify-between items-end mt-4">
+                            <div>
+                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Total Tagihan</span>
+                                <p className="text-xs font-black text-slate-400">Rp {expense.amount.toLocaleString()}</p>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sisa Hutang</span>
+                                <p className="text-xl font-black text-white italic tracking-tighter">Rp {remainingAmount.toLocaleString()}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Nominal Pembayaran (Rp)</label>
+                        <div className="relative">
+                            <input 
+                                type="number"
+                                placeholder="Masukkan nominal..."
+                                value={paymentAmount}
+                                onChange={(e) => setPaymentAmount(e.target.value)}
+                                className="w-full px-6 py-4 bg-slate-950/50 rounded-[1.8rem] border border-white/5 focus:border-rose-500 outline-none text-white font-bold"
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setPaymentAmount(remainingAmount.toFixed(0))}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1 bg-white/10 hover:bg-white/20 text-white text-[8px] font-black rounded-xl uppercase tracking-wider transition-all"
+                            >
+                                Set Penuh
+                            </button>
+                        </div>
+                        {paymentAmount && (
+                            <p className={`text-[10px] font-bold mt-2 ml-2 ${parseFloat(paymentAmount) >= remainingAmount - 0.01 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                {parseFloat(paymentAmount) >= remainingAmount - 0.01 
+                                    ? '✓ Pembayaran penuh akan melunasi hutang ini.' 
+                                    : '⚠ Pembayaran sebagian akan dicatat sebagai Cicilan.'}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-4">
@@ -56,13 +108,13 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
                                     onClick={() => setSelectedId(acc.id.toString())}
                                     className={`flex items-center justify-between p-5 rounded-[1.8rem] border transition-all ${
                                         selectedId === acc.id.toString() 
-                                        ? 'border-indigo-500/50 bg-indigo-500/10 shadow-lg shadow-indigo-500/5' 
+                                        ? 'border-rose-500/50 bg-rose-500/10 shadow-lg shadow-rose-500/5' 
                                         : 'border-white/5 bg-slate-950 hover:border-white/10'
                                     }`}
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className={`h-11 w-11 rounded-2xl flex items-center justify-center transition-colors ${
-                                            selectedId === acc.id.toString() ? 'bg-indigo-500 text-white shadow-lg' : 'bg-slate-900 text-slate-600'
+                                            selectedId === acc.id.toString() ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'bg-slate-900 text-slate-600'
                                         }`}>
                                             <Wallet className="h-5 w-5" />
                                         </div>
@@ -72,8 +124,8 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
                                         </div>
                                     </div>
                                     {selectedId === acc.id.toString() && (
-                                        <div className="h-6 w-6 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                                            <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+                                        <div className="h-6 w-6 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/30">
+                                            <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
                                         </div>
                                     )}
                                 </button>
@@ -89,14 +141,16 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
                             Cancel
                         </button>
                         <button
-                            disabled={!selectedId || loading}
-                            onClick={() => onConfirm(selectedId)}
+                            disabled={!selectedId || loading || !paymentAmount}
+                            onClick={handleConfirm}
                             className="flex-[2] rounded-[24px] bg-emerald-600/20 text-emerald-500 border border-emerald-600/30 py-5 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/10 hover:bg-emerald-600 hover:text-white active:scale-95 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-3 italic"
                         >
                             {loading ? (
                                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500"></div>
                             ) : (
-                                "Execute Settlement"
+                                paymentAmount && parseFloat(paymentAmount) < remainingAmount - 0.01 
+                                    ? "Execute Installment" 
+                                    : "Execute Settlement"
                             )}
                         </button>
                     </div>

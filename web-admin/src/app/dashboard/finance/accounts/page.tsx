@@ -209,7 +209,12 @@ export default function AccountsPage() {
                             
                             <div className="flex flex-col gap-1">
                                 <h3 className="font-bold text-slate-900 leading-tight">{acc.name}</h3>
-                                <div className="flex items-center gap-1.5">
+                                {acc.type === 'BANK' && acc.accountNumber && (
+                                    <p className="text-[10px] font-bold text-slate-500 leading-none mt-0.5">
+                                        {acc.bankName || 'BANK'}: <span className="font-black text-slate-700">{acc.accountNumber}</span>
+                                    </p>
+                                )}
+                                <div className="flex items-center gap-1.5 mt-1">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{acc.type === 'BANK' ? 'Rekening Bank' : 'Kas Tunai'}</span>
                                     <span className="text-[10px] text-slate-300">•</span>
                                     <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-600">

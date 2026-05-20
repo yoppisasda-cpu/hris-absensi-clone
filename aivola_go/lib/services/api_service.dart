@@ -7,13 +7,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   static String get host {
     if (kIsWeb) return "localhost";
-    return "192.168.1.165";
+    return "10.0.2.2"; // Standard for Android Emulator to hit Localhost
   }
 
   // Gunakan domain live jika Release (di HP), gunakan IP lokal jika Debug (di Emulator)
   static String get baseUrl => kReleaseMode 
       ? "https://api.aivola.id/api"
-      : "http://$host:5005/api";
+      : "http://$host:5000/api";
 
   // Helper for images and other direct URLs
   static String resolveUrl(String? path) {
@@ -214,6 +214,7 @@ class ApiService {
     int? branchId,
     String? notes,
     int? voucherId,
+    int? customerAddressId,
     String? deliveryMethod,
     String? paymentMethod,
     int pointsUsed = 0,
@@ -231,6 +232,7 @@ class ApiService {
           "customerId": customerId,
           "branchId": branchId,
           "voucherId": voucherId,
+          "customerAddressId": customerAddressId,
           "deliveryMethod": deliveryMethod,
           "paymentMethod": paymentMethod ?? "Bayar di Kasir",
           "pointsUsed": pointsUsed,
@@ -283,6 +285,68 @@ class ApiService {
       );
     } catch (e) {
       print("Error in GET $path: $e");
+      return ApiResponse(statusCode: 500, data: {"error": e.toString()});
+    }
+  }
+
+  static Future<ApiResponse> post(String path, dynamic body) async {
+    try {
+      final token = await getToken();
+      final response = await http.post(
+        Uri.parse("$baseUrl$path"),
+        headers: {
+          if (token != null) "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode(body),
+      );
+      return ApiResponse(
+        statusCode: response.statusCode,
+        data: jsonDecode(response.body),
+      );
+    } catch (e) {
+      print("Error in POST $path: $e");
+      return ApiResponse(statusCode: 500, data: {"error": e.toString()});
+    }
+  }
+
+  static Future<ApiResponse> patch(String path, dynamic body) async {
+    try {
+      final token = await getToken();
+      final response = await http.patch(
+        Uri.parse("$baseUrl$path"),
+        headers: {
+          if (token != null) "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode(body),
+      );
+      return ApiResponse(
+        statusCode: response.statusCode,
+        data: jsonDecode(response.body),
+      );
+    } catch (e) {
+      print("Error in PATCH $path: $e");
+      return ApiResponse(statusCode: 500, data: {"error": e.toString()});
+    }
+  }
+
+  static Future<ApiResponse> delete(String path) async {
+    try {
+      final token = await getToken();
+      final response = await http.delete(
+        Uri.parse("$baseUrl$path"),
+        headers: {
+          if (token != null) "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+      return ApiResponse(
+        statusCode: response.statusCode,
+        data: jsonDecode(response.body),
+      );
+    } catch (e) {
+      print("Error in DELETE $path: $e");
       return ApiResponse(statusCode: 500, data: {"error": e.toString()});
     }
   }

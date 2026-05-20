@@ -13,7 +13,13 @@ export default function ReceivablesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isPayModalOpen, setIsPayModalOpen] = useState(false);
     const [modalData, setModalData] = useState({ id: 0, date: '', ref: '' });
-    const [payData, setPayData] = useState({ id: 0, accountId: '', date: new Date().toISOString().split('T')[0] });
+    const [payData, setPayData] = useState({ 
+        id: 0, 
+        accountId: '', 
+        date: new Date().toISOString().split('T')[0],
+        paymentAmount: '',
+        remainingAmount: 0
+    });
     const [accounts, setAccounts] = useState<any[]>([]);
 
     useEffect(() => {
@@ -73,27 +79,34 @@ export default function ReceivablesPage() {
         }
     };
 
-    const handlePayClick = (id: number) => {
+    const handlePayClick = (r: any) => {
+        const remaining = r.totalAmount - (r.paidAmount || 0);
         setPayData({ 
-            id, 
+            id: r.id, 
             accountId: accounts.length > 0 ? accounts[0].id.toString() : '', 
-            date: new Date().toISOString().split('T')[0] 
+            date: new Date().toISOString().split('T')[0],
+            paymentAmount: remaining.toFixed(0),
+            remainingAmount: remaining
         });
         setIsPayModalOpen(true);
     };
 
     const confirmPayment = async () => {
         if (!payData.accountId) return alert("Pilih akun pembayaran");
+        if (!payData.paymentAmount || parseFloat(payData.paymentAmount) <= 0) {
+            return alert("Nominal pembayaran tidak valid");
+        }
         try {
             setUpdatingId(payData.id);
             await api.patch(`/finance/sales/${payData.id}/pay`, {
                 accountId: payData.accountId,
-                paymentDate: payData.date
+                paymentDate: payData.date,
+                paymentAmount: parseFloat(payData.paymentAmount)
             });
             await fetchReceivables();
             setIsPayModalOpen(false);
-        } catch (error) {
-            alert("Gagal melunasi piutang");
+        } catch (error: any) {
+            alert(error.response?.data?.error || "Gagal mencatat pembayaran piutang");
         } finally {
             setUpdatingId(null);
         }
@@ -104,7 +117,7 @@ export default function ReceivablesPage() {
         (r.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    const totalPiutang = filteredData.reduce((sum, r) => sum + r.totalAmount, 0);
+    const totalPiutang = filteredData.reduce((sum, r) => sum + (r.totalAmount - (r.paidAmount || 0)), 0);
 
     return (
         <DashboardLayout>
@@ -152,9 +165,11 @@ export default function ReceivablesPage() {
                             <tr className="bg-slate-50/50 border-b border-slate-100">
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">No. Invoice</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal Penjualan</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Piutang</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Tagihan</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Telah Dibayar</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Sisa Piutang</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Tukar Faktur</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Aksi</th>
                             </tr>
                         </thead>
@@ -162,12 +177,12 @@ export default function ReceivablesPage() {
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan={5} className="px-6 py-4"><div className="h-10 bg-slate-100 rounded-lg w-full"></div></td>
+                                        <td colSpan={8} className="px-6 py-4"><div className="h-10 bg-slate-100 rounded-lg w-full"></div></td>
                                     </tr>
                                 ))
                             ) : filteredData.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center">
+                                    <td colSpan={8} className="px-6 py-12 text-center">
                                         <div className="flex flex-col items-center gap-2">
                                             <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center">
                                                 <AlertCircle className="h-6 w-6 text-slate-300" />
@@ -178,6 +193,7 @@ export default function ReceivablesPage() {
                                 </tr>
                             ) : (
                                 filteredData.map((r) => {
+                                    const remaining = r.totalAmount - (r.paidAmount || 0);
                                     return (
                                         <tr key={r.id} className="hover:bg-slate-50/80 transition-colors group">
                                             <td className="px-6 py-4">
@@ -201,6 +217,15 @@ export default function ReceivablesPage() {
                                                         {new Date(r.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                                                     </span>
                                                 </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-black text-slate-900">Rp {r.totalAmount.toLocaleString()}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-bold text-slate-500">Rp {(r.paidAmount || 0).toLocaleString()}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-black text-blue-600">Rp {remaining.toLocaleString()}</span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 {r.isTukarFaktur ? (
@@ -235,12 +260,12 @@ export default function ReceivablesPage() {
                                                     </button>
                                                     
                                                     <button 
-                                                        onClick={() => handlePayClick(r.id)}
+                                                        onClick={() => handlePayClick(r)}
                                                         disabled={updatingId === r.id}
                                                         className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
                                                     >
                                                         {updatingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-                                                        Lunasi
+                                                        Lunasi / Cicil
                                                     </button>
                                                 </div>
                                             </td>
@@ -331,12 +356,43 @@ export default function ReceivablesPage() {
                                 <CheckCircle2 className="h-6 w-6 text-emerald-600" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-black italic tracking-tight text-slate-900 uppercase">Pelunasan Piutang</h3>
-                                <p className="text-xs text-slate-500 font-medium tracking-tight">Konfirmasi pembayaran piutang pelanggan.</p>
+                                <h3 className="text-xl font-black italic tracking-tight text-slate-900 uppercase">Pembayaran Piutang</h3>
+                                <p className="text-xs text-slate-500 font-medium tracking-tight">Catat pembayaran penuh atau cicilan piutang.</p>
                             </div>
                         </div>
         
                         <div className="space-y-4">
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Sisa Piutang Saat Ini</p>
+                                    <p className="text-lg font-black text-slate-800 mt-1">Rp {payData.remainingAmount.toLocaleString()}</p>
+                                </div>
+                                <button 
+                                    onClick={() => setPayData({ ...payData, paymentAmount: payData.remainingAmount.toFixed(0) })}
+                                    className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[9px] font-black rounded-lg uppercase tracking-wider transition-all"
+                                >
+                                    Set Penuh
+                                </button>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nominal Pembayaran (Rp)</label>
+                                <input 
+                                    type="number"
+                                    placeholder="Masukkan nominal..."
+                                    value={payData.paymentAmount}
+                                    onChange={(e) => setPayData({...payData, paymentAmount: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 focus:border-emerald-500 outline-none transition-all font-bold text-slate-700"
+                                />
+                                {payData.paymentAmount && (
+                                    <p className={`text-[10px] font-bold mt-2 ${parseFloat(payData.paymentAmount) >= payData.remainingAmount - 0.01 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                        {parseFloat(payData.paymentAmount) >= payData.remainingAmount - 0.01 
+                                            ? '✓ Pembayaran penuh akan melunasi piutang ini.' 
+                                            : '⚠ Pembayaran sebagian akan dicatat sebagai Cicilan (Partially Paid).'}
+                                    </p>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Terima di Akun (Kas/Bank)</label>
                                 <select 
@@ -350,6 +406,7 @@ export default function ReceivablesPage() {
                                     ))}
                                 </select>
                             </div>
+                            
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Tanggal Pelunasan</label>
                                 <input 
@@ -370,11 +427,13 @@ export default function ReceivablesPage() {
                             </button>
                             <button 
                                 onClick={confirmPayment}
-                                disabled={updatingId !== null || !payData.accountId}
+                                disabled={updatingId !== null || !payData.accountId || !payData.paymentAmount}
                                 className="flex-1 py-3 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                                 {updatingId !== null ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
-                                Lunasi Sekarang
+                                {payData.paymentAmount && parseFloat(payData.paymentAmount) < payData.remainingAmount - 0.01 
+                                    ? 'Simpan Cicilan' 
+                                    : 'Lunasi Sekarang'}
                             </button>
                         </div>
                     </div>
