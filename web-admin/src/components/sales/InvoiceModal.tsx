@@ -1,4 +1,5 @@
 'use client';
+// Active B2B Invoice Protocol
 
 import { useState, useEffect } from "react";
 import { X, Printer, Download, Mail, Phone, MapPin, Package, CreditCard, CheckCircle, Clock } from "lucide-react";
