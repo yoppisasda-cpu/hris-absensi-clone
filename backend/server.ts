@@ -9413,7 +9413,6 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
         );
 
         // 4. Apply New Balance (ONLY if new status is not PENDING and has accountId)
-        const finalStatus = status || expense.status;
         const finalAccountId = accountId || expense.accountId;
         const finalAmount = amount || expense.amount;
 
