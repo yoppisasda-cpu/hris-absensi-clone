@@ -82,8 +82,22 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
         <div id="printable-invoice" className="fixed inset-0 z-[100] flex items-center justify-center p-4 print:p-0 print:bg-white print:static print:inset-auto">
             <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl print:hidden" onClick={onClose} />
             <div className="bg-white w-full max-w-3xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none">
-                
-                {/* Floating Buttons - Modern UI (Removed as requested) */}
+                {/* Floating Control Panel (Hidden on Print) */}
+                <div className="absolute top-8 right-8 flex items-center gap-3 z-50 print:hidden">
+                    <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 px-5 py-3 bg-slate-950 hover:bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 border border-white/10"
+                    >
+                        <Printer className="h-4 w-4 stroke-[2.5px]" /> Cetak Invoice
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="h-10 w-10 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-900 border border-slate-200/60 rounded-2xl flex items-center justify-center transition-all active:scale-95"
+                        title="Tutup"
+                    >
+                        <X className="h-4 w-4 stroke-[2.5px]" />
+                    </button>
+                </div>
 
                 <div className="overflow-y-auto p-12 print:overflow-visible print:p-0 no-scrollbar">
                     {loading ? (
