@@ -9266,12 +9266,12 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
       
       const insertRes = await tx.$queryRawUnsafe<any[]>(
         `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "dueDate", "status", "description", "paidTo", "branchId", "updatedAt")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::"ExpenseStatus", $11, $12, $13, NOW())
+         VALUES ($1::INTEGER, $2::INTEGER, $3::INTEGER, $4::INTEGER, $5::INTEGER, $6, $7, $8, $9, $10::"ExpenseStatus", $11, $12, $13::INTEGER, NOW())
          RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "dueDate", "status", "description", "paidTo", "branchId"`,
         tenantId, 
-        accountId ? parseInt(accountId) : null,
+        accountId ? Number(accountId) : null,
         finalCategoryId,
-        req.body.supplierId ? parseInt(req.body.supplierId) : null,
+        req.body.supplierId ? Number(req.body.supplierId) : null,
         prodIdNum,
         qtyNum,
         parseFloat(amount),
@@ -9280,7 +9280,7 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
         status || 'PAID',
         description,
         paidTo,
-        branchId ? parseInt(branchId) : null
+        branchId ? Number(branchId) : null
       );
       
       const expense = insertRes[0];
@@ -9335,13 +9335,15 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
         // 3. Update Expense
         const upRes = await tx.$queryRawUnsafe<any[]>(
             `UPDATE "Expense" SET 
-                "accountId" = $1, "categoryId" = $2, "supplierId" = $3, "amount" = $4, 
+                "accountId" = $1::INTEGER, "categoryId" = $2::INTEGER, "supplierId" = $3::INTEGER, "amount" = $4, 
                 "date" = $5, "dueDate" = $6, "status" = $7::"ExpenseStatus", 
                 "description" = $8, "paidTo" = $9, "updatedAt" = NOW() 
              WHERE "id" = $10 AND "companyId" = $11
              RETURNING *`,
-            accountId || expense.accountId, categoryId || expense.categoryId, supplierId || expense.supplierId, 
-            amount || expense.amount, date ? new Date(date) : expense.date, 
+            accountId ? Number(accountId) : (expense.accountId || null), 
+            categoryId ? Number(categoryId) : expense.categoryId, 
+            supplierId ? Number(supplierId) : (expense.supplierId || null), 
+            amount ? Number(amount) : expense.amount, date ? new Date(date) : expense.date, 
             dueDate ? new Date(dueDate) : expense.dueDate, status || expense.status, 
             description || expense.description, paidTo || expense.paidTo, 
             parseInt(id as string), tenantId
