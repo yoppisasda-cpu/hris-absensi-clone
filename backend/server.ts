@@ -132,6 +132,7 @@ const runAutoMigration = async () => {
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "quantity" FLOAT`,
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "dueDate" TIMESTAMP`,
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "branchId" INTEGER`,
+    `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "paidAt" TIMESTAMP`,
     `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "bankName" TEXT`,
     `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "accountNumber" TEXT`,
   ];
@@ -9250,7 +9251,7 @@ app.get('/api/finance/expense', tenantMiddleware, async (req: Request, res: Resp
 // F5.2. Record Expense
 app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { accountId, categoryId, branchId, amount, date, description, paidTo, status, dueDate, productId, quantity } = req.body;
+    const { accountId, categoryId, branchId, amount, date, description, paidTo, status, dueDate, productId, quantity, paidAt } = req.body;
     const tenantId = Number((req as any).tenantId);
 
     // --- CHECK CLOSING ---
@@ -9304,11 +9305,12 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
       // 2. Create Expense
       const dateVal = date ? new Date(date) : new Date();
       const dueDateVal = dueDate ? new Date(dueDate) : null;
+      const paidAtVal = (status !== 'PENDING') ? (paidAt ? new Date(paidAt) : dateVal) : null;
       
       const insertRes = await tx.$queryRawUnsafe<any[]>(
-        `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "dueDate", "status", "description", "paidTo", "branchId", "updatedAt")
-         VALUES ($1::INTEGER, $2::INTEGER, $3::INTEGER, $4::INTEGER, $5::INTEGER, $6, $7, $8, $9, $10::"ExpenseStatus", $11, $12, $13::INTEGER, NOW())
-         RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "dueDate", "status", "description", "paidTo", "branchId"`,
+        `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "paidAt", "dueDate", "status", "description", "paidTo", "branchId", "updatedAt")
+         VALUES ($1::INTEGER, $2::INTEGER, $3::INTEGER, $4::INTEGER, $5::INTEGER, $6, $7, $8, $9, $10, $11::"ExpenseStatus", $12, $13, $14::INTEGER, NOW())
+         RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "paidAt", "dueDate", "status", "description", "paidTo", "branchId"`,
         tenantId, 
         accountId ? Number(accountId) : null,
         finalCategoryId,
@@ -9317,6 +9319,7 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
         qtyNum,
         parseFloat(amount),
         dateVal,
+        paidAtVal,
         dueDateVal,
         status || 'PAID',
         description,
@@ -9350,7 +9353,7 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
 app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { accountId, categoryId, supplierId, amount, date, dueDate, status, description, paidTo } = req.body;
+    const { accountId, categoryId, supplierId, amount, date, dueDate, status, description, paidTo, paidAt } = req.body;
     const tenantId = Number((req as any).tenantId);
 
     // 1. Safety Check: Period Closing
@@ -9374,20 +9377,39 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
         }
 
         // 3. Update Expense
+        const finalStatus = status || expense.status;
+        const finalDate = date ? new Date(date) : expense.date;
+        
+        let paidAtVal: Date | null = null;
+        if (finalStatus !== 'PENDING') {
+          if (paidAt !== undefined) {
+            paidAtVal = paidAt ? new Date(paidAt) : null;
+          } else if (expense.status === 'PENDING') {
+            paidAtVal = new Date();
+          } else {
+            paidAtVal = expense.paidAt ? new Date(expense.paidAt) : finalDate;
+          }
+        }
+
         const upRes = await tx.$queryRawUnsafe<any[]>(
             `UPDATE "Expense" SET 
                 "accountId" = $1::INTEGER, "categoryId" = $2::INTEGER, "supplierId" = $3::INTEGER, "amount" = $4, 
                 "date" = $5, "dueDate" = $6, "status" = $7::"ExpenseStatus", 
-                "description" = $8, "paidTo" = $9, "updatedAt" = NOW() 
-             WHERE "id" = $10 AND "companyId" = $11
+                "description" = $8, "paidTo" = $9, "paidAt" = $10, "updatedAt" = NOW() 
+             WHERE "id" = $11 AND "companyId" = $12
              RETURNING *`,
             accountId ? Number(accountId) : (expense.accountId || null), 
             categoryId ? Number(categoryId) : expense.categoryId, 
             supplierId ? Number(supplierId) : (expense.supplierId || null), 
-            amount ? Number(amount) : expense.amount, date ? new Date(date) : expense.date, 
-            dueDate ? new Date(dueDate) : expense.dueDate, status || expense.status, 
-            description || expense.description, paidTo || expense.paidTo, 
-            parseInt(id as string), tenantId
+            amount ? Number(amount) : expense.amount, 
+            finalDate, 
+            dueDate ? new Date(dueDate) : expense.dueDate, 
+            finalStatus, 
+            description || expense.description, 
+            paidTo || expense.paidTo,
+            paidAtVal,
+            parseInt(id as string), 
+            tenantId
         );
 
         // 4. Apply New Balance (ONLY if new status is not PENDING and has accountId)
@@ -10236,7 +10258,10 @@ app.get('/api/finance/reports/cash-flow', tenantMiddleware, async (req: Request,
       where: {
         companyId: tenantId,
         status: 'PAID',
-        date: { gte: startDate, lte: endDate }
+        OR: [
+          { paidAt: { gte: startDate, lte: endDate } },
+          { paidAt: null, date: { gte: startDate, lte: endDate } }
+        ]
       },
       include: { category: true }
     });
@@ -10262,7 +10287,14 @@ app.get('/api/finance/reports/cash-flow', tenantMiddleware, async (req: Request,
       _sum: { amount: true }
     });
     const futureOutflows = await prisma.expense.aggregate({
-      where: { companyId: tenantId, status: 'PAID', date: { gt: endDate } },
+      where: {
+        companyId: tenantId,
+        status: 'PAID',
+        OR: [
+          { paidAt: { gt: endDate } },
+          { paidAt: null, date: { gt: endDate } }
+        ]
+      },
       _sum: { amount: true }
     });
 
@@ -10315,7 +10347,14 @@ app.get('/api/finance/reports/cash-flow/export', tenantMiddleware, async (req: R
     });
 
     const outflows = await prisma.expense.findMany({
-      where: { companyId: tenantId, status: 'PAID', date: { gte: startDate, lte: endDate } },
+      where: {
+        companyId: tenantId,
+        status: 'PAID',
+        OR: [
+          { paidAt: { gte: startDate, lte: endDate } },
+          { paidAt: null, date: { gte: startDate, lte: endDate } }
+        ]
+      },
       include: { category: true }
     });
     const outflowByCategory: Record<string, number> = {};
@@ -10329,7 +10368,17 @@ app.get('/api/finance/reports/cash-flow/export', tenantMiddleware, async (req: R
     const allAccounts = await prisma.financialAccount.findMany({ where: { companyId: tenantId } });
     const currentTotalBalance = allAccounts.reduce((sum, acc) => sum + acc.balance, 0);
     const futureIncomes = await prisma.income.aggregate({ where: { companyId: tenantId, date: { gt: endDate } }, _sum: { amount: true } });
-    const futureOutflows = await prisma.expense.aggregate({ where: { companyId: tenantId, status: 'PAID', date: { gt: endDate } }, _sum: { amount: true } });
+    const futureOutflows = await prisma.expense.aggregate({
+      where: {
+        companyId: tenantId,
+        status: 'PAID',
+        OR: [
+          { paidAt: { gt: endDate } },
+          { paidAt: null, date: { gt: endDate } }
+        ]
+      },
+      _sum: { amount: true }
+    });
     const balanceAtEndPeriod = currentTotalBalance - (futureIncomes._sum.amount || 0) + (futureOutflows._sum.amount || 0);
     const startingBalance = balanceAtEndPeriod - totalInflow + totalOutflow;
 
@@ -10446,29 +10495,21 @@ app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Resp
     // Map Expenses to Journal Lines
     expenses.forEach(exp => {
       const entryId = `EXP-${exp.id.toString().padStart(6, '0')}`;
-      journalEntries.push({
-        id: `${entryId}-D`,
-        date: exp.date,
-        ref: entryId,
-        description: exp.description || `Pengeluaran: ${exp.paidTo || 'Tanpa Nama'}`,
-        accountName: exp.category.name,
-        debit: exp.amount,
-        credit: 0
-      });
+      const hasDifferentDates = exp.status === 'PAID' && exp.paidAt && new Date(exp.paidAt).toDateString() !== new Date(exp.date).toDateString();
 
-      if (exp.status === 'PAID') {
+      if (hasDifferentDates) {
+        // Accrual Dual-Date Entry 1: Recognition of Expense and Liability (on invoice date)
         journalEntries.push({
-          id: `${entryId}-C`,
+          id: `${entryId}-REC-D`,
           date: exp.date,
           ref: entryId,
-          description: '',
-          accountName: exp.account?.name || 'Kas/Bank',
-          debit: 0,
-          credit: exp.amount
+          description: (exp.description || `Pengeluaran: ${exp.paidTo || 'Tanpa Nama'}`) + ' (Pengakuan Hutang)',
+          accountName: exp.category.name,
+          debit: exp.amount,
+          credit: 0
         });
-      } else {
         journalEntries.push({
-          id: `${entryId}-C`,
+          id: `${entryId}-REC-C`,
           date: exp.date,
           ref: entryId,
           description: '',
@@ -10476,6 +10517,59 @@ app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Resp
           debit: 0,
           credit: exp.amount
         });
+
+        // Accrual Dual-Date Entry 2: Payment and settlement of Liability (on payment date)
+        journalEntries.push({
+          id: `${entryId}-PAY-D`,
+          date: exp.paidAt!,
+          ref: entryId,
+          description: `Pelunasan: ${exp.description || exp.paidTo || 'Tanpa Nama'}`,
+          accountName: 'Hutang Usaha (Accounts Payable)',
+          debit: exp.amount,
+          credit: 0
+        });
+        journalEntries.push({
+          id: `${entryId}-PAY-C`,
+          date: exp.paidAt!,
+          ref: entryId,
+          description: '',
+          accountName: exp.account?.name || 'Kas/Bank',
+          debit: 0,
+          credit: exp.amount
+        });
+      } else {
+        // Simple Single-Date Entry (either PAID same-day or PENDING)
+        journalEntries.push({
+          id: `${entryId}-D`,
+          date: exp.date,
+          ref: entryId,
+          description: exp.description || `Pengeluaran: ${exp.paidTo || 'Tanpa Nama'}`,
+          accountName: exp.category.name,
+          debit: exp.amount,
+          credit: 0
+        });
+
+        if (exp.status === 'PAID') {
+          journalEntries.push({
+            id: `${entryId}-C`,
+            date: exp.date,
+            ref: entryId,
+            description: '',
+            accountName: exp.account?.name || 'Kas/Bank',
+            debit: 0,
+            credit: exp.amount
+          });
+        } else {
+          journalEntries.push({
+            id: `${entryId}-C`,
+            date: exp.date,
+            ref: entryId,
+            description: '',
+            accountName: 'Hutang Usaha (Accounts Payable)',
+            debit: 0,
+            credit: exp.amount
+          });
+        }
       }
     });
 

@@ -188,6 +188,7 @@ model Expense {
   amount      Float
   paidAmount  Float             @default(0)
   date        DateTime          @default(now())
+  paidAt      DateTime?
   description String?
   paidTo      String?
   createdAt   DateTime          @default(now())
