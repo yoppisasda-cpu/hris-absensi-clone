@@ -590,8 +590,11 @@ class ApiService {
     try {
       final response = await _dio.get('/pos/products');
       return response.data as List<dynamic>;
+    } on DioException catch (e) {
+      final errMsg = e.response?.data['error'] ?? e.message ?? e.toString();
+      throw Exception('Gagal mengambil daftar produk POS: $errMsg');
     } catch (e) {
-      throw Exception('Gagal mengambil daftar produk POS.');
+      throw Exception('Gagal mengambil daftar produk POS: $e');
     }
   }
 
@@ -600,8 +603,11 @@ class ApiService {
     try {
       final response = await _dio.get('/pos/categories');
       return response.data as List<dynamic>;
+    } on DioException catch (e) {
+      final errMsg = e.response?.data['error'] ?? e.message ?? e.toString();
+      throw Exception('Gagal mengambil kategori produk: $errMsg');
     } catch (e) {
-      throw Exception('Gagal mengambil kategori produk.');
+      throw Exception('Gagal mengambil kategori produk: $e');
     }
   }
 
@@ -621,8 +627,11 @@ class ApiService {
     try {
       final response = await _dio.get('/finance/accounts');
       return response.data as List<dynamic>;
+    } on DioException catch (e) {
+      final errMsg = e.response?.data['error'] ?? e.message ?? e.toString();
+      throw Exception('Gagal mengambil daftar akun keuangan: $errMsg');
     } catch (e) {
-      throw Exception('Gagal mengambil daftar akun keuangan.');
+      throw Exception('Gagal mengambil daftar akun keuangan: $e');
     }
   }
 

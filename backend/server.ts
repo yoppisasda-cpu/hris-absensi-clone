@@ -8920,7 +8920,8 @@ app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Res
     });
     res.json(accounts);
   } catch (error: any) {
-    res.status(500).json({ error: 'Gagal mengambil daftar akun keuangan' });
+    console.error('[GET /api/finance/accounts] Error:', error);
+    res.status(500).json({ error: 'Gagal mengambil daftar akun keuangan: ' + error.message });
   }
 });
 
