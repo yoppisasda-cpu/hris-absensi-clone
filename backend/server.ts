@@ -10092,7 +10092,14 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     });
     const totalLoans = activeLoans.reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
 
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans;
+    // 3b. Assets: Customer Receivables (Piutang Usaha)
+    const unpaidSales: any[] = await prisma.$queryRawUnsafe(`
+      SELECT "totalAmount", "paidAmount" FROM "Sale"
+      WHERE "companyId" = $1 AND "status" != 'PAID'
+    `, tenantId);
+    const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
+
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables;
 
     // 4. Liabilities: Pending Expenses (Hutang Usaha)
     const pendingExpenses = await prisma.expense.findMany({
@@ -10109,6 +10116,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         totalCurrent: totalCurrentAssets,
         totalFixed: totalFixedAssets,
         totalLoans: totalLoans,
+        totalCustomerReceivables: totalCustomerReceivables,
         accounts,
         fixedAssets: assetsWithBookValue,
         loans: activeLoans
@@ -10151,7 +10159,14 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
 
     const activeLoans = await prisma.loan.findMany({ where: { companyId: tenantId, status: 'ACTIVE' } });
     const totalLoans = activeLoans.reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans;
+
+    const unpaidSales: any[] = await prisma.$queryRawUnsafe(`
+      SELECT "totalAmount", "paidAmount" FROM "Sale"
+      WHERE "companyId" = $1 AND "status" != 'PAID'
+    `, tenantId);
+    const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
+
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables;
 
     const pendingExpenses = await prisma.expense.findMany({ where: { companyId: tenantId, status: 'PENDING' } });
     const totalLiabilities = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -10180,9 +10195,11 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       worksheet.addRow([acc.name, '', acc.balance]);
       currentRow++;
     });
+    worksheet.addRow(['Piutang Usaha (Outstanding)', '', totalCustomerReceivables]);
+    currentRow++;
     worksheet.addRow(['Piutang Karyawan', '', totalLoans]);
     currentRow++;
-    worksheet.addRow(['Total Aset Lancar', '', totalCurrentAssets + totalLoans]);
+    worksheet.addRow(['Total Aset Lancar & Piutang', '', totalCurrentAssets + totalLoans + totalCustomerReceivables]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 

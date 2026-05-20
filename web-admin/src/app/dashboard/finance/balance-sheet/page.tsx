@@ -142,12 +142,21 @@ export default function BalanceSheetPage() {
                                         </tr>
                                     ))}
 
-                                    {/* PIUTANG KARYAWAN */}
+                                    {/* PIUTANG (RECEIVABLES) */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-amber-50/10 not-italic">PIUTANG (Receivables)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {data?.assets.totalLoans.toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {(Number(data?.assets.totalLoans || 0) + Number(data?.assets.totalCustomerReceivables || 0)).toLocaleString()}</td>
                                     </tr>
-                                    {data?.assets.totalLoans > 0 ? (
+                                    {(data?.assets.totalCustomerReceivables || 0) > 0 && (
+                                        <tr className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
+                                                <Building className="h-3 w-3 text-blue-500" />
+                                                Piutang Usaha (Outstanding)
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.assets.totalCustomerReceivables.toLocaleString()}</td>
+                                        </tr>
+                                    )}
+                                    {(data?.assets.totalLoans || 0) > 0 && (
                                         <tr className="hover:bg-slate-50 transition-colors">
                                             <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
                                                 <HandCoins className="h-3 w-3 text-amber-500" />
@@ -155,7 +164,8 @@ export default function BalanceSheetPage() {
                                             </td>
                                             <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.assets.totalLoans.toLocaleString()}</td>
                                         </tr>
-                                    ) : (
+                                    )}
+                                    {!((data?.assets.totalCustomerReceivables || 0) > 0 || (data?.assets.totalLoans || 0) > 0) && (
                                         <tr>
                                             <td colSpan={2} className="px-10 py-2 text-[10px] text-slate-300 italic">Tidak ada piutang aktif</td>
                                         </tr>
