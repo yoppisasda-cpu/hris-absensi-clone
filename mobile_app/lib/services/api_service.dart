@@ -5,9 +5,7 @@ import 'package:flutter/foundation.dart';
 class ApiService {
   // URL API akan otomatis berubah tergantung mode (Debug vs Release/Google Play)
   // PENTING: Jika menggunakan HP asli (Debug), ganti IP di bawah jika tidak menggunakan emulator
-  static const String baseUrl = kReleaseMode
-      ? 'https://api.aivola.id/api' // PRODUCTION SERVER
-      : 'http://192.168.1.165:5005/api'; // LOCAL TESTING - ACTUAL MACHINE IP
+  static const String baseUrl = 'https://api.aivola.id/api'; // FORCE PRODUCTION SERVER FOR LIVE TESTING
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   ApiService() {

@@ -200,6 +200,14 @@ app.use(express.json());
 
 // Logger middleware to see incoming requests
 app.use((req, res, next) => {
+  res.on('finish', () => {
+    try {
+      const logStr = `[${new Date().toISOString()}] ${req.method} ${req.url} -> ${res.statusCode}\n`;
+      fs.appendFileSync(path.join(__dirname, 'requests.log'), logStr);
+    } catch (e) {
+      // Ignore write errors
+    }
+  });
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
