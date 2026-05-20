@@ -166,7 +166,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                         </span>
                                     </div>
                                     <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
-                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">TANGGAL:</span>
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">TANGGAL INVOICE:</span>
                                         <span className="font-bold text-slate-950 col-span-2 print:text-black">
                                             {format(new Date(sale.date), 'dd/MM/yyyy')}
                                         </span>
