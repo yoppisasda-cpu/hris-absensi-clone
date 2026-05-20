@@ -115,6 +115,36 @@ const prisma = new PrismaClient({
   }
 });
 
+// --- AUTO-MIGRATION: Ensure critical columns exist on every startup ---
+const runAutoMigration = async () => {
+  const migrations = [
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "paidAmount" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "isTukarFaktur" BOOLEAN DEFAULT false`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "tukarFakturDate" TIMESTAMP`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "tukarFakturRef" TEXT`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "deliveryMethod" TEXT`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "pointsUsed" INTEGER DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "saleType" TEXT DEFAULT 'RETAIL'`,
+    `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "paidAmount" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "supplierId" INTEGER`,
+    `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "productId" INTEGER`,
+    `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "quantity" FLOAT`,
+    `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "dueDate" TIMESTAMP`,
+    `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "branchId" INTEGER`,
+  ];
+  console.log('[AUTO-MIGRATION] Checking and applying missing columns...');
+  for (const sql of migrations) {
+    try {
+      await prisma.$executeRawUnsafe(sql);
+    } catch (e: any) {
+      // Ignore errors (e.g., column already exists with different type)
+      console.warn(`[AUTO-MIGRATION] Skipped: ${sql.substring(0, 60)}... | ${e.message}`);
+    }
+  }
+  console.log('[AUTO-MIGRATION] ✅ Done.');
+};
+
 // --- GRACEFUL SHUTDOWN ---
 const gracefulShutdown = async (signal: string) => {
   console.log(`[SHUTDOWN] ${signal} received. Disconnecting Prisma...`);
@@ -14900,10 +14930,12 @@ app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response
   }
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
-  console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);
-  initCleanupCron(); // Start the background cleanup job
+runAutoMigration().then(() => {
+  httpServer.listen(PORT, () => {
+    console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
+    console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);
+    initCleanupCron(); // Start the background cleanup job
+  });
 });
 // Trigger reload
 
