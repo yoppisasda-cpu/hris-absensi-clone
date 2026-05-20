@@ -9631,9 +9631,9 @@ app.put('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: 
       // 3. Update record
       await tx.$executeRawUnsafe(
         `UPDATE "Expense" SET 
-            "accountId" = $1, 
-            "categoryId" = $2, 
-            "supplierId" = $3,
+            "accountId" = $1::INTEGER, 
+            "categoryId" = $2::INTEGER, 
+            "supplierId" = $3::INTEGER,
             "amount" = $4, 
             "date" = $5, 
             "dueDate" = $6, 
@@ -9642,9 +9642,9 @@ app.put('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: 
             "paidTo" = $9, 
             "updatedAt" = NOW()
          WHERE "id" = $10 AND "companyId" = $11`,
-        newAccountId, 
-        parseInt(categoryId), 
-        req.body.supplierId ? parseInt(req.body.supplierId) : null,
+        newAccountId ? Number(newAccountId) : null, 
+        categoryId ? Number(categoryId) : null, 
+        req.body.supplierId ? Number(req.body.supplierId) : null,
         newAmount, 
         new Date(date), 
         dueDate ? new Date(dueDate) : null,
