@@ -230,11 +230,21 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
 
                             {/* Summary Totals */}
                             <div className="flex flex-col md:flex-row justify-between items-start gap-12 relative z-10">
-                                <div className="flex-1 space-y-2 w-full">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black/50">Terbilang</h4>
-                                    <p className="text-[12px] font-bold text-slate-900 italic bg-slate-50 border border-slate-100 rounded-2xl p-4 leading-relaxed print:bg-white print:border-black/10 print:text-black">
-                                        "{formatTerbilang(sale.totalAmount)}"
-                                    </p>
+                                <div className="flex-1 space-y-4 w-full">
+                                    <div className="space-y-2">
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black/50">Terbilang</h4>
+                                        <p className="text-[12px] font-bold text-slate-900 italic bg-slate-50 border border-slate-100 rounded-2xl p-4 leading-relaxed print:bg-white print:border-black/10 print:text-black">
+                                            "{formatTerbilang(sale.totalAmount)}"
+                                        </p>
+                                    </div>
+                                    {sale.notes && (
+                                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black/50">Catatan / Keterangan</h4>
+                                            <p className="text-[11px] font-medium text-slate-700 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl p-4 leading-relaxed print:bg-white print:border-black/10 print:text-black">
+                                                {sale.notes}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="w-full md:w-80 space-y-3">
                                     <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-widest italic print:text-black">
