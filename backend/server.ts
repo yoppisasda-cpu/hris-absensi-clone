@@ -995,6 +995,7 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
     const tenantId = Number((req as any).tenantId);
     const orderId = Number(req.params.id);
     const userId = Number((req as any).userId);
+    const { dueDate } = req.body;
     
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
 
@@ -1009,6 +1010,8 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      const dueDateVal = (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') ? new Date(dueDate) : null;
+
       // 1. Create Sale (Invoice)
       const newSale = await tx.sale.create({
         data: {
@@ -1022,7 +1025,10 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
           status: 'UNPAID',
           saleType: 'B2B',
           cashierId: userId,
-          notes: `Dikonversi dari PO Customer: ${order.orderNumber}`,
+          dueDate: dueDateVal,
+          notes: order.notes 
+            ? `${order.notes} (Dikonversi dari PO Customer: ${order.orderNumber})` 
+            : `Dikonversi dari PO Customer: ${order.orderNumber}`,
           SaleItem: {
              create: order.items.map((i: any) => ({
                productId: i.productId,

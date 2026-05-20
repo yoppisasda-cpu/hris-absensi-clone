@@ -50,10 +50,20 @@ export default function SalesOrdersPage() {
   };
 
   const handleConvertToInvoice = async (id: number) => {
-    if (!confirm("Apakah Anda yakin ingin menagihkan pesanan ini? Stok akan terpotong secara otomatis.")) return;
+    const defaultDate = new Date();
+    defaultDate.setDate(defaultDate.getDate() + 30);
+    const defaultDateStr = defaultDate.toISOString().split('T')[0];
+
+    const inputDate = prompt(
+      "Apakah Anda yakin ingin menagihkan pesanan ini? Stok akan terpotong secara otomatis.\n\n" +
+      "Silakan tentukan TANGGAL JATUH TEMPO untuk invoice ini (Format: YYYY-MM-DD):",
+      defaultDateStr
+    );
     
+    if (inputDate === null) return; // Batal konversi
+
     try {
-      const res = await api.post(`/sales/orders/${id}/convert`);
+      const res = await api.post(`/sales/orders/${id}/convert`, { dueDate: inputDate });
       toast.success(res.data.message || "Berhasil dikonversi ke Invoice");
       fetchOrders();
     } catch (error: any) {
