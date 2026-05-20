@@ -12216,7 +12216,7 @@ app.get('/api/customers/me/addresses', tenantMiddleware, async (req: Request, re
     const customer = await prisma.customer.findFirst({ where: { email: user.email } });
     if (!customer) return res.json([]);
 
-    const addresses = await prisma.customerAddress.findMany({
+    const addresses = await (prisma as any).customerAddress.findMany({
       where: { customerId: customer.id },
       orderBy: { isDefault: 'desc' }
     });
@@ -12240,13 +12240,13 @@ app.post('/api/customers/me/addresses', tenantMiddleware, async (req: Request, r
 
     // If this is the first address or set as default, unset other defaults
     if (isDefault) {
-      await prisma.customerAddress.updateMany({
+      await (prisma as any).customerAddress.updateMany({
         where: { customerId: customer.id },
         data: { isDefault: false }
       });
     }
 
-    const address = await prisma.customerAddress.create({
+    const address = await (prisma as any).customerAddress.create({
       data: {
         customerId: customer.id,
         label,
@@ -12275,13 +12275,13 @@ app.patch('/api/customers/me/addresses/:id', tenantMiddleware, async (req: Reque
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
 
     if (isDefault) {
-      await prisma.customerAddress.updateMany({
+      await (prisma as any).customerAddress.updateMany({
         where: { customerId: customer.id },
         data: { isDefault: false }
       });
     }
 
-    const updated = await prisma.customerAddress.update({
+    const updated = await (prisma as any).customerAddress.update({
       where: { id: Number(id), customerId: customer.id },
       data: { label, recipientName, phoneNumber, fullAddress, isDefault }
     });
@@ -12302,7 +12302,7 @@ app.delete('/api/customers/me/addresses/:id', tenantMiddleware, async (req: Requ
     const customer = await prisma.customer.findFirst({ where: { email: user?.email } });
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
 
-    await prisma.customerAddress.delete({
+    await (prisma as any).customerAddress.delete({
       where: { id: Number(id), customerId: customer.id }
     });
 
