@@ -9777,6 +9777,65 @@ app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, re
   }
 });
 
+// Helper function to calculate B2B / Retail Sales COGS in high performance batch queries (solves N+1 database round-trip timeout)
+async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Date): Promise<number> {
+  const sales: any[] = await prisma.$queryRawUnsafe(`
+    SELECT id FROM "Sale" 
+    WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
+  `, tenantId, startDate, endDate);
+
+  if (sales.length === 0) return 0;
+  const saleIds = sales.map(s => s.id);
+
+  const saleItems: any[] = await prisma.$queryRawUnsafe(`
+    SELECT "productId", "quantity" FROM "SaleItem" 
+    WHERE "saleId" IN (${saleIds.join(',')})
+  `);
+
+  if (saleItems.length === 0) return 0;
+  const productIds = [...new Set(saleItems.map(item => item.productId))];
+
+  const products: any[] = await prisma.$queryRawUnsafe(`
+    SELECT id, "costPrice", "recipeYield" FROM "Product" 
+    WHERE id IN (${productIds.join(',')})
+  `);
+  const productMap = new Map<number, any>(products.map(p => [p.id, p]));
+
+  const recipes: any[] = await prisma.$queryRawUnsafe(`
+    SELECT pr."productId", pr."quantity", p."costPrice"
+    FROM "ProductRecipe" pr
+    JOIN "Product" p ON pr."materialId" = p.id
+    WHERE pr."productId" IN (${productIds.join(',')})
+  `);
+
+  const recipesByProduct = new Map<number, any[]>();
+  for (const r of recipes) {
+    if (!recipesByProduct.has(r.productId)) {
+      recipesByProduct.set(r.productId, []);
+    }
+    recipesByProduct.get(r.productId)!.push(r);
+  }
+
+  let calculatedCogsFromSales = 0;
+  for (const item of saleItems) {
+    const prodId = item.productId;
+    const qty = item.quantity;
+    const product = productMap.get(prodId);
+    const costPrice = product?.costPrice || 0;
+    const yieldVal = parseFloat(product?.recipeYield as any) || 1;
+    
+    const prodRecipes = recipesByProduct.get(prodId);
+    if (prodRecipes && prodRecipes.length > 0) {
+      const recipeCost = prodRecipes.reduce((sum, r) => sum + (parseFloat(r.quantity) * (r.costPrice || 0)), 0);
+      calculatedCogsFromSales += qty * (recipeCost / yieldVal);
+    } else {
+      calculatedCogsFromSales += qty * costPrice;
+    }
+  }
+
+  return calculatedCogsFromSales;
+}
+
 // F6.1. Profit & Loss Report
 app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -9832,36 +9891,8 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       }
     });
 
-    // 4. Calculate Detailed COGS based on Sales (Standard Costing)
-    // We use queryRawUnsafe for Sale/SaleItem as they are not in the main Prisma model yet
-    const sales: any[] = await prisma.$queryRawUnsafe(`
-      SELECT * FROM "Sale" 
-      WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
-    `, tenantId, startDate, endDate);
-
-    let calculatedCogsFromSales = 0;
-    for (const s of sales) {
-      const items: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "SaleItem" WHERE "saleId" = $1`, s.id);
-      for (const item of items) {
-        // Get recipe for this product
-        const recipes: any[] = await prisma.$queryRawUnsafe(`
-          SELECT pr.*, p."costPrice" 
-          FROM "ProductRecipe" pr
-          JOIN "Product" p ON pr."materialId" = p.id
-          WHERE pr."productId" = $1
-        `, item.productId);
-
-        if (recipes.length > 0) {
-          const recipeCost = recipes.reduce((sum, r) => sum + (parseFloat(r.quantity) * (r.costPrice || 0)), 0);
-          calculatedCogsFromSales += item.quantity * recipeCost;
-        } else {
-          // If no recipe, use product's own costPrice (Retail)
-          const products: any[] = await prisma.$queryRawUnsafe(`SELECT "costPrice" FROM "Product" WHERE id = $1`, item.productId);
-          const costPrice = products[0]?.costPrice || 0;
-          calculatedCogsFromSales += item.quantity * costPrice;
-        }
-      }
-    }
+    // 4. Calculate Detailed COGS based on Sales in high-performance batch (solves PnL N+1 timeout)
+    const calculatedCogsFromSales = await calculateSalesCOGS(tenantId, startDate, endDate);
 
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
     const grossProfit = totalRevenue - totalCOGS;
@@ -9936,30 +9967,8 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       }
     });
 
-    const sales: any[] = await prisma.$queryRawUnsafe(`
-      SELECT * FROM "Sale" 
-      WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
-    `, tenantId, startDate, endDate);
-
-    let calculatedCogsFromSales = 0;
-    for (const s of sales) {
-      const items: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "SaleItem" WHERE "saleId" = $1`, s.id);
-      for (const item of items) {
-        const recipes: any[] = await prisma.$queryRawUnsafe(`
-          SELECT pr.*, p."costPrice", targetP."recipeYield" FROM "ProductRecipe" pr
-          JOIN "Product" p ON pr."materialId" = p.id
-          JOIN "Product" targetP ON pr."productId" = targetP.id
-          WHERE pr."productId" = $1
-        `, item.productId);
-        if (recipes.length > 0) {
-          const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
-          calculatedCogsFromSales += item.quantity * (recipes.reduce((sum, r) => sum + (parseFloat(r.quantity) * (r.costPrice || 0)), 0) / yieldVal);
-        } else {
-          const products: any[] = await prisma.$queryRawUnsafe(`SELECT "costPrice" FROM "Product" WHERE id = $1`, item.productId);
-          calculatedCogsFromSales += item.quantity * (products[0]?.costPrice || 0);
-        }
-      }
-    }
+    // Calculate B2B / Retail Sales COGS in high performance batch (solves export timeout)
+    const calculatedCogsFromSales = await calculateSalesCOGS(tenantId, startDate, endDate);
 
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
     const grossProfit = totalRevenue - totalCOGS;
