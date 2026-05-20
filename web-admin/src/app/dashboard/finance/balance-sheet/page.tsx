@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Landmark, Wallet, ShieldCheck, Scale, FileText, Download, Printer, AlertCircle, Info, Building, HandCoins } from "lucide-react";
+import { Landmark, Wallet, ShieldCheck, Scale, FileText, Download, Printer, AlertCircle, Info, Building, HandCoins, Package } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 
@@ -171,6 +171,25 @@ export default function BalanceSheetPage() {
                                         </tr>
                                     )}
 
+                                    {/* PERSEDIAAN (INVENTORY) */}
+                                    <tr>
+                                        <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-teal-50/10 not-italic border-t border-slate-100">PERSEDIAAN (Inventory)</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-teal-600 italic border-t border-slate-100">Rp {(data?.assets.totalInventoryValue || 0).toLocaleString()}</td>
+                                    </tr>
+                                    {(data?.assets.totalInventoryValue || 0) > 0 ? (
+                                        <tr className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
+                                                <Package className="h-3 w-3 text-teal-500" />
+                                                Persediaan Barang Dagang
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.assets.totalInventoryValue.toLocaleString()}</td>
+                                        </tr>
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={2} className="px-10 py-2 text-[10px] text-slate-300 italic">Tidak ada persediaan aktif</td>
+                                        </tr>
+                                    )}
+
                                     {/* ASSET TETAP */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-emerald-50/10 not-italic border-t border-slate-100">ASET TETAP (Fixed Assets)</td>
@@ -200,7 +219,7 @@ export default function BalanceSheetPage() {
                         <div className="p-4 rounded-xl bg-blue-50/50 flex gap-3 items-start border border-blue-100">
                             <Info className="h-4 w-4 text-blue-500 mt-0.5" />
                             <p className="text-[11px] font-medium text-slate-500 italic leading-relaxed">
-                                Aset Lancar mencakup Saldo Kas & Bank. Piutang mencakup dana pinjaman karyawan yang belum lunas. Aset Tetap mencakup nilai buku (harga beli - depresiasi) dari gedung dan peralatan.
+                                Aset Lancar mencakup Saldo Kas & Bank. Piutang mencakup Piutang Usaha Outstanding dan Pinjaman Karyawan. Persediaan mencakup nilai buku stok produk fisik. Aset Tetap mencakup nilai buku dari gedung dan peralatan.
                             </p>
                         </div>
                     </div>

@@ -10099,7 +10099,13 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     `, tenantId);
     const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
 
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables;
+    // 3c. Assets: Stock / Inventory Value (Persediaan Barang)
+    const products = await prisma.product.findMany({
+      where: { companyId: tenantId }
+    });
+    const totalInventoryValue = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.costPrice || 0)), 0);
+
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue;
 
     // 4. Liabilities: Pending Expenses (Hutang Usaha)
     const pendingExpenses = await prisma.expense.findMany({
@@ -10117,6 +10123,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         totalFixed: totalFixedAssets,
         totalLoans: totalLoans,
         totalCustomerReceivables: totalCustomerReceivables,
+        totalInventoryValue: totalInventoryValue,
         accounts,
         fixedAssets: assetsWithBookValue,
         loans: activeLoans
@@ -10166,7 +10173,10 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     `, tenantId);
     const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
 
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables;
+    const products = await prisma.product.findMany({ where: { companyId: tenantId } });
+    const totalInventoryValue = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.costPrice || 0)), 0);
+
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue;
 
     const pendingExpenses = await prisma.expense.findMany({ where: { companyId: tenantId, status: 'PENDING' } });
     const totalLiabilities = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -10199,7 +10209,9 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     currentRow++;
     worksheet.addRow(['Piutang Karyawan', '', totalLoans]);
     currentRow++;
-    worksheet.addRow(['Total Aset Lancar & Piutang', '', totalCurrentAssets + totalLoans + totalCustomerReceivables]);
+    worksheet.addRow(['Persediaan Barang Dagang', '', totalInventoryValue]);
+    currentRow++;
+    worksheet.addRow(['Total Aset Lancar & Piutang', '', totalCurrentAssets + totalLoans + totalCustomerReceivables + totalInventoryValue]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 
