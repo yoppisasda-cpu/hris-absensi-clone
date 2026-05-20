@@ -1,2 +1,2 @@
 [phases.setup]
-nixPkgs = ["node", "postgresql", "libatomic"]
+nixPkgs = ["node", "postgresql"]
