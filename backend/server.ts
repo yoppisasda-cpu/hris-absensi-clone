@@ -132,6 +132,8 @@ const runAutoMigration = async () => {
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "quantity" FLOAT`,
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "dueDate" TIMESTAMP`,
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "branchId" INTEGER`,
+    `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "bankName" TEXT`,
+    `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "accountNumber" TEXT`,
   ];
   console.log('[AUTO-MIGRATION] Checking and applying missing columns...');
   for (const sql of migrations) {
