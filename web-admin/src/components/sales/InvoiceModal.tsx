@@ -6,6 +6,40 @@ import api from "@/lib/api";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 
+
+function terbilang(n: number): string {
+    const s = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
+    let temp = "";
+    if (n < 12) {
+        temp = " " + s[n];
+    } else if (n < 20) {
+        temp = terbilang(n - 10) + " belas";
+    } else if (n < 100) {
+        temp = terbilang(Math.floor(n / 10)) + " puluh" + terbilang(n % 10);
+    } else if (n < 200) {
+        temp = " seratus" + terbilang(n - 100);
+    } else if (n < 1000) {
+        temp = terbilang(Math.floor(n / 100)) + " ratus" + terbilang(n % 100);
+    } else if (n < 2000) {
+        temp = " seribu" + terbilang(n - 1000);
+    } else if (n < 1000000) {
+        temp = terbilang(Math.floor(n / 1000)) + " ribu" + terbilang(n % 1000);
+    } else if (n < 1000000000) {
+        temp = terbilang(Math.floor(n / 1000000)) + " juta" + terbilang(n % 1000000);
+    } else if (n < 1000000000000) {
+        temp = terbilang(Math.floor(n / 1000000000)) + " milyar" + terbilang(n % 1000000000);
+    } else if (n < 1000000000000000) {
+        temp = terbilang(Math.floor(n / 1000000000000)) + " trilyun" + terbilang(n % 1000000000000);
+    }
+    return temp.trim();
+}
+
+function formatTerbilang(num: number): string {
+    if (num === 0) return "Nol Rupiah";
+    const hasil = terbilang(Math.floor(num));
+    return hasil.split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ") + " Rupiah";
+}
+
 export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: boolean, onClose: () => void, saleId: number }) {
     const [sale, setSale] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -49,22 +83,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
             <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl print:hidden" onClick={onClose} />
             <div className="bg-white w-full max-w-3xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none">
                 
-                {/* Floating Buttons - Modern UI */}
-                <div className="absolute top-6 right-6 flex items-center gap-3 z-30 print:hidden print-hidden">
-                    <button 
-                        onClick={handlePrint}
-                        className="h-10 w-10 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-950 text-white flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-slate-950/10 group"
-                        title="Cetak Invoice"
-                    >
-                        <Printer className="h-4.5 w-4.5 group-hover:scale-110 transition-transform" />
-                    </button>
-                    <button 
-                        onClick={onClose} 
-                        className="h-10 w-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center border border-slate-200 text-slate-600 hover:text-slate-900 transition-all active:scale-95"
-                    >
-                        <X className="h-4.5 w-4.5" />
-                    </button>
-                </div>
+                {/* Floating Buttons - Modern UI (Removed as requested) */}
 
                 <div className="overflow-y-auto p-12 print:overflow-visible print:p-0 no-scrollbar">
                     {loading ? (
@@ -73,14 +92,24 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                             <p className="text-slate-500 font-black italic uppercase tracking-widest text-[10px]">Memuat Data Transaksi...</p>
                         </div>
                     ) : sale ? (
-                        <div className="flex flex-col gap-12 text-slate-950">
+                        <div className="flex flex-col gap-6 text-slate-950">
                             
                             {/* Branding Section */}
-                            <div className="flex flex-col md:flex-row justify-between items-start gap-8 relative z-10">
-                                <div className="space-y-6">
+                            <div className="flex flex-col md:flex-row justify-between items-start gap-4 relative z-10">
+                                <div className="space-y-3">
                                     <div className="flex items-center gap-4">
-                                        <div className="h-12 w-12 bg-slate-950 border border-slate-200 rounded-xl flex items-center justify-center shadow-sm print:bg-black print:text-white">
-                                            <Package className="h-5 w-5 text-white print:text-white" />
+                                        <div className="h-12 w-12 border border-slate-200 rounded-xl flex items-center justify-center shadow-sm overflow-hidden bg-white">
+                                            {sale.company?.logoUrl ? (
+                                                <img 
+                                                    src={sale.company.logoUrl} 
+                                                    alt="Company Logo" 
+                                                    className="h-full w-full object-contain"
+                                                />
+                                            ) : (
+                                                <div className="h-full w-full bg-slate-950 flex items-center justify-center print:bg-black">
+                                                    <Package className="h-5 w-5 text-white" />
+                                                </div>
+                                            )}
                                         </div>
                                         <div>
                                             <h1 className="text-xl font-black italic text-slate-950 leading-none tracking-tighter uppercase print:text-black">
@@ -89,51 +118,79 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                             <p className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-500 mt-1 italic">Solusi Bisnis Cerdas</p>
                                         </div>
                                     </div>
-                                    <div className="space-y-2 pt-2 border-l-2 border-slate-200 pl-6 print:border-black/10">
-                                        <div className="flex items-center gap-3 text-slate-500 text-[10px] font-black uppercase tracking-wider italic print:text-black/60">
-                                            <MapPin className="h-3.5 w-3.5" />
+                                    <div className="space-y-1 pl-16">
+                                        <div className="flex items-center gap-2 text-slate-500 text-[10px] font-black uppercase tracking-wider italic print:text-black/60">
+                                            <MapPin className="h-3 w-3" />
                                             <span>{sale.company?.address || 'Jl. Raya Digital No. 123, Indonesia'}</span>
                                         </div>
-                                        <div className="flex items-center gap-3 text-slate-500 text-[10px] font-black uppercase tracking-wider italic print:text-black/60">
-                                            <Phone className="h-3.5 w-3.5" />
+                                        <div className="flex items-center gap-2 text-slate-500 text-[10px] font-black uppercase tracking-wider italic print:text-black/60">
+                                            <Phone className="h-3 w-3" />
                                             <span>{sale.company?.picPhone || '+62 812 3456 789'}</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Metadata Grid */}
-                            <div className="grid grid-cols-5 gap-2 relative z-10">
-                                <div className="bg-white p-2 px-3 rounded-xl border border-slate-200 shadow-sm print:border-black print:shadow-none">
-                                    <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5 print:text-black">Nomor Invoice</p>
-                                    <p className="text-[10px] font-black text-slate-950 uppercase tracking-tighter print:text-black truncate">
-                                        #{sale.invoiceNumber}
-                                    </p>
+                            {/* Header Section (Reorganized as requested) */}
+                            <div className="border-t border-b border-slate-200 py-4 relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 print:border-black print:py-4">
+                                {/* Left Side: Customer & Billing Info */}
+                                <div className="space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 print:text-black/50">Detail Pelanggan / Outlet</h3>
+                                    <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-1">OUTLET:</span>
+                                        <span className="font-extrabold text-slate-950 uppercase col-span-3 print:text-black">
+                                            {sale.customerName || 'UMUM / GUEST'}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-1">PIC / TLP:</span>
+                                        <span className="font-bold text-slate-950 col-span-3 print:text-black">
+                                            {sale.customerPhone || sale.customer?.phone || '-'}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-1">BILL TO:</span>
+                                        <span className="text-slate-600 col-span-3 print:text-black leading-normal">
+                                            {sale.customer?.address || 'Tidak ada alamat terdaftar'}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="bg-white p-2 px-3 rounded-xl border border-slate-200 shadow-sm print:border-black print:shadow-none">
-                                    <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5 print:text-black">Tanggal Transaksi</p>
-                                    <p className="text-[10px] font-black text-slate-950 uppercase tracking-tighter print:text-black truncate">
-                                        {format(new Date(sale.date), 'dd MMM yyyy', { locale: id })}
-                                    </p>
-                                </div>
-                                <div className="bg-white p-2 px-3 rounded-xl border border-slate-200 shadow-sm print:border-black print:shadow-none">
-                                    <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5 print:text-black">Nama Pelanggan</p>
-                                    <p className="text-[10px] font-black text-slate-950 uppercase tracking-tighter print:text-black truncate">
-                                        {sale.customerName?.toUpperCase() || 'UMUM / GUEST'}
-                                    </p>
-                                </div>
-                                <div className="bg-white p-2 px-3 rounded-xl border border-slate-200 shadow-sm print:border-black print:shadow-none">
-                                    <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5 print:text-black">Status Pembayaran</p>
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-black tracking-tighter text-slate-950 print:text-black truncate">
-                                        {sale.status === 'PAID' ? <CheckCircle className="h-3 w-3 flex-shrink-0" /> : <Clock className="h-3 w-3 flex-shrink-0" />}
-                                        {getStatusLabel(sale.status)}
-                                    </span>
-                                </div>
-                                <div className="bg-white p-2 px-3 rounded-xl border border-slate-200 shadow-sm print:border-black print:shadow-none">
-                                    <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5 print:text-black">Metode Pembayaran</p>
-                                    <p className="text-[10px] font-black text-slate-950 uppercase tracking-tighter print:text-black truncate">
-                                        {getFundingLabel(sale.accountId)}
-                                    </p>
+
+                                {/* Right Side: Invoice Meta Info */}
+                                <div className="space-y-3 md:pl-8 md:border-l border-slate-100 print:border-black/10 print:pl-8">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 print:text-black/50">Detail Invoice</h3>
+                                    <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">INVOICE NO.:</span>
+                                        <span className="font-black text-slate-950 col-span-2 print:text-black">
+                                            #{sale.invoiceNumber}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">TANGGAL:</span>
+                                        <span className="font-bold text-slate-950 col-span-2 print:text-black">
+                                            {format(new Date(sale.date), 'dd/MM/yyyy')}
+                                        </span>
+                                    </div>
+                                    {sale.dueDate && (
+                                        <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed animate-pulse">
+                                            <span className="font-black text-rose-500 uppercase tracking-wider print:text-black/60 col-span-2">JATUH TEMPO:</span>
+                                            <span className="font-extrabold text-rose-600 col-span-2 print:text-black">
+                                                {format(new Date(sale.dueDate), 'dd/MM/yyyy')}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">METODE BAYAR:</span>
+                                        <span className="font-bold text-slate-950 col-span-2 print:text-black">
+                                            {getFundingLabel(sale.accountId)}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-x-2 text-[11px] leading-relaxed">
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">STATUS:</span>
+                                        <span className="font-extrabold text-slate-950 col-span-2 print:text-black">
+                                            {getStatusLabel(sale.status)}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -173,8 +230,11 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
 
                             {/* Summary Totals */}
                             <div className="flex flex-col md:flex-row justify-between items-start gap-12 relative z-10">
-                                <div className="flex-1">
-                                    {/* Left side empty for standard layout balance */}
+                                <div className="flex-1 space-y-2 w-full">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black/50">Terbilang</h4>
+                                    <p className="text-[12px] font-bold text-slate-900 italic bg-slate-50 border border-slate-100 rounded-2xl p-4 leading-relaxed print:bg-white print:border-black/10 print:text-black">
+                                        "{formatTerbilang(sale.totalAmount)}"
+                                    </p>
                                 </div>
                                 <div className="w-full md:w-80 space-y-3">
                                     <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-widest italic print:text-black">
@@ -219,7 +279,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                 )}
 
                                 <div className="text-center w-48 mt-8 sm:mt-0">
-                                    <p className="text-[9px] font-black uppercase text-slate-500 tracking-[0.3em] mb-12 print:text-black">Tanda Tangan Resmi</p>
+                                    <div className="h-12"></div>
                                     <div className="h-[1px] bg-slate-200 w-full mb-3 print:bg-black"></div>
                                     <p className="text-[10px] font-black text-slate-950 uppercase tracking-[0.2em] print:text-black">{sale.company?.name || 'OPERATOR_TOKO'}</p>
                                 </div>

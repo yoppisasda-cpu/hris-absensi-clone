@@ -20,6 +20,7 @@ export default function AddSaleModal({ isOpen, onClose, onSuccess }: AddSaleModa
         accountId: '',
         customerId: '',
         date: new Date().toISOString().split('T')[0],
+        dueDate: '',
         status: 'PAID',
         notes: '',
         items: [{ productId: '', quantity: 1, price: 0 }]
@@ -197,6 +198,21 @@ export default function AddSaleModal({ isOpen, onClose, onSuccess }: AddSaleModa
                                     <option key={acc.id} value={acc.id} className="text-white bg-slate-950">{acc.name.toUpperCase()} (Rp {acc.balance.toLocaleString()})</option>
                                 ))}
                             </select>
+                        </div>
+                    )}
+
+                    {formData.status === 'UNPAID' && (
+                        <div className="space-y-2 animate-in slide-in-from-top-4 duration-500">
+                            <label className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] italic ml-1">
+                                Temporal Directive Due (Tanggal Jatuh Tempo)
+                            </label>
+                            <input
+                                type="date"
+                                required
+                                value={formData.dueDate}
+                                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                                className="w-full bg-amber-500/5 border border-amber-500/20 rounded-2xl px-6 py-4 text-xs font-black text-amber-400 focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner"
+                            />
                         </div>
                     )}
 

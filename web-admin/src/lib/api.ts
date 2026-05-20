@@ -21,14 +21,14 @@ const getBaseURL = () => {
 
         // If on Localhost
         if (host === 'localhost' || host === '127.0.0.1') {
-            const localApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+            const localApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5005/api';
             console.log("[API] Hits Backend at (Localhost):", localApi);
             return localApi;
         }
 
         // If accessing via Local IP (e.g. 192.168.x.x)
         if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(host)) {
-            const ipApi = `http://${host}:5000/api`;
+            const ipApi = `http://${host}:5005/api`;
             console.log("[API] Hits Backend at (IP):", ipApi);
             return ipApi;
         }
@@ -40,7 +40,7 @@ const getBaseURL = () => {
     }
     
     // Default fallback to local for development if nothing else matches
-    const defaultApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    const defaultApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5005/api';
     console.log("[API] Hits Backend at (Default):", defaultApi);
     return defaultApi; 
 };

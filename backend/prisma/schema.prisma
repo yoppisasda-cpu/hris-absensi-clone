@@ -876,6 +876,7 @@ model Sale {
   customerName          String?
   customerPhone         String?
   date                  DateTime     @default(now()) @db.Timestamp(6)
+  dueDate               DateTime?    @db.Timestamp(6)
   totalAmount           Float        @default(0)
   paidAmount            Float        @default(0)
   status                String       @default("PAID")

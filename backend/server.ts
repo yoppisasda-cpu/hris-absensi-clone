@@ -119,6 +119,7 @@ const prisma = new PrismaClient({
 const runAutoMigration = async () => {
   const migrations = [
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "paidAmount" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "dueDate" TIMESTAMP`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "isTukarFaktur" BOOLEAN DEFAULT false`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "tukarFakturDate" TIMESTAMP`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "tukarFakturRef" TEXT`,
@@ -12572,9 +12573,10 @@ app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Res
 app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { items, accountId, customerId, status, notes, date, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod } = req.body;
+    const { items, accountId, customerId, status, notes, date, dueDate, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod } = req.body;
     const userId = Number((req as any).userId);
     let finalCustomerId = customerId ? parseInt(customerId) : null;
+    const dueDateVal = (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') ? new Date(dueDate) : null;
 
     // --- SECURITY & SYNC FIX ---
     // If we have a userId (from token), always override customerId with the one linked to user email
@@ -12649,8 +12651,8 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
       // 3. Create Sale Record (Merged with GitHub's new fields)
       const saleResult: any[] = await tx.$queryRawUnsafe(`
-        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13, $14, $15, $16, $17)
+        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "dueDate", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14, $15, $16, $17, $18)
         RETURNING id
       `, 
       tenantId, 
@@ -12659,6 +12661,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       invoiceNumber, 
       finalCustomerId, 
       dateVal, 
+      dueDateVal,
       totalAmount, 
       totalCommission, 
       status || 'PAID', 
@@ -13521,15 +13524,23 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
       orderBy: { name: 'asc' }
     });
 
+    let customerObj: any = null;
+    if (sale.customerId) {
+      const customers: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Customer" WHERE id = $1 AND "companyId" = $2`, sale.customerId, tenantId);
+      if (customers.length > 0) {
+        customerObj = customers[0];
+      }
+    }
+
     if (company.length > 0) {
       const comp = company[0];
       if (comp.logoUrl && comp.logoUrl.startsWith('/uploads')) {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         comp.logoUrl = `${baseUrl}${comp.logoUrl}`;
       }
-      res.json({ ...sales[0], items, company: comp, bankAccounts });
+      res.json({ ...sales[0], items, company: comp, bankAccounts, customer: customerObj });
     } else {
-      res.json({ ...sales[0], items, company: null, bankAccounts });
+      res.json({ ...sales[0], items, company: null, bankAccounts, customer: customerObj });
     }
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil detail penjualan: ' + error.message });
