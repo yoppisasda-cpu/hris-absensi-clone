@@ -16,6 +16,11 @@
   ],
   "include": [
     "server.ts",
+    "examAI.ts",
+    "moodAI.ts",
+    "reimbursementAI.ts",
+    "ventAI.ts",
+    "learningAI.ts",
     "src/**/*"
   ],
   "ts-node": {
