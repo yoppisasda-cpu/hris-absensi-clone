@@ -154,9 +154,9 @@ export default function ProfitLossPage() {
 
                     <table className="w-full border-collapse text-left">
                         <tbody className="divide-y divide-slate-100 italic">
-                            {/* Section: Pendapatan */}
+                            {/* Section I: Pendapatan Bersih */}
                             <tr className="bg-slate-50/80 not-italic">
-                                <td className="px-6 py-3 font-black text-slate-900 uppercase tracking-widest text-[11px]">I. Pendapatan</td>
+                                <td className="px-6 py-3 font-black text-slate-900 uppercase tracking-widest text-[11px]">I. Pendapatan Bersih</td>
                                 <td className="px-6 py-3 text-right"></td>
                             </tr>
                             {Object.entries(data?.revenue.categories || {}).map(([name, amount]: [string, any]) => (
@@ -165,14 +165,22 @@ export default function ProfitLossPage() {
                                     <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {fmtRp(amount)}</td>
                                 </tr>
                             ))}
+                            {(data?.revenue.taxCollected || 0) > 0 && (
+                                <tr className="hover:bg-slate-50 transition-colors italic">
+                                    <td className="px-10 py-3 text-sm font-semibold text-red-500/80">
+                                        PPN Keluaran (Dikeluarkan)
+                                    </td>
+                                    <td className="px-6 py-3 text-right text-sm font-bold text-red-600">(Rp {fmtRp(data?.revenue.taxCollected)})</td>
+                                </tr>
+                            )}
                             <tr className="not-italic bg-emerald-50/30">
-                                <td className="px-6 py-4 font-bold text-emerald-700 text-sm">TOTAL PENDAPATAN</td>
+                                <td className="px-6 py-4 font-bold text-emerald-700 text-sm">TOTAL PENDAPATAN BERSIH</td>
                                 <td className="px-6 py-4 text-right font-black text-emerald-700 text-base underline decoration-double">Rp {fmtRp(data?.revenue.total)}</td>
                             </tr>
 
                             <tr className="h-4 bg-white border-none"><td></td><td></td></tr>
 
-                            {/* Section: HPP */}
+                            {/* Section II: HPP */}
                             <tr className="bg-slate-50/80 not-italic">
                                 <td className="px-6 py-3 font-black text-slate-900 uppercase tracking-widest text-[11px]">II. Beban Pokok Penjualan (HPP)</td>
                                 <td className="px-6 py-3 text-right"></td>
@@ -184,7 +192,7 @@ export default function ProfitLossPage() {
                                 </tr>
                             ))}
                             <tr className="not-italic bg-red-50/20">
-                                <td className="px-6 py-4 font-bold text-red-700 text-sm italic">TOTAL HARGA POKOK PENJUALAN</td>
+                                <td className="px-6 py-4 font-bold text-red-700 text-sm italic">TOTAL HARGA POKOK PENJUALAN (HPP)</td>
                                 <td className="px-6 py-4 text-right font-black text-red-700 text-base">(Rp {fmtRp(data?.cogs.total)})</td>
                             </tr>
 
@@ -196,7 +204,7 @@ export default function ProfitLossPage() {
 
                             <tr className="h-4 bg-white border-none"><td></td><td></td></tr>
 
-                            {/* Section: Expenses (OpEx) */}
+                            {/* Section III: General OpEx */}
                             <tr className="bg-slate-50/80 not-italic">
                                 <td className="px-6 py-3 font-black text-slate-900 uppercase tracking-widest text-[11px]">III. Beban Operasional</td>
                                 <td className="px-6 py-3 text-right"></td>
@@ -210,6 +218,62 @@ export default function ProfitLossPage() {
                             <tr className="not-italic bg-blue-50/20">
                                 <td className="px-6 py-4 font-bold text-blue-700 text-sm">TOTAL BEBAN OPERASIONAL</td>
                                 <td className="px-6 py-4 text-right font-black text-blue-700 text-base underline">(Rp {fmtRp(data?.opex.total)})</td>
+                            </tr>
+
+                            {/* Operating Profit Row */}
+                            <tr className="bg-slate-100 not-italic">
+                                <td className="px-6 py-4 font-bold text-slate-900 text-sm uppercase">LABA / (RUGI) OPERASIONAL</td>
+                                <td className={`px-6 py-4 text-right font-black text-sm italic ${data?.operatingProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    Rp {fmtRp(data?.operatingProfit)}
+                                </td>
+                            </tr>
+
+                            <tr className="h-4 bg-white border-none"><td></td><td></td></tr>
+
+                            {/* Section IV: Non-Operational */}
+                            <tr className="bg-slate-50/80 not-italic">
+                                <td className="px-6 py-3 font-black text-slate-900 uppercase tracking-widest text-[11px]">IV. Pendapatan & Beban Lain-lain (Non-Operasional)</td>
+                                <td className="px-6 py-3 text-right"></td>
+                            </tr>
+                            {Object.entries(data?.nonOperational.categories || {}).map(([name, amount]: [string, any]) => (
+                                <tr key={name} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-10 py-3 text-sm font-semibold text-slate-600 font-mono tracking-tighter text-amber-600/80">{name}</td>
+                                    <td className={`px-6 py-3 text-right text-sm font-bold ${amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                        {amount >= 0 ? `Rp ${fmtRp(amount)}` : `(Rp ${fmtRp(Math.abs(amount))})`}
+                                    </td>
+                                </tr>
+                            ))}
+                            <tr className="not-italic bg-amber-50/20">
+                                <td className="px-6 py-4 font-bold text-amber-700 text-sm">TOTAL PENDAPATAN / BIAYA LAIN-LAIN</td>
+                                <td className={`px-6 py-4 text-right font-black text-amber-700 text-base ${data?.nonOperational.total >= 0 ? '' : 'italic'}`}>
+                                    {data?.nonOperational.total >= 0 ? `Rp ${fmtRp(data?.nonOperational.total)}` : `(Rp ${fmtRp(Math.abs(data?.nonOperational.total))})`}
+                                </td>
+                            </tr>
+
+                            {/* EBITDA Row */}
+                            <tr className="bg-slate-200 not-italic">
+                                <td className="px-6 py-4 font-black text-slate-900 text-sm uppercase">LABA BERSIH SEBELUM BUNGA, PAJAK DAN PENYUSUTAN (EBITDA)</td>
+                                <td className={`px-6 py-4 text-right font-black text-base italic ${data?.ebitda >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    Rp {fmtRp(data?.ebitda)}
+                                </td>
+                            </tr>
+
+                            <tr className="h-4 bg-white border-none"><td></td><td></td></tr>
+
+                            {/* Section V: Depreciation & Amortization */}
+                            <tr className="bg-slate-50/80 not-italic">
+                                <td className="px-6 py-3 font-black text-slate-900 uppercase tracking-widest text-[11px]">V. Beban Penyusutan & Amortisasi</td>
+                                <td className="px-6 py-3 text-right"></td>
+                            </tr>
+                            {Object.entries(data?.depreciation.categories || {}).map(([name, amount]: [string, any]) => (
+                                <tr key={name} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-10 py-3 text-sm font-semibold text-slate-600 font-mono tracking-tighter text-purple-500/80">{name}</td>
+                                    <td className="px-6 py-3 text-right text-sm font-bold text-purple-600">(Rp {fmtRp(amount)})</td>
+                                </tr>
+                            ))}
+                            <tr className="not-italic bg-purple-50/20">
+                                <td className="px-6 py-4 font-bold text-purple-700 text-sm">TOTAL BIAYA PENYUSUTAN DAN AMORTISASI</td>
+                                <td className="px-6 py-4 text-right font-black text-purple-700 text-base underline">(Rp {fmtRp(data?.depreciation.total)})</td>
                             </tr>
 
                             <tr className="h-8 bg-white border-none"><td></td><td></td></tr>

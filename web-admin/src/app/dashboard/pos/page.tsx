@@ -47,6 +47,7 @@ export default function POSPage() {
     const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [showReceipt, setShowReceipt] = useState(false);
     const [lastSale, setLastSale] = useState<any>(null);
+    const [taxRate, setTaxRate] = useState<number>(0);
 
     const fetchData = async () => {
         setLoading(true);
@@ -122,9 +123,17 @@ export default function POSPage() {
         setCart(prev => prev.filter(item => item.id !== id));
     };
 
-    const totalAmount = useMemo(() => {
+    const subtotal = useMemo(() => {
         return cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     }, [cart]);
+
+    const taxAmount = useMemo(() => {
+        return Math.round(subtotal * taxRate / 100);
+    }, [subtotal, taxRate]);
+
+    const finalTotalAmount = useMemo(() => {
+        return subtotal + taxAmount;
+    }, [subtotal, taxAmount]);
 
     const handleCheckout = async () => {
         if (cart.length === 0) return;
@@ -142,7 +151,9 @@ export default function POSPage() {
                     price: item.price
                 })),
                 accountId: selectedAccount,
-                totalAmount
+                totalAmount: finalTotalAmount,
+                taxRate,
+                taxAmount
             };
 
             const res = await api.post('/pos/checkout', payload);
@@ -389,19 +400,46 @@ export default function POSPage() {
                         <div className="space-y-4 relative z-10">
                             <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] italic">
                                 <span>Subtotal Processing</span>
-                                <span className="text-slate-300">Rp {totalAmount.toLocaleString()}</span>
+                                <span className="text-slate-300">Rp {subtotal.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] italic">
-                                <span>Tax Load Engine (0%)</span>
-                                <span className="text-slate-300">Rp 0</span>
+                                <span>Tax Load Engine ({taxRate}%)</span>
+                                <span className="text-slate-300">Rp {taxAmount.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between items-end border-t border-white/5 pt-6 text-white group">
                                 <div className="flex flex-col">
                                     <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 italic mb-1">Final Transaction Total</span>
                                     <span className="text-4xl font-black italic tracking-tighter text-glow-md group-hover:scale-110 transition-transform origin-left duration-500">
-                                        Rp <span className="text-white group-hover:text-blue-400 transition-colors uppercase">{totalAmount.toLocaleString()}</span>
+                                         Rp <span className="text-white group-hover:text-blue-400 transition-colors uppercase">{finalTotalAmount.toLocaleString()}</span>
                                     </span>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Tax Selection Protocol */}
+                        <div className="space-y-4 relative z-10">
+                            <label className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600 italic flex items-center gap-2">
+                                <div className="h-1 w-4 bg-amber-500 rounded-full"></div> Tax Protocol
+                            </label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { label: "NON (0%)", value: 0 },
+                                    { label: "PB1 (10%)", value: 10 },
+                                    { label: "PPN (11%)", value: 11 }
+                                ].map(opt => (
+                                    <button 
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setTaxRate(opt.value)}
+                                        className={`py-3 rounded-xl text-[9px] font-black border transition-all uppercase tracking-widest italic relative overflow-hidden group ${
+                                            taxRate === opt.value 
+                                            ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-lg shadow-amber-500/20' 
+                                            : 'bg-slate-900 border-white/5 text-slate-500 hover:border-amber-500/40 hover:text-amber-400'
+                                        }`}
+                                    >
+                                        {opt.value > 0 ? opt.label : "NON TAX"}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -471,6 +509,12 @@ export default function POSPage() {
                                 <span className="text-slate-500">Amount Transferred</span>
                                 <span className="text-white text-base tracking-tighter italic">Rp {lastSale.totalAmount.toLocaleString()}</span>
                             </div>
+                            {lastSale.taxRate > 0 && (
+                                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest italic text-amber-500">
+                                    <span>Tax Load Protocol ({lastSale.taxRate}%)</span>
+                                    <span>Rp {lastSale.taxAmount.toLocaleString()}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest italic">
                                 <span className="text-slate-500">Protocol Method</span>
                                 <span className="text-blue-400">{accounts.find(a => a.id === selectedAccount)?.name}</span>

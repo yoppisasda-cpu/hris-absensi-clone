@@ -9874,18 +9874,72 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     });
 
     // 3. Aggregate Data
-    const revenueByCategory: Record<string, number> = {};
-    let totalRevenue = 0;
+    const salesRevenueByCategory: Record<string, number> = {};
+    const otherIncomeByCategory: Record<string, number> = {};
+    let totalSalesRevenue = 0;
+    let totalOtherIncome = 0;
+    let totalTaxCollected = 0;
+
+    // Extract invoice numbers to query tax rates
+    const salesIncomes = incomes.filter(inc => 
+      inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS'
+    );
+    const invoiceNumbers = salesIncomes
+      .map(inc => {
+        if (!inc.description) return null;
+        const match = inc.description.match(/(INV-[A-Za-z0-9\-]+)/);
+        return match ? match[1] : null;
+      })
+      .filter((inv): inv is string => inv !== null);
+
+    const salesWithTax = invoiceNumbers.length > 0 ? await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        invoiceNumber: { in: invoiceNumbers }
+      },
+      select: { invoiceNumber: true, taxRate: true }
+    }) : [];
+
+    const saleTaxRateMap = new Map<string, number>(
+      salesWithTax.map(s => [s.invoiceNumber, s.taxRate || 0])
+    );
+
     incomes.forEach(inc => {
       const catName = inc.category?.name || 'Uncategorized';
-      revenueByCategory[catName] = (revenueByCategory[catName] || 0) + inc.amount;
-      totalRevenue += inc.amount;
+      let amount = inc.amount;
+      
+      const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
+      
+      if (isSales) {
+        const desc = inc.description || '';
+        const match = desc.match(/(INV-[A-Za-z0-9\-]+)/);
+        const invNum = match ? match[1] : null;
+        if (invNum) {
+          const taxRate = saleTaxRateMap.get(invNum) || 0;
+          if (taxRate > 0) {
+            const taxAmount = amount * (taxRate / (100 + taxRate));
+            amount = amount - taxAmount;
+            totalTaxCollected += taxAmount;
+          }
+        }
+        salesRevenueByCategory[catName] = (salesRevenueByCategory[catName] || 0) + amount;
+        totalSalesRevenue += amount;
+      } else {
+        otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
+        totalOtherIncome += amount;
+      }
     });
 
+    // Process Expenses
     const cogsByCategory: Record<string, number> = {};
-    const opexByCategory: Record<string, number> = {};
-    let totalOpEx = 0;
+    const opexByCategory: Record<string, number> = {}; // general operational expenses
+    const nonOpExpensesByCategory: Record<string, number> = {}; // other expenses (non-operational)
+    const depreciationByCategory: Record<string, number> = {}; // depreciation expenses
+
     let manualCOGS = 0;
+    let totalOpexGeneral = 0;
+    let totalNonOpExpenses = 0;
+    let totalDepreciation = 0;
 
     expenses.forEach(exp => {
       const catName = exp.category?.name || 'Uncategorized';
@@ -9895,16 +9949,27 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
       } else {
-        opexByCategory[catName] = (opexByCategory[catName] || 0) + exp.amount;
-        totalOpEx += exp.amount;
+        // Classify opex into General Opex, Depreciation, or Non-Operational
+        const isDep = /penyusutan|amortisasi|depresiasi/i.test(catName);
+        const isNonOp = /admin bank|biaya bank|bunga bank|biaya lain|jasa manajemen|non-operasional|lain-lain/i.test(catName);
+        
+        if (isDep) {
+          depreciationByCategory[catName] = (depreciationByCategory[catName] || 0) + exp.amount;
+          totalDepreciation += exp.amount;
+        } else if (isNonOp) {
+          nonOpExpensesByCategory[catName] = (nonOpExpensesByCategory[catName] || 0) + exp.amount;
+          totalNonOpExpenses += exp.amount;
+        } else {
+          opexByCategory[catName] = (opexByCategory[catName] || 0) + exp.amount;
+          totalOpexGeneral += exp.amount;
+        }
       }
     });
 
     // 4. Calculate Detailed COGS based on Sales in high-performance batch (solves PnL N+1 timeout)
     const calculatedCogsFromSales = await calculateSalesCOGS(tenantId, startDate, endDate);
-
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
-    const grossProfit = totalRevenue - totalCOGS;
+    const grossProfit = totalSalesRevenue - totalCOGS;
 
     // 4b. Calculate Asset Depreciations/Amortizations for this month (such as Prepaid Rent / Sewa Kantor)
     const assets = await prisma.asset.findMany({
@@ -9923,31 +9988,66 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
         if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
           const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
           const depName = `Penyusutan: ${asset.name}`;
-          opexByCategory[depName] = (opexByCategory[depName] || 0) + monthlyDepreciation;
-          totalOpEx += monthlyDepreciation;
+          depreciationByCategory[depName] = (depreciationByCategory[depName] || 0) + monthlyDepreciation;
+          totalDepreciation += monthlyDepreciation;
         }
       }
     });
 
-    const netProfit = grossProfit - totalOpEx;
+    const operatingProfit = grossProfit - totalOpexGeneral;
+
+    // Combine other incomes and other expenses into Non-Operational details
+    const nonOperationalByCategory: Record<string, number> = {};
+    Object.entries(otherIncomeByCategory).forEach(([k, v]) => {
+      nonOperationalByCategory[k] = v;
+    });
+    Object.entries(nonOpExpensesByCategory).forEach(([k, v]) => {
+      // Show expenses as negative values in non-operational details
+      nonOperationalByCategory[k] = -v;
+    });
+    const totalNonOperational = totalOtherIncome - totalNonOpExpenses;
+
+    const ebitda = operatingProfit + totalNonOperational;
+    const netProfit = ebitda - totalDepreciation;
+
+    // Round everything to 2 decimal places
+    const round2 = (num: number) => Math.round(num * 100) / 100;
+    const roundRecord = (rec: Record<string, number>) => {
+      const result: Record<string, number> = {};
+      Object.entries(rec).forEach(([k, v]) => {
+        result[k] = round2(v);
+      });
+      return result;
+    };
 
     res.json({
       period: { month, year },
       revenue: {
-        categories: revenueByCategory,
-        total: totalRevenue
+        categories: roundRecord(salesRevenueByCategory),
+        total: round2(totalSalesRevenue),
+        taxCollected: round2(totalTaxCollected)
       },
       cogs: {
-        categories: { ...cogsByCategory, "HPP Terjual (Calc)": calculatedCogsFromSales },
-        total: totalCOGS,
+        categories: { ...roundRecord(cogsByCategory), "HPP Terjual (Calc)": round2(calculatedCogsFromSales) },
+        total: round2(totalCOGS),
         detail: "HPP dihitung otomatis berdasarkan resep dan volume penjualan"
       },
-      grossProfit,
+      grossProfit: round2(grossProfit),
       opex: {
-        categories: opexByCategory,
-        total: totalOpEx
+        categories: roundRecord(opexByCategory),
+        total: round2(totalOpexGeneral)
       },
-      netProfit
+      operatingProfit: round2(operatingProfit),
+      nonOperational: {
+        categories: roundRecord(nonOperationalByCategory),
+        total: round2(totalNonOperational)
+      },
+      ebitda: round2(ebitda),
+      depreciation: {
+        categories: roundRecord(depreciationByCategory),
+        total: round2(totalDepreciation)
+      },
+      netProfit: round2(netProfit)
     });
 
   } catch (error: any) {
@@ -9977,34 +10077,102 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       include: { category: true }
     });
 
-    const revenueByCategory: Record<string, number> = {};
-    let totalRevenue = 0;
+    const salesRevenueByCategory: Record<string, number> = {};
+    const otherIncomeByCategory: Record<string, number> = {};
+    let totalSalesRevenue = 0;
+    let totalOtherIncome = 0;
+    let totalTaxCollected = 0;
+
+    // Extract invoice numbers to query tax rates
+    const salesIncomes = incomes.filter(inc => 
+      inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS'
+    );
+    const invoiceNumbers = salesIncomes
+      .map(inc => {
+        if (!inc.description) return null;
+        const match = inc.description.match(/(INV-[A-Za-z0-9\-]+)/);
+        return match ? match[1] : null;
+      })
+      .filter((inv): inv is string => inv !== null);
+
+    const salesWithTax = invoiceNumbers.length > 0 ? await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        invoiceNumber: { in: invoiceNumbers }
+      },
+      select: { invoiceNumber: true, taxRate: true }
+    }) : [];
+
+    const saleTaxRateMap = new Map<string, number>(
+      salesWithTax.map(s => [s.invoiceNumber, s.taxRate || 0])
+    );
+
     incomes.forEach(inc => {
       const catName = inc.category?.name || 'Uncategorized';
-      revenueByCategory[catName] = (revenueByCategory[catName] || 0) + inc.amount;
-      totalRevenue += inc.amount;
+      let amount = inc.amount;
+      
+      const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
+      
+      if (isSales) {
+        const desc = inc.description || '';
+        const match = desc.match(/(INV-[A-Za-z0-9\-]+)/);
+        const invNum = match ? match[1] : null;
+        if (invNum) {
+          const taxRate = saleTaxRateMap.get(invNum) || 0;
+          if (taxRate > 0) {
+            const taxAmount = amount * (taxRate / (100 + taxRate));
+            amount = amount - taxAmount;
+            totalTaxCollected += taxAmount;
+          }
+        }
+        salesRevenueByCategory[catName] = (salesRevenueByCategory[catName] || 0) + amount;
+        totalSalesRevenue += amount;
+      } else {
+        otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
+        totalOtherIncome += amount;
+      }
     });
 
+    // Process Expenses
     const cogsByCategory: Record<string, number> = {};
-    const opexByCategory: Record<string, number> = {};
-    let totalOpEx = 0;
+    const opexByCategory: Record<string, number> = {}; // general operational expenses
+    const nonOpExpensesByCategory: Record<string, number> = {}; // other expenses (non-operational)
+    const depreciationByCategory: Record<string, number> = {}; // depreciation expenses
+
     let manualCOGS = 0;
+    let totalOpexGeneral = 0;
+    let totalNonOpExpenses = 0;
+    let totalDepreciation = 0;
+
     expenses.forEach(exp => {
       const catName = exp.category?.name || 'Uncategorized';
-      if (exp.category?.type === 'COGS') {
+      const isCOGS = exp.category?.type === 'COGS';
+      
+      if (isCOGS) {
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
       } else {
-        opexByCategory[catName] = (opexByCategory[catName] || 0) + exp.amount;
-        totalOpEx += exp.amount;
+        // Classify opex into General Opex, Depreciation, or Non-Operational
+        const isDep = /penyusutan|amortisasi|depresiasi/i.test(catName);
+        const isNonOp = /admin bank|biaya bank|bunga bank|biaya lain|jasa manajemen|non-operasional|lain-lain/i.test(catName);
+        
+        if (isDep) {
+          depreciationByCategory[catName] = (depreciationByCategory[catName] || 0) + exp.amount;
+          totalDepreciation += exp.amount;
+        } else if (isNonOp) {
+          nonOpExpensesByCategory[catName] = (nonOpExpensesByCategory[catName] || 0) + exp.amount;
+          totalNonOpExpenses += exp.amount;
+        } else {
+          opexByCategory[catName] = (opexByCategory[catName] || 0) + exp.amount;
+          totalOpexGeneral += exp.amount;
+        }
       }
     });
 
     // Calculate B2B / Retail Sales COGS in high performance batch (solves export timeout)
     const calculatedCogsFromSales = await calculateSalesCOGS(tenantId, startDate, endDate);
-
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
-    const grossProfit = totalRevenue - totalCOGS;
+    const grossProfit = totalSalesRevenue - totalCOGS;
 
     // Calculate Asset Depreciations/Amortizations for this month (such as Prepaid Rent / Sewa Kantor)
     const assets = await prisma.asset.findMany({
@@ -10023,13 +10191,43 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
         if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
           const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
           const depName = `Penyusutan: ${asset.name}`;
-          opexByCategory[depName] = (opexByCategory[depName] || 0) + monthlyDepreciation;
-          totalOpEx += monthlyDepreciation;
+          depreciationByCategory[depName] = (depreciationByCategory[depName] || 0) + monthlyDepreciation;
+          totalDepreciation += monthlyDepreciation;
         }
       }
     });
 
-    const netProfit = grossProfit - totalOpEx;
+    const operatingProfit = grossProfit - totalOpexGeneral;
+
+    // Combine other incomes and other expenses into Non-Operational details
+    const nonOperationalByCategory: Record<string, number> = {};
+    Object.entries(otherIncomeByCategory).forEach(([k, v]) => {
+      nonOperationalByCategory[k] = v;
+    });
+    Object.entries(nonOpExpensesByCategory).forEach(([k, v]) => {
+      // Show expenses as negative values in non-operational details
+      nonOperationalByCategory[k] = -v;
+    });
+    const totalNonOperational = totalOtherIncome - totalNonOpExpenses;
+
+    const ebitda = operatingProfit + totalNonOperational;
+    const netProfit = ebitda - totalDepreciation;
+
+    // Round everything to 2 decimal places
+    const round2 = (num: number) => Math.round(num * 100) / 100;
+    const roundRecord = (rec: Record<string, number>) => {
+      const result: Record<string, number> = {};
+      Object.entries(rec).forEach(([k, v]) => {
+        result[k] = round2(v);
+      });
+      return result;
+    };
+
+    const finalSalesRev = roundRecord(salesRevenueByCategory);
+    const finalCogs = roundRecord(cogsByCategory);
+    const finalOpex = roundRecord(opexByCategory);
+    const finalNonOp = roundRecord(nonOperationalByCategory);
+    const finalDep = roundRecord(depreciationByCategory);
 
     // --- CREATE EXCEL ---
     const workbook = new ExcelJS.Workbook();
@@ -10042,57 +10240,95 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
 
     let currentRow = 3;
 
-    // Revenue
-    worksheet.getCell(`A${currentRow}`).value = 'PENDAPATAN';
+    // 1. Penjualan Bersih
+    worksheet.getCell(`A${currentRow}`).value = 'PENDAPATAN BERSIH';
     worksheet.getCell(`A${currentRow}`).font = { bold: true };
     currentRow++;
-    Object.entries(revenueByCategory).forEach(([cat, amt]) => {
+    Object.entries(finalSalesRev).forEach(([cat, amt]) => {
       worksheet.addRow([cat, '', amt]);
       currentRow++;
     });
-    worksheet.addRow(['Total Pendapatan', '', totalRevenue]);
+    if (totalTaxCollected > 0) {
+      worksheet.addRow(['PPN Keluaran (Dikeluarkan)', '', round2(totalTaxCollected)]);
+      currentRow++;
+    }
+    worksheet.addRow(['Total Pendapatan Bersih', '', round2(totalSalesRevenue)]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 
-    // COGS
+    // 2. COGS (HPP)
     worksheet.getCell(`A${currentRow}`).value = 'BEBAN POKOK PENJUALAN (HPP)';
     worksheet.getCell(`A${currentRow}`).font = { bold: true };
     currentRow++;
-    Object.entries(cogsByCategory).forEach(([cat, amt]) => {
+    Object.entries(finalCogs).forEach(([cat, amt]) => {
       worksheet.addRow([cat, '', amt]);
       currentRow++;
     });
-    worksheet.addRow(['HPP Terjual (Otomatis)', '', calculatedCogsFromSales]);
+    worksheet.addRow(['HPP Terjual (Otomatis)', '', round2(calculatedCogsFromSales)]);
     currentRow++;
-    worksheet.addRow(['Total HPP', '', totalCOGS]);
+    worksheet.addRow(['Total HPP', '', round2(totalCOGS)]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 
-    // Gross Profit
-    worksheet.addRow(['LABA KOTOR', '', grossProfit]);
+    // 3. Gross Profit (Laba Kotor)
+    worksheet.addRow(['LABA KOTOR', '', round2(grossProfit)]);
+    worksheet.getRow(currentRow).font = { bold: true, color: { argb: 'FF008000' } };
+    currentRow += 2;
+
+    // 4. General Operational Expenses (Biaya Operasional)
+    worksheet.getCell(`A${currentRow}`).value = 'BIAYA OPERASIONAL';
+    worksheet.getCell(`A${currentRow}`).font = { bold: true };
+    currentRow++;
+    Object.entries(finalOpex).forEach(([cat, amt]) => {
+      worksheet.addRow([cat, '', amt]);
+      currentRow++;
+    });
+    worksheet.addRow(['Total Biaya Operasional', '', round2(totalOpexGeneral)]);
+    worksheet.getRow(currentRow).font = { bold: true };
+    currentRow += 2;
+
+    // 5. Operating Profit (Laba/Rugi Operasional)
+    worksheet.addRow(['LABA / (RUGI) OPERASIONAL', '', round2(operatingProfit)]);
     worksheet.getRow(currentRow).font = { bold: true, color: { argb: 'FF0000FF' } };
     currentRow += 2;
 
-    // OpEx
-    worksheet.getCell(`A${currentRow}`).value = 'BEBAN OPERASIONAL';
+    // 6. Non-Operational (Pendapatan/Biaya Lain-lain)
+    worksheet.getCell(`A${currentRow}`).value = 'PENDAPATAN / BIAYA LAIN-LAIN';
     worksheet.getCell(`A${currentRow}`).font = { bold: true };
     currentRow++;
-    Object.entries(opexByCategory).forEach(([cat, amt]) => {
+    Object.entries(finalNonOp).forEach(([cat, amt]) => {
       worksheet.addRow([cat, '', amt]);
       currentRow++;
     });
-    worksheet.addRow(['Total Beban Operasional', '', totalOpEx]);
+    worksheet.addRow(['Total Pendapatan/Biaya Lain-lain', '', round2(totalNonOperational)]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 
-    // Net Profit
-    worksheet.addRow(['LABA BERSIH', '', netProfit]);
+    // 7. EBITDA (Laba Sebelum Bunga, Pajak, Penyusutan)
+    worksheet.addRow(['LABA BERSIH SEBELUM BUNGA, PAJAK DAN PENYUSUTAN', '', round2(ebitda)]);
+    worksheet.getRow(currentRow).font = { bold: true };
+    currentRow += 2;
+
+    // 8. Depreciation (Biaya Penyusutan dan Amortisasi)
+    worksheet.getCell(`A${currentRow}`).value = 'BIAYA PENYUSUTAN DAN AMORTISASI';
+    worksheet.getCell(`A${currentRow}`).font = { bold: true };
+    currentRow++;
+    Object.entries(finalDep).forEach(([cat, amt]) => {
+      worksheet.addRow([cat, '', amt]);
+      currentRow++;
+    });
+    worksheet.addRow(['Total Biaya Penyusutan dan Amortisasi', '', round2(totalDepreciation)]);
+    worksheet.getRow(currentRow).font = { bold: true };
+    currentRow += 2;
+
+    // 9. Net Profit (Laba Bersih)
+    worksheet.addRow(['LABA BERSIH', '', round2(netProfit)]);
     worksheet.getRow(currentRow).font = { bold: true, size: 12 };
     worksheet.getCell(`C${currentRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
 
     // Styling
     worksheet.getColumn(3).numFmt = '#,##0';
-    worksheet.getColumn(1).width = 40;
+    worksheet.getColumn(1).width = 50;
     worksheet.getColumn(3).width = 20;
 
     const fileName = `Laba_Rugi_${month}_${year}.xlsx`;
@@ -10164,11 +10400,18 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
 
     const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue;
 
-    // 4. Liabilities: Pending Expenses (Hutang Usaha)
+    // 4. Liabilities: Pending Expenses (Hutang Usaha) & Tax Liability (PPN Keluaran)
     const pendingExpenses = await prisma.expense.findMany({
       where: { companyId: tenantId, status: 'PENDING' }
     });
-    const totalLiabilities = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const salesWithTaxInCompany = await prisma.sale.findMany({
+      where: { companyId: tenantId },
+      select: { taxAmount: true }
+    });
+    const totalTaxLiability = salesWithTaxInCompany.reduce((sum, s) => sum + (s.taxAmount || 0), 0);
+    const totalLiabilities = totalPendingExpenses + totalTaxLiability;
 
     // 5. Equity: Assets - Liabilities
     const totalEquity = totalAssets - totalLiabilities;
@@ -10182,7 +10425,53 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
       _sum: { amount: true }
     });
-    const ytdRevenue = revenueRes._sum.amount || 0;
+
+    // Calculate YTD Tax Collected from incomes to ensure matching YTD Net Profit
+    const ytdIncomes = await prisma.income.findMany({
+      where: {
+        companyId: tenantId,
+        date: { gte: startOfYear, lte: endOfToday },
+        category: {
+          name: { in: ['Penjualan Produk', 'Penjualan POS'] }
+        }
+      },
+      select: { amount: true, description: true }
+    });
+    
+    const ytdInvoiceNumbers = ytdIncomes
+      .map(inc => {
+        if (!inc.description) return null;
+        const match = inc.description.match(/(INV-[A-Za-z0-9\-]+)/);
+        return match ? match[1] : null;
+      })
+      .filter((inv): inv is string => inv !== null);
+
+    const ytdSalesWithTax = ytdInvoiceNumbers.length > 0 ? await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        invoiceNumber: { in: ytdInvoiceNumbers }
+      },
+      select: { invoiceNumber: true, taxRate: true }
+    }) : [];
+
+    const ytdSaleTaxRateMap = new Map<string, number>(
+      ytdSalesWithTax.map(s => [s.invoiceNumber, s.taxRate || 0])
+    );
+
+    let ytdTaxCollected = 0;
+    ytdIncomes.forEach(inc => {
+      const desc = inc.description || '';
+      const match = desc.match(/(INV-[A-Za-z0-9\-]+)/);
+      const invNum = match ? match[1] : null;
+      if (invNum) {
+        const taxRate = ytdSaleTaxRateMap.get(invNum) || 0;
+        if (taxRate > 0) {
+          ytdTaxCollected += inc.amount * (taxRate / (100 + taxRate));
+        }
+      }
+    });
+
+    const ytdRevenue = (revenueRes._sum.amount || 0) - ytdTaxCollected;
 
     const expenseRes = await prisma.expense.aggregate({
       where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
@@ -10191,8 +10480,8 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const ytdExpense = expenseRes._sum.amount || 0;
 
     const ytdSalesCogs = await calculateSalesCOGS(tenantId, startOfYear, endOfToday);
-    const ytdNetProfit = ytdRevenue - (ytdExpense + ytdSalesCogs);
-    const modalDisetor = totalEquity - ytdNetProfit;
+    const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs)) * 100) / 100;
+    const modalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
 
     res.json({
       assets: {
@@ -10206,7 +10495,12 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         fixedAssets: assetsWithBookValue,
         loans: activeLoans
       },
-      liabilities: { total: totalLiabilities, details: pendingExpenses },
+      liabilities: { 
+        total: totalLiabilities, 
+        pendingExpensesTotal: totalPendingExpenses,
+        taxLiability: totalTaxLiability,
+        details: pendingExpenses 
+      },
       equity: { 
         total: totalEquity,
         modalDisetor,
@@ -10261,7 +10555,14 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue;
 
     const pendingExpenses = await prisma.expense.findMany({ where: { companyId: tenantId, status: 'PENDING' } });
-    const totalLiabilities = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const salesWithTaxInCompany = await prisma.sale.findMany({
+      where: { companyId: tenantId },
+      select: { taxAmount: true }
+    });
+    const totalTaxLiability = salesWithTaxInCompany.reduce((sum, s) => sum + (s.taxAmount || 0), 0);
+    const totalLiabilities = totalPendingExpenses + totalTaxLiability;
     const totalEquity = totalAssets - totalLiabilities;
 
     // Equity Splits
@@ -10273,7 +10574,53 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
       _sum: { amount: true }
     });
-    const ytdRevenue = revenueRes._sum.amount || 0;
+
+    // Calculate YTD Tax Collected from incomes to ensure matching YTD Net Profit
+    const ytdIncomes = await prisma.income.findMany({
+      where: {
+        companyId: tenantId,
+        date: { gte: startOfYear, lte: endOfToday },
+        category: {
+          name: { in: ['Penjualan Produk', 'Penjualan POS'] }
+        }
+      },
+      select: { amount: true, description: true }
+    });
+    
+    const ytdInvoiceNumbers = ytdIncomes
+      .map(inc => {
+        if (!inc.description) return null;
+        const match = inc.description.match(/(INV-[A-Za-z0-9\-]+)/);
+        return match ? match[1] : null;
+      })
+      .filter((inv): inv is string => inv !== null);
+
+    const ytdSalesWithTax = ytdInvoiceNumbers.length > 0 ? await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        invoiceNumber: { in: ytdInvoiceNumbers }
+      },
+      select: { invoiceNumber: true, taxRate: true }
+    }) : [];
+
+    const ytdSaleTaxRateMap = new Map<string, number>(
+      ytdSalesWithTax.map(s => [s.invoiceNumber, s.taxRate || 0])
+    );
+
+    let ytdTaxCollected = 0;
+    ytdIncomes.forEach(inc => {
+      const desc = inc.description || '';
+      const match = desc.match(/(INV-[A-Za-z0-9\-]+)/);
+      const invNum = match ? match[1] : null;
+      if (invNum) {
+        const taxRate = ytdSaleTaxRateMap.get(invNum) || 0;
+        if (taxRate > 0) {
+          ytdTaxCollected += inc.amount * (taxRate / (100 + taxRate));
+        }
+      }
+    });
+
+    const ytdRevenue = (revenueRes._sum.amount || 0) - ytdTaxCollected;
 
     const expenseRes = await prisma.expense.aggregate({
       where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
@@ -10282,8 +10629,8 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     const ytdExpense = expenseRes._sum.amount || 0;
 
     const ytdSalesCogs = await calculateSalesCOGS(tenantId, startOfYear, endOfToday);
-    const ytdNetProfit = ytdRevenue - (ytdExpense + ytdSalesCogs);
-    const modalDisetor = totalEquity - ytdNetProfit;
+    const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs)) * 100) / 100;
+    const modalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
 
     // --- CREATE EXCEL ---
     const workbook = new ExcelJS.Workbook();
@@ -10342,6 +10689,10 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       worksheet.addRow([`Hutang: ${exp.paidTo || exp.description}`, '', exp.amount]);
       currentRow++;
     });
+    if (totalTaxLiability > 0) {
+      worksheet.addRow(['Hutang Pajak (PPN Keluaran)', '', totalTaxLiability]);
+      currentRow++;
+    }
     worksheet.addRow(['TOTAL KEWAJIBAN', '', totalLiabilities]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 3;
@@ -14203,7 +14554,9 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       voucherCode = null,
       voucherDiscountAmount = 0,
       pointsUsed = 0,
-      pointsEarned = 0
+      pointsEarned = 0,
+      taxRate = 0,
+      taxAmount = 0
     } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
@@ -14279,7 +14632,9 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           voucherCode: voucherCode || null,
           voucherDiscountAmount: Number(voucherDiscountAmount),
           pointsUsed: Number(pointsUsed),
-          pointsEarned: Number(pointsEarned)
+          pointsEarned: Number(pointsEarned),
+          taxRate: Number(taxRate) || 0,
+          taxAmount: Number(taxAmount) || 0
         }
       });
 

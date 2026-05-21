@@ -243,12 +243,21 @@ export default function BalanceSheetPage() {
                                         <td></td>
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-10 py-3 text-sm font-semibold text-red-600 flex items-center gap-2">
-                                            <AlertCircle className="h-3 w-3" />
+                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
+                                            <AlertCircle className="h-3 w-3 text-red-500" />
                                             Hutang Usaha (Expense Pending)
                                         </td>
-                                        <td className="px-6 py-3 text-right text-sm font-bold text-red-700">Rp {data?.liabilities.total.toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(data?.liabilities.pendingExpensesTotal || 0).toLocaleString()}</td>
                                     </tr>
+                                    {(data?.liabilities.taxLiability || 0) > 0 && (
+                                        <tr className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
+                                                <AlertCircle className="h-3 w-3 text-amber-500" />
+                                                Hutang Pajak (PPN Keluaran)
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.liabilities.taxLiability.toLocaleString()}</td>
+                                        </tr>
+                                    )}
                                     <tr className="bg-slate-50">
                                         <td className="px-6 py-3 font-bold text-slate-700 text-xs italic not-italic">TOTAL KEWAJIBAN</td>
                                         <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {data?.liabilities.total.toLocaleString()}</td>
