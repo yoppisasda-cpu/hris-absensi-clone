@@ -886,6 +886,8 @@ model Sale {
   serviceFee            Float        @default(0)
   markupPercentage      Float        @default(0)
   totalCommission       Float        @default(0)
+  taxRate               Float        @default(0)
+  taxAmount             Float        @default(0)
   accountId             Int?
   notes                 String?
   createdAt             DateTime     @default(now()) @db.Timestamp(6)

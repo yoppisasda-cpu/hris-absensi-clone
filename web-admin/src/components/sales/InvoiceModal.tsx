@@ -272,18 +272,22 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                 <div className="w-full md:w-80 space-y-3">
                                     <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-widest italic print:text-black">
                                         <span>Subtotal</span>
-                                        <span className="text-slate-950 font-black">{parseFloat(sale.totalAmount).toLocaleString()}</span>
+                                        <span className="text-slate-950 font-black">
+                                            {(parseFloat(sale.totalAmount) - parseFloat(sale.taxAmount || 0)).toLocaleString('id-ID')}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-widest italic print:text-black">
-                                        <span>Pajak (0%)</span>
-                                        <span className="text-slate-950 font-black">0</span>
+                                        <span>Pajak ({sale.taxRate || 0}%)</span>
+                                        <span className={`font-black ${(sale.taxRate || 0) > 0 ? 'text-amber-600' : 'text-slate-950'}`}>
+                                            {parseFloat(sale.taxAmount || 0).toLocaleString('id-ID')}
+                                        </span>
                                     </div>
                                     <div className="h-[1px] bg-slate-200 my-2 print:bg-black"></div>
                                     <div className="p-4 px-6 bg-white border-2 border-slate-950 rounded-2xl text-slate-950 shadow-sm print:border-black print:border-2">
                                         <p className="text-[8px] font-black uppercase tracking-[0.2em] mb-1 print:text-black">Total Bersih</p>
                                         <div className="flex justify-between items-end">
                                             <span className="text-[10px] font-black opacity-50 print:text-black">Rp</span>
-                                            <span className="text-xl font-black italic tracking-tighter print:text-black">{parseFloat(sale.totalAmount).toLocaleString()}</span>
+                                            <span className="text-xl font-black italic tracking-tighter print:text-black">{parseFloat(sale.totalAmount).toLocaleString('id-ID')}</span>
                                         </div>
                                     </div>
                                 </div>
