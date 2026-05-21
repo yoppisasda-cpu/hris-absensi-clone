@@ -25,6 +25,13 @@ export default function JournalPage() {
 
     useEffect(() => {
         fetchJournal();
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            const account = params.get("account");
+            if (account) {
+                setSearchTerm(account);
+            }
+        }
     }, []);
 
     const filteredEntries = entries.filter(entry => 

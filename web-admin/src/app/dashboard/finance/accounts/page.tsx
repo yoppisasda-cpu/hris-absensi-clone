@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Plus, Landmark, Wallet, MoreVertical, Search, ArrowUpRight, ArrowDownLeft, History, Edit3, Trash2, X, AlertTriangle, Building2, Sparkles, Loader2, BrainCircuit } from "lucide-react";
 import api from "@/lib/api";
@@ -229,9 +230,13 @@ export default function AccountsPage() {
                                     Rp {acc.balance.toLocaleString()}
                                 </div>
                                 <div className="flex gap-1">
-                                    <button className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors" title='Riwayat'>
+                                    <Link 
+                                        href={`/dashboard/finance/journal?account=${encodeURIComponent(acc.name)}`}
+                                        className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors" 
+                                        title="Riwayat"
+                                    >
                                         <History className="h-4 w-4" />
-                                    </button>
+                                    </Link>
                                 </div>
                             </div>
                         </div>
