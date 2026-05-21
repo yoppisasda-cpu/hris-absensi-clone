@@ -166,6 +166,19 @@ body {
     color: black !important;
   }
 
+  /* 7. Tombol & elemen kontrol di DALAM area printable harus TETAP TERSEMBUNYI */
+  #invoice-controls,
+  #printable-invoice button,
+  #printable-invoice .print\\:hidden,
+  #printable-invoice .print-hidden,
+  #po-printable-area button,
+  #po-printable-area .print\\:hidden,
+  #po-printable-area .print-hidden,
+  .printable-content button {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   @page {
     size: auto;
     margin: 0;

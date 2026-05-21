@@ -84,7 +84,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
             <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl print:hidden" onClick={onClose} />
             <div className="bg-white w-full max-w-3xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none">
                 {/* Floating Control Panel (Hidden on Print) */}
-                <div className="absolute top-8 right-8 flex items-center gap-3 z-50 print:hidden">
+                <div id="invoice-controls" className="absolute top-8 right-8 flex items-center gap-3 z-50 print:hidden">
                     <button
                         onClick={handlePrint}
                         className="flex items-center gap-2 px-5 py-3 bg-slate-950 hover:bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 border border-white/10"
