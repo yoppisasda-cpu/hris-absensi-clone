@@ -10990,6 +10990,13 @@ app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Resp
       orderBy: { date: 'desc' }
     });
 
+    // 3. Fetch Transfers
+    const transfers = await prisma.transfer.findMany({
+      where: { companyId: tenantId },
+      include: { fromAccount: true, toAccount: true },
+      orderBy: { date: 'desc' }
+    });
+
     const journalEntries: any[] = [];
 
     // Map Incomes to Journal Lines
@@ -11096,6 +11103,29 @@ app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Resp
       }
     });
 
+    // Map Transfers to Journal Lines
+    transfers.forEach(trsf => {
+      const entryId = `TRSF-${trsf.id.toString().padStart(6, '0')}`;
+      journalEntries.push({
+        id: `${entryId}-D`,
+        date: trsf.date,
+        ref: entryId,
+        description: trsf.description || `Mutasi Dana: ${trsf.fromAccount.name} ➔ ${trsf.toAccount.name}`,
+        accountName: trsf.toAccount.name,
+        debit: trsf.amount,
+        credit: 0
+      });
+      journalEntries.push({
+        id: `${entryId}-C`,
+        date: trsf.date,
+        ref: entryId,
+        description: '',
+        accountName: trsf.fromAccount.name,
+        debit: 0,
+        credit: trsf.amount
+      });
+    });
+
     journalEntries.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
@@ -11130,6 +11160,12 @@ app.get('/api/finance/journal/export', tenantMiddleware, async (req: Request, re
       orderBy: { date: 'asc' }
     });
 
+    const transfers = await prisma.transfer.findMany({
+      where: { companyId: tenantId },
+      include: { fromAccount: true, toAccount: true },
+      orderBy: { date: 'asc' }
+    });
+
     const journalEntries: any[] = [];
     incomes.forEach(inc => {
       const entryId = `INC-${inc.id.toString().padStart(6, '0')}`;
@@ -11140,6 +11176,11 @@ app.get('/api/finance/journal/export', tenantMiddleware, async (req: Request, re
       const entryId = `EXP-${exp.id.toString().padStart(6, '0')}`;
       journalEntries.push({ date: exp.date, ref: entryId, account: exp.category.name, debit: exp.amount, credit: 0, description: exp.description || `Pengeluaran: ${exp.paidTo || '-'}` });
       journalEntries.push({ date: exp.date, ref: entryId, account: exp.status === 'PAID' ? (exp.account?.name || 'Kas/Bank') : 'Hutang Usaha', debit: 0, credit: exp.amount, description: '' });
+    });
+    transfers.forEach(trsf => {
+      const entryId = `TRSF-${trsf.id.toString().padStart(6, '0')}`;
+      journalEntries.push({ date: trsf.date, ref: entryId, account: trsf.toAccount.name, debit: trsf.amount, credit: 0, description: trsf.description || `Mutasi Dana: ${trsf.fromAccount.name} ➔ ${trsf.toAccount.name}` });
+      journalEntries.push({ date: trsf.date, dateEntry: trsf.date, ref: entryId, account: trsf.fromAccount.name, debit: 0, credit: trsf.amount, description: '' });
     });
 
     journalEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
