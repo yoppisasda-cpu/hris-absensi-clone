@@ -64,6 +64,15 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
     };
 
     const handlePrint = () => {
+        const controls = document.getElementById('invoice-controls');
+        if (controls) controls.style.display = 'none';
+        
+        const afterPrint = () => {
+            if (controls) controls.style.display = '';
+            window.removeEventListener('afterprint', afterPrint);
+        };
+        window.addEventListener('afterprint', afterPrint);
+        
         window.print();
     };
 
