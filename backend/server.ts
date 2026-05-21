@@ -922,18 +922,18 @@ app.get('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respons
 app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { customerId, orderNumber, date, notes, items } = req.body;
+    const { customerId, orderNumber, date, notes, items, taxRate } = req.body;
 
     if (!customerId || !orderNumber || !items || items.length === 0) {
       return res.status(400).json({ error: 'Data pesanan tidak lengkap' });
     }
 
-    let totalAmount = 0;
+    let subtotal = 0;
     const validatedItems = items.map((item: any) => {
       const q = Number(item.quantity) || 0;
       const p = Number(item.price) || 0;
       const t = q * p;
-      totalAmount += t;
+      subtotal += t;
       return {
         productId: Number(item.productId),
         quantity: q,
@@ -942,12 +942,19 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
       };
     });
 
+    const parsedTaxRate = Number(taxRate) || 0;
+    const taxAmount = Math.round((subtotal * parsedTaxRate / 100) * 100) / 100;
+    const totalAmount = subtotal + taxAmount;
+
     const newOrder = await prisma.salesOrder.create({
       data: {
         companyId: tenantId,
         customerId: Number(customerId),
         orderNumber,
         date: date ? new Date(date) : new Date(),
+        subtotal,
+        taxRate: parsedTaxRate,
+        taxAmount,
         totalAmount,
         notes,
         status: 'PENDING',

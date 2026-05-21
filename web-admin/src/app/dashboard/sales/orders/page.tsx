@@ -158,6 +158,11 @@ export default function SalesOrdersPage() {
                                  </td>
                                  <td className="px-6 py-4 text-right">
                                      <div className="font-semibold text-gray-900">{formatCurrency(order.totalAmount)}</div>
+                                     {order.taxRate > 0 && (
+                                       <div className="text-xs text-amber-600 font-medium mt-0.5">
+                                         Termasuk PPN {order.taxRate}% ({formatCurrency(order.taxAmount)})
+                                       </div>
+                                     )}
                                  </td>
                                  <td className="px-6 py-4">
                                      {getStatusBadge(order.status)}

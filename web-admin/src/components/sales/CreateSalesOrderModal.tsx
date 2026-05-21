@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Search, Plus, Trash2, Save } from "lucide-react";
+import { X, Search, Plus, Trash2, Save, Receipt } from "lucide-react";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
 
@@ -17,6 +17,13 @@ interface Props {
   onSuccess: () => void;
 }
 
+const TAX_OPTIONS = [
+  { label: "Tanpa Pajak (0%)", value: 0 },
+  { label: "PPN 11%", value: 11 },
+  { label: "PPN 12%", value: 12 },
+  { label: "Custom...", value: -1 },
+];
+
 export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -26,6 +33,9 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
   const [orderNumber, setOrderNumber] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [taxRate, setTaxRate] = useState(0);
+  const [taxPreset, setTaxPreset] = useState(0);
+  const [customTaxRate, setCustomTaxRate] = useState("");
   
   const [items, setItems] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -36,22 +46,14 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
 
   const fetchData = async () => {
     try {
-      console.log("[B2B] Fetching customers and products...");
       const [cusRes, prodRes] = await Promise.all([
         api.get("/customers"),
         api.get("/inventory/products")
       ]);
-      
-      console.log("[B2B] Customers fetched:", cusRes.data.length);
-      console.log("[B2B] Products fetched:", prodRes.data.length);
-
       setCustomers(cusRes.data);
-      // Only B2B / Finished products
       const finishedGoods = prodRes.data.filter((p: any) => p.type === "FINISHED_GOOD");
-      console.log("[B2B] Finished Goods (B2B) found:", finishedGoods.length);
       setProducts(finishedGoods);
     } catch (error: any) {
-      console.error("[B2B] Fetch Error:", error.response || error);
       toast.error("Gagal memuat data pelanggan / produk");
     }
   };
@@ -63,20 +65,24 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
       setCustomerId("");
       setNotes("");
       setItems([]);
+      setTaxRate(0);
+      setTaxPreset(0);
+      setCustomTaxRate("");
     }
   }, [isOpen]);
 
-
+  const handleTaxPresetChange = (val: number) => {
+    setTaxPreset(val);
+    if (val >= 0) setTaxRate(val);
+    else setTaxRate(Number(customTaxRate) || 0);
+  };
 
   const handleProductSelect = (pId: string) => {
     setSelectedProduct(pId);
     setIsProductDropdownOpen(false);
     const prod = products.find(p => p.id.toString() === pId);
-    if (prod) {
-      setPrice(prod.price.toString());
-    } else {
-      setPrice("");
-    }
+    if (prod) setPrice(prod.price.toString());
+    else setPrice("");
   };
 
   const filteredProducts = products.filter(p => 
@@ -86,41 +92,29 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
 
   const handleAddItem = () => {
     if (!selectedProduct || !quantity || !price) return toast.error("Lengkapi data item");
-    
     const prod = products.find(p => p.id.toString() === selectedProduct);
     if (!prod) return;
 
-    const newItem = {
+    setItems([...items, {
       productId: prod.id,
       productName: prod.name,
       quantity: Number(quantity),
       price: Number(price),
       total: Number(quantity) * Number(price)
-    };
-
-    setItems([...items, newItem]);
+    }]);
     setSelectedProduct("");
     setQuantity("1");
     setPrice("");
   };
 
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
+  const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerId || items.length === 0) return toast.error("Pilih pelanggan dan minimal masukan 1 item");
-
+    if (!customerId || items.length === 0) return toast.error("Pilih pelanggan dan minimal 1 item");
     try {
       setLoading(true);
-      await api.post("/sales/orders", {
-        customerId,
-        orderNumber,
-        date,
-        notes,
-        items
-      });
+      await api.post("/sales/orders", { customerId, orderNumber, date, notes, items, taxRate });
       toast.success("Pesanan B2B berhasil dibuat!");
       onSuccess();
       onClose();
@@ -131,7 +125,9 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
     }
   };
 
-  const totalOrder = items.reduce((sum, item) => sum + item.total, 0);
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const taxAmount = Math.round((subtotal * taxRate / 100) * 100) / 100;
+  const totalOrder = subtotal + taxAmount;
 
   if (!isOpen) return null;
 
@@ -156,6 +152,8 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
 
         <div className="p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
           <form id="salesOrderForm" onSubmit={handleSubmit} className="space-y-8">
+            
+            {/* Header Info Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-950/40 p-8 rounded-[2.5rem] border border-white/5 shadow-inner">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Corporate Identity (PT/CV)</label>
@@ -206,7 +204,67 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
               </div>
             </div>
 
-            {/* Tambah Item Premium */}
+            {/* TAX SECTION */}
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-[2.5rem] p-8 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <Receipt className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] italic">Skema Pajak (PPN)</h4>
+                  <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest italic">Pilih sesuai kebutuhan customer — tidak semua transaksi dikenakan pajak</p>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap gap-3">
+                {TAX_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleTaxPresetChange(opt.value)}
+                    className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest italic transition-all border ${
+                      taxPreset === opt.value
+                        ? opt.value === 0
+                          ? 'bg-slate-700 text-white border-slate-500'
+                          : 'bg-amber-500 text-white border-amber-400 shadow-lg shadow-amber-500/20'
+                        : 'bg-slate-950 text-slate-500 border-slate-800 hover:text-white hover:border-slate-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {taxPreset === -1 && (
+                <div className="flex items-center gap-3 animate-in slide-in-from-top-2 duration-300">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="Masukkan % pajak..."
+                    value={customTaxRate}
+                    onChange={(e) => {
+                      setCustomTaxRate(e.target.value);
+                      setTaxRate(Number(e.target.value) || 0);
+                    }}
+                    className="w-40 bg-slate-950 border border-amber-500/30 rounded-2xl px-5 py-3 text-xs font-black text-amber-400 outline-none focus:border-amber-500/60 italic tracking-widest"
+                  />
+                  <span className="text-[10px] font-black text-slate-600 italic">%</span>
+                </div>
+              )}
+
+              {taxRate > 0 && (
+                <div className="bg-amber-500/10 rounded-2xl px-5 py-3 flex items-center gap-2 border border-amber-500/20">
+                  <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
+                  <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest italic">
+                    PPN {taxRate}% aktif — akan ditambahkan ke total tagihan
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Tambah Item */}
             <div className="space-y-6">
               <div className="flex items-center justify-between ml-1">
                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Manifest Breakdown</h3>
@@ -300,7 +358,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
                 </div>
               </div>
 
-              {/* Tabel Item Premium Glass */}
+              {/* Items Table */}
               {items.length > 0 ? (
                 <div className="overflow-hidden rounded-[2.5rem] border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-sm animate-in fade-in duration-500">
                   <table className="w-full text-left">
@@ -330,8 +388,20 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
                     </tbody>
                     <tfoot className="bg-slate-950 border-t border-indigo-500/30">
                       <tr>
-                        <td colSpan={3} className="px-8 py-6 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Order Aggregation total</td>
-                        <td className="px-8 py-6 text-right text-2xl font-black italic text-indigo-400 tracking-tighter">{formatCurrency(totalOrder)}</td>
+                        <td colSpan={3} className="px-8 py-4 text-right text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Subtotal</td>
+                        <td className="px-8 py-4 text-right text-sm font-black italic text-slate-300">{formatCurrency(subtotal)}</td>
+                        <td></td>
+                      </tr>
+                      {taxRate > 0 && (
+                        <tr>
+                          <td colSpan={3} className="px-8 py-2 text-right text-[9px] font-black uppercase tracking-[0.2em] text-amber-500 italic">PPN {taxRate}%</td>
+                          <td className="px-8 py-2 text-right text-sm font-black italic text-amber-400">{formatCurrency(taxAmount)}</td>
+                          <td></td>
+                        </tr>
+                      )}
+                      <tr className="border-t border-white/10">
+                        <td colSpan={3} className="px-8 py-5 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 italic">Total Tagihan</td>
+                        <td className="px-8 py-5 text-right text-2xl font-black italic text-indigo-400 tracking-tighter">{formatCurrency(totalOrder)}</td>
                         <td></td>
                       </tr>
                     </tfoot>
