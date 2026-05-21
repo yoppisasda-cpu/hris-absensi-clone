@@ -244,43 +244,43 @@ export default function LoanPage() {
 
                             <form onSubmit={handleCreateLoan} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Karyawan</label>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Pilih Karyawan</label>
                                     <select
                                         required
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 bg-white"
                                         value={formData.userId}
                                         onChange={e => setFormData({ ...formData, userId: e.target.value })}
                                     >
-                                        <option value="">-- Pilih Karyawan --</option>
+                                        <option value="" className="text-slate-900 bg-white">-- Pilih Karyawan --</option>
                                         {employees.map(emp => (
-                                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                            <option key={emp.id} value={emp.id} className="text-slate-900 bg-white">{emp.name}</option>
                                         ))}
                                     </select>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Total Pinjaman</label>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Total Pinjaman</label>
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-2.5 text-sm font-semibold text-slate-400">Rp</span>
-                                            <input required type="number" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="0" />
+                                            <input required type="number" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-slate-900 bg-white placeholder:text-slate-400" placeholder="0" />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Potongan / Bln</label>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Potongan / Bln</label>
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-2.5 text-sm font-semibold text-slate-400">Rp</span>
-                                            <input required type="number" value={formData.monthlyDeduction} onChange={e => setFormData({ ...formData, monthlyDeduction: e.target.value })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="0" />
+                                            <input required type="number" value={formData.monthlyDeduction} onChange={e => setFormData({ ...formData, monthlyDeduction: e.target.value })} className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-slate-900 bg-white placeholder:text-slate-400" placeholder="0" />
                                         </div>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Keterangan / Alasan</label>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Keterangan / Alasan</label>
                                     <textarea
                                         value={formData.description}
                                         onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none h-24"
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none h-24 text-slate-900 bg-white placeholder:text-slate-400"
                                         placeholder="Opsional: Misal Pinjaman Darurat Keluarga"
                                     ></textarea>
                                 </div>

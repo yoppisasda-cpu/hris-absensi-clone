@@ -116,7 +116,7 @@ export default function BalanceSheetPage() {
                     {/* AKTIVA (ASSETS) */}
                     <div className="space-y-6">
                         <div className="flex items-center justify-between px-2">
-                            <h2 className="text-lg font-black text-slate-900 border-b-2 border-blue-600 pb-1 uppercase">AKTIVA (ASET)</h2>
+                            <h2 className="text-lg font-black text-white border-b-2 border-blue-600 pb-1 uppercase">AKTIVA (ASET)</h2>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <table className="w-full">
@@ -227,7 +227,7 @@ export default function BalanceSheetPage() {
                     {/* PASIVA (LIABILITIES & EQUITY) */}
                     <div className="space-y-6">
                         <div className="flex items-center justify-between px-2">
-                                <h2 className="text-lg font-black text-slate-900 border-b-2 border-indigo-600 pb-1 uppercase">PASIVA (KEWAJIBAN & MODAL)</h2>
+                                <h2 className="text-lg font-black text-white border-b-2 border-indigo-600 pb-1 uppercase">PASIVA (KEWAJIBAN & MODAL)</h2>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden border-t-4 border-t-indigo-600">
                             <table className="w-full">
