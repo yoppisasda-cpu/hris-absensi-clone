@@ -93,8 +93,8 @@ export default function TransferModal({ isOpen, onClose, onSuccess }: TransferMo
                             <ArrowRight className="h-6 w-6 stroke-[3px]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Journal Transfer</h3>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Liquidity Deployment Protocol</p>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Transfer Dana</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Protokol Mutasi / Pemindahan Kas</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
@@ -112,7 +112,7 @@ export default function TransferModal({ isOpen, onClose, onSuccess }: TransferMo
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Effective Date</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Tanggal Transaksi</label>
                             <input
                                 type="date"
                                 required
@@ -122,7 +122,7 @@ export default function TransferModal({ isOpen, onClose, onSuccess }: TransferMo
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Quantum (IDR)</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Jumlah Transfer (IDR)</label>
                             <input
                                 type="number"
                                 required
@@ -136,14 +136,14 @@ export default function TransferModal({ isOpen, onClose, onSuccess }: TransferMo
 
                     <div className="space-y-4 py-2 relative">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-1">Source Interface</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-1">Akun Sumber (Bank/Kas)</label>
                             <select
                                 required
                                 value={formData.fromAccountId}
                                 onChange={(e) => setFormData({ ...formData, fromAccountId: e.target.value })}
                                 className="w-full rounded-[2rem] border border-slate-800 bg-slate-950 px-6 py-5 text-xs font-black text-white focus:border-rose-500/50 outline-none transition-all appearance-none cursor-pointer italic uppercase tracking-tighter"
                             >
-                                <option value="" disabled>-- SELECT SOURCE ACCOUNT --</option>
+                                <option value="" disabled>-- PILIH AKUN SUMBER --</option>
                                 {accounts.map(acc => (
                                     <option key={acc.id} value={acc.id} className="bg-slate-900">
                                         {acc.name.toUpperCase()} (Rp {acc.balance.toLocaleString()})
@@ -159,14 +159,14 @@ export default function TransferModal({ isOpen, onClose, onSuccess }: TransferMo
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-1">Destination Target</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-1">Akun Tujuan (Kas Kecil/Bank)</label>
                             <select
                                 required
                                 value={formData.toAccountId}
                                 onChange={(e) => setFormData({ ...formData, toAccountId: e.target.value })}
                                 className="w-full rounded-[2rem] border border-slate-800 bg-slate-950 px-6 py-5 text-xs font-black text-white focus:border-emerald-500/50 outline-none transition-all appearance-none cursor-pointer italic uppercase tracking-tighter"
                             >
-                                <option value="" disabled>-- SELECT TARGET ACCOUNT --</option>
+                                <option value="" disabled>-- PILIH AKUN TUJUAN --</option>
                                 {accounts.map(acc => (
                                     <option key={acc.id} value={acc.id} className="bg-slate-900">
                                         {acc.name.toUpperCase()} (Rp {acc.balance.toLocaleString()})
@@ -177,9 +177,9 @@ export default function TransferModal({ isOpen, onClose, onSuccess }: TransferMo
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Reference Log / Memo</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Catatan / Keterangan</label>
                         <textarea
-                            placeholder="Enter transaction details..."
+                            placeholder="Masukkan keterangan transfer..."
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             className="w-full rounded-[2rem] bg-slate-950 border border-slate-800 py-5 px-6 text-sm font-black text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all min-h-[100px] no-scrollbar italic placeholder:text-slate-800"
@@ -192,7 +192,7 @@ export default function TransferModal({ isOpen, onClose, onSuccess }: TransferMo
                             onClick={onClose}
                             className="flex-1 rounded-[24px] border border-white/5 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white hover:bg-white/5 transition-all italic"
                         >
-                            Cancel
+                            Batal
                         </button>
                         <button
                             type="submit"
@@ -202,7 +202,7 @@ export default function TransferModal({ isOpen, onClose, onSuccess }: TransferMo
                             {submitting ? (
                                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500/30 border-t-indigo-500"></div>
                             ) : (
-                                <><Save className="h-5 w-5" /> Execute Transfer</>
+                                <><Save className="h-5 w-5" /> Kirim Transfer</>
                             )}
                         </button>
                     </div>
