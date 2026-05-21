@@ -74,137 +74,153 @@ export default function SalesOrdersPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "PENDING":
-        return <span className="px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-lg">Menunggu Approval</span>;
+        return <span className="px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-amber-400 bg-amber-400/10 rounded-xl border border-amber-400/20">Menunggu Approval</span>;
       case "APPROVED":
-        return <span className="px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-100 rounded-lg">Disetujui</span>;
+        return <span className="px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-400/10 rounded-xl border border-indigo-400/20">Disetujui</span>;
       case "PREPARING":
-        return <span className="px-2 py-1 text-xs font-semibold text-orange-700 bg-orange-100 rounded-lg">Dikemas</span>;
+        return <span className="px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-orange-400 bg-orange-400/10 rounded-xl border border-orange-400/20">Dikemas</span>;
       case "SHIPPED":
-        return <span className="px-2 py-1 text-xs font-semibold text-purple-700 bg-purple-100 rounded-lg">Dalam Pengiriman</span>;
+        return <span className="px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-purple-400 bg-purple-400/10 rounded-xl border border-purple-400/20">Dalam Pengiriman</span>;
       case "INVOICED":
-        return <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-lg">Ditagihkan (Invoice)</span>;
+        return <span className="px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 rounded-xl border border-emerald-400/20">Ditagihkan (Invoice)</span>;
       case "CANCELLED":
-        return <span className="px-2 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded-lg">Dibatalkan</span>;
+        return <span className="px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-rose-400 bg-rose-400/10 rounded-xl border border-rose-400/20">Dibatalkan</span>;
       default:
-        return <span className="px-2 py-1 text-xs font-semibold text-gray-700 bg-gray-100 rounded-lg">{status}</span>;
+        return <span className="px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-slate-400 bg-slate-400/10 rounded-xl border border-slate-400/20">{status}</span>;
     }
   };
 
   if (!hasFeature("CRM") && !hasFeature("INVENTORY")) {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center">
-        <Package className="h-16 w-16 text-slate-700 mb-4" />
-        <h2 className="text-xl font-bold text-white">Akses Ditolak</h2>
-        <p className="text-slate-400 mt-2 max-w-sm">Anda membutuhkan modul Penjualan & Inventaris untuk mengakses B2B Sales Orders.</p>
+        <Package className="h-16 w-16 text-slate-755 mb-4 animate-pulse" />
+        <h2 className="text-xl font-black italic uppercase tracking-widest text-white">Akses Ditolak</h2>
+        <p className="text-slate-500 font-bold uppercase tracking-widest text-[9px] mt-2 max-w-sm">Anda membutuhkan modul Penjualan & Inventaris untuk mengakses B2B Sales Orders.</p>
       </div>
     );
   }
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/50 p-6 rounded-2xl shadow-sm border border-slate-700">
-        <div>
-          <h1 className="text-2xl font-bold text-white">B2B Sales Orders (PO)</h1>
-          <p className="text-slate-400 mt-1">Kelola pesanan dari pelanggan bisnis secara efisien.</p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/50 p-8 rounded-[2.5rem] shadow-2xl border border-slate-800 backdrop-blur-xl">
+          <div>
+            <h1 className="text-2xl font-black italic uppercase tracking-widest text-white leading-none">B2B Sales Orders (PO)</h1>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-3 italic">B2B Procurement Tracking & Fulfillment Vector</p>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest italic transition-all shadow-lg shadow-indigo-600/20 border border-white/10 active:scale-95"
+          >
+            <Plus className="h-4 w-4 stroke-[3px]" />
+            <span>Buat Pesanan (PO)</span>
+          </button>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Buat Pesanan (PO)</span>
-        </button>
-      </div>
 
-      {/* Orders List */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-         <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-             <h2 className="font-semibold text-gray-800">Daftar Pesanan</h2>
-         </div>
-         {loading ? (
-             <div className="p-10 text-center text-gray-500">Memuat data...</div>
-         ) : orders.length === 0 ? (
-             <div className="p-10 text-center flex flex-col items-center">
-                 <div className="bg-gray-50 p-4 rounded-full mb-3">
-                     <FileText className="h-8 w-8 text-gray-400" />
-                 </div>
-                 <h3 className="text-lg font-medium text-gray-800">Belum Ada Pesanan</h3>
-                 <p className="text-gray-500 max-w-sm mt-1">Pesanan (PO) baru dari pelanggan B2B akan muncul di sini.</p>
-             </div>
-         ) : (
-             <div className="overflow-x-auto">
-                 <table className="w-full text-sm text-left">
-                     <thead className="bg-gray-50/50 text-gray-600 text-xs uppercase">
-                         <tr>
-                             <th className="px-6 py-4 font-semibold">Nomor PO / Tanggal</th>
-                             <th className="px-6 py-4 font-semibold">Pelanggan</th>
-                             <th className="px-6 py-4 font-semibold text-right">Total Tagihan</th>
-                             <th className="px-6 py-4 font-semibold">Status</th>
-                             <th className="px-6 py-4 font-semibold text-center">Aksi</th>
-                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
-                         {orders.map((order) => (
-                             <tr key={order.id} className="hover:bg-gray-50/30 transition-colors">
-                                 <td className="px-6 py-4">
-                                     <div className="font-semibold text-gray-900">{order.orderNumber}</div>
-                                     <div className="text-xs text-gray-500 mt-1">{new Date(order.date).toLocaleDateString('id-ID')}</div>
-                                 </td>
-                                 <td className="px-6 py-4">
-                                     <div className="font-medium text-gray-800">{order.customer?.name}</div>
-                                     <div className="text-xs text-gray-500">{order.items?.length || 0} item dipesan</div>
-                                 </td>
-                                 <td className="px-6 py-4 text-right">
-                                     <div className="font-semibold text-gray-900">{formatCurrency(order.totalAmount)}</div>
-                                     {order.taxRate > 0 && (
-                                       <div className="text-xs text-amber-600 font-medium mt-0.5">
-                                         Termasuk PPN {order.taxRate}% ({formatCurrency(order.taxAmount)})
-                                       </div>
-                                     )}
-                                 </td>
-                                 <td className="px-6 py-4">
-                                     {getStatusBadge(order.status)}
-                                 </td>
-                                 <td className="px-6 py-4 text-center">
-                                     <div className="flex items-center justify-center gap-2">
-                                         {order.status === 'PENDING' && (
-                                            <button onClick={() => handleUpdateStatus(order.id, 'APPROVED')} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors" title="Setujui Pesanan">
-                                                <CheckCircle className="w-4 h-4" />
-                                            </button>
-                                         )}
-                                         {order.status === 'APPROVED' && (
-                                            <button onClick={() => handleUpdateStatus(order.id, 'PREPARING')} className="p-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors" title="Bungkus / Kemas">
-                                                <Package className="w-4 h-4" />
-                                            </button>
-                                         )}
-                                         {order.status === 'PREPARING' && (
-                                            <button onClick={() => handleUpdateStatus(order.id, 'SHIPPED')} className="p-2 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg transition-colors" title="Kirim Pesanan">
-                                                <Truck className="w-4 h-4" />
-                                            </button>
-                                         )}
-                                         {(order.status === 'SHIPPED' || order.status === 'APPROVED' || order.status === 'PREPARING') && (
-                                            <button onClick={() => handleConvertToInvoice(order.id)} className="p-2 bg-green-50 text-green-700 hover:bg-green-100 font-medium rounded-lg text-xs flex items-center gap-1 transition-colors" title="Konversi ke Invoice & Potong Stok">
-                                                <span>Tagih</span>
-                                                <ArrowRight className="w-3 h-3" />
-                                            </button>
-                                         )}
-                                     </div>
-                                 </td>
-                             </tr>
-                         ))}
-                     </tbody>
-                 </table>
-             </div>
-         )}
-      </div>
+        {/* Orders List */}
+        <div className="bg-slate-900/40 rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden backdrop-blur-2xl">
+          <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-950/30">
+            <h2 className="font-black italic tracking-widest text-white uppercase text-[10px]">Daftar Pesanan</h2>
+          </div>
+          {loading ? (
+            <div className="p-12 text-center text-slate-500 font-bold uppercase tracking-widest text-[10px] italic">Memuat data...</div>
+          ) : orders.length === 0 ? (
+            <div className="p-12 text-center flex flex-col items-center">
+              <div className="bg-slate-950 p-4 rounded-3xl border border-white/5 mb-4 text-slate-600 shadow-inner">
+                <FileText className="h-8 w-8" />
+              </div>
+              <h3 className="text-xs font-black italic tracking-widest text-white uppercase">Belum Ada Pesanan</h3>
+              <p className="text-slate-500 text-[9px] uppercase font-bold tracking-widest max-w-sm mt-2">Pesanan (PO) baru dari pelanggan B2B akan muncul di sini.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-950 text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] border-b border-white/5 italic">
+                  <tr>
+                    <th className="px-8 py-5">Nomor PO / Tanggal</th>
+                    <th className="px-8 py-5">Pelanggan</th>
+                    <th className="px-8 py-5 text-right">Total Tagihan</th>
+                    <th className="px-8 py-5">Status</th>
+                    <th className="px-8 py-5 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 italic">
+                  {orders.map((order) => (
+                    <tr key={order.id} className="hover:bg-white/5 transition-colors">
+                      <td className="px-8 py-5">
+                        <div className="font-black text-white text-[11px] uppercase tracking-tighter">{order.orderNumber}</div>
+                        <div className="text-[10px] font-bold text-slate-500 mt-1.5">{new Date(order.date).toLocaleDateString('id-ID')}</div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <div className="font-black text-slate-300 text-[11px] uppercase">{order.customer?.name}</div>
+                        <div className="text-[10px] font-bold text-slate-500 mt-1.5">{order.items?.length || 0} item dipesan</div>
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                        <div className="font-black text-white text-[11px] tracking-widest">{formatCurrency(order.totalAmount)}</div>
+                        {order.taxRate > 0 && (
+                          <div className="text-[10px] text-amber-500 font-bold mt-1.5">
+                            PPN {order.taxRate}% (+{formatCurrency(order.taxAmount)})
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-8 py-5">
+                        {getStatusBadge(order.status)}
+                      </td>
+                      <td className="px-8 py-5 text-center">
+                        <div className="flex items-center justify-center gap-2.5">
+                          {order.status === 'PENDING' && (
+                            <button
+                              onClick={() => handleUpdateStatus(order.id, 'APPROVED')}
+                              className="p-2.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-xl transition-all border border-indigo-500/20 active:scale-90"
+                              title="Setujui Pesanan"
+                            >
+                              <CheckCircle className="w-4 h-4 stroke-[2.5px]" />
+                            </button>
+                          )}
+                          {order.status === 'APPROVED' && (
+                            <button
+                              onClick={() => handleUpdateStatus(order.id, 'PREPARING')}
+                              className="p-2.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded-xl transition-all border border-amber-500/20 active:scale-90"
+                              title="Bungkus / Kemas"
+                            >
+                              <Package className="w-4 h-4 stroke-[2.5px]" />
+                            </button>
+                          )}
+                          {order.status === 'PREPARING' && (
+                            <button
+                              onClick={() => handleUpdateStatus(order.id, 'SHIPPED')}
+                              className="p-2.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-xl transition-all border border-purple-500/20 active:scale-90"
+                              title="Kirim Pesanan"
+                            >
+                              <Truck className="w-4 h-4 stroke-[2.5px]" />
+                            </button>
+                          )}
+                          {(order.status === 'SHIPPED' || order.status === 'APPROVED' || order.status === 'PREPARING') && (
+                            <button
+                              onClick={() => handleConvertToInvoice(order.id)}
+                              className="px-3.5 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-black rounded-xl text-[9px] uppercase tracking-widest flex items-center gap-1.5 transition-all border border-emerald-500/20 active:scale-95"
+                              title="Konversi ke Invoice & Potong Stok"
+                            >
+                              <span>Tagih</span>
+                              <ArrowRight className="w-3.5 h-3.5 stroke-[3px]" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
-      <CreateSalesOrderModal 
-         isOpen={isModalOpen}
-         onClose={() => setIsModalOpen(false)}
-         onSuccess={fetchOrders}
-      />
+        <CreateSalesOrderModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={fetchOrders}
+        />
       </div>
     </DashboardLayout>
   );
