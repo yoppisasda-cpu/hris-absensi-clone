@@ -9416,7 +9416,7 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
         }
 
         // 3. Update Expense
-        const finalStatus = status || expense.status;
+        const finalStatus = status !== undefined ? status : expense.status;
         const finalDate = date ? new Date(date) : expense.date;
         
         let paidAtVal: Date | null = null;
@@ -9430,6 +9430,14 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
           }
         }
 
+        const finalAccountId = accountId !== undefined ? (accountId ? Number(accountId) : null) : expense.accountId;
+        const finalCategoryId = categoryId !== undefined ? (categoryId ? Number(categoryId) : expense.categoryId) : expense.categoryId;
+        const finalSupplierId = supplierId !== undefined ? (supplierId ? Number(supplierId) : null) : expense.supplierId;
+        const finalAmount = amount !== undefined ? (amount ? Number(amount) : 0) : expense.amount;
+        const finalDueDate = dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : expense.dueDate;
+        const finalDescription = description !== undefined ? description : expense.description;
+        const finalPaidTo = paidTo !== undefined ? paidTo : expense.paidTo;
+
         const upRes = await tx.$queryRawUnsafe<any[]>(
             `UPDATE "Expense" SET 
                 "accountId" = $1::INTEGER, "categoryId" = $2::INTEGER, "supplierId" = $3::INTEGER, "amount" = $4, 
@@ -9437,24 +9445,21 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
                 "description" = $8, "paidTo" = $9, "paidAt" = $10, "updatedAt" = NOW() 
              WHERE "id" = $11 AND "companyId" = $12
              RETURNING *`,
-            accountId ? Number(accountId) : (expense.accountId || null), 
-            categoryId ? Number(categoryId) : expense.categoryId, 
-            supplierId ? Number(supplierId) : (expense.supplierId || null), 
-            amount ? Number(amount) : expense.amount, 
-            finalDate, 
-            dueDate ? new Date(dueDate) : expense.dueDate, 
-            finalStatus, 
-            description || expense.description, 
-            paidTo || expense.paidTo,
+            finalAccountId,
+            finalCategoryId,
+            finalSupplierId,
+            finalAmount,
+            finalDate,
+            finalDueDate,
+            finalStatus,
+            finalDescription,
+            finalPaidTo,
             paidAtVal,
-            parseInt(id as string), 
+            parseInt(id as string),
             tenantId
         );
 
         // 4. Apply New Balance (ONLY if new status is not PENDING and has accountId)
-        const finalAccountId = accountId || expense.accountId;
-        const finalAmount = amount || expense.amount;
-
         if (finalStatus !== 'PENDING' && finalAccountId) {
             await tx.$executeRawUnsafe(
                 'UPDATE "FinancialAccount" SET "balance" = "balance" - $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
