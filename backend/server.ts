@@ -6772,61 +6772,74 @@ app.put('/api/admin/learning/materials/:id', tenantMiddleware, learningUpload.si
       imageUrl = `/uploads/learning/${req.file.filename}`;
     }
 
-    // Update material
-    const updatedMaterial = await (prisma as any).learningMaterial.update({
-      where: { id },
-      data: {
-        title,
-        content,
-        imageUrl,
-        category,
-        targetDivision,
-        targetJobTitle
+    // Correctly parse the string boolean from multipart/form-data
+    const shouldRegenerate = regenerateQuestions === 'true' || regenerateQuestions === true;
+
+    // 1. AI generate questions first if requested (takes time, do this before locking/modifying the database)
+    let questionsData: any[] = [];
+    if (shouldRegenerate) {
+        const { generateQuestions } = require('./examAI');
+        questionsData = await generateQuestions(content, questionCount ? parseInt(questionCount) : 5);
+    }
+
+    // 2. Perform all database updates inside a fast, reliable transaction
+    const updatedMaterial = await prisma.$transaction(async (tx) => {
+      // Update material
+      const mat = await (tx as any).learningMaterial.update({
+        where: { id },
+        data: {
+          title,
+          content,
+          imageUrl,
+          category,
+          targetDivision: targetDivision || null,
+          targetJobTitle: targetJobTitle || null
+        }
+      });
+
+      // Update minScore of existing exams if present
+      if (minScore !== undefined) {
+        await (tx as any).exam.updateMany({
+          where: { materialId: id },
+          data: { minScore: parseFloat(minScore) }
+        });
       }
+
+      // If regenerating, perform delete and create inside transaction
+      if (shouldRegenerate && questionsData.length > 0) {
+          // Hapus ujian lama
+          await (tx as any).exam.deleteMany({
+              where: { materialId: id }
+          });
+
+          // Create new exam with AI generated questions
+          await (tx as any).exam.create({
+              data: {
+                  companyId: material.companyId,
+                  materialId: id,
+                  title: `Test Pemahaman: ${title}`,
+                  description: `Ujian otomatis untuk memverifikasi pemahaman Anda tentang ${title}.`,
+                  targetDivision: targetDivision || null,
+                  targetJobTitle: targetJobTitle || null,
+                  minScore: minScore ? parseFloat(minScore) : 70,
+                  questions: {
+                      create: questionsData.map((q: any) => ({
+                          question: q.question,
+                          options: JSON.stringify(q.options),
+                          correctAnswer: q.correctAnswer
+                      }))
+                  }
+              }
+          });
+      }
+
+      return mat;
     });
 
-    // Update minScore of existing exams if present
-    if (minScore !== undefined) {
-      await (prisma as any).exam.updateMany({
-        where: { materialId: id },
-        data: { minScore: parseFloat(minScore) }
-      });
-    }
-
-    // Jika re-generate questions
-    if (regenerateQuestions) {
-        // Hapus ujian lama
-        await (prisma as any).exam.deleteMany({
-            where: { materialId: id }
-        });
-
-        // Generate baru
-        const { generateQuestions } = require('./examAI');
-        const questionsData = await generateQuestions(content, questionCount || 5);
-
-        await (prisma as any).exam.create({
-            data: {
-                companyId: material.companyId,
-                materialId: id,
-                title: `Test Pemahaman: ${title}`,
-                description: `Ujian otomatis untuk memverifikasi pemahaman Anda tentang ${title}.`,
-                targetDivision: targetDivision || null,
-                targetJobTitle: targetJobTitle || null,
-                questions: {
-                    create: questionsData.map((q: any) => ({
-                        question: q.question,
-                        options: JSON.stringify(q.options),
-                        correctAnswer: q.correctAnswer
-                    }))
-                }
-            }
-        });
-    }
-
     res.json(updatedMaterial);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating material:', error);
-    res.status(500).json({ error: 'Gagal memperbarui materi.' });
+    res.status(500).json({ error: `Gagal memperbarui materi: ${error.message || error}` });
   }
 });
 
@@ -6843,48 +6856,53 @@ app.post('/api/learning/materials', tenantMiddleware, learningUpload.single('ima
       imageUrl = `/uploads/learning/${req.file.filename}`;
     }
 
-    // Simpan Material SOP
-    const material = await (prisma as any).learningMaterial.create({
-      data: {
-        companyId: tenantId,
-        title,
-        content,
-        imageUrl,
-        category: category || 'SOP',
-        targetDivision: targetDivision || null,
-        targetJobTitle: targetJobTitle || null
-      }
-    });
-
-    // AI generate questions
+    // 1. AI generate questions first (network call completely independent of database connection pool)
     const { generateQuestions } = require('./examAI');
-    const questionsData = await generateQuestions(content, questionCount || 5);
+    const questionsData = await generateQuestions(content, questionCount ? parseInt(questionCount) : 5);
 
-    // Create Exam based on material
-    const exam = await (prisma as any).exam.create({
-      data: {
-        companyId: tenantId,
-        materialId: material.id,
-        title: `Test Pemahaman: ${title}`,
-        description: `Ujian otomatis untuk memverifikasi pemahaman Anda tentang ${title}.`,
-        targetDivision: targetDivision || null,
-        targetJobTitle: targetJobTitle || null,
-        minScore: minScore ? parseFloat(minScore) : 70,
-        questions: {
-          create: questionsData.map((q: any) => ({
-            question: q.question,
-            options: JSON.stringify(q.options),
-            correctAnswer: q.correctAnswer
-          }))
+    // 2. Perform rapid database writes inside a transaction (minimizing connection pool lock duration)
+    const result = await prisma.$transaction(async (tx) => {
+      // Simpan Material SOP
+      const material = await (tx as any).learningMaterial.create({
+        data: {
+          companyId: tenantId,
+          title,
+          content,
+          imageUrl,
+          category: category || 'SOP',
+          targetDivision: targetDivision || null,
+          targetJobTitle: targetJobTitle || null
         }
-      },
-      include: { questions: true }
+      });
+
+      // Create Exam based on material
+      const exam = await (tx as any).exam.create({
+        data: {
+          companyId: tenantId,
+          materialId: material.id,
+          title: `Test Pemahaman: ${title}`,
+          description: `Ujian otomatis untuk memverifikasi pemahaman Anda tentang ${title}.`,
+          targetDivision: targetDivision || null,
+          targetJobTitle: targetJobTitle || null,
+          minScore: minScore ? parseFloat(minScore) : 70,
+          questions: {
+            create: questionsData.map((q: any) => ({
+              question: q.question,
+              options: JSON.stringify(q.options),
+              correctAnswer: q.correctAnswer
+            }))
+          }
+        },
+        include: { questions: true }
+      });
+
+      return { material, exam };
     });
 
-    res.status(201).json({ material, exam });
-  } catch (error) {
+    res.status(201).json(result);
+  } catch (error: any) {
     console.error('Error creating material/exam:', error);
-    res.status(500).json({ error: 'Gagal memproses material dan membuat ujian.' });
+    res.status(500).json({ error: `Gagal memproses material dan membuat ujian: ${error.message || error}` });
   }
 });
 

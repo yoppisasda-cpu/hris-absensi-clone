@@ -151,8 +151,9 @@ export default function LearningDashboard() {
             setSopMinScore(70); // Reset min score
             setActiveTab('exams');
             fetchData();
-        } catch (err) {
-            alert('Gagal mengupload SOP.');
+        } catch (err: any) {
+            const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Gagal mengupload SOP.';
+            alert(`Gagal mengupload SOP: ${errorMsg}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -254,8 +255,9 @@ export default function LearningDashboard() {
             setSelectedMaterial(null);
             setSopImage(null);
             fetchData();
-        } catch (err) {
-            alert('Gagal memperbarui SOP.');
+        } catch (err: any) {
+            const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Gagal memperbarui SOP.';
+            alert(`Gagal memperbarui SOP: ${errorMsg}`);
         } finally {
             setIsSubmitting(false);
         }

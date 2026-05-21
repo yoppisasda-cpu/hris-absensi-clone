@@ -16,8 +16,8 @@ export async function generateQuestions(content: string, count: number = 5) {
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        // Try gemini-1.5-flash first, fallback to gemini-pro if needed
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        // Using gemini-2.0-flash for high speed and reliable output
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const prompt = `
             Anda adalah seorang spesialis HR Learning & Development yang sangat detail. 
@@ -32,13 +32,13 @@ export async function generateQuestions(content: string, count: number = 5) {
             4. PILIHAN JAWABAN HARUS VARIATIF: Jangan gunakan "Kepatuhan pada standar" di semua soal. Buat pilihan jawaban yang benar-benar berasal dari konteks materi.
             5. JAWABAN PENGECOH: Buat jawaban salah yang terlihat meyakinkan (misal: angka yang salah, atau urutan yang tertukar).
             6. Format output HARUS dalam JSON Array murni tanpa markdown, seperti ini:
-               [
-                 {
-                   "question": "Berapa gram bumbu yang dibutuhkan untuk 1kg ayam?",
-                   "options": ["100g", "250g", "500g", "1000g"],
-                   "correctAnswer": "250g"
-                 }
-               ]
+                [
+                  {
+                    "question": "Berapa gram bumbu yang dibutuhkan untuk 1kg ayam?",
+                    "options": ["100g", "250g", "500g", "1000g"],
+                    "correctAnswer": "250g"
+                  }
+                ]
         `;
 
         console.log("[examAI] Calling Gemini API...");
@@ -49,10 +49,53 @@ export async function generateQuestions(content: string, count: number = 5) {
         
         // Clean the response if it has markdown code blocks
         const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const questions = JSON.parse(cleanedText);
+        let questions = JSON.parse(cleanedText);
         
-        console.log(`[examAI] Successfully parsed ${questions.length} questions.`);
-        return questions.slice(0, count);
+        // Handle cases where the model returns an object wrapping the array
+        if (questions && typeof questions === 'object' && !Array.isArray(questions)) {
+            if (Array.isArray((questions as any).questions)) {
+                questions = (questions as any).questions;
+            } else {
+                const keys = Object.keys(questions);
+                const arrayKey = keys.find(k => Array.isArray((questions as any)[k]));
+                if (arrayKey) {
+                    questions = (questions as any)[arrayKey];
+                } else {
+                    throw new Error("Parsed JSON object does not contain a questions array.");
+                }
+            }
+        }
+
+        if (!Array.isArray(questions)) {
+            throw new Error("Gemini response is not a valid JSON array.");
+        }
+
+        // Validate and normalize schema to prevent database query failures
+        const mappedQuestions = questions.map((q: any) => {
+            const questionText = q.question || q.text || "Pertanyaan Prosedur";
+            
+            let rawOptions = q.options || q.choices || q.answers || [];
+            if (!Array.isArray(rawOptions)) {
+                if (typeof rawOptions === 'string') {
+                    rawOptions = rawOptions.split(',').map((o: string) => o.trim());
+                } else {
+                    rawOptions = [];
+                }
+            }
+            
+            // Provide solid defaults if options are empty
+            const finalOptions = rawOptions.length >= 2 ? rawOptions : ["Kepatuhan pada standar", "Efisiensi biaya", "Kecepatan eksekusi", "Kebersihan area"];
+            const correctAnswer = q.correctAnswer || q.correct_answer || q.answer || finalOptions[0];
+
+            return {
+                question: questionText,
+                options: finalOptions,
+                correctAnswer: correctAnswer
+            };
+        });
+        
+        console.log(`[examAI] Successfully parsed and normalized ${mappedQuestions.length} questions.`);
+        return mappedQuestions.slice(0, count);
     } catch (error: any) {
         console.error("[examAI] CRITICAL ERROR calling Gemini AI:", error.message);
         if (error.stack) console.error(error.stack);
