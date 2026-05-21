@@ -116,8 +116,8 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                             <TrendingUp className="h-6 w-6 stroke-[2.5px]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Fiscal Accretion Node</h3>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">{initialData ? 'Update Record Protocol' : 'Cash-In Initialization'}</p>
+                            <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">Pemasukan Kas (Cash-In)</h3>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">{initialData ? 'Protokol Pembaruan Data' : 'Pencatatan Pemasukan Kas'}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
@@ -128,7 +128,7 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                 <form onSubmit={handleSubmit} className="p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Temporal Directive</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Tanggal Transaksi</label>
                             <input
                                 type="date"
                                 required
@@ -138,7 +138,7 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] italic ml-1 font-black">Accretion Magnitude (IDR)</label>
+                            <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] italic ml-1 font-black">Jumlah Pemasukan (IDR)</label>
                             <div className="relative">
                                 <input
                                     type="number"
@@ -155,7 +155,7 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
 
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1 flex items-center gap-2">
-                            <Wallet className="h-3 w-3" /> Target Vault (Cash-In)
+                            <Wallet className="h-3 w-3" /> Kas/Bank Penerima
                         </label>
                         <select
                             required
@@ -171,10 +171,10 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
 
                     <div className="space-y-2">
                         <div className="flex justify-between items-center ml-1">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Classification Vector</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Kategori Pemasukan</label>
                             {!showNewCategory && (
                                 <button type="button" onClick={() => setShowNewCategory(true)} className="text-[9px] font-black text-emerald-400 hover:text-emerald-300 flex items-center gap-2 uppercase tracking-[0.2em] italic transition-colors">
-                                    <Plus className="h-3 w-3 stroke-[3px]" /> NEW_TAG
+                                    <Plus className="h-3 w-3 stroke-[3px]" /> KATEGORI_BARU
                                 </button>
                             )}
                         </div>
@@ -183,12 +183,12 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                             <div className="flex gap-4 animate-in fade-in slide-in-from-top-2 duration-300 p-2 bg-slate-950 border border-emerald-500/20 rounded-[2rem]">
                                 <input
                                     type="text"
-                                    placeholder="INPUT NEW SCHE MA..."
+                                    placeholder="MASUKKAN KATEGORI BARU..."
                                     value={newCategoryName}
                                     onChange={(e) => setNewCategoryName(e.target.value)}
                                     className="flex-1 bg-transparent px-6 py-3 text-xs font-black text-white outline-none italic uppercase tracking-widest placeholder:text-slate-900"
                                 />
-                                <button type="button" onClick={handleCreateCategory} className="bg-emerald-600 text-white px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic shadow-lg shadow-emerald-600/20">COMMIT</button>
+                                <button type="button" onClick={handleCreateCategory} className="bg-emerald-600 text-white px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic shadow-lg shadow-emerald-600/20">SIMPAN</button>
                                 <button type="button" onClick={() => setShowNewCategory(false)} className="text-slate-500 px-3 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
                             </div>
                         ) : (
@@ -206,10 +206,10 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Entity Source / Origin</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Asal / Sumber Dana</label>
                         <input
                             type="text"
-                            placeholder="EX: CORPORATE_CLIENT // INTERNAL_TRANSFER..."
+                            placeholder="CONTOH: KLIEN KORPORAT // TRANSFER INTERNAL..."
                             value={formData.receivedFrom}
                             onChange={(e) => setFormData({ ...formData, receivedFrom: e.target.value })}
                             className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-emerald-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-slate-900"
@@ -217,9 +217,9 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Internal Directives / Notes</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Catatan / Keterangan</label>
                         <textarea
-                            placeholder="INPUT TRANSACTIONAL DATA ANCHORS..."
+                            placeholder="MASUKKAN CATATAN / KETERANGAN TRANSAKSI..."
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             className="w-full bg-slate-950 border border-slate-800 rounded-[2rem] px-8 py-6 text-xs font-black text-white focus:border-emerald-500/50 outline-none transition-all min-h-[120px] italic no-scrollbar uppercase tracking-widest placeholder:text-slate-900 shadow-inner resize-none"
@@ -232,7 +232,7 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                             onClick={onClose}
                             className="flex-1 rounded-2xl bg-white/5 border border-white/5 py-5 text-[10px] font-black text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-[0.3em] italic"
                         >
-                            Abort
+                            Batal
                         </button>
                         <button
                             type="submit"
@@ -242,7 +242,7 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                             {loading ? (
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                             ) : (
-                                <><Save className="h-4 w-4 stroke-[3px]" /> {initialData ? 'Update Record' : 'Transmit Schema'}</>
+                                <><Save className="h-4 w-4 stroke-[3px]" /> {initialData ? 'Simpan Perubahan' : 'Simpan Transaksi'}</>
                             )}
                         </button>
                     </div>
