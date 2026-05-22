@@ -127,6 +127,19 @@ const runAutoMigration = async () => {
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "pointsUsed" INTEGER DEFAULT 0`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "saleType" TEXT DEFAULT 'RETAIL'`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "taxRate" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "taxAmount" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "branchId" INTEGER`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "cashierId" INTEGER`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "totalCommission" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "serviceFee" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "markupPercentage" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "memberDiscountAmount" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "pointsEarned" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "voucherCode" TEXT`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "voucherDiscountAmount" FLOAT DEFAULT 0`,
+    `ALTER TABLE "SaleItem" ADD COLUMN IF NOT EXISTS "originalPrice" FLOAT DEFAULT 0`,
+    `ALTER TABLE "SaleItem" ADD COLUMN IF NOT EXISTS "modifiers" JSON`,
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "paidAmount" FLOAT DEFAULT 0`,
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "supplierId" INTEGER`,
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "productId" INTEGER`,
@@ -14598,8 +14611,9 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
   }
 });
 
-// 2. POS Checkout (Branch-Specific Stock Deduction)
+// POS 1. Checkout (Hybrid Sync & Online)
 app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Response) => {
+  console.log("=== CHECKOUT REACHED ===", req.body?.offlineInvoiceNumber ? "[OFFLINE SYNC]" : "[ONLINE CHECKOUT]");
   try {
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
@@ -14674,7 +14688,15 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       }, 0);
 
       // 1. Create Sale
-      const invoiceNumber = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const invoiceNumber = req.body.offlineInvoiceNumber || `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      const existingSale = await tx.sale.findUnique({
+        where: { invoiceNumber }
+      });
+      if (existingSale) {
+        return existingSale;
+      }
+
       const sale = await tx.sale.create({
         data: {
           companyId: tenantId,
@@ -14738,16 +14760,18 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             });
         });
 
-        // 1.7 Validate Stock before proceeding
+        // 1.7 Validate Stock before proceeding (Skip validation for offline synchronized sales since they have already been finalized)
         const productsInCart = await tx.product.findMany({
             where: { id: { in: productIds } },
             select: { id: true, name: true, stock: true, trackStock: true }
         });
 
-        for (const item of items) {
-            const product = productsInCart.find(p => p.id === Number(item.productId));
-            if (product && product.trackStock && product.stock < Number(item.quantity)) {
-                throw new Error(`Stok tidak mencukupi untuk produk: ${product.name}. Stok tersedia: ${product.stock}`);
+        if (!req.body.offlineInvoiceNumber) {
+            for (const item of items) {
+                const product = productsInCart.find(p => p.id === Number(item.productId));
+                if (product && product.trackStock && product.stock < Number(item.quantity)) {
+                    throw new Error(`Stok tidak mencukupi untuk produk: ${product.name}. Stok tersedia: ${product.stock}`);
+                }
             }
         }
 

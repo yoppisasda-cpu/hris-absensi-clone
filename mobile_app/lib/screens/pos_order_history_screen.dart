@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../providers/auth_provider.dart';
 import 'package:intl/intl.dart';
 import '../services/printer_service.dart';
+import '../services/pos_local_db_service.dart';
 
 class PosOrderHistoryScreen extends StatefulWidget {
   @override
@@ -24,8 +25,29 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
   Future<void> _fetchOrders() async {
     setState(() => _isLoading = true);
     try {
-      final data = await _apiService.getPosOrders();
-      setState(() => _orders = data);
+      final onlineData = await _apiService.getPosOrders();
+      
+      // Mengambil transaksi offline yang BELUM tersinkron
+      final offlineSales = PosLocalDbService.getOfflineSales();
+      final localData = offlineSales.map((sale) => {
+        'id': 'offline_${sale['localInvoiceNumber']}',
+        'invoiceNumber': sale['localInvoiceNumber'],
+        'date': sale['date'] ?? DateTime.now().toIso8601String(),
+        'totalAmount': sale['totalAmount'],
+        'status': 'MENUNGGU SINKRON',
+        'saleType': sale['saleType'] ?? 'WALK_IN',
+        'items': (sale['items'] as List).map((it) => {
+            ...it,
+            'product_name': it['name'] ?? it['productName'] ?? 'Produk',
+            'quantity': it['quantity'],
+            'price': it['price'],
+            'total': it['total'],
+        }).toList(),
+        'isOffline': true,
+        'totalCommission': 0.0,
+      }).toList();
+
+      setState(() => _orders = [...localData, ...onlineData]);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal mengambil riwayat: $e'), backgroundColor: Colors.red),
@@ -141,14 +163,27 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
     final userRole = Provider.of<AuthProvider>(context, listen: false).userRole;
     final isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER'].contains(userRole);
 
-    showDialog(
-      context: context,
-      builder: (context) => Center(child: CircularProgressIndicator()),
-    );
+    dynamic detail;
+    if (order['isOffline'] == true) {
+      detail = order;
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => Center(child: CircularProgressIndicator()),
+      );
+      try {
+        detail = await _apiService.getSaleDetail(order['id']);
+        Navigator.pop(context); // Close loading
+      } catch (e) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memuat detail: $e'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+    }
 
     try {
-      final detail = await _apiService.getSaleDetail(order['id']);
-      Navigator.pop(context); // Close loading
 
       showModalBottomSheet(
         context: context,
@@ -234,14 +269,14 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                         ),
                         onPressed: () {
                           // Prepare data for printer
-                          final printData = {
+                          final printData = Map<String, dynamic>.from({
                             ...detail,
-                            'items': (detail['items'] as List).map((it) => {
+                            'items': (detail['items'] as List).map((it) => Map<String, dynamic>.from({
                               ...it,
                               'name': it['product_name'],
                               'modifiers': it['modifiers'],
-                            }).toList(),
-                          };
+                            })).toList(),
+                          });
                           final printer = Provider.of<PrinterService>(context, listen: false);
                           printer.printReceipt(printData);
                         },
@@ -258,14 +293,14 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                           padding: EdgeInsets.symmetric(vertical: 12),
                         ),
                         onPressed: () {
-                          final printData = {
+                          final printData = Map<String, dynamic>.from({
                             ...detail,
-                            'items': (detail['items'] as List).map((it) => {
+                            'items': (detail['items'] as List).map((it) => Map<String, dynamic>.from({
                               ...it,
                               'name': it['product_name'],
                               'modifiers': it['modifiers'],
-                            }).toList(),
-                          };
+                            })).toList(),
+                          });
                           final printer = Provider.of<PrinterService>(context, listen: false);
                           printer.printKitchenReceipt(printData);
                         },
@@ -273,26 +308,28 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                         label: Text('DAPUR', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red[50],
-                          foregroundColor: Colors.red[800],
-                          side: BorderSide(color: Colors.red[200]!),
-                          padding: EdgeInsets.symmetric(vertical: 12),
+                    if (detail['isOffline'] != true) ...[
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red[50],
+                            foregroundColor: Colors.red[800],
+                            side: BorderSide(color: Colors.red[200]!),
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () => _handleRefund(detail),
+                          icon: Icon(Icons.undo),
+                          label: Text('REFUND FULL', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
-                        onPressed: () => _handleRefund(detail),
-                        icon: Icon(Icons.undo),
-                        label: Text('REFUND FULL', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ],
               
               // Status Action Buttons
-              if (detail['status'] == 'PROCESSING' || detail['status'] == 'READY') ...[
+              if (detail['isOffline'] != true && (detail['status'] == 'PROCESSING' || detail['status'] == 'READY')) ...[
                 SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -351,6 +388,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
       case 'READY': color = Colors.purple; break;
       case 'PAID': color = Colors.green; break;
       case 'CANCELLED': color = Colors.red; break;
+      case 'MENUNGGU SINKRON': color = Colors.orange[800]!; break;
       default: color = Colors.grey;
     }
     return Container(

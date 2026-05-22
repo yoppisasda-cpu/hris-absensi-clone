@@ -9,6 +9,8 @@ import 'pos_closing_screen.dart';
 import 'printer_settings_screen.dart';
 import '../services/socket_service.dart';
 import 'package:provider/provider.dart';
+import '../services/pos_local_db_service.dart';
+import '../services/pos_sync_manager.dart';
 
 class POSScreen extends StatefulWidget {
   @override
@@ -81,8 +83,35 @@ class _POSScreenState extends State<POSScreen> {
 
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
+
+    // 1. LOAD FROM LOCAL DB CACHE FIRST (Instant Load)
     try {
-      // Parallelize API calls for better performance
+      final cachedProducts = PosLocalDbService.getCachedProducts();
+      final cachedCategories = PosLocalDbService.getCachedCategories();
+      final cachedAccounts = PosLocalDbService.getCachedAccounts();
+
+      if (cachedProducts.isNotEmpty || cachedCategories.isNotEmpty || cachedAccounts.isNotEmpty) {
+        setState(() {
+          _products = cachedProducts;
+          _categories = cachedCategories;
+          _accounts = cachedAccounts;
+          if (_accounts.isNotEmpty) {
+             _selectedPaymentMethod = 'Tunai';
+             final cashAcc = _accounts.firstWhere(
+               (a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), 
+               orElse: () => _accounts.first
+             );
+             _selectedAccountId = cashAcc['id'];
+          }
+          _isLoading = false; // Render catalog instantly
+        });
+      }
+    } catch (e) {
+      print("Failed to load cached POS data: $e");
+    }
+
+    // 2. BACKGROUND SYNC FROM NETWORK
+    try {
       final results = await Future.wait([
         _apiService.getPosProducts(),
         _apiService.getPosCategories(),
@@ -92,6 +121,17 @@ class _POSScreenState extends State<POSScreen> {
       final prods = results[0];
       final cats = results[1];
       final accs = results[2];
+
+      // Update cache
+      if (prods.isNotEmpty) {
+        await PosLocalDbService.cacheProducts(prods);
+      }
+      if (cats.isNotEmpty) {
+        await PosLocalDbService.cacheCategories(cats);
+      }
+      if (accs.isNotEmpty) {
+        await PosLocalDbService.cacheAccounts(accs);
+      }
 
       setState(() {
         _products = prods;
@@ -106,10 +146,19 @@ class _POSScreenState extends State<POSScreen> {
            _selectedAccountId = cashAcc['id'];
         }
       });
+
+      // Background Sync for offline sales
+      PosSyncManager.syncOfflineSales().then((_) {
+        if (mounted) setState(() {});
+      });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengambil data POS: $e')),
-      );
+      print("Failed to sync fresh POS data: $e");
+      // If we don't even have cached data, show the error alert
+      if (_products.isEmpty && _categories.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Offline: Gagal mengambil data POS dari server. Koneksi internet terganggu.')),
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -993,17 +1042,18 @@ class _POSScreenState extends State<POSScreen> {
   Future<void> _processCheckout(BuildContext currentContext, {bool isModal = true}) async {
     if (isModal) Navigator.pop(currentContext);
     setState(() => _isLoading = true);
-    try {
-      final checkoutItems = _cart.map((item) {
-        final salePrice = _getItemPrice(item);
-        return {
-          ...item,
-          'price': salePrice,
-          'originalPrice': item['price'],
-          'total': salePrice * item['quantity'],
-        };
-      }).toList();
+    
+    final checkoutItems = _cart.map((item) {
+      final salePrice = _getItemPrice(item);
+      return {
+        ...item,
+        'price': salePrice,
+        'originalPrice': item['price'],
+        'total': salePrice * item['quantity'],
+      };
+    }).toList();
 
+    try {
       final response = await _apiService.checkoutPos(
         items: checkoutItems,
         accountId: _selectedAccountId!,
@@ -1116,38 +1166,194 @@ class _POSScreenState extends State<POSScreen> {
         ),
       );
 
-      // AFTER dialog is closed, then clear everything
-      setState(() {
-        _cart.clear();
-        _customerNameController.clear();
-        _customerPhoneController.clear();
-        _activeCustomerId = null;
-        _voucherController.clear();
-        _usePoints = false;
-        _availablePoints = 0;
-        _memberDiscountAmount = 0;
-        _voucherDiscountAmount = 0;
-        _pointsUsed = 0;
-        _pointsEarned = 0;
-        _pointValueUsed = 0;
-        _calculatedFinalTotal = 0;
-        _cashReceived = 0;
-        _cashReceivedController.clear();
-      });
+      _clearCartAndInputs();
     } catch (e) {
-      showDialog(
+      setState(() => _isLoading = false);
+      if (!mounted) return;
+
+      final errorMsg = e.toString();
+      final isNetworkError = errorMsg.contains('NETWORK_ERROR');
+
+      if (!isNetworkError) {
+        // SERVER REJECTED IT (e.g. Stock Insufficient, Invalid Voucher, etc)
+        // Show as a SnackBar error and DO NOT save offline
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(child: Text(errorMsg.replaceAll('Exception: ', ''))),
+              ],
+            ),
+            backgroundColor: Colors.red[800],
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return; // Stop checkout process
+      }
+
+      // IF NETWORK FAILS (No internet connection or timeout), ASK IF THEY WANT TO SAVE OFFLINE
+      final bool saveOffline = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Gagal Checkout'),
-          content: Text('$e'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.wifi_off, color: Colors.orange[800], size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Koneksi Terganggu',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Gagal memproses transaksi online ($e).\n\nApakah Anda ingin menyimpan transaksi ini secara OFFLINE untuk dicetak sekarang? Transaksi akan otomatis sinkron setelah internet kembali.',
+            style: TextStyle(color: Colors.blueGrey[800]),
+          ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text('OK')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Batal', style: TextStyle(color: Colors.blueGrey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange[800],
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('Ya, Simpan Offline'),
+            ),
           ],
         ),
-      );
+      ) ?? false;
+
+      if (saveOffline) {
+        setState(() => _isLoading = true);
+        
+        final String localInvoiceNumber = "INV-OFFLINE-${DateTime.now().millisecondsSinceEpoch}";
+        
+        final offlineSaleData = {
+          'localInvoiceNumber': localInvoiceNumber,
+          'invoiceNumber': localInvoiceNumber,
+          'items': checkoutItems,
+          'accountId': _selectedAccountId!,
+          'totalAmount': _grandTotal,
+          'cashReceived': _cashReceived > 0 ? _cashReceived : _grandTotal,
+          'customerId': _activeCustomerId,
+          'customerName': _customerNameController.text.trim(),
+          'customerPhone': _customerPhoneController.text.trim(),
+          'saleType': _saleType,
+          'notes': _selectedPaymentMethod != 'Tunai' ? '[Offline] [Metode: $_selectedPaymentMethod]' : '[Offline]',
+          'memberDiscountAmount': _memberDiscountAmount,
+          'voucherCode': _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
+          'voucherDiscountAmount': _voucherDiscountAmount,
+          'pointsUsed': _pointsUsed,
+          'pointsEarned': _pointsEarned,
+          'paymentMethod': _selectedPaymentMethod,
+          'date': DateTime.now().toIso8601String(),
+          'isSynced': false,
+        };
+
+        // Save to Hive offline sale box
+        await PosLocalDbService.saveOfflineSale(offlineSaleData);
+        setState(() => _isLoading = false);
+
+        // Auto print receipt offline if enabled
+        _printerService.isAutoPrintEnabled().then((enabled) {
+          if (enabled) {
+            _printerService.printReceipt(offlineSaleData);
+          }
+        });
+
+        // Unfocus active fields
+        FocusScope.of(context).unfocus();
+
+        // Show offline success dialog
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Column(
+              children: [
+                Icon(Icons.cloud_queue, color: Colors.orange[800], size: 64),
+                SizedBox(height: 16),
+                Text('Tersimpan Offline!', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(
+              'Pesanan #$localInvoiceNumber berhasil disimpan secara lokal.\n\nStruk bisa dicetak secara offline sekarang.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.blueGrey[800]),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _printerService.printReceipt(offlineSaleData),
+                    icon: Icon(Icons.print, color: Colors.white),
+                    label: Text('CETAK STRUK OFFLINE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange[800],
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _printerService.printKitchenReceipt(offlineSaleData),
+                    icon: Icon(Icons.restaurant, color: Colors.white),
+                    label: Text('CETAK DAPUR OFFLINE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: Colors.orange[900],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: Text('OK, KEMBALI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                  ),
+                ],
+              )
+            ],
+          ),
+        );
+
+        _clearCartAndInputs();
+      }
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _clearCartAndInputs() {
+    setState(() {
+      _cart.clear();
+      _customerNameController.clear();
+      _customerPhoneController.clear();
+      _activeCustomerId = null;
+      _voucherController.clear();
+      _usePoints = false;
+      _availablePoints = 0;
+      _memberDiscountAmount = 0;
+      _voucherDiscountAmount = 0;
+      _pointsUsed = 0;
+      _pointsEarned = 0;
+      _pointValueUsed = 0;
+      _calculatedFinalTotal = 0;
+      _cashReceived = 0;
+      _cashReceivedController.clear();
+    });
   }
 
   void _handleProductTap(dynamic p) {
@@ -1265,6 +1471,50 @@ class _POSScreenState extends State<POSScreen> {
         elevation: 0.5,
         foregroundColor: Colors.black,
         actions: [
+          (() {
+            final int pendingSyncCount = PosSyncManager.getPendingCount();
+            if (pendingSyncCount == 0) return SizedBox();
+
+            return IconButton(
+              icon: Badge(
+                label: Text(pendingSyncCount.toString()),
+                child: Icon(Icons.cloud_upload_outlined, color: Colors.orange[800]),
+              ),
+              tooltip: 'Sinkronkan $pendingSyncCount Transaksi Offline',
+              onPressed: () async {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Menyinkronkan transaksi offline...'),
+                      ],
+                    ),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+                final lastError = await PosSyncManager.syncOfflineSales(force: true);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      PosSyncManager.getPendingCount() == 0
+                          ? 'Semua transaksi offline berhasil disinkronkan!'
+                          : (lastError != null 
+                              ? 'Gagal sinkron: $lastError'
+                              : 'Beberapa transaksi gagal disinkronkan. Periksa koneksi internet.'),
+                    ),
+                    backgroundColor: PosSyncManager.getPendingCount() == 0 ? Colors.green : Colors.red,
+                  ),
+                );
+              },
+            );
+          })(),
           Consumer<SocketService>(
             builder: (context, socket, _) => IconButton(
               icon: Badge(

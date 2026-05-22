@@ -5,8 +5,12 @@ import 'package:flutter/foundation.dart';
 class ApiService {
   // URL API akan otomatis berubah tergantung mode (Debug vs Release/Google Play)
   // PENTING: Jika menggunakan HP asli (Debug), ganti IP di bawah jika tidak menggunakan emulator
-  static const String baseUrl = 'https://api.aivola.id/api'; // FORCE PRODUCTION SERVER FOR LIVE TESTING
-  final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
+  static const String baseUrl = 'https://api.aivola.id/api'; // POINT TO PRODUCTION BACKEND
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: baseUrl,
+    connectTimeout: Duration(milliseconds: 15000),
+    receiveTimeout: Duration(milliseconds: 15000),
+  ));
 
   ApiService() {
     _dio.interceptors.add(
@@ -675,6 +679,7 @@ class ApiService {
     double voucherDiscountAmount = 0,
     double pointsUsed = 0,
     double pointsEarned = 0,
+    String? offlineInvoiceNumber,
   }) async {
     try {
       final response = await _dio.post('/pos/checkout', data: {
@@ -693,15 +698,27 @@ class ApiService {
         'voucherDiscountAmount': voucherDiscountAmount,
         'pointsUsed': pointsUsed,
         'pointsEarned': pointsEarned,
+        'offlineInvoiceNumber': offlineInvoiceNumber,
       });
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      if (e.response != null && e.response?.data['error'] != null) {
-        throw Exception(e.response?.data['error']);
+      if (e.type == DioExceptionType.connectionTimeout || 
+          e.type == DioExceptionType.receiveTimeout || 
+          e.type == DioExceptionType.sendTimeout || 
+          e.type == DioExceptionType.connectionError) {
+        throw Exception('NETWORK_ERROR');
+      }
+      if (e.response != null) {
+        if (e.response?.data is Map && e.response?.data['error'] != null) {
+          throw Exception(e.response?.data['error']);
+        }
       }
       throw Exception('Gagal memproses checkout kasir.');
     } catch (e) {
-      throw Exception('Terjadi kesalahan saat checkout.');
+      if (e.toString().contains('SocketException')) {
+        throw Exception('NETWORK_ERROR');
+      }
+      throw Exception('Terjadi kesalahan saat checkout: $e');
     }
   }
 
