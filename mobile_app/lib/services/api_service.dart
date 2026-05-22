@@ -680,6 +680,8 @@ class ApiService {
     double pointsUsed = 0,
     double pointsEarned = 0,
     String? offlineInvoiceNumber,
+    double taxRate = 0,
+    double taxAmount = 0,
   }) async {
     try {
       final response = await _dio.post('/pos/checkout', data: {
@@ -699,6 +701,8 @@ class ApiService {
         'pointsUsed': pointsUsed,
         'pointsEarned': pointsEarned,
         'offlineInvoiceNumber': offlineInvoiceNumber,
+        'taxRate': taxRate,
+        'taxAmount': taxAmount,
       });
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
