@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Company" ADD COLUMN "globalTaxRate" DOUBLE PRECISION DEFAULT 0;
