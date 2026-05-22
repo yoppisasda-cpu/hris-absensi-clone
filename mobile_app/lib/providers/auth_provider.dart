@@ -34,6 +34,9 @@ class AuthProvider with ChangeNotifier {
     if (user['branchId'] != null) {
       await prefs.setInt('branchId', user['branchId']);
     }
+    if (user['company'] != null) {
+      await prefs.setDouble('globalTaxRate', (user['company']['globalTaxRate'] ?? 0).toDouble());
+    }
 
     _companyId = user['companyId'].toString();
     _userId = user['id'];

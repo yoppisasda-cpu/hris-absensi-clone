@@ -1468,7 +1468,8 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
             primaryColor: true,
             secondaryColor: true,
             plan: true, 
-            addons: true 
+            addons: true,
+            globalTaxRate: true
           } 
         } 
       }
@@ -2624,7 +2625,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       primaryColor, secondaryColor,
       timezone,
       addons,
-      posBlindClosing
+      posBlindClosing,
+      globalTaxRate
     } = req.body;
 
     console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
@@ -2669,6 +2671,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         waGatewayUrl: waGatewayUrl !== undefined ? waGatewayUrl : undefined,
         waProspectTemplate: waProspectTemplate !== undefined ? waProspectTemplate : undefined,
         posBlindClosing: posBlindClosing !== undefined ? !!posBlindClosing : undefined,
+        globalTaxRate: parseNum(globalTaxRate),
         timezone: timezone || undefined,
         addons: Array.isArray(addons) ? addons : undefined
       }
@@ -2698,7 +2701,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons, purchasedInsights,
       discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion, discountProspecting,
-      adminEmail, adminPassword, adminName
+      adminEmail, adminPassword, adminName, globalTaxRate
     } = req.body;
 
     const payloadToLog = { 
@@ -2740,7 +2743,8 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         discountAi: safeParseInt(discountAi),
         discountFraud: safeParseInt(discountFraud),
         discountExpansion: safeParseInt(discountExpansion),
-        discountProspecting: safeParseInt(discountProspecting)
+        discountProspecting: safeParseInt(discountProspecting),
+        globalTaxRate: (globalTaxRate !== undefined && globalTaxRate !== null) ? parseFloat(globalTaxRate.toString()) : undefined
       }
     });
 

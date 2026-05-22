@@ -57,6 +57,7 @@ model Company {
   memberDiscountValue    Float                @default(0)
   pointsEarnRatio        Float                @default(0)
   pointsRedeemValue      Float                @default(0)
+  globalTaxRate          Float                @default(0)
   discountProspecting    Int                  @default(0)
   waProspectTemplate     String?
   timezone               String               @default("Asia/Jakarta")

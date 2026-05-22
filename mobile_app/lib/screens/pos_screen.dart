@@ -51,8 +51,7 @@ class _POSScreenState extends State<POSScreen> {
   double _pointValueUsed = 0;
   double _calculatedFinalTotal = 0;
   
-  bool _applyTax = false;
-  double _taxRate = 10.0;
+  double _globalTaxRate = 0.0;
 
   @override
   void initState() {
@@ -86,6 +85,13 @@ class _POSScreenState extends State<POSScreen> {
 
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _globalTaxRate = prefs.getDouble('globalTaxRate') ?? 0.0;
+    } catch (e) {
+      print("Failed to load global tax rate: $e");
+    }
 
     // 1. LOAD FROM LOCAL DB CACHE FIRST (Instant Load)
     try {
@@ -233,10 +239,10 @@ class _POSScreenState extends State<POSScreen> {
   }
 
   double get _taxAmount {
-    if (!_applyTax) return 0;
+    if (_globalTaxRate <= 0) return 0;
     double base = _subtotalAmount - _memberDiscountAmount - _voucherDiscountAmount - _pointValueUsed;
     if (base < 0) base = 0;
-    return base * (_taxRate / 100);
+    return base * (_globalTaxRate / 100);
   }
 
   double get _grandTotal {
@@ -719,35 +725,7 @@ class _POSScreenState extends State<POSScreen> {
                     ),
                   ),
                 ],
-                if (_saleType == 'WALK_IN' || _saleType == 'DINE_IN') ...[
-                  SizedBox(height: 16),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red[100]!)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Kenakan Pajak PB1 (${_taxRate.toStringAsFixed(0)}%)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red[800])),
-                            Text('Ditambahkan ke total bayar', style: TextStyle(fontSize: 12, color: Colors.red[600])),
-                          ],
-                        ),
-                        Switch(
-                          value: _applyTax,
-                          activeColor: Colors.red,
-                          onChanged: (val) {
-                            setPanelState(() {
-                              _applyTax = val;
-                            });
-                            setState((){});
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+
                 SizedBox(height: 24),
                 
                 Container(
@@ -762,8 +740,8 @@ class _POSScreenState extends State<POSScreen> {
                         _buildSummaryRow('Voucher Dipakai', '- Rp ${_voucherDiscountAmount.toStringAsFixed(0)}', isPositive: true),
                       if (_pointValueUsed > 0)
                         _buildSummaryRow('Poin Ditukar', '- Rp ${_pointValueUsed.toStringAsFixed(0)}', isPositive: true),
-                      if (_applyTax)
-                        _buildSummaryRow('Pajak PB1 (${_taxRate.toStringAsFixed(0)}%)', '+ Rp ${_taxAmount.toStringAsFixed(0)}'),
+                      if (_globalTaxRate > 0)
+                        _buildSummaryRow('Pajak (${_globalTaxRate.toStringAsFixed(0)}%)', '+ Rp ${_taxAmount.toStringAsFixed(0)}'),
                       Divider(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1112,7 +1090,7 @@ class _POSScreenState extends State<POSScreen> {
         voucherDiscountAmount: _voucherDiscountAmount,
         pointsUsed: _pointsUsed,
         pointsEarned: _pointsEarned,
-        taxRate: _applyTax ? _taxRate : 0,
+        taxRate: _globalTaxRate,
         taxAmount: _taxAmount,
       );
 
@@ -1298,7 +1276,7 @@ class _POSScreenState extends State<POSScreen> {
           'voucherDiscountAmount': _voucherDiscountAmount,
           'pointsUsed': _pointsUsed,
           'pointsEarned': _pointsEarned,
-          'taxRate': _applyTax ? _taxRate : 0,
+          'taxRate': _globalTaxRate,
           'taxAmount': _taxAmount,
           'paymentMethod': _selectedPaymentMethod,
           'date': DateTime.now().toIso8601String(),
@@ -1397,7 +1375,6 @@ class _POSScreenState extends State<POSScreen> {
       _pointsEarned = 0;
       _pointValueUsed = 0;
       _calculatedFinalTotal = 0;
-      _applyTax = false;
       _cashReceived = 0;
       _cashReceivedController.clear();
     });

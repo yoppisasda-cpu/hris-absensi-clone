@@ -32,6 +32,7 @@ interface Company {
     primaryColor: string | null;
     secondaryColor: string | null;
     posBlindClosing: boolean;
+    globalTaxRate: number;
 }
 
 export default function CompanyProfilePage() {
@@ -54,7 +55,8 @@ export default function CompanyProfilePage() {
         timezone: 'Asia/Jakarta',
         primaryColor: '#3B82F6',
         secondaryColor: '#1E293B',
-        posBlindClosing: false
+        posBlindClosing: false,
+        globalTaxRate: 0
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -98,7 +100,8 @@ export default function CompanyProfilePage() {
                 timezone: response.data.timezone || 'Asia/Jakarta',
                 primaryColor: response.data.primaryColor || '#3B82F6',
                 secondaryColor: response.data.secondaryColor || '#1E293B',
-                posBlindClosing: response.data.posBlindClosing || false
+                posBlindClosing: response.data.posBlindClosing || false,
+                globalTaxRate: response.data.globalTaxRate || 0
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -143,7 +146,8 @@ export default function CompanyProfilePage() {
                 timezone: formData.timezone,
                 primaryColor: formData.primaryColor,
                 secondaryColor: formData.secondaryColor,
-                posBlindClosing: formData.posBlindClosing
+                posBlindClosing: formData.posBlindClosing,
+                globalTaxRate: formData.globalTaxRate
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -576,6 +580,28 @@ export default function CompanyProfilePage() {
                                         >
                                             <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.posBlindClosing ? 'translate-x-6' : 'translate-x-1'}`} />
                                         </button>
+                                    </div>
+                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mt-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-12 w-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-200">
+                                                <span className="font-black text-xl">%</span>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-800">Pajak Transaksi Kasir (Global Tax)</h4>
+                                                <p className="text-xs text-slate-500 max-w-sm mt-0.5">Semua transaksi kasir akan otomatis ditambahkan pajak sebesar persentase ini. Isi 0 jika tanpa pajak.</p>
+                                            </div>
+                                        </div>
+                                        <div className="relative w-24">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                value={formData.globalTaxRate}
+                                                onChange={e => setFormData({ ...formData, globalTaxRate: parseFloat(e.target.value) || 0 })}
+                                                className="w-full rounded-xl border border-slate-200 py-3 pl-4 pr-8 text-sm font-bold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-center"
+                                            />
+                                            <span className="absolute right-3 top-3.5 text-slate-400 font-bold">%</span>
+                                        </div>
                                     </div>
                                 </div>
 
