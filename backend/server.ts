@@ -4089,36 +4089,37 @@ async function clockInHandler(req: Request, res: Response) {
       }
     });
 
-    // --- AI MOOD ANALYSIS (Phase 36) ---
+    // --- AI MOOD ANALYSIS (Phase 36) - BACKGROUND JOB ---
     if (photoUrl) {
         const fullPath = path.join(process.cwd(), photoUrl.replace(/^\/+/, ""));
-        console.log(`[Mood AI] Analyzing photo at: ${fullPath}`);
-        if (fs.existsSync(fullPath)) {
-            try {
-                const { analyzeMood } = require('./moodAI');
-                const moodResult = await analyzeMood(fullPath);
-                console.log(`[Mood AI] Result for attendance ${attendance.id}:`, moodResult);
-                await (prisma.attendance as any).update({
-                    where: { id: attendance.id },
-                    data: {
-                        mood: moodResult.mood,
-                        moodScore: moodResult.score
-                    }
-                });
-                // Update response object for mobile
-                (attendance as any).mood = moodResult.mood;
-                (attendance as any).moodScore = moodResult.score;
-            } catch (moodErr) {
-                console.error('[Mood AI] Error during analysis:', moodErr);
+        console.log(`[Mood AI] Queuing photo for background analysis: ${fullPath}`);
+        
+        // Jalankan secara asynchronous tanpa me-lock response HTTP
+        (async () => {
+            if (fs.existsSync(fullPath)) {
+                try {
+                    const { analyzeMood } = require('./moodAI');
+                    const moodResult = await analyzeMood(fullPath);
+                    console.log(`[Mood AI] Background Result for attendance ${attendance.id}:`, moodResult);
+                    await (prisma.attendance as any).update({
+                        where: { id: attendance.id },
+                        data: {
+                            mood: moodResult.mood,
+                            moodScore: moodResult.score
+                        }
+                    });
+                } catch (moodErr) {
+                    console.error('[Mood AI] Background Error during analysis:', moodErr);
+                }
+            } else {
+                console.warn(`[Mood AI] Photo file not found for analysis: ${fullPath}`);
             }
-        } else {
-            console.warn(`[Mood AI] Photo file not found for analysis: ${fullPath}`);
-        }
-        // Cleanup after Supabase upload and AI processing
-        // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
-        if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
-            cleanupLocalFile(fullPath);
-        }
+            // Cleanup after Supabase upload and AI processing
+            // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
+            if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
+                cleanupLocalFile(fullPath);
+            }
+        })();
     }
 
     // TRIGGER NOTIFIKASI KE ADMIN
@@ -4383,33 +4384,36 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
       }
     });
 
-    // --- AI MOOD ANALYSIS (Phase 36) - Clock Out ---
+    // --- AI MOOD ANALYSIS (Phase 36) - Clock Out (BACKGROUND JOB) ---
     if (photoUrl) {
         const fullPath = path.join(process.cwd(), photoUrl.replace(/^\/+/, ""));
-        if (fs.existsSync(fullPath)) {
-            try {
-                const { analyzeMood } = require('./moodAI');
-                const moodResult = await analyzeMood(fullPath);
-                console.log(`[Mood AI - ClockOut] Result for attendance ${attendance.id}:`, moodResult);
-                // Kita simpan mood clock-out jika ingin mendata mood akhir hari
-                // Namun di database kita hanya punya satu kolom mood (biasanya clock-in yang paling krusial)
-                // Jika ingin menyimpan keduanya, butuh update schema.
-                // Untuk sekarang kita hanya update jika data mood masih kosong (misal gagal saat clock-in)
-                await (prisma.attendance as any).update({
-                    where: { id: attendance.id },
-                    data: {
-                        mood: moodResult.mood,
-                        moodScore: moodResult.score
-                    }
-                });
-            } catch (moodErr) {
-                console.error('[Mood AI - ClockOut] Error:', moodErr);
+        console.log(`[Mood AI - ClockOut] Queuing photo for background analysis: ${fullPath}`);
+        
+        // Jalankan secara asynchronous
+        (async () => {
+            if (fs.existsSync(fullPath)) {
+                try {
+                    const { analyzeMood } = require('./moodAI');
+                    const moodResult = await analyzeMood(fullPath);
+                    console.log(`[Mood AI - ClockOut] Background Result for attendance ${attendance.id}:`, moodResult);
+                    // Kita simpan mood clock-out jika ingin mendata mood akhir hari
+                    // Untuk sekarang kita hanya update jika data mood masih kosong
+                    await (prisma.attendance as any).update({
+                        where: { id: attendance.id },
+                        data: {
+                            mood: moodResult.mood,
+                            moodScore: moodResult.score
+                        }
+                    });
+                } catch (moodErr) {
+                    console.error('[Mood AI - ClockOut] Background Error:', moodErr);
+                }
             }
-        }
-        // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
-        if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
-            cleanupLocalFile(fullPath);
-        }
+            // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
+            if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
+                cleanupLocalFile(fullPath);
+            }
+        })();
     }
 
     res.json({ message: 'Berhasil Clock-Out', attendance: updatedAttendance });
