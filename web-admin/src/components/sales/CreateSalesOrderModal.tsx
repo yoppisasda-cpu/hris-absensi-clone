@@ -15,6 +15,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  orderId?: number | null;
 }
 
 const TAX_OPTIONS = [
@@ -24,7 +25,7 @@ const TAX_OPTIONS = [
   { label: "Custom...", value: -1 },
 ];
 
-export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Props) {
+export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orderId }: Props) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -53,23 +54,61 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
       setCustomers(cusRes.data);
       const finishedGoods = prodRes.data.filter((p: any) => p.type === "FINISHED_GOOD");
       setProducts(finishedGoods);
+      
+      if (orderId) {
+        await fetchOrderDetails();
+      }
     } catch (error: any) {
       toast.error("Gagal memuat data pelanggan / produk");
     }
   };
 
+  const fetchOrderDetails = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/sales/orders/${orderId}`);
+      const order = res.data;
+      setCustomerId(order.customerId.toString());
+      setOrderNumber(order.orderNumber);
+      setDate(new Date(order.date).toISOString().split("T")[0]);
+      setNotes(order.notes || "");
+      setTaxRate(order.taxRate);
+      if ([0, 11, 12].includes(order.taxRate)) {
+        setTaxPreset(order.taxRate);
+      } else {
+        setTaxPreset(-1);
+        setCustomTaxRate(order.taxRate.toString());
+      }
+      setItems(order.items.map((i: any) => ({
+        productId: i.productId,
+        productName: i.product?.name || i.productName || "Produk",
+        quantity: i.quantity,
+        price: i.price,
+        total: i.total
+      })));
+    } catch (err) {
+      toast.error("Gagal memuat detail pesanan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
-      fetchData();
-      setOrderNumber(`PO-${Date.now().toString().slice(-6)}`);
-      setCustomerId("");
-      setNotes("");
-      setItems([]);
-      setTaxRate(0);
-      setTaxPreset(0);
-      setCustomTaxRate("");
+      if (orderId) {
+        fetchData();
+      } else {
+        fetchData();
+        setOrderNumber(`PO-${Date.now().toString().slice(-6)}`);
+        setCustomerId("");
+        setNotes("");
+        setItems([]);
+        setTaxRate(0);
+        setTaxPreset(0);
+        setCustomTaxRate("");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, orderId]);
 
   const handleTaxPresetChange = (val: number) => {
     setTaxPreset(val);
@@ -114,8 +153,13 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
     if (!customerId || items.length === 0) return toast.error("Pilih pelanggan dan minimal 1 item");
     try {
       setLoading(true);
-      await api.post("/sales/orders", { customerId, orderNumber, date, notes, items, taxRate });
-      toast.success("Pesanan B2B berhasil dibuat!");
+      if (orderId) {
+        await api.put(`/sales/orders/${orderId}`, { customerId, orderNumber, date, notes, items, taxRate });
+        toast.success("Pesanan B2B berhasil diperbarui!");
+      } else {
+        await api.post("/sales/orders", { customerId, orderNumber, date, notes, items, taxRate });
+        toast.success("Pesanan B2B berhasil dibuat!");
+      }
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -141,8 +185,8 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess }: Pr
               <Plus className="h-6 w-6 stroke-[2.5px]" />
             </div>
             <div>
-              <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">B2B Procurement Matrix</h3>
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">PO Customer Initialization Protocol</p>
+              <h3 className="text-sm font-black italic tracking-widest text-white uppercase leading-none">{orderId ? "Edit B2B Procurement" : "B2B Procurement Matrix"}</h3>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">{orderId ? "PO Customer Update Protocol" : "PO Customer Initialization Protocol"}</p>
             </div>
           </div>
           <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">

@@ -1068,8 +1068,14 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
       });
 
       // 2. Deduct Stock for trackable items
+      const productIds = order.items.map((item: any) => item.productId);
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } }
+      });
+      const productMap = new Map(products.map((p: any) => [p.id, p]));
+
       for (const item of order.items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        const product = productMap.get(item.productId);
         if (product && product.trackStock && (product as any).type === 'FINISHED_GOOD') {
            await tx.product.update({
              where: { id: product.id },
@@ -1093,12 +1099,138 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
       });
 
       return newSale;
+    }, {
+      maxWait: 15000,
+      timeout: 30000
     });
 
     res.json({ message: 'Berhasil dikonversi menjadi Invoice', sale: result });
   } catch (error: any) {
     console.error("CONVERT SALES ORDER ERROR:", error);
     res.status(500).json({ error: error.message || 'Gagal mengonversi pesanan ke Invoice' });
+  }
+});
+
+// 5. Get Single Sales Order
+app.get('/api/sales/orders/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const orderId = Number(req.params.id);
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id: orderId, companyId: tenantId },
+      include: {
+        customer: true,
+        items: {
+          include: { product: true }
+        }
+      }
+    });
+
+    if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan' });
+    res.json(order);
+  } catch (error: any) {
+    console.error("GET SINGLE SALES ORDER ERROR:", error);
+    res.status(500).json({ error: 'Gagal memuat pesanan: ' + error.message });
+  }
+});
+
+// 6. Update Sales Order
+app.put('/api/sales/orders/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const orderId = Number(req.params.id);
+    const { customerId, orderNumber, date, notes, items, taxRate } = req.body;
+
+    if (!customerId || !orderNumber || !items || items.length === 0) {
+      return res.status(400).json({ error: 'Data pesanan tidak lengkap' });
+    }
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id: orderId, companyId: tenantId }
+    });
+
+    if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan atau bukan milik Anda' });
+    if (order.status === 'INVOICED') {
+      return res.status(400).json({ error: 'Pesanan yang sudah ditagihkan (Invoice) tidak dapat diubah' });
+    }
+
+    let subtotal = 0;
+    const validatedItems = items.map((item: any) => {
+      const q = Number(item.quantity) || 0;
+      const p = Number(item.price) || 0;
+      const t = q * p;
+      subtotal += t;
+      return {
+        productId: Number(item.productId),
+        quantity: q,
+        price: p,
+        total: t
+      };
+    });
+
+    const parsedTaxRate = Number(taxRate) || 0;
+    const taxAmount = Math.round((subtotal * parsedTaxRate / 100) * 100) / 100;
+    const totalAmount = subtotal + taxAmount;
+
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // 1. Delete old items
+      await tx.salesOrderItem.deleteMany({
+        where: { salesOrderId: orderId }
+      });
+
+      // 2. Update order and create new items
+      return await tx.salesOrder.update({
+        where: { id: orderId },
+        data: {
+          customerId: Number(customerId),
+          orderNumber,
+          date: date ? new Date(date) : new Date(),
+          subtotal,
+          taxRate: parsedTaxRate,
+          taxAmount,
+          totalAmount,
+          notes,
+          items: {
+            create: validatedItems
+          }
+        },
+        include: { items: true, customer: true }
+      });
+    }, {
+      maxWait: 15000,
+      timeout: 30000
+    });
+
+    res.json(updatedOrder);
+  } catch (error: any) {
+    console.error("UPDATE SALES ORDER ERROR:", error);
+    if (error.code === 'P2002') return res.status(400).json({ error: 'Nomor PO sudah digunakan' });
+    res.status(500).json({ error: 'Gagal memperbarui pesanan: ' + error.message });
+  }
+});
+
+// 7. Delete Sales Order
+app.delete('/api/sales/orders/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const orderId = Number(req.params.id);
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id: orderId, companyId: tenantId }
+    });
+
+    if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan atau bukan milik Anda' });
+
+    // Since we configured onDelete: Cascade on SalesOrderItem, deleting the SalesOrder automatically deletes its items!
+    await prisma.salesOrder.delete({
+      where: { id: orderId }
+    });
+
+    res.json({ message: 'Pesanan berhasil dihapus' });
+  } catch (error: any) {
+    console.error("DELETE SALES ORDER ERROR:", error);
+    res.status(500).json({ error: 'Gagal menghapus pesanan: ' + error.message });
   }
 });
 
@@ -14299,6 +14431,9 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
       await tx.$executeRawUnsafe(`UPDATE "Sale" SET "status" = $1, "updatedAt" = NOW() WHERE id = $2`, newStatus, saleId);
 
       return { returnId, returnNumber, refundAmount: totalRefundAmount, newStatus };
+    }, {
+      maxWait: 15000,
+      timeout: 30000
     });
 
     res.json(result);

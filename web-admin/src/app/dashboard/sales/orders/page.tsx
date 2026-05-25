@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, ChevronRight, CheckCircle, Package, Truck, FileText, ArrowRight } from "lucide-react";
+import { Plus, Search, ChevronRight, CheckCircle, Package, Truck, FileText, ArrowRight, Pencil, Trash2, Printer } from "lucide-react";
 import { useFeatures } from "@/lib/FeatureContext";
 import api from "@/lib/api";
 import CreateSalesOrderModal from "@/components/sales/CreateSalesOrderModal";
+import InvoiceModal from "@/components/sales/InvoiceModal";
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -21,6 +22,10 @@ export default function SalesOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  
+  const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -71,6 +76,17 @@ export default function SalesOrdersPage() {
     }
   };
 
+  const handleDeleteOrder = async (id: number) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus pesanan (PO) ini? Tindakan ini tidak dapat dibatalkan.")) return;
+    try {
+      await api.delete(`/sales/orders/${id}`);
+      toast.success("Pesanan berhasil dihapus");
+      fetchOrders();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Gagal menghapus pesanan");
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "PENDING":
@@ -110,7 +126,10 @@ export default function SalesOrdersPage() {
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-3 italic">B2B Procurement Tracking & Fulfillment Vector</p>
           </div>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setSelectedOrderId(null);
+              setIsModalOpen(true);
+            }}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest italic transition-all shadow-lg shadow-indigo-600/20 border border-white/10 active:scale-95"
           >
             <Plus className="h-4 w-4 stroke-[3px]" />
@@ -170,31 +189,89 @@ export default function SalesOrdersPage() {
                       <td className="px-8 py-5 text-center">
                         <div className="flex items-center justify-center gap-2.5">
                           {order.status === 'PENDING' && (
-                            <button
-                              onClick={() => handleUpdateStatus(order.id, 'APPROVED')}
-                              className="p-2.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-xl transition-all border border-indigo-500/20 active:scale-90"
-                              title="Setujui Pesanan"
-                            >
-                              <CheckCircle className="w-4 h-4 stroke-[2.5px]" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(order.id, 'APPROVED')}
+                                className="p-2.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-xl transition-all border border-indigo-500/20 active:scale-90"
+                                title="Setujui Pesanan"
+                              >
+                                <CheckCircle className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedOrderId(order.id);
+                                  setIsModalOpen(true);
+                                }}
+                                className="p-2.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-xl transition-all border border-blue-500/20 active:scale-90"
+                                title="Edit Pesanan"
+                              >
+                                <Pencil className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteOrder(order.id)}
+                                className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all border border-rose-500/20 active:scale-90"
+                                title="Hapus Pesanan"
+                              >
+                                <Trash2 className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                            </>
                           )}
                           {order.status === 'APPROVED' && (
-                            <button
-                              onClick={() => handleUpdateStatus(order.id, 'PREPARING')}
-                              className="p-2.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded-xl transition-all border border-amber-500/20 active:scale-90"
-                              title="Bungkus / Kemas"
-                            >
-                              <Package className="w-4 h-4 stroke-[2.5px]" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(order.id, 'PREPARING')}
+                                className="p-2.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded-xl transition-all border border-amber-500/20 active:scale-90"
+                                title="Bungkus / Kemas"
+                              >
+                                <Package className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedOrderId(order.id);
+                                  setIsModalOpen(true);
+                                }}
+                                className="p-2.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-xl transition-all border border-blue-500/20 active:scale-90"
+                                title="Edit Pesanan"
+                              >
+                                <Pencil className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteOrder(order.id)}
+                                className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all border border-rose-500/20 active:scale-90"
+                                title="Hapus Pesanan"
+                              >
+                                <Trash2 className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                            </>
                           )}
                           {order.status === 'PREPARING' && (
-                            <button
-                              onClick={() => handleUpdateStatus(order.id, 'SHIPPED')}
-                              className="p-2.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-xl transition-all border border-purple-500/20 active:scale-90"
-                              title="Kirim Pesanan"
-                            >
-                              <Truck className="w-4 h-4 stroke-[2.5px]" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(order.id, 'SHIPPED')}
+                                className="p-2.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-xl transition-all border border-purple-500/20 active:scale-90"
+                                title="Kirim Pesanan"
+                              >
+                                <Truck className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteOrder(order.id)}
+                                className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all border border-rose-500/20 active:scale-90"
+                                title="Hapus Pesanan"
+                              >
+                                <Trash2 className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                            </>
+                          )}
+                          {order.status === 'SHIPPED' && (
+                            <>
+                              <button
+                                onClick={() => handleDeleteOrder(order.id)}
+                                className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all border border-rose-500/20 active:scale-90"
+                                title="Hapus Pesanan"
+                              >
+                                <Trash2 className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                            </>
                           )}
                           {(order.status === 'SHIPPED' || order.status === 'APPROVED' || order.status === 'PREPARING') && (
                             <button
@@ -205,6 +282,28 @@ export default function SalesOrdersPage() {
                               <span>Tagih</span>
                               <ArrowRight className="w-3.5 h-3.5 stroke-[3px]" />
                             </button>
+                          )}
+                          {order.status === 'INVOICED' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setSelectedSaleId(order.saleId);
+                                  setIsInvoiceModalOpen(true);
+                                }}
+                                className="px-3.5 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-black rounded-xl text-[9px] uppercase tracking-widest flex items-center gap-1.5 transition-all border border-emerald-500/20 active:scale-95"
+                                title="Cetak/Lihat Invoice"
+                              >
+                                <Printer className="w-3.5 h-3.5 stroke-[3.5px]" />
+                                <span>Invoice</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteOrder(order.id)}
+                                className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all border border-rose-500/20 active:scale-90"
+                                title="Hapus Pesanan"
+                              >
+                                <Trash2 className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -218,9 +317,24 @@ export default function SalesOrdersPage() {
 
         <CreateSalesOrderModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedOrderId(null);
+          }}
           onSuccess={fetchOrders}
+          orderId={selectedOrderId}
         />
+
+        {selectedSaleId && (
+          <InvoiceModal
+            isOpen={isInvoiceModalOpen}
+            onClose={() => {
+              setIsInvoiceModalOpen(false);
+              setSelectedSaleId(null);
+            }}
+            saleId={selectedSaleId}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
