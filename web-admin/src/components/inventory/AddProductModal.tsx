@@ -940,7 +940,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                                     placeholder="Select Raw Material..."
                                                 />
                                             </div>
-                                            <div className="flex-1">
+                                            <div className="flex-1 flex flex-col items-end gap-1">
                                                 <input
                                                     required
                                                     type="number"
@@ -952,6 +952,11 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                                         updateRecipeItem(index, 'quantity', isNaN(val) ? 0 : val);
                                                     }}
                                                 />
+                                                {item.materialId && (
+                                                    <span className="text-[9px] font-black text-amber-500/80 italic pr-2">
+                                                        = Rp {((productList.find((p: any) => p.id.toString() === item.materialId)?.costPrice || 0) * (Number(item.quantity) || 0)).toLocaleString('id-ID')}
+                                                    </span>
+                                                )}
                                             </div>
                                             <button 
                                                 type="button"
