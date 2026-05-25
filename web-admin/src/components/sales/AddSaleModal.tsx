@@ -4,6 +4,66 @@ import { useState, useEffect } from "react";
 import { X, Save, Plus, Trash2, ShoppingBag, Wallet } from "lucide-react";
 import api from "@/lib/api";
 
+const SearchableProductSelect = ({ products, value, onChange }: any) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    const selectedProduct = products.find((p: any) => p.id.toString() === value);
+
+    return (
+        <div className="relative">
+            <div 
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-black italic outline-none hover:border-blue-500/30 uppercase cursor-pointer flex justify-between items-center transition-all shadow-inner"
+                onClick={() => setIsOpen(true)}
+            >
+                <span className={selectedProduct ? "text-white" : "text-slate-500"}>
+                    {selectedProduct ? `${selectedProduct.name.toUpperCase()} (STK: ${selectedProduct.stock})` : '-- SELECT UNIT --'}
+                </span>
+                <span className="text-slate-600 text-[10px]">▼</span>
+            </div>
+            
+            {isOpen && (
+                <>
+                    <div 
+                        className="fixed inset-0 z-[110]" 
+                        onClick={() => setIsOpen(false)}
+                    />
+                    <div className="absolute z-[120] w-full mt-2 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-h-[300px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-2 border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm sticky top-0">
+                            <input
+                                type="text"
+                                autoFocus
+                                placeholder="SEARCH UNIT..."
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-xs font-black text-white outline-none focus:border-blue-500/50 uppercase placeholder:text-slate-600 italic tracking-widest shadow-inner"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <div className="overflow-y-auto no-scrollbar flex-1 py-1">
+                            {products.filter((p: any) => p.name.toLowerCase().includes(search.toLowerCase())).map((p: any) => (
+                                <div 
+                                    key={p.id}
+                                    className={`px-5 py-3 text-xs font-black hover:bg-blue-600/20 cursor-pointer uppercase transition-colors ${p.id.toString() === value ? 'bg-blue-600/10 text-blue-400' : 'text-slate-300'}`}
+                                    onClick={() => {
+                                        onChange(p.id.toString());
+                                        setIsOpen(false);
+                                        setSearch('');
+                                    }}
+                                >
+                                    {p.name.toUpperCase()} <span className="text-slate-500 font-bold italic ml-2">(STK: {p.stock})</span>
+                                </div>
+                            ))}
+                            {products.filter((p: any) => p.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+                                <div className="px-5 py-6 text-xs font-black text-slate-600 uppercase tracking-widest italic text-center">NO MATCH FOUND</div>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
 interface AddSaleModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -233,17 +293,11 @@ export default function AddSaleModal({ isOpen, onClose, onSuccess }: AddSaleModa
                                 <div key={index} className="flex flex-col lg:flex-row gap-5 p-6 bg-slate-950 border border-slate-900 rounded-[2.5rem] relative group animate-in slide-in-from-left-4 transition-all hover:bg-slate-900/50 hover:border-blue-500/20 shadow-inner">
                                     <div className="flex-[3] space-y-2">
                                         <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">SKU Nomenclature</label>
-                                        <select
-                                            required
+                                        <SearchableProductSelect 
+                                            products={products}
                                             value={item.productId}
-                                            onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-black italic text-white outline-none focus:border-blue-500/50 uppercase appearance-none cursor-pointer"
-                                        >
-                                            <option value="">-- SELECT UNIT --</option>
-                                            {products.map(p => (
-                                                <option key={p.id} value={p.id}>{p.name.toUpperCase()} (STK: {p.stock})</option>
-                                            ))}
-                                        </select>
+                                            onChange={(val: string) => handleItemChange(index, 'productId', val)}
+                                        />
                                     </div>
                                     <div className="flex-1 space-y-2">
                                         <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Vol</label>
