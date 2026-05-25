@@ -14431,6 +14431,9 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
       await tx.$executeRawUnsafe(`UPDATE "Sale" SET "status" = $1, "updatedAt" = NOW() WHERE id = $2`, newStatus, saleId);
 
       return { returnId, returnNumber, refundAmount: totalRefundAmount, newStatus };
+    }, {
+      maxWait: 15000,
+      timeout: 30000
     });
 
     res.json(result);
