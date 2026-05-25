@@ -13412,6 +13412,9 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       }
 
       return { saleId, invoiceNumber, totalAmount };
+    }, {
+      maxWait: 5000,
+      timeout: 30000
     });
 
     res.status(201).json(result);
