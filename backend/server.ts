@@ -1068,8 +1068,14 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
       });
 
       // 2. Deduct Stock for trackable items
+      const productIds = order.items.map((item: any) => item.productId);
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } }
+      });
+      const productMap = new Map(products.map((p: any) => [p.id, p]));
+
       for (const item of order.items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        const product = productMap.get(item.productId);
         if (product && product.trackStock && (product as any).type === 'FINISHED_GOOD') {
            await tx.product.update({
              where: { id: product.id },
@@ -1093,6 +1099,9 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
       });
 
       return newSale;
+    }, {
+      maxWait: 15000,
+      timeout: 30000
     });
 
     res.json({ message: 'Berhasil dikonversi menjadi Invoice', sale: result });
