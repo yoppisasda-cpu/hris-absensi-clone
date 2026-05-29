@@ -17,7 +17,7 @@ import FinancialHealthScore from "@/components/dashboard/FinancialHealthScore";
 
 export default function DashboardPage() {
     const router = useRouter();
-    const [adminName, setAdminName] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userName') || 'Admin' : 'Admin'));
+    const [adminName, setAdminName] = useState('Admin');
     const [companyName, setCompanyName] = useState('Perusahaan Anda');
     const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | 'INVENTORY' | null>(null);
     const [isMounted, setIsMounted] = useState(false);

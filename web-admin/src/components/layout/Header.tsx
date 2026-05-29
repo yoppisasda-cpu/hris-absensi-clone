@@ -7,16 +7,8 @@ import { useLanguage } from '@/lib/LanguageContext';
 
 export default function Header() {
     const { language, setLanguage } = useLanguage();
-    const [profileName, setProfileName] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userName') || 'Memuat...' : 'Memuat...'));
-    const [roleLabel, setRoleLabel] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const r = localStorage.getItem('userRole');
-            if (r === 'SUPERADMIN' || r === 'OWNER') return 'SaaS Owner';
-            if (r === 'ADMIN') return 'HR Director';
-            if (r) return 'Karyawan';
-        }
-        return '-';
-    });
+    const [profileName, setProfileName] = useState('Memuat...');
+    const [roleLabel, setRoleLabel] = useState('-');
     const [companyName, setCompanyName] = useState('');
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -31,6 +23,14 @@ export default function Header() {
     useEffect(() => {
         setIsMounted(true);
         const token = localStorage.getItem('jwt_token');
+        
+        // Hydrate local storage states
+        setProfileName(localStorage.getItem('userName') || 'Memuat...');
+        const r = localStorage.getItem('userRole');
+        if (r === 'SUPERADMIN' || r === 'OWNER') setRoleLabel('SaaS Owner');
+        else if (r === 'ADMIN') setRoleLabel('HR Director');
+        else if (r) setRoleLabel('Karyawan');
+
         if (!token) return;
 
         const fetchCompany = async () => {
