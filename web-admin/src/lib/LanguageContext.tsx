@@ -24,6 +24,47 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (savedLang && (savedLang === 'en' || savedLang === 'id')) {
             setLanguageState(savedLang);
         }
+
+        // Global handler for ChunkLoadError (highly recommended for Next.js production deployments)
+        const handleGlobalError = (event: ErrorEvent) => {
+            const errorMsg = event.message || '';
+            const errorStack = event.error?.stack || '';
+            const isChunkError = 
+                errorMsg.toLowerCase().includes('chunk') || 
+                errorMsg.toLowerCase().includes('loading chunk') ||
+                errorStack.toLowerCase().includes('chunk') ||
+                errorStack.toLowerCase().includes('loading chunk') ||
+                event.error?.name === 'ChunkLoadError';
+
+            if (isChunkError) {
+                console.warn('[System] Chunk load error detected. Reloading page to fetch the latest application build...');
+                window.location.reload();
+            }
+        };
+
+        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+            const errorMsg = event.reason?.message || '';
+            const errorStack = event.reason?.stack || '';
+            const isChunkError = 
+                errorMsg.toLowerCase().includes('chunk') || 
+                errorMsg.toLowerCase().includes('loading chunk') ||
+                errorStack.toLowerCase().includes('chunk') ||
+                errorStack.toLowerCase().includes('loading chunk') ||
+                event.reason?.name === 'ChunkLoadError';
+
+            if (isChunkError) {
+                console.warn('[System] Chunk load rejection detected. Reloading page to fetch the latest application build...');
+                window.location.reload();
+            }
+        };
+
+        window.addEventListener('error', handleGlobalError);
+        window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+        return () => {
+            window.removeEventListener('error', handleGlobalError);
+            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        };
     }, []);
 
     const setLanguage = (lang: string) => {

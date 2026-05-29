@@ -77,7 +77,8 @@ export default function EmployeesPage() {
 
     const [availableShifts, setAvailableShifts] = useState<Shift[]>([]);
     const [availableBranches, setAvailableBranches] = useState<Branch[]>([]);
-    const [userRole, setUserRole] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userRole') || 'EMPLOYEE' : 'EMPLOYEE'));
+    const [userRole, setUserRole] = useState('EMPLOYEE');
+    const [isMounted, setIsMounted] = useState(false);
 
     const fetchUsers = async () => {
         try {
@@ -98,6 +99,11 @@ export default function EmployeesPage() {
     };
 
     useEffect(() => {
+        setIsMounted(true);
+        if (typeof window !== 'undefined') {
+            const role = localStorage.getItem('userRole');
+            if (role) setUserRole(role);
+        }
         setIsLoading(true);
         fetchUsers();
     }, [activeTab]);
@@ -267,7 +273,7 @@ export default function EmployeesPage() {
                         Manajemen data karyawan secara lengkap untuk <span className="text-blue-400 font-bold border-b border-blue-500/30 pb-0.5">{activeTab === 'active' ? 'NODE_AKTIF' : 'ARSIP_EX_KARYAWAN'}</span>. Sinkronisasi data biometrik dan akses operasional.
                     </p>
                 </div>
-                {userRole !== 'FINANCE' && (
+                {isMounted && userRole !== 'FINANCE' && (
                     <button
                         onClick={() => {
                             setIsEditMode(false);
@@ -511,7 +517,7 @@ export default function EmployeesPage() {
                                                 >
                                                     <FileText className="h-4 w-4" />
                                                 </button>
-                                                {userRole !== 'FINANCE' && (
+                                                {isMounted && userRole !== 'FINANCE' && (
                                                     <>
                                                         <button onClick={() => handleOpenEdit(user)} className="p-1 px-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors" title="Edit Karyawan">
                                                             <Edit2 className="h-4 w-4" />
@@ -577,7 +583,7 @@ export default function EmployeesPage() {
                                                         </button>
                                                     </>
                                                 )}
-                                                {userRole === 'FINANCE' && (
+                                                {isMounted && userRole === 'FINANCE' && (
                                                     <button
                                                         onClick={() => {
                                                             setSelectedUserForAssets({ id: user.id, name: user.name });
