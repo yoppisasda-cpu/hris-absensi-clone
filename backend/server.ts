@@ -13408,7 +13408,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         totalCommission = totalAmount * 0.20; // 20% Platform Fee
       }
 
-      const finalCustomerId = customerId ? parseInt(customerId) : null;
+
 
       // 3. Create Sale Record (Merged with GitHub's new fields)
       const saleResult: any[] = await tx.$queryRawUnsafe(`
