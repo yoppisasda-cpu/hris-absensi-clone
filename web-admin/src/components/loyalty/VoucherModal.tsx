@@ -23,6 +23,7 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
         validUntil: "",
         quota: "",
         isActive: true,
+        targetAudience: "PUBLIC",
     });
 
     useEffect(() => {
@@ -37,6 +38,7 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                 validUntil: editData.validUntil ? new Date(editData.validUntil).toISOString().split('T')[0] : "",
                 quota: editData.quota?.toString() || "",
                 isActive: editData.isActive ?? true,
+                targetAudience: editData.targetAudience || "PUBLIC",
             });
         } else {
             setFormData({
@@ -49,6 +51,7 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                 validUntil: "",
                 quota: "",
                 isActive: true,
+                targetAudience: "PUBLIC",
             });
         }
     }, [editData, isOpen]);
@@ -66,7 +69,8 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                 validFrom: formData.validFrom ? new Date(formData.validFrom).toISOString() : null,
                 validUntil: formData.validUntil ? new Date(formData.validUntil).toISOString() : null,
                 quota: formData.quota ? Number(formData.quota) : 0,
-                isActive: formData.isActive
+                isActive: formData.isActive,
+                targetAudience: formData.targetAudience
             };
 
             if (editData) {
@@ -217,6 +221,17 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                                         className="w-full pl-11 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white font-bold focus:border-indigo-500 outline-none"
                                     />
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Target Pengguna</label>
+                                <select 
+                                    value={formData.targetAudience}
+                                    onChange={e => setFormData({...formData, targetAudience: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white font-bold focus:border-indigo-500 outline-none"
+                                >
+                                    <option value="PUBLIC">Semua Pelanggan (Publik)</option>
+                                    <option value="EMPLOYEE">Khusus Karyawan Internal</option>
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Status Voucher</label>
