@@ -337,19 +337,16 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         
         // 2. Kirim balasan balasan otomatis ke klien lewat Meta API
         await sendWhatsAppMessage(from, aiResponse);
-        console.log(`✅ [WA AI] Balasan otomatis terkirim ke ${from}`);
-
-        // Return direct JSON response for Wablas "Get Auto Reply From Webhook"
-        return res.status(200).json({
-            message: aiResponse
-        });
+        // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send(aiResponse);
     }
 
     res.status(200).send('EVENT_RECEIVED');
 
   } catch (error: any) {
     console.error('❌ [WA WEBHOOK Error]:', error.message);
-    res.status(200).json({ error: error.message });
+    res.status(200).send(error.message);
   }
 });
 
@@ -439,13 +436,12 @@ app.post('/api/webhook/wablas', async (req: Request, res: Response) => {
         await sendWhatsAppMessage(senderPhone, aiResponse);
         console.log(`🤖 [WABLAS AI] Balasan otomatis terkirim ke ${targetName} (${senderPhone})`);
 
-        // Return direct JSON response for Wablas "Get Auto Reply From Webhook"
-        return res.status(200).json({
-            message: aiResponse
-        });
+        // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send(aiResponse);
     } catch (error: any) {
         console.error('❌ [WABLAS WEBHOOK Error]:', error.message);
-        res.status(200).json({ error: error.message });
+        res.status(200).send(error.message);
     }
 });
 
