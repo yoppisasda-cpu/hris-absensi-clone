@@ -315,13 +315,20 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
     const body = req.body;
     console.log(`📩 [WA WEBHOOK] Inbound Payload: ${JSON.stringify(body)}`);
 
-    // Pastikan ini adalah event pesan masuk dari WhatsApp
+    let from = '';
+    let text = '';
+
+    // 1. Parse payload: Dukungan ganda untuk Meta Cloud API dan Wablas
     if (body.object === 'whatsapp_business_account' && body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
       const messageObj = body.entry[0].changes[0].value.messages[0];
-      const from = messageObj.from; // Nomor WA klien
-      const text = messageObj.text?.body; // Isi pesan teks
+      from = messageObj.from;
+      text = messageObj.text?.body;
+    } else if (body.phone && (body.message || body.text)) {
+      from = body.phone || body.sender;
+      text = body.message || body.text;
+    }
 
-      if (text) {
+    if (text && from) {
         console.log(`🤖 [WA AI] Memproses pesan dari ${from}: "${text}"`);
         
         // --- LOGIKA AI AUTO-REPLY ---
