@@ -706,17 +706,17 @@ const Footer = () => (
   <footer className="footer">
     <div className="footer-content">
       <div className="footer-brand">
-        <span className="logo-text">Aivola.id</span>
+        <span className="logo-text">PT. Permata Gempita Sejahtera</span>
         <p>Sistem Manajemen Bisnis yang Cerdas & Terintegrasi.</p>
       </div>
       <div className="footer-links">
-        <div className="link-group">
+        <div className="link-group" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <h4>Produk</h4>
           <a href="#">HR Core</a>
           <a href="#">Add-ons</a>
           <a href="#">Enterprise</a>
         </div>
-        <div className="link-group">
+        <div className="link-group" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <h4>Perusahaan</h4>
           <a href="#">Tentang Kami</a>
           <a href="#">Kontak</a>
@@ -725,7 +725,7 @@ const Footer = () => (
       </div>
     </div>
     <div className="footer-bottom">
-      &copy; 2026 Aivola.id. Built with ❤️ in Indonesia.
+      &copy; 2026 PT. Permata Gempita Sejahtera. Built with ❤️ in Indonesia.
     </div>
   </footer>
 );
