@@ -317,12 +317,14 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
 
     let from = '';
     let text = '';
+    let pushName = body.pushName || body.name || 'WhatsApp User';
 
     // 1. Parse payload: Dukungan ganda untuk Meta Cloud API dan Wablas
     if (body.object === 'whatsapp_business_account' && body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
       const messageObj = body.entry[0].changes[0].value.messages[0];
       from = messageObj.from;
       text = messageObj.text?.body;
+      pushName = body.entry[0].changes[0].value.contacts?.[0]?.profile?.name || pushName;
     } else if (body.phone && (body.message || body.text)) {
       from = body.phone || body.sender;
       text = body.message || body.text;
@@ -330,13 +332,70 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
 
     if (text && from) {
         console.log(`🤖 [WA AI] Memproses pesan dari ${from}: "${text}"`);
-        
-        // --- LOGIKA AI AUTO-REPLY ---
-        // 1. Tanya AI (Cek data paket/harga jika msg mengandung kata kunci)
+        const senderPhone = from.replace(/\D/g, '');
+
+        // A. Identifikasi Tenant/Perusahaan
+        const prospect = await prisma.prospect.findFirst({
+            where: { phone: { contains: senderPhone.slice(-8) } },
+        });
+        const customer = await prisma.customer.findFirst({
+            where: { phone: { contains: senderPhone.slice(-8) } },
+        });
+        const targetCompanyId = prospect?.companyId || customer?.companyId || 1;
+        const targetName = prospect?.name || customer?.name || pushName;
+
+        // B. Cari atau Buat ChatSession
+        let session = await prisma.chatSession.findFirst({
+            where: { 
+                phone: senderPhone,
+                companyId: targetCompanyId,
+                isWhatsApp: true
+            }
+        });
+
+        if (!session) {
+            session = await prisma.chatSession.create({
+                data: {
+                    id: `wa-${senderPhone}`,
+                    companyId: targetCompanyId,
+                    visitorName: targetName,
+                    phone: senderPhone,
+                    isWhatsApp: true
+                }
+            });
+        }
+
+        // C. Simpan Pesan Pengguna ke Database
+        await prisma.chatMessage.create({
+            data: {
+                sessionId: session.id,
+                sender: 'USER',
+                content: text
+            }
+        });
+
+        // D. Dapatkan Balasan dari AI
         const aiResponse = await getAIChatResponse(text, []);
-        
-        // 2. Kirim balasan balasan otomatis ke klien lewat Meta API
-        await sendWhatsAppMessage(from, aiResponse);
+
+        // E. Simpan Pesan AI ke Database
+        await prisma.chatMessage.create({
+            data: {
+                sessionId: session.id,
+                sender: 'AI',
+                content: aiResponse
+            }
+        });
+
+        // F. Update Timestamp Sesi
+        await prisma.chatSession.update({
+            where: { id: session.id },
+            data: { updatedAt: new Date() }
+        });
+
+        // G. Kirim kembali ke WhatsApp klien via Wablas
+        await sendWhatsAppMessage(senderPhone, aiResponse);
+        console.log(`✅ [WA AI] Balasan otomatis tersimpan di CRM & terkirim ke ${from}`);
+
         // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
         res.setHeader('Content-Type', 'text/plain');
         return res.status(200).send(aiResponse);
