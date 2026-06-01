@@ -7,7 +7,7 @@ dotenv.config();
  * Mengirim pesan via Wablas Gateway.
  * Mendukung API Key global dari .env atau API Key spesifik per-perusahaan.
  */
-export async function sendWhatsAppMessage(to: string, message: string, customDomain?: string, customToken?: string, allowFallback: boolean = false) {
+export async function sendWhatsAppMessage(to: string, message: string, customDomain?: string, customToken?: string, allowFallback: boolean = true) {
     const DOMAIN = customDomain || (allowFallback ? process.env.WA_GATEWAY_URL : null);
     const TOKEN = customToken || (allowFallback ? process.env.WA_API_KEY : null);
 
