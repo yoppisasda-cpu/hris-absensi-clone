@@ -56,7 +56,7 @@ const Hero = () => (
         Didesain untuk membantu bisnis Anda tumbuh lebih cepat.
       </p>
       <div className="cta-group">
-        <a href="https://admin.Aivola.id/register" className="btn-primary">Coba Gratis 14 Hari</a>
+        <a href="https://admin.Aivola.id/register" className="btn-primary">Coba Gratis 6 Bulan</a>
         <a href="#demo" className="btn-secondary">Konsultasi Gratis</a>
       </div>
     </div>
