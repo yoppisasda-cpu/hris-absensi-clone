@@ -416,6 +416,24 @@ app.post('/api/webhook/wablas', async (req: Request, res: Response) => {
         });
 
         console.log(`✅ [WABLAS WEBHOOK] Message saved for ${targetName} (${senderPhone}) at Tenant: ${targetCompanyId}`);
+
+        // 5. LOGIKA AI AUTO-REPLY
+        // Ambil respon dari AI
+        const aiResponse = await getAIChatResponse(message, []);
+
+        // Simpan pesan AI ke database
+        await prisma.chatMessage.create({
+            data: {
+                sessionId: session.id,
+                sender: 'AI',
+                content: aiResponse
+            }
+        });
+
+        // Kirim kembali ke WhatsApp klien via Wablas
+        await sendWhatsAppMessage(senderPhone, aiResponse);
+        console.log(`🤖 [WABLAS AI] Balasan otomatis terkirim ke ${targetName} (${senderPhone})`);
+
         res.sendStatus(200);
     } catch (error: any) {
         console.error('❌ [WABLAS WEBHOOK Error]:', error.message);
