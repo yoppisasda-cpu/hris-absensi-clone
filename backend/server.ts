@@ -1740,9 +1740,9 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 
     // 2. Gunakan Prisma Transaction untuk Inisialisasi Akun
     const result = await prisma.$transaction(async (tx) => {
-      // Hitung tanggal akhir trial (14 hari dari sekarang)
+      // Hitung tanggal akhir trial (6 Bulan / 180 Hari dari sekarang)
       const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 14);
+      trialEnd.setDate(trialEnd.getDate() + 180);
 
       // A. Buat Database Perusahaan
       const company = await tx.company.create({
