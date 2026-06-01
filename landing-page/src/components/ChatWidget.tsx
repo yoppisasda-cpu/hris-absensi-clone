@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ChatWidget.css';
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.aivola.id';
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +40,7 @@ export function ChatWidget() {
     if (!input.trim() || isLoading) return;
 
     const userMsg = input;
-    const historyContext = messages.map(m => `${m.sender}: ${m.content}`).join('\n');
+    const historyContext = messages.map(m => ({ role: m.sender === 'USER' ? 'USER' : 'AI', content: m.content }));
     
     setInput('');
     setMessages(prev => [...prev, { sender: 'USER', content: userMsg }]);
@@ -52,7 +52,7 @@ export function ChatWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: userMsg, 
-          context: { history: historyContext } 
+          history: historyContext
         })
       });
 

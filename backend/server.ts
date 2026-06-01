@@ -9060,6 +9060,18 @@ app.post('/api/chat/message', async (req: Request, res: Response) => {
   }
 });
 
+// C1.2.5 Landing Page AI Chatbot Endpoint
+app.post('/api/ai/chat', async (req: Request, res: Response) => {
+  try {
+    const { message, history } = req.body;
+    const aiResponseContent = await getAIChatResponse(message, history || []);
+    res.json({ reply: aiResponseContent });
+  } catch (error: any) {
+    console.error('Landing Page AI Error:', error);
+    res.status(500).json({ error: 'Gagal menghubungi AI' });
+  }
+});
+
 // C1.3. Get All Sessions (Admin Monitoring)
 app.get('/api/chat/admin/sessions', tenantMiddleware, async (req: Request, res: Response) => {
   try {
