@@ -4425,7 +4425,7 @@ app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response)
     const targetDate = new Date(`${dateStr}T00:00:00+07:00`);
     const nextDay = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
 
-    const baseWhere = userRole === 'SUPERADMIN' ? {} : { companyId: tenantId };
+    const baseWhere = { companyId: tenantId };
 
     const attendances = await prisma.attendance.findMany({
       where: {
@@ -4692,7 +4692,7 @@ app.get('/api/shifts', tenantMiddleware, async (req: Request, res: Response) => 
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
     const shifts = await prisma.shift.findMany({ 
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId } 
+      where: { companyId: tenantId } 
     });
     res.json(shifts);
   } catch (error) {
@@ -4944,7 +4944,7 @@ app.get('/api/leaves', tenantMiddleware, async (req: Request, res: Response) => 
     const year = new Date().getFullYear();
 
     const leaves = await prisma.leaveRequest.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: 'desc' }
     });
@@ -5624,7 +5624,7 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
     // 1. Ambil semua karyawan di perusahaan ini
     const company = await prisma.company.findUnique({ where: { id: tenantId } });
     const users = await prisma.user.findMany({ 
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: { shift: true }
     });
 
@@ -5887,7 +5887,7 @@ app.get('/api/payroll', tenantMiddleware, async (req: Request, res: Response) =>
       return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki izin untuk melihat data penggajian.' });
     }
 
-    const whereClause: any = userRole === 'SUPERADMIN' ? {} : { companyId: tenantId };
+    const whereClause: any = { companyId: tenantId };
     if (month) whereClause.month = parseInt(month as string);
     if (year) whereClause.year = parseInt(year as string);
     if (branchId && branchId !== 'all') {
@@ -6319,7 +6319,7 @@ app.get('/api/loans', tenantMiddleware, async (req: Request, res: Response) => {
     }
 
     const loans = await prisma.loan.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: { user: { select: { name: true, email: true } } },
       orderBy: { createdAt: 'desc' }
     });
@@ -6463,7 +6463,7 @@ app.get('/api/reimbursements', tenantMiddleware, async (req: Request, res: Respo
     }
 
     const reimbursements = await prisma.reimbursement.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: {
         user: { select: { name: true, email: true } }
       },
@@ -6547,7 +6547,7 @@ app.get('/api/holidays', tenantMiddleware, async (req: Request, res: Response) =
     const { month, year } = req.query;
 
     const userRole = (req as any).userRole;
-    const whereClause: any = userRole === 'SUPERADMIN' ? {} : { companyId: tenantId };
+    const whereClause: any = { companyId: tenantId };
     if (month && year) {
       const startDate = new Date(parseInt(year as string), parseInt(month as string) - 1, 1);
       const endDate = new Date(parseInt(year as string), parseInt(month as string), 0, 23, 59, 59);
@@ -6703,7 +6703,7 @@ app.get('/api/vents', tenantMiddleware, async (req: Request, res: Response) => {
     }
 
     const vents = await (prisma as any).employeeVent.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: { 
         user: { select: { name: true, email: true } } 
       },
@@ -6850,7 +6850,7 @@ app.get('/api/admin/learning/all', tenantMiddleware, async (req: Request, res: R
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
     const data = await (prisma as any).learningObjective.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: { 
         user: { select: { name: true, jobTitle: true } },
         material: { select: { title: true } }
@@ -6870,7 +6870,7 @@ app.get('/api/admin/learning/materials', tenantMiddleware, async (req: Request, 
     const userRole = (req as any).userRole;
 
     const materials = await (prisma as any).learningMaterial.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: {
         exams: {
           include: {
@@ -7305,7 +7305,7 @@ app.get('/api/admin/learning/exams/results', tenantMiddleware, async (req: Reque
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
     const results = await (prisma as any).examAttempt.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: { 
         user: { select: { name: true, jobTitle: true } },
         exam: { select: { title: true } }
@@ -7516,7 +7516,7 @@ app.get('/api/announcements', tenantMiddleware, async (req: Request, res: Respon
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
     const announcements = await prisma.announcement.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       orderBy: { createdAt: 'desc' }
     });
     console.log(`[GET /announcements] Tenant: ${tenantId}, Count: ${announcements.length}`);
@@ -7704,7 +7704,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     // 1. Total Karyawan
     const totalEmployees = await prisma.user.count({
       where: {
-        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        ...({ companyId: tenantId }),
         ...(userRole !== 'SUPERADMIN' ? { name: { not: 'Aivola Owner' } } : {})
       }
     });
@@ -7716,7 +7716,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     const attendancesToday = await prisma.attendance.groupBy({
       by: ['userId'],
       where: {
-        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        ...({ companyId: tenantId }),
         clockIn: { gte: today }
       }
     });
@@ -7725,7 +7725,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     // 3. Terlambat Hari Ini
     const lateCountCurrentDay = await prisma.attendance.count({
       where: {
-        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        ...({ companyId: tenantId }),
         status: 'LATE',
         clockIn: { gte: today }
       }
@@ -7734,7 +7734,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     // 4. Cuti/Sakit
     const leaveCount = await prisma.leaveRequest.count({
       where: {
-        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        ...({ companyId: tenantId }),
         status: 'APPROVED',
         startDate: { lte: new Date() },
         endDate: { gte: new Date() }
@@ -8173,7 +8173,7 @@ app.get('/api/assets', tenantMiddleware, async (req: Request, res: Response) => 
 
     const assets = await prisma.asset.findMany({
       where: {
-        ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+        ...({ companyId: tenantId }),
         userId: userId
       },
       include: {
@@ -8567,7 +8567,7 @@ app.get('/api/stats/trends', tenantMiddleware, async (req: Request, res: Respons
 
       const attendances = await prisma.attendance.findMany({
         where: {
-          ...(userRole === 'SUPERADMIN' ? {} : { companyId: tenantId }),
+          ...({ companyId: tenantId }),
           clockIn: {
             gte: date,
             lt: nextDate
@@ -8598,7 +8598,7 @@ app.get('/api/bonuses', tenantMiddleware, async (req: Request, res: Response) =>
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
     const bonuses = await prisma.bonus.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: {
         user: { select: { name: true, email: true } }
       },
@@ -8888,7 +8888,7 @@ app.get('/api/billing', tenantMiddleware, async (req: Request, res: Response) =>
     const userRole = (req as any).userRole;
 
     const invoices = await (prisma as any).invoice.findMany({
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      where: { companyId: tenantId },
       include: {
         company: {
           select: { name: true }
