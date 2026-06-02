@@ -110,7 +110,7 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                                     {po.items?.map((item: any) => (
                                         <tr key={item.id} className="group hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4 font-black text-slate-950 text-[11px] uppercase tracking-tighter">{item.product?.name}</td>
-                                            <td className="px-6 py-4 text-center font-black text-slate-950 text-[11px] uppercase">{item.quantity} <span className="text-[9px] text-slate-500">{item.product?.unit?.toUpperCase() || 'PCS'}</span></td>
+                                            <td className="px-6 py-4 text-center font-black text-slate-950 text-[11px] uppercase">{item.quantity} <span className="text-[9px] text-slate-500">{(item.product?.purchaseUnit || item.product?.unit || 'PCS').toUpperCase()}</span></td>
                                             <td className="px-6 py-4 text-right font-black text-slate-500 text-[11px] tracking-widest">{item.price.toLocaleString('id-ID')}</td>
                                             <td className="px-6 py-4 text-right font-black text-slate-950 text-[11px] tracking-widest">{(item.quantity * item.price).toLocaleString('id-ID')}</td>
                                         </tr>

@@ -138,7 +138,7 @@ export default function PurchaseOrdersPage() {
             const tableBody = items.map((item: any, index: number) => [
                 index + 1,
                 item.product?.name || "N/A",
-                `${item.quantity || 0} ${item.product?.unit || 'Pcs'}`,
+                `${item.quantity || 0} ${item.product?.purchaseUnit || item.product?.unit || 'Pcs'}`,
                 `Rp ${(item.price || 0).toLocaleString('id-ID')}`,
                 `Rp ${((item.quantity || 0) * (item.price || 0)).toLocaleString('id-ID')}`
             ]);

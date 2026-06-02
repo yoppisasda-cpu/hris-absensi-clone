@@ -2575,7 +2575,7 @@ app.get('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request,
         supplier: { select: { name: true, phone: true, email: true } },
         createdBy: { select: { name: true } },
         approvedBy: { select: { name: true } },
-        items: { include: { product: { select: { name: true, unit: true } } } }
+        items: { include: { product: { select: { name: true, unit: true, purchaseUnit: true } } } }
       },
       orderBy: { createdAt: 'desc' }
     });

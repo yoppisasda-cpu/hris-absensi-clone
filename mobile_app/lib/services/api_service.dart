@@ -8,8 +8,8 @@ class ApiService {
   static const String baseUrl = 'https://api.aivola.id/api'; // POINT TO PRODUCTION BACKEND
   final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
-    connectTimeout: Duration(milliseconds: 15000),
-    receiveTimeout: Duration(milliseconds: 15000),
+    connectTimeout: Duration(milliseconds: 60000),
+    receiveTimeout: Duration(milliseconds: 60000),
   ));
 
   ApiService() {
