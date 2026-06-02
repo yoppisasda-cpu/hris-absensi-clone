@@ -5894,6 +5894,9 @@ app.get('/api/payroll', tenantMiddleware, async (req: Request, res: Response) =>
       whereClause.user = { branchId: parseInt(branchId as string) };
     }
 
+    // AUTO CLEANUP: Remove corrupted cross-tenant payroll records caused by previous bug
+    await prisma.$executeRaw`DELETE FROM "Payroll" WHERE "companyId" != (SELECT "companyId" FROM "User" WHERE "User"."id" = "Payroll"."userId")`;
+
     const payrolls = await prisma.payroll.findMany({
       where: whereClause,
       include: { user: { select: { name: true, email: true, branchId: true } } },
