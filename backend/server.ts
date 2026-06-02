@@ -13855,6 +13855,61 @@ app.get('/api/sales/my-orders', tenantMiddleware, async (req: Request, res: Resp
   }
 });
 
+// ==========================================
+// 🚀 DELETE SALES / INVOICE (Hard Delete)
+// ==========================================
+app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const saleId = parseInt(req.params.id as string);
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+
+    // 1. Role Verification
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER'].includes(user?.role || '')) {
+      return res.status(403).json({ error: 'Akses Ditolak. Hanya Admin yang dapat menghapus transaksi penjualan.' });
+    }
+
+    const sale = await prisma.sale.findFirst({ where: { id: saleId, companyId: tenantId }});
+    if (!sale) return res.status(404).json({ error: 'Penjualan tidak ditemukan' });
+
+    // --- CHECK CLOSING ---
+    if (await isPeriodClosed(tenantId, sale.date)) {
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat menghapus transaksi pada tanggal ini.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Hapus Jurnal Akuntansi terkait
+      await tx.journalEntry.deleteMany({ where: { refId: saleId.toString(), type: 'SALE' }});
+      await tx.journalEntry.deleteMany({ where: { refId: saleId.toString(), type: 'SALE_PAYMENT' }});
+      await tx.journalEntry.deleteMany({ where: { refId: saleId.toString(), type: 'COGS' }});
+      await tx.journalEntry.deleteMany({ where: { refId: saleId.toString(), type: 'REFUND' }});
+
+      // 2. Hapus Riwayat Poin (Jika ada poin yang digunakan atau didapat dari pesanan ini)
+      // (Untuk penyederhanaan, kita abaikan pengembalian poin ke user, hanya menghapus record transaksinya agar database tidak kotor)
+      await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+
+      // 3. Hapus SaleReturnItem dan SaleReturn (Jika pernah diretur)
+      const returns = await tx.saleReturn.findMany({ where: { saleId }});
+      for (const r of returns) {
+         await tx.saleReturnItem.deleteMany({ where: { returnId: r.id }});
+         await tx.saleReturn.delete({ where: { id: r.id }});
+      }
+
+      // 4. Hapus SaleItem (Detail barang)
+      await tx.saleItem.deleteMany({ where: { saleId }});
+
+      // 5. Hapus Penjualan Utama
+      await tx.sale.delete({ where: { id: saleId }});
+    });
+
+    res.json({ message: 'Penjualan beserta seluruh jurnal terkait berhasil dihapus secara permanen' });
+  } catch (err: any) {
+    console.error("Delete Sale Error:", err);
+    res.status(500).json({ error: err.message || 'Terjadi kesalahan pada server' });
+  }
+});
+
 app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);

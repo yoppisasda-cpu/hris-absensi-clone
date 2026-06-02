@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import AddSaleModal from "@/components/sales/AddSaleModal";
 import InvoiceModal from "@/components/sales/InvoiceModal";
 import ReturnSaleModal from "@/components/sales/ReturnSaleModal";
-import { Plus, Search, Filter, ShoppingCart, TrendingUp, CreditCard, Calendar, MoreVertical, FileText, Download, CheckCircle2, Eye, Printer, RotateCcw } from "lucide-react";
+import { Plus, Search, Filter, ShoppingCart, TrendingUp, CreditCard, Calendar, MoreVertical, FileText, Download, CheckCircle2, Eye, Printer, RotateCcw, Trash2 } from "lucide-react";
 
 export default function SalesPage() {
     const [sales, setSales] = useState<any[]>([]);
@@ -35,9 +35,11 @@ export default function SalesPage() {
     }, []);
 
     const stats = useMemo(() => {
-        const total = sales.reduce((sum, s) => sum + s.totalAmount, 0);
-        const paid = sales.filter(s => s.status === 'PAID').reduce((sum, s) => sum + s.totalAmount, 0);
-        const pending = sales.filter(s => s.status === 'UNPAID').reduce((sum, s) => sum + s.totalAmount, 0);
+        // Pengecualian transaksi yang sudah diretur (RETURNED) dari perhitungan omset utama
+        const validSales = sales.filter(s => s.status !== 'RETURNED');
+        const total = validSales.reduce((sum, s) => sum + s.totalAmount, 0);
+        const paid = validSales.filter(s => s.status === 'PAID').reduce((sum, s) => sum + s.totalAmount, 0);
+        const pending = validSales.filter(s => s.status === 'UNPAID').reduce((sum, s) => sum + s.totalAmount, 0);
         return { total, paid, pending };
     }, [sales]);
 
@@ -65,6 +67,17 @@ export default function SalesPage() {
         } catch (error) {
             console.error("Gagal mengekspor data", error);
             alert("Gagal mengunduh laporan Excel");
+        }
+    };
+
+    const handleDeleteSale = async (id: number) => {
+        if (!window.confirm("Apakah Anda yakin ingin menghapus transaksi penjualan ini secara permanen? Riwayat jurnal terkait juga akan dihapus.")) return;
+        try {
+            await api.delete(`/sales/${id}`);
+            fetchSales();
+        } catch (error) {
+            console.error("Gagal menghapus penjualan", error);
+            alert("Gagal menghapus data penjualan.");
         }
     };
 
@@ -191,6 +204,13 @@ export default function SalesPage() {
                                                     title="Lihat Detail"
                                                 >
                                                     <Eye className="h-4 w-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteSale(sale.id)}
+                                                    className="rounded-lg bg-rose-50 p-2 text-rose-600 hover:bg-rose-600 hover:text-white transition-all shadow-sm border border-rose-100"
+                                                    title="Hapus Transaksi"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>
                                         </td>
