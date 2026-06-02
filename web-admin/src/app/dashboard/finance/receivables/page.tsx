@@ -160,8 +160,9 @@ export default function ReceivablesPage() {
                 </div>
 
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left min-w-max whitespace-nowrap">
+                            <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">No. Invoice</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</th>
@@ -275,6 +276,7 @@ export default function ReceivablesPage() {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden">
