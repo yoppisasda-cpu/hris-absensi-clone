@@ -476,6 +476,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                 >
                                     <option value="Pcs">PIECES (PCS)</option>
                                     <option value="Porsi">PORSI (PORTION)</option>
+                                    <option value="Trip">TRIP / KIRIMAN (JASA)</option>
+                                    <option value="Layanan">LAYANAN (SERVICE)</option>
                                     <option value="Box">BOX / DUS</option>
                                     <option value="Carton">CARTON (KARTON)</option>
                                     <option value="Pack">PACK / BUNGKUS</option>
@@ -507,6 +509,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     }}
                                 >
                                     <option value="Pcs">PIECES (PCS)</option>
+                                    <option value="Trip">TRIP / KIRIMAN (JASA)</option>
+                                    <option value="Layanan">LAYANAN (SERVICE)</option>
                                     <option value="Box">BOX / DUS</option>
                                     <option value="Carton">CARTON (KARTON)</option>
                                     <option value="Pack">PACK / BUNGKUS</option>
