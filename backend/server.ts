@@ -5624,7 +5624,8 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
     // 1. Ambil semua karyawan di perusahaan ini
     const company = await prisma.company.findUnique({ where: { id: tenantId } });
     const users = await prisma.user.findMany({ 
-      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId } 
+      where: userRole === 'SUPERADMIN' ? {} : { companyId: tenantId },
+      include: { shift: true }
     });
 
     const startDate = new Date(year, month - 1, 1);
@@ -5679,18 +5680,12 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
             companyId: tenantId, 
             status: 'LATE', 
             clockIn: { gte: startDate, lte: endDate } 
-          },
-          include: { 
-            // @ts-ignore
-            shift: true 
           }
         });
 
         for (const att of lateAttendances) {
-          // @ts-ignore
-          if (att.shift && att.shift.startTime) {
-            // @ts-ignore
-            const shiftStart = att.shift.startTime; // Format "HH:mm"
+          if ((user as any).shift && (user as any).shift.startTime) {
+            const shiftStart = (user as any).shift.startTime; // Format "HH:mm"
             const [sh, sm] = shiftStart.split(':').map(Number);
             
             const actualIn = new Date(att.clockIn);
