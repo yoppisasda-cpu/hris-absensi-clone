@@ -13054,12 +13054,11 @@ app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) 
         discountType,
         discountValue: Number(discountValue),
         minPurchase: Number(minPurchase || 0),
-        maxDiscount: maxDiscount ? Number(maxDiscount) : null,
+        maxDiscount: maxDiscount ? parseFloat(maxDiscount) : null,
         validFrom: validFrom ? new Date(validFrom) : null,
         validUntil: validUntil ? new Date(validUntil) : null,
         quota: Number(quota || 0),
-        isActive: isActive !== undefined ? isActive : true,
-        targetAudience: targetAudience || 'PUBLIC'
+        isActive: isActive !== undefined ? isActive : true
       }
     });
     res.status(201).json(voucher);
@@ -13073,7 +13072,7 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
   try {
     const tenantId = Number((req as any).tenantId);
     const voucherId = Number(req.params.id);
-    const { code, discountType, discountValue, minPurchase, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
+    const { code, discountType, discountValue, minPurchase, maxDiscount, validFrom, validUntil, quota, isActive } = req.body;
     
     // Ensure voucher belongs to tenant
     const existing = await prisma.voucher.findFirst({ where: { id: voucherId, companyId: tenantId } });
@@ -13086,12 +13085,11 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
         discountType,
         discountValue: discountValue !== undefined ? Number(discountValue) : undefined,
         minPurchase: minPurchase !== undefined ? Number(minPurchase) : undefined,
-        maxDiscount: maxDiscount !== undefined ? (maxDiscount ? Number(maxDiscount) : null) : undefined,
+        maxDiscount: maxDiscount !== undefined ? (maxDiscount ? parseFloat(maxDiscount) : null) : undefined,
         validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
         validUntil: validUntil !== undefined ? (validUntil ? new Date(validUntil) : null) : undefined,
         quota: quota !== undefined ? Number(quota) : undefined,
-        isActive: isActive !== undefined ? isActive : undefined,
-        targetAudience: targetAudience !== undefined ? targetAudience : undefined
+        isActive: isActive !== undefined ? isActive : undefined
       }
     });
     res.json(voucher);
@@ -13299,22 +13297,6 @@ app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: 
     const voucher = await prisma.voucher.findUnique({ where: { id: voucherId } });
     if (!voucher) return res.status(404).json({ error: 'Voucher tidak ditemukan' });
 
-    if (voucher.targetAudience === 'EMPLOYEE') {
-      // In Aivola GO, the logged-in user is usually a customer. 
-      // Wait, in Aivola GO, the token contains `userId` which is the Customer ID? Or User ID?
-      // The claim route does `const user = await prisma.user.findUnique({ where: { id: userId } });`
-      // So Aivola GO uses the `User` table for auth? Let's check. 
-      // Actually, if `targetAudience === 'EMPLOYEE'`, and the claim route already checks `prisma.user`, it means it's an employee.
-      // But wait, does Aivola GO use `User` table for customer login? Yes! Aivola GO uses `User` with role `CUSTOMER` or it just uses `User` and links to `Customer`.
-      // Let's just make sure the user exists.
-      if (!user.email) return res.status(403).json({ error: 'Voucher eksklusif untuk karyawan internal.' });
-      
-      const isEmployee = await prisma.user.findFirst({
-         where: { companyId: user.companyId, email: user.email, role: { not: 'POS_VIEWER' } } // rough check, just need to ensure they are a real employee
-      });
-      // Actually, if they are logged in and their email exists in the User table, they are an employee.
-    }
-
     let customer = await prisma.customer.findFirst({ where: { email: user.email } });
     
     // Create customer profile if doesn't exist (Auto-Member)
@@ -13470,24 +13452,6 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       if (voucherId) {
         const voucher = await tx.voucher.findUnique({ where: { id: parseInt(voucherId) } });
         if (voucher && voucher.isActive && subtotal >= voucher.minPurchase) {
-          
-          // --- Validasi Target Pengguna (Khusus Karyawan) ---
-          if (voucher.targetAudience === 'EMPLOYEE') {
-            if (!finalCustomerId) {
-              throw new Error("Voucher ini eksklusif untuk karyawan internal (Membutuhkan data pelanggan).");
-            }
-            const cust = await tx.customer.findUnique({ where: { id: finalCustomerId } });
-            if (!cust || !cust.email) {
-               throw new Error("Voucher ini eksklusif untuk karyawan internal. Email tidak terdaftar.");
-            }
-            const isEmployee = await tx.user.findFirst({
-              where: { companyId: tenantId, email: cust.email }
-            });
-            if (!isEmployee) {
-               throw new Error("Voucher ini eksklusif untuk karyawan internal. Akses ditolak.");
-            }
-          }
-          // --------------------------------------------------
           voucherCode = voucher.code;
           if (voucher.discountType === 'PERCENTAGE') {
             voucherDiscountAmount = subtotal * (voucher.discountValue / 100);
@@ -13879,11 +13843,8 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
     }
 
     await prisma.$transaction(async (tx) => {
-      // 1. Hapus Jurnal Akuntansi terkait
-      await tx.journalEntry.deleteMany({ where: { refId: saleId.toString(), type: 'SALE' }});
-      await tx.journalEntry.deleteMany({ where: { refId: saleId.toString(), type: 'SALE_PAYMENT' }});
-      await tx.journalEntry.deleteMany({ where: { refId: saleId.toString(), type: 'COGS' }});
-      await tx.journalEntry.deleteMany({ where: { refId: saleId.toString(), type: 'REFUND' }});
+      // 1. Hapus Pemasukan (Income) terkait
+      await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
 
       // 2. Hapus Riwayat Poin (Jika ada poin yang digunakan atau didapat dari pesanan ini)
       // (Untuk penyederhanaan, kita abaikan pengembalian poin ke user, hanya menghapus record transaksinya agar database tidak kotor)
