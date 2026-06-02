@@ -292,7 +292,9 @@ const PricingSection = () => {
             <li style={{ marginBottom: '1rem' }}><span style={{ color: '#4ade80', marginRight: '8px' }}>✓</span> Prioritas Support 24/7</li>
           </ul>
           <a 
-            href="#" 
+            href={"https://wa.me/6287882716935?text=Halo Aivola.id, saya tertarik dengan Paket ENTERPRISE (" + (isAnnual ? 'Tahunan' : 'Bulanan') + "). Mohon info lebih lanjut."}
+            target="_blank" 
+            rel="noopener noreferrer"
             className="btn-cta-big" 
             style={{ display: 'block', width: '100%', textAlign: 'center', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '14px', color: 'white', fontWeight: 700, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}
           >
