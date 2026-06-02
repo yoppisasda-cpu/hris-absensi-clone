@@ -4418,12 +4418,30 @@ app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response)
     }
 
     // Filter by date: ?date=2026-04-17 (default: hari ini di Jakarta +7)
+    // Atau filter by month: ?month=2026-04
     const dateParam = req.query.date as string | undefined;
-    const dateStr = dateParam || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+    const monthParam = req.query.month as string | undefined;
     
-    // Set range mulai dari jam 00:00:00 WIB sampai 23:59:59 WIB
-    const targetDate = new Date(`${dateStr}T00:00:00+07:00`);
-    const nextDay = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+    let targetDate: Date;
+    let nextDate: Date;
+
+    if (monthParam) {
+      const [y, m] = monthParam.split('-').map(Number);
+      targetDate = new Date(`${monthParam}-01T00:00:00+07:00`);
+      
+      let nextY = y;
+      let nextM = m + 1;
+      if (nextM > 12) {
+        nextM = 1;
+        nextY++;
+      }
+      const nextMonthStr = `${nextY}-${String(nextM).padStart(2, '0')}-01T00:00:00+07:00`;
+      nextDate = new Date(nextMonthStr);
+    } else {
+      const dateStr = dateParam || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+      targetDate = new Date(`${dateStr}T00:00:00+07:00`);
+      nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+    }
 
     const baseWhere = { companyId: tenantId };
 
@@ -4432,7 +4450,7 @@ app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response)
         ...baseWhere,
         clockIn: {
           gte: targetDate,
-          lt: nextDay,
+          lt: nextDate,
         },
       },
       include: { user: { select: { name: true, email: true } } },

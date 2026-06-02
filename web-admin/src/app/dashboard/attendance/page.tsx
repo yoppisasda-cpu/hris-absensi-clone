@@ -39,6 +39,8 @@ export default function AttendancePage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPhoto, setSelectedPhoto] = useState<{ url: string, title: string } | null>(null);
     const [selectedDate, setSelectedDate] = useState<string>(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date()));
+    const [exportMonth, setExportMonth] = useState<string>(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date()).substring(0, 7));
+    const [isExportingMonth, setIsExportingMonth] = useState(false);
 
     const fetchAttendances = async (date: string) => {
         try {
@@ -67,10 +69,6 @@ export default function AttendancePage() {
             'Tanggal': new Date(att.clockIn).toLocaleDateString('id-ID'),
             'Jam Masuk': new Date(att.clockIn).toLocaleTimeString('id-ID'),
             'Jam Keluar': att.clockOut ? new Date(att.clockOut).toLocaleTimeString('id-ID') : '-',
-            'In Lat': att.lat || '-',
-            'In Lng': att.lng || '-',
-            'Out Lat': att.clockOutLat || '-',
-            'Out Lng': att.clockOutLng || '-',
             'Mood': att.mood || '-',
             'Status Presensi': att.status === 'LATE' ? 'Terlambat' : 'Hadir',
             'Menit Terlambat': att.lateMinutes || 0,
@@ -78,16 +76,120 @@ export default function AttendancePage() {
             'Kecocokan Wajah (%)': att.faceSimilarityScore ? (att.faceSimilarityScore * 100).toFixed(0) + '%' : '-',
             'ID Perangkat': att.deviceId || '-',
             'Fraud Score': att.fraudScore || 0,
-            'Suspicious': att.isSuspicious ? 'YES' : 'NO'
+            'Suspicious': att.isSuspicious ? 'YES' : 'NO',
+            'In Lat': att.lat || '-',
+            'In Lng': att.lng || '-',
+            'Out Lat': att.clockOutLat || '-',
+            'Out Lng': att.clockOutLng || '-'
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(exportData);
+        
+        // Atur lebar kolom agar rapi
+        const wscols = [
+            { wch: 25 }, // Nama Karyawan
+            { wch: 25 }, // Email
+            { wch: 12 }, // Tanggal
+            { wch: 12 }, // Jam Masuk
+            { wch: 12 }, // Jam Keluar
+            { wch: 10 }, // Mood
+            { wch: 15 }, // Status Presensi
+            { wch: 15 }, // Menit Terlambat
+            { wch: 18 }, // Menit Pulang Cepat
+            { wch: 20 }, // Kecocokan Wajah
+            { wch: 15 }, // ID Perangkat
+            { wch: 12 }, // Fraud Score
+            { wch: 12 }, // Suspicious
+            { wch: 15 }, // In Lat
+            { wch: 15 }, // In Lng
+            { wch: 15 }, // Out Lat
+            { wch: 15 }  // Out Lng
+        ];
+        worksheet['!cols'] = wscols;
+
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Absensi");
 
         // Generate filename with current date
         const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
         XLSX.writeFile(workbook, `Laporan_Absensi_${date}.xlsx`);
+    };
+
+    const handleExportMonthly = async () => {
+        if (!exportMonth) return;
+        try {
+            setIsExportingMonth(true);
+            const response = await api.get(`/attendance?month=${exportMonth}`);
+            const monthlyData: Attendance[] = response.data;
+            
+            if (monthlyData.length === 0) {
+                alert('Tidak ada data absensi di bulan ini.');
+                return;
+            }
+
+            // Urutkan data berdasarkan: Nama Karyawan (A-Z), lalu Tanggal (Lama -> Baru)
+            monthlyData.sort((a, b) => {
+                const nameA = a.user.name.toLowerCase();
+                const nameB = b.user.name.toLowerCase();
+                if (nameA < nameB) return -1;
+                if (nameA > nameB) return 1;
+                return new Date(a.clockIn).getTime() - new Date(b.clockIn).getTime();
+            });
+
+            const exportData = monthlyData.map(att => ({
+                'Nama Karyawan': att.user.name,
+                'Email': att.user.email,
+                'Tanggal': new Date(att.clockIn).toLocaleDateString('id-ID'),
+                'Jam Masuk': new Date(att.clockIn).toLocaleTimeString('id-ID'),
+                'Jam Keluar': att.clockOut ? new Date(att.clockOut).toLocaleTimeString('id-ID') : '-',
+                'Mood': att.mood || '-',
+                'Status Presensi': att.status === 'LATE' ? 'Terlambat' : 'Hadir',
+                'Menit Terlambat': att.lateMinutes || 0,
+                'Menit Pulang Cepat': att.earlyCheckOutMinutes || 0,
+                'Kecocokan Wajah (%)': att.faceSimilarityScore ? (att.faceSimilarityScore * 100).toFixed(0) + '%' : '-',
+                'ID Perangkat': att.deviceId || '-',
+                'Fraud Score': att.fraudScore || 0,
+                'Suspicious': att.isSuspicious ? 'YES' : 'NO',
+                'In Lat': att.lat || '-',
+                'In Lng': att.lng || '-',
+                'Out Lat': att.clockOutLat || '-',
+                'Out Lng': att.clockOutLng || '-'
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+            // Atur lebar kolom agar rapi
+            const wscols = [
+                { wch: 25 }, // Nama Karyawan
+                { wch: 25 }, // Email
+                { wch: 12 }, // Tanggal
+                { wch: 12 }, // Jam Masuk
+                { wch: 12 }, // Jam Keluar
+                { wch: 10 }, // Mood
+                { wch: 15 }, // Status Presensi
+                { wch: 15 }, // Menit Terlambat
+                { wch: 18 }, // Menit Pulang Cepat
+                { wch: 20 }, // Kecocokan Wajah
+                { wch: 15 }, // ID Perangkat
+                { wch: 12 }, // Fraud Score
+                { wch: 12 }, // Suspicious
+                { wch: 15 }, // In Lat
+                { wch: 15 }, // In Lng
+                { wch: 15 }, // Out Lat
+                { wch: 15 }  // Out Lng
+            ];
+            worksheet['!cols'] = wscols;
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, `Absensi_${exportMonth}`);
+
+            XLSX.writeFile(workbook, `Laporan_Absensi_Bulanan_${exportMonth}.xlsx`);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal mengekspor data bulanan.');
+        } finally {
+            setIsExportingMonth(false);
+        }
     };
 
     const formatDate = (dateStr: string) => {
@@ -183,6 +285,28 @@ export default function AttendancePage() {
                         <Printer className="h-4 w-4" />
                         Cetak Laporan
                     </button>
+                    
+                    <div className="flex items-center gap-1 bg-slate-900/50 border border-slate-700 rounded-lg p-1">
+                        <input
+                            type="month"
+                            value={exportMonth}
+                            onChange={(e) => setExportMonth(e.target.value)}
+                            className="bg-white text-slate-950 text-sm font-medium focus:outline-none px-2 py-1 rounded cursor-pointer border border-slate-300"
+                        />
+                        <button
+                            onClick={handleExportMonthly}
+                            disabled={isExportingMonth || !exportMonth}
+                            className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-wait"
+                        >
+                            {isExportingMonth ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                            ) : (
+                                <Download className="h-4 w-4" />
+                            )}
+                            Export
+                        </button>
+                    </div>
+
                     <button
                         onClick={handleExportExcel}
                         disabled={isLoading || attendances.length === 0}
