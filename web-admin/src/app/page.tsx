@@ -83,7 +83,6 @@ export default function LoginPage() {
       <div className="login-container shadow-2xl" style={{ position: 'relative', zIndex: 10 }}>
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-10 flex flex-col items-center text-center">
-          <div className="mb-10 flex flex-col items-center text-center">
             <div className="bg-[#050505] px-8 py-5 rounded-[2rem] mb-6 shadow-2xl border border-slate-800/60 ring-4 ring-slate-900/5">
                 <img 
                   src="/logo.png" 
