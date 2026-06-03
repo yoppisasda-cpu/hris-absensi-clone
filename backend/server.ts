@@ -2863,7 +2863,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       timezone,
       addons,
       posBlindClosing,
-      globalTaxRate
+      globalTaxRate,
+      deliveryNoteTerms
     } = req.body;
 
     console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
@@ -2910,7 +2911,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         posBlindClosing: posBlindClosing !== undefined ? !!posBlindClosing : undefined,
         globalTaxRate: parseNum(globalTaxRate),
         timezone: timezone || undefined,
-        addons: Array.isArray(addons) ? addons : undefined
+        addons: Array.isArray(addons) ? addons : undefined,
+        deliveryNoteTerms: deliveryNoteTerms !== undefined ? deliveryNoteTerms : undefined
       }
     });
 

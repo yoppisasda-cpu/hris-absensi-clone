@@ -56,7 +56,8 @@ export default function CompanyProfilePage() {
         primaryColor: '#3B82F6',
         secondaryColor: '#1E293B',
         posBlindClosing: false,
-        globalTaxRate: 0
+        globalTaxRate: 0,
+        deliveryNoteTerms: ''
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -101,7 +102,8 @@ export default function CompanyProfilePage() {
                 primaryColor: response.data.primaryColor || '#3B82F6',
                 secondaryColor: response.data.secondaryColor || '#1E293B',
                 posBlindClosing: response.data.posBlindClosing || false,
-                globalTaxRate: response.data.globalTaxRate || 0
+                globalTaxRate: response.data.globalTaxRate || 0,
+                deliveryNoteTerms: response.data.deliveryNoteTerms || ''
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -147,7 +149,8 @@ export default function CompanyProfilePage() {
                 primaryColor: formData.primaryColor,
                 secondaryColor: formData.secondaryColor,
                 posBlindClosing: formData.posBlindClosing,
-                globalTaxRate: formData.globalTaxRate
+                globalTaxRate: formData.globalTaxRate,
+                deliveryNoteTerms: formData.deliveryNoteTerms
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -337,6 +340,17 @@ export default function CompanyProfilePage() {
                                         onChange={e => setFormData({ ...formData, address: e.target.value })}
                                         className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none hover:border-slate-300 placeholder:font-normal"
                                         placeholder="Jl. Raya Utama No. 123, Jakarta"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Catatan Surat Jalan / DO</label>
+                                    <textarea
+                                        rows={4}
+                                        value={formData.deliveryNoteTerms}
+                                        onChange={e => setFormData({ ...formData, deliveryNoteTerms: e.target.value })}
+                                        className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none hover:border-slate-300 placeholder:font-normal"
+                                        placeholder="1. Kendaraan dalam keadaan bersih&#10;2. Kondisi barang baik..."
                                     />
                                 </div>
 
