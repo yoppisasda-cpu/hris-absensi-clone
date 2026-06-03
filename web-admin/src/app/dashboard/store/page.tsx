@@ -411,25 +411,6 @@ export default function StorePage() {
           </div>
         </div>
 
-        {/* Custom Module Banner */}
-        <div className="rounded-2xl bg-amber-50 p-8 border border-amber-100 flex flex-col md:flex-row items-center gap-6">
-          <div className="bg-amber-100 p-4 rounded-full">
-            <Shield className="h-10 w-10 text-amber-600" />
-          </div>
-          <div className="flex-1 text-center md:text-left">
-            <h4 className="text-lg font-bold text-amber-900 mb-1">Butuh Modul Custom?</h4>
-            <p className="text-sm text-amber-700 max-w-xl">
-              Aivola Cloud mendukung pengembangan fitur kustom. Hubungi tim developer kami untuk konsultasi gratis.
-            </p>
-          </div>
-          <a
-            href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo Admin Aivola, saya ingin konsultasi modul custom.')}`}
-            target="_blank"
-            className="whitespace-nowrap rounded-xl bg-amber-600 px-8 py-3 text-sm font-bold text-white hover:bg-amber-700 transition-all shadow-md"
-          >
-            Konsultasi Kustom
-          </a>
-        </div>
 
         {/* Aivola Mind Premium */}
         <div className="text-center pt-4">
