@@ -274,9 +274,17 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                     </div>
                                     {sale.notes && (
                                         <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black/50">Catatan / Keterangan</h4>
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black/50">Catatan Transaksi</h4>
                                             <p className="text-[11px] font-medium text-slate-700 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl p-4 leading-relaxed print:bg-white print:border-black/10 print:text-black">
                                                 {sale.notes}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {sale.company?.deliveryNoteTerms && (
+                                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                            <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest print:text-black/50">Syarat & Ketentuan (Surat Jalan)</h4>
+                                            <p className="text-[10px] font-medium text-slate-700 bg-rose-50/30 border border-dashed border-rose-200 rounded-2xl p-4 leading-relaxed whitespace-pre-wrap print:bg-white print:border-black/10 print:text-black">
+                                                {sale.company.deliveryNoteTerms}
                                             </p>
                                         </div>
                                     )}
