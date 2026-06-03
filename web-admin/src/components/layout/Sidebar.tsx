@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, CalendarCheck, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit, Sparkles, Database, Upload, Gift, Image as ImageIcon } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, CalendarCheck, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit, Sparkles, Database, Upload, Gift, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useFeatures } from '@/lib/FeatureContext';
 import api from '@/lib/api';
@@ -86,6 +86,7 @@ export default function Sidebar() {
     const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | null>(null);
     const [allowedModules, setAllowedModules] = useState<string>('BOTH');
     const [isMounted, setIsMounted] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(false);
     
     // Holding / Multi-Company States
     const [accessibleCompanies, setAccessibleCompanies] = useState<any[]>([]);
@@ -188,7 +189,7 @@ export default function Sidebar() {
         }
     };
     return (
-        <div className="flex h-screen w-64 flex-col bg-[#050505] border-r border-white/5 text-white transition-all overflow-y-auto no-scrollbar relative z-30 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        <div className={`flex h-screen ${isCollapsed ? 'w-20' : 'w-64'} flex-col bg-[#050505] border-r border-white/5 text-white transition-all duration-300 relative z-30 shadow-[0_0_50px_rgba(0,0,0,0.5)]`}>
             <style jsx>{`
                 .nav-link { 
                     display: flex; 
@@ -225,15 +226,21 @@ export default function Sidebar() {
             
             <div className="flex flex-col items-center justify-center border-b border-white/5 mt-6 pb-6 px-4">
                 <div className="flex items-center justify-center w-full px-2 mb-2">
-                    <img 
-                      src="/logo.png" 
-                      alt="Aivola.id Logo" 
-                      className="h-12 w-auto object-contain brightness-110 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]"
-                    />
+                    {isCollapsed ? (
+                        <div className="h-10 w-10 rounded-full bg-indigo-500/20 flex items-center justify-center font-black text-indigo-400 text-lg border border-indigo-500/30">A</div>
+                    ) : (
+                        <img 
+                          src="/logo.png" 
+                          alt="Aivola.id Logo" 
+                          className="h-12 w-auto object-contain brightness-110 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+                        />
+                    )}
                 </div>
-                <div className="flex flex-col items-center mb-4">
-                    <span className="text-[10px] text-white/30 font-black uppercase tracking-[0.4em] leading-none">Intelligence Ecosystem</span>
-                </div>
+                {!isCollapsed && (
+                    <div className="flex flex-col items-center mb-4">
+                        <span className="text-[10px] text-white/30 font-black uppercase tracking-[0.4em] leading-none">Intelligence Ecosystem</span>
+                    </div>
+                )}
 
                 {/* HOLDING COMPANY SWITCHER */}
                 {isMounted && (userRole === 'OWNER' || userRole === 'SUPERADMIN') && accessibleCompanies.length > 0 && (
@@ -266,7 +273,7 @@ export default function Sidebar() {
                 )}
             </div>
 
-            <nav className="flex-1 space-y-1 px-3 py-6">
+            <nav className={`flex-1 overflow-y-auto no-scrollbar space-y-1 py-6 ${isCollapsed ? 'px-2' : 'px-3'} ${isCollapsed ? '[&_a]:whitespace-nowrap [&_a]:overflow-hidden [&_a]:flex-nowrap [&_a_svg]:shrink-0' : ''}`}>
                 {/* MODULE SWITCHER BUTTON (Hidden for Finance role) */}
                 {isMounted && userRole !== 'FINANCE' && (
                     <div className="px-3 mb-6">
@@ -622,12 +629,20 @@ export default function Sidebar() {
                         localStorage.clear();
                         router.push('/');
                     }}
-                    className="flex w-full mt-2 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                    className="flex w-full mt-2 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors whitespace-nowrap overflow-hidden"
                 >
-                    <LogOut className="h-5 w-5" />
-                    Keluar Sistem
+                    <LogOut className="h-5 w-5 shrink-0" />
+                    {!isCollapsed && <span>Keluar Sistem</span>}
                 </button>
             </div>
+            
+            {/* COLLAPSE TOGGLE BUTTON */}
+            <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="absolute top-6 -right-3 h-6 w-6 bg-indigo-600 rounded-full flex items-center justify-center hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/20 z-50 text-white cursor-pointer"
+            >
+                {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </button>
         </div>
     )
 }
