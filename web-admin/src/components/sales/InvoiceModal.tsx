@@ -280,14 +280,6 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                             </p>
                                         </div>
                                     )}
-                                    {sale.company?.deliveryNoteTerms && (
-                                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                                            <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest print:text-black/50">Syarat & Ketentuan (Surat Jalan)</h4>
-                                            <p className="text-[10px] font-medium text-slate-700 bg-rose-50/30 border border-dashed border-rose-200 rounded-2xl p-4 leading-relaxed whitespace-pre-wrap print:bg-white print:border-black/10 print:text-black">
-                                                {sale.company.deliveryNoteTerms}
-                                            </p>
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="w-full md:w-80 space-y-3">
                                     <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-widest italic print:text-black">

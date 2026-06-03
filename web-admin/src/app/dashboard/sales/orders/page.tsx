@@ -7,6 +7,7 @@ import { useFeatures } from "@/lib/FeatureContext";
 import api from "@/lib/api";
 import CreateSalesOrderModal from "@/components/sales/CreateSalesOrderModal";
 import InvoiceModal from "@/components/sales/InvoiceModal";
+import DeliveryNoteModal from "@/components/sales/DeliveryNoteModal";
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -26,6 +27,7 @@ export default function SalesOrdersPage() {
   
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isDeliveryNoteModalOpen, setIsDeliveryNoteModalOpen] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -297,6 +299,17 @@ export default function SalesOrdersPage() {
                                 <span>Invoice</span>
                               </button>
                               <button
+                                onClick={() => {
+                                  setSelectedSaleId(order.saleId);
+                                  setIsDeliveryNoteModalOpen(true);
+                                }}
+                                className="px-3.5 py-2 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 font-black rounded-xl text-[9px] uppercase tracking-widest flex items-center gap-1.5 transition-all border border-amber-500/20 active:scale-95"
+                                title="Cetak Surat Jalan Pengiriman"
+                              >
+                                <Truck className="w-3.5 h-3.5 stroke-[3.5px]" />
+                                <span>Surat Jalan</span>
+                              </button>
+                              <button
                                 onClick={() => handleDeleteOrder(order.id)}
                                 className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all border border-rose-500/20 active:scale-90"
                                 title="Hapus Pesanan"
@@ -326,14 +339,24 @@ export default function SalesOrdersPage() {
         />
 
         {selectedSaleId && (
-          <InvoiceModal
-            isOpen={isInvoiceModalOpen}
-            onClose={() => {
-              setIsInvoiceModalOpen(false);
-              setSelectedSaleId(null);
-            }}
-            saleId={selectedSaleId}
-          />
+          <>
+            <InvoiceModal
+              isOpen={isInvoiceModalOpen}
+              onClose={() => {
+                setIsInvoiceModalOpen(false);
+                setSelectedSaleId(null);
+              }}
+              saleId={selectedSaleId}
+            />
+            <DeliveryNoteModal
+              isOpen={isDeliveryNoteModalOpen}
+              onClose={() => {
+                setIsDeliveryNoteModalOpen(false);
+                setSelectedSaleId(null);
+              }}
+              saleId={selectedSaleId}
+            />
+          </>
         )}
       </div>
     </DashboardLayout>
