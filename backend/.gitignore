@@ -31,3 +31,6 @@ list_*.ts
 
 # OCR Data (Uncomment if you want to include in repo, but it makes repo heavy)
 # *.traineddata
+
+# Uploads
+uploads/

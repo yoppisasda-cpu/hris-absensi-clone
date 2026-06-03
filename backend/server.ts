@@ -917,12 +917,30 @@ app.get('/api/companies/accessible', tenantMiddleware, async (req: Request, res:
       include: { company: { select: { id: true, name: true, logoUrl: true } } }
     });
 
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const formatLogoUrl = (url: string | null) => {
+        if (url && url.startsWith('/uploads')) {
+            return `${baseUrl}${url}`;
+        }
+        return url;
+    };
+
     const results = [];
-    if (primaryCompany) results.push({ ...primaryCompany, isPrimary: true });
+    if (primaryCompany) {
+        results.push({ 
+            ...primaryCompany, 
+            logoUrl: formatLogoUrl(primaryCompany.logoUrl),
+            isPrimary: true 
+        });
+    }
     
     accessList.forEach(acc => {
       if (acc.companyId !== primaryCompanyId) {
-        results.push({ ...acc.company, isPrimary: false });
+        results.push({ 
+            ...acc.company, 
+            logoUrl: formatLogoUrl(acc.company.logoUrl),
+            isPrimary: false 
+        });
       }
     });
 

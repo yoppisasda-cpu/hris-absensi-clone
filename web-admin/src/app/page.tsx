@@ -83,14 +83,17 @@ export default function LoginPage() {
       <div className="login-container shadow-2xl" style={{ position: 'relative', zIndex: 10 }}>
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-10 flex flex-col items-center text-center">
-            <img 
-              src="/logo.png" 
-              alt="Aivola.id Logo" 
-              className="mb-4" 
-              style={{ height: '60px', width: 'auto', marginBottom: '1rem' }} 
-            />
+          <div className="mb-10 flex flex-col items-center text-center">
+            <div className="bg-[#050505] px-8 py-5 rounded-[2rem] mb-6 shadow-2xl border border-slate-800/60 ring-4 ring-slate-900/5">
+                <img 
+                  src="/logo.png" 
+                  alt="Aivola.id Logo" 
+                  style={{ height: '45px', width: 'auto', objectFit: 'contain' }} 
+                  className="brightness-110 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+                />
+            </div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              Aivola.id <span className="text-blue-600">Portal</span>
+              Login ke <span className="text-blue-600">Portal</span>
             </h1>
             <p className="mt-4 text-slate-500">
               Selamat datang kembali. Masuk ke panel admin untuk mengelola karyawan perusahaan Anda.
@@ -196,8 +199,8 @@ export default function LoginPage() {
             <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm animate-in fade-in duration-300">
                <div className="relative mb-6">
                   <div className="h-20 w-20 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                     <img src="/logo.png" alt="aivola" className="h-8 w-8 animate-pulse" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900 rounded-full p-2 m-1">
+                     <img src="/logo.png" alt="aivola" className="h-full w-full object-contain animate-pulse brightness-110" />
                   </div>
                </div>
                <h3 className="text-xl font-black text-slate-900">Menyiapkan Dashboard...</h3>
