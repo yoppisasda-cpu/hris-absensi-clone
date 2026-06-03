@@ -3194,9 +3194,12 @@ app.patch('/api/companies/my/logo', tenantMiddleware, uploadLogo.single('logo'),
       return res.status(400).json({ error: 'Tidak ada file yang diupload' });
     }
 
-    // 1. Upload ke Cloud Storage (dengan fallback otomatis ke lokal jika gagal)
-    const logoUrl = await uploadToSupabase(req.file.path, 'logos');
-    console.log(`[LOGO UPLOAD] File saved at: ${logoUrl}`);
+    // 1. Baca file dan ubah ke Base64 (Data URI)
+    const mimeType = req.file.mimetype;
+    const base64Image = fs.readFileSync(req.file.path, { encoding: 'base64' });
+    const logoUrl = `data:${mimeType};base64,${base64Image}`;
+    
+    console.log(`[LOGO UPLOAD] File converted to Base64, length: ${logoUrl.length}`);
 
     // 2. Update URL di Database
     const updatedCompany = await prisma.company.update({
@@ -3204,19 +3207,13 @@ app.patch('/api/companies/my/logo', tenantMiddleware, uploadLogo.single('logo'),
       data: { logoUrl }
     });
 
-    // 3. Cleanup local file hanya jika sudah aman di cloud
-    if (logoUrl && !logoUrl.startsWith('/uploads')) {
-      cleanupLocalFile(req.file.path);
-    }
-
-    // Pastikan URL yang dikirim balik adalah URL lengkap jika itu file lokal
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const finalUrl = logoUrl.startsWith('/') ? `${baseUrl}${logoUrl}` : logoUrl;
+    // 3. Cleanup local file karena sudah masuk database
+    cleanupLocalFile(req.file.path);
 
     res.json({ 
       success: true,
-      message: 'Logo berhasil diperbarui', 
-      logoUrl: finalUrl 
+      message: 'Logo berhasil diperbarui dan disimpan di database', 
+      logoUrl: logoUrl 
     });
   } catch (error: any) {
     console.error('!!! LOGO UPLOAD CRITICAL ERROR !!!', error);
