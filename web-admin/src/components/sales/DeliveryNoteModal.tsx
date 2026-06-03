@@ -147,7 +147,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, saleId }: { isOpen:
                                             <th className="px-6 py-4">Nama Produk / Barang</th>
                                             <th className="px-6 py-4 text-center">Jumlah</th>
                                             <th className="px-6 py-4 text-center">Satuan</th>
-                                            <th className="px-6 py-4 text-center w-24">Ceklis</th>
+                                            <th className="px-6 py-4 text-center w-32">Production Date</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 print:divide-black/20 text-slate-950">
@@ -165,7 +165,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, saleId }: { isOpen:
                                                     <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest print:text-black">{item.product_unit}</span>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <div className="w-5 h-5 border-2 border-slate-300 mx-auto rounded-sm print:border-black"></div>
+                                                    <div className="border-b border-dashed border-slate-300 w-full h-4 mt-1 print:border-black/40"></div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -190,10 +190,30 @@ export default function DeliveryNoteModal({ isOpen, onClose, saleId }: { isOpen:
                                 )}
                             </div>
 
+                            {/* Vehicle Checklist */}
+                            <div className="mt-4 p-4 border border-slate-200 rounded-xl print:border-black/20 print:rounded-none">
+                                <h4 className="text-[10px] font-black text-slate-950 uppercase tracking-widest mb-3 print:text-black">Checklist Kendaraan (Wajib Diisi oleh Staff Gudang):</h4>
+                                <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                                    {[
+                                        "Kabin & Box dalam keadaan bersih / tidak berbau",
+                                        "Box kendaraan dalam kondisi terkunci aman",
+                                        "Suhu pendingin kendaraan sesuai standar",
+                                        "Kendaraan bebas dari hama / serangga",
+                                        "Tidak membawa produk/barang pihak lain",
+                                        "Palet / alas barang dalam kondisi baik"
+                                    ].map((item, i) => (
+                                        <div key={i} className="flex items-start gap-3">
+                                            <div className="w-4 h-4 border border-slate-400 mt-0.5 rounded-[2px] print:border-black shrink-0"></div>
+                                            <span className="text-[10px] font-bold text-slate-700 print:text-black leading-tight">{item}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
                             {/* Signatures */}
                             <div className="grid grid-cols-3 gap-4 pt-8 mt-4 print:pt-4">
                                 <div className="text-center">
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest print:text-black">Dibuat Oleh (Gudang)</p>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest print:text-black">Disiapkan Oleh (Logistik)</p>
                                     <div className="h-20"></div>
                                     <div className="w-3/4 h-[1px] bg-slate-300 mx-auto print:bg-black"></div>
                                     <p className="text-[9px] mt-1 text-slate-400 print:text-black">Nama Terang & Tanda Tangan</p>
