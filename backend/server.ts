@@ -1147,6 +1147,7 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
         data: {
           companyId: tenantId,
           branchId: user?.branchId || null,
+          date: order.date,
           invoiceNumber: `INV-${order.orderNumber}`,
           customerId: order.customerId,
           customerName: order.customer.name,
