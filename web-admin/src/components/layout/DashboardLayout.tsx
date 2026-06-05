@@ -29,22 +29,22 @@ export default function DashboardLayout({
     }, [isMounted, router]);
 
     return (
-        <div className="flex h-screen bg-[#020617] overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 font-sans">
+        <div className="flex h-screen bg-[#020617] overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 font-sans print:h-auto print:overflow-visible print:block">
             {/* Sidebar Kiri */}
             <div id="main-sidebar" className="print:hidden z-30 transition-all duration-500 ease-in-out">
                 <Sidebar />
             </div>
 
             {/* Konten Kanan */}
-            <div className="flex flex-1 flex-col overflow-hidden relative">
+            <div className="flex flex-1 flex-col overflow-hidden relative print:h-auto print:overflow-visible print:block">
                 {/* Header Atas - Floating Style */}
                 <div id="main-header" className="print:hidden z-20 px-8 pt-6">
                     <Header />
                 </div>
 
                 {/* Main Workspace */}
-                <main className="flex-1 overflow-y-auto px-10 py-8 transition-all duration-300 scroll-smooth no-scrollbar">
-                    <div className="mx-auto max-w-[1600px] animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-[cubic-bezier(0.2,0.8,0.2,1)]">
+                <main className="flex-1 overflow-y-auto px-10 py-8 transition-all duration-300 scroll-smooth no-scrollbar print:h-auto print:overflow-visible print:p-0">
+                    <div className="mx-auto max-w-[1600px] animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-[cubic-bezier(0.2,0.8,0.2,1)] print:max-w-none print:w-full print:p-0">
                         {children}
                     </div>
                 </main>

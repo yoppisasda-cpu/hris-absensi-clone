@@ -120,7 +120,7 @@ export default function SalesOrdersPage() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+      <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300 print:hidden">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/50 p-8 rounded-[2.5rem] shadow-2xl border border-slate-800 backdrop-blur-xl">
           <div>
