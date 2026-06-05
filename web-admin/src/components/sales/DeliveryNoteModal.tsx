@@ -55,7 +55,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 print:static print:p-0 print:block print:w-full print:h-auto print:overflow-visible">
             {/* Backdrop - never printed */}
             <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl print:hidden" onClick={onClose} />
 
@@ -77,8 +77,8 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
             </div>
 
             {/* Printable DO Card */}
-            <div className="printable-content bg-white w-full max-w-4xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none">
-                <div className="overflow-y-auto p-12 print:overflow-visible print:p-0 no-scrollbar">
+            <div className="printable-content bg-white w-full max-w-4xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none print:block print:overflow-visible">
+                <div className="overflow-y-auto p-12 print:overflow-visible print:p-0 no-scrollbar print:block">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 animate-pulse">
                             <div className="h-16 w-16 border-4 border-slate-200 border-t-emerald-600 rounded-full animate-spin mb-6"></div>
