@@ -168,29 +168,6 @@ export default function PurchaseOrdersPage() {
             doc.text(po.createdBy?.name || "-", 20, signatureY + 15);
             doc.text(po.approvedBy?.name || "..........................", 140, signatureY + 15);
 
-            // Render Notes / Delivery Note Terms if available
-            if (company?.deliveryNoteTerms) {
-                const noteY = signatureY + 30;
-                
-                // Cek jika butuh halaman baru untuk catatan
-                if (noteY > 270) {
-                    doc.addPage();
-                }
-
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(10);
-                doc.setTextColor(220, 38, 38); // Red text for "Note:"
-                doc.text("Note:", 15, noteY);
-
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(9);
-                doc.setTextColor(30, 41, 59); // Slate 800
-                
-                // Gunakan doc.splitTextToSize untuk word-wrapping otomatis
-                const splitNotes = doc.splitTextToSize(company.deliveryNoteTerms, 180);
-                doc.text(splitNotes, 15, noteY + 5);
-            }
-
             // Safe FileName: Very Simple String
             const poNum = (po.orderNumber || po.id || "Order").toString().replace(/[^a-zA-Z0-9]/g, "");
             const fileName = `PO_${poNum}.pdf`;
