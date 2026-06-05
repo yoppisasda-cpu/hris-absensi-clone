@@ -40,16 +40,66 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
     };
 
     const handlePrint = () => {
-        const controls = document.getElementById('do-controls');
-        if (controls) controls.style.display = 'none';
-        
-        const afterPrint = () => {
-            if (controls) controls.style.display = '';
-            window.removeEventListener('afterprint', afterPrint);
-        };
-        window.addEventListener('afterprint', afterPrint);
-        
-        window.print();
+        const printContent = document.getElementById('printable-do');
+        if (!printContent) return;
+
+        const printWindow = window.open('', '_blank', 'width=1000,height=800');
+        if (!printWindow) {
+            alert("Gagal membuka jendela cetak. Pastikan pop-up blocker dinatikan.");
+            return;
+        }
+
+        const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+            .map(style => style.outerHTML)
+            .join('\n');
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Surat Jalan - ${sale.orderNumber || sale.invoiceNumber}</title>
+                    ${styles}
+                    <style>
+                        body {
+                            background: white !important;
+                            color: black !important;
+                            padding: 2cm !important;
+                            margin: 0 !important;
+                            height: auto !important;
+                            overflow: visible !important;
+                        }
+                        #printable-do {
+                            display: block !important;
+                            width: 100% !important;
+                            max-width: none !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            max-height: none !important;
+                            overflow: visible !important;
+                            position: static !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+                        .print-hidden, .print\\:hidden, #do-controls, #invoice-controls {
+                            display: none !important;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div id="printable-do">
+                        ${printContent.innerHTML}
+                    </div>
+                    <script>
+                        window.onload = function() {
+                            setTimeout(function() {
+                                window.print();
+                                window.close();
+                            }, 500);
+                        };
+                    </script>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
     };
 
     if (!isOpen) return null;
@@ -77,7 +127,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
             </div>
 
             {/* Printable DO Card */}
-            <div className="printable-content bg-white w-full max-w-4xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none print:block print:overflow-visible">
+            <div id="printable-do" className="printable-content bg-white w-full max-w-4xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none print:block print:overflow-visible">
                 <div className="overflow-y-auto p-12 print:overflow-visible print:p-0 no-scrollbar print:block">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 animate-pulse">

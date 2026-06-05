@@ -64,16 +64,66 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
     };
 
     const handlePrint = () => {
-        const controls = document.getElementById('invoice-controls');
-        if (controls) controls.style.display = 'none';
-        
-        const afterPrint = () => {
-            if (controls) controls.style.display = '';
-            window.removeEventListener('afterprint', afterPrint);
-        };
-        window.addEventListener('afterprint', afterPrint);
-        
-        window.print();
+        const printContent = document.getElementById('printable-invoice');
+        if (!printContent) return;
+
+        const printWindow = window.open('', '_blank', 'width=1000,height=800');
+        if (!printWindow) {
+            alert("Gagal membuka jendela cetak. Pastikan pop-up blocker dinatikan.");
+            return;
+        }
+
+        const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+            .map(style => style.outerHTML)
+            .join('\n');
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Invoice - ${sale.invoiceNumber}</title>
+                    ${styles}
+                    <style>
+                        body {
+                            background: white !important;
+                            color: black !important;
+                            padding: 2cm !important;
+                            margin: 0 !important;
+                            height: auto !important;
+                            overflow: visible !important;
+                        }
+                        #printable-invoice {
+                            display: block !important;
+                            width: 100% !important;
+                            max-width: none !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            max-height: none !important;
+                            overflow: visible !important;
+                            position: static !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+                        .print-hidden, .print\\:hidden, #do-controls, #invoice-controls {
+                            display: none !important;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div id="printable-invoice">
+                        ${printContent.innerHTML}
+                    </div>
+                    <script>
+                        window.onload = function() {
+                            setTimeout(function() {
+                                window.print();
+                                window.close();
+                            }, 500);
+                        };
+                    </script>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
     };
 
     const getStatusLabel = (status: string) => {
