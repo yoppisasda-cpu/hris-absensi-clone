@@ -1234,7 +1234,15 @@ app.get('/api/sales/orders/:id', tenantMiddleware, async (req: Request, res: Res
     });
 
     if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan' });
-    res.json(order);
+
+    // Include company for delivery note / printing
+    const company = await prisma.company.findUnique({ where: { id: tenantId } });
+    if (company && company.logoUrl && company.logoUrl.startsWith('/uploads')) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        company.logoUrl = `${baseUrl}${company.logoUrl}`;
+    }
+
+    res.json({ ...order, company });
   } catch (error: any) {
     console.error("GET SINGLE SALES ORDER ERROR:", error);
     res.status(500).json({ error: 'Gagal memuat pesanan: ' + error.message });

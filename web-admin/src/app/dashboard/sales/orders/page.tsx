@@ -267,6 +267,17 @@ export default function SalesOrdersPage() {
                           {order.status === 'SHIPPED' && (
                             <>
                               <button
+                                onClick={() => {
+                                  setSelectedOrderId(order.id);
+                                  setIsDeliveryNoteModalOpen(true);
+                                }}
+                                className="px-3.5 py-2 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 font-black rounded-xl text-[9px] uppercase tracking-widest flex items-center gap-1.5 transition-all border border-amber-500/20 active:scale-95"
+                                title="Cetak Surat Jalan Pengiriman"
+                              >
+                                <Truck className="w-3.5 h-3.5 stroke-[3.5px]" />
+                                <span>Surat Jalan</span>
+                              </button>
+                              <button
                                 onClick={() => handleDeleteOrder(order.id)}
                                 className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all border border-rose-500/20 active:scale-90"
                                 title="Hapus Pesanan"
@@ -300,7 +311,7 @@ export default function SalesOrdersPage() {
                               </button>
                               <button
                                 onClick={() => {
-                                  setSelectedSaleId(order.saleId);
+                                  setSelectedOrderId(order.id);
                                   setIsDeliveryNoteModalOpen(true);
                                 }}
                                 className="px-3.5 py-2 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 font-black rounded-xl text-[9px] uppercase tracking-widest flex items-center gap-1.5 transition-all border border-amber-500/20 active:scale-95"
@@ -339,7 +350,6 @@ export default function SalesOrdersPage() {
         />
 
         {selectedSaleId && (
-          <>
             <InvoiceModal
               isOpen={isInvoiceModalOpen}
               onClose={() => {
@@ -348,15 +358,17 @@ export default function SalesOrdersPage() {
               }}
               saleId={selectedSaleId}
             />
+        )}
+
+        {selectedOrderId && (
             <DeliveryNoteModal
               isOpen={isDeliveryNoteModalOpen}
               onClose={() => {
                 setIsDeliveryNoteModalOpen(false);
-                setSelectedSaleId(null);
+                setSelectedOrderId(null);
               }}
-              saleId={selectedSaleId}
+              orderId={selectedOrderId}
             />
-          </>
         )}
       </div>
     </DashboardLayout>

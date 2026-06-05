@@ -7,21 +7,31 @@ import api from "@/lib/api";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 
-export default function DeliveryNoteModal({ isOpen, onClose, saleId }: { isOpen: boolean, onClose: () => void, saleId: number }) {
+export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen: boolean, onClose: () => void, orderId: number }) {
     const [sale, setSale] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (isOpen && saleId) {
+        if (isOpen && orderId) {
             fetchSaleDetail();
         }
-    }, [isOpen, saleId]);
+    }, [isOpen, orderId]);
 
     const fetchSaleDetail = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/sales/${saleId}`);
-            setSale(res.data);
+            const res = await api.get(`/sales/orders/${orderId}`);
+            // Map items for consistency with original format if needed
+            const orderData = res.data;
+            if (orderData.items) {
+                orderData.items = orderData.items.map((item: any) => ({
+                    ...item,
+                    product_name: item.product?.name,
+                    product_sku: item.product?.sku,
+                    product_unit: item.product?.unit
+                }));
+            }
+            setSale(orderData);
         } catch (error) {
             console.error("Gagal mengambil detail pesanan", error);
         } finally {
@@ -67,7 +77,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, saleId }: { isOpen:
             </div>
 
             {/* Printable DO Card */}
-            <div className="bg-white w-full max-w-4xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none">
+            <div className="printable-content bg-white w-full max-w-4xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none">
                 <div className="overflow-y-auto p-12 print:overflow-visible print:p-0 no-scrollbar">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 animate-pulse">
