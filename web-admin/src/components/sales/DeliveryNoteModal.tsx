@@ -116,12 +116,12 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                                 <div className="space-y-3">
                                     <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 bg-slate-50 p-2 rounded-lg print:bg-transparent print:p-0 print:text-black/50">Dikirim Kepada (Penerima):</h3>
                                     <div className="pl-2">
-                                        <div className="font-extrabold text-lg text-slate-950 uppercase print:text-black">{sale.customerName || 'UMUM / GUEST'}</div>
+                                        <div className="font-extrabold text-lg text-slate-950 uppercase print:text-black">{sale.customer?.name || sale.customerName || 'UMUM / GUEST'}</div>
                                         <div className="text-[11px] text-slate-600 mt-1 leading-relaxed print:text-black">
                                             {sale.customer?.address || 'Alamat Outlet / Pelanggan tidak terdaftar'}
                                         </div>
                                         <div className="text-[11px] font-bold text-slate-700 mt-2 flex items-center gap-1.5 print:text-black">
-                                            <Phone className="h-3 w-3" /> {sale.customerPhone || sale.customer?.phone || '-'}
+                                            <Phone className="h-3 w-3" /> {sale.customer?.phone || sale.customerPhone || '-'}
                                         </div>
                                     </div>
                                 </div>
@@ -132,7 +132,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                                     <div className="pl-2 space-y-2">
                                         <div className="grid grid-cols-3 gap-2 text-[11px]">
                                             <span className="font-black text-slate-500 uppercase print:text-black/60">No. Surat:</span>
-                                            <span className="font-black text-slate-950 col-span-2 print:text-black">DO-{sale.invoiceNumber}</span>
+                                            <span className="font-black text-slate-950 col-span-2 print:text-black">DO-{sale.orderNumber || sale.invoiceNumber}</span>
                                         </div>
                                         <div className="grid grid-cols-3 gap-2 text-[11px]">
                                             <span className="font-black text-slate-500 uppercase print:text-black/60">Tgl Kirim:</span>
