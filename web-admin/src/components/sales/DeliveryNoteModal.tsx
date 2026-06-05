@@ -66,6 +66,10 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                             margin: 0 !important;
                             height: auto !important;
                             overflow: visible !important;
+                            visibility: visible !important;
+                        }
+                        body * {
+                            visibility: visible !important;
                         }
                         #printable-do {
                             display: block !important;
@@ -79,8 +83,9 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                             margin: 0 !important;
                             padding: 0 !important;
                         }
-                        .print-hidden, .print\\:hidden, #do-controls, #invoice-controls {
+                        .print-hidden, .print\\:hidden, #do-controls, #invoice-controls, .print\\:hidden *, #do-controls * {
                             display: none !important;
+                            visibility: hidden !important;
                         }
                     </style>
                 </head>
