@@ -14,7 +14,7 @@ export class AIService {
   static async generateBusinessAdvice(userQuery: string, context: any, isJson: boolean = false) {
     try {
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         generationConfig: isJson ? { responseMimeType: "application/json" } : undefined,
         systemInstruction: `
           You are Aivola AI Strategic Assistant, an elite business consultant specialized in:

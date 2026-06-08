@@ -1522,7 +1522,7 @@ app.post('/api/prospects/market-insight', async (req: Request, res: Response) =>
 
     const genAI = new GeminiAI(apiKey);
     const model = genAI.getGenerativeModel(
-      { model: 'gemini-2.0-flash' },
+      { model: 'gemini-2.5-flash' },
       { apiVersion: 'v1beta' }
     );
 
@@ -14255,7 +14255,7 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
 
     // Initialize Gemini
     const genAI = new GeminiAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       Anda adalah konsultan bisnis retail profesional kelas dunia.

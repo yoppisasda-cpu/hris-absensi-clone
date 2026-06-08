@@ -349,7 +349,7 @@ export const ProspectController = {
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const modelName = 'gemini-1.0-pro';
+      const modelName = 'gemini-2.5-flash';
       console.log(`🤖 [DEBUG] Requesting Gemini Model: ${modelName}`);
       const model = genAI.getGenerativeModel({ model: modelName });
 
