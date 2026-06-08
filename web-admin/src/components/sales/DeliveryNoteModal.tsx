@@ -331,6 +331,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                         </div>
                     )}
                 </div>
+            </div>
             <style dangerouslySetInnerHTML={{__html: `
                 .print-only { display: none !important; }
                 @media print {
