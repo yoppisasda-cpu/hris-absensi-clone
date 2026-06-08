@@ -7834,11 +7834,12 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
       visited.add(product.id);
 
       if (product.Recipes && product.Recipes.length > 0) {
-        return product.Recipes.reduce((sum: number, r: any) => {
+        const totalRecipeCost = product.Recipes.reduce((sum: number, r: any) => {
           const material = allProducts.find(m => m.id === r.materialId);
           const materialUnitCost = material ? getProductCost(material, allProducts, new Set(visited)) : (r.Material?.costPrice || 0);
-          return sum + (r.quantity * materialUnitCost);
+          return sum + (Number(r.quantity || 0) * Number(materialUnitCost || 0));
         }, 0);
+        return totalRecipeCost / (product.recipeYield || 1);
       }
 
       return product.costPrice || 0;
@@ -7846,7 +7847,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
 
     const inventoryValue = products.reduce((sum, p) => {
       const unitCost = (p.Recipes && p.Recipes.length > 0) ? getProductCost(p, products) : (p.costPrice || 0);
-      return sum + (Number(p.stock || 0) * unitCost);
+      return sum + (Math.max(0, Number(p.stock || 0)) * unitCost);
     }, 0);
 
     // 7. NEW: Rincian Gaji Karyawan (Untuk Dashboard Coffee)
@@ -10713,7 +10714,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const products = await prisma.product.findMany({
       where: { companyId: tenantId }
     });
-    const totalInventoryValue = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.costPrice || 0)), 0);
+    const totalInventoryValue = products.reduce((sum, p) => sum + (Math.max(0, p.stock || 0) * (p.costPrice || 0)), 0);
 
     const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue;
 
@@ -10867,7 +10868,7 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
 
     const products = await prisma.product.findMany({ where: { companyId: tenantId } });
-    const totalInventoryValue = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.costPrice || 0)), 0);
+    const totalInventoryValue = products.reduce((sum, p) => sum + (Math.max(0, p.stock || 0) * (p.costPrice || 0)), 0);
 
     const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue;
 
