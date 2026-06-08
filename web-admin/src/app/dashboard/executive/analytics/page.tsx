@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import api from '@/lib/api';
 import { 
   TrendingUp, 
   ArrowLeft,
@@ -55,18 +56,9 @@ export default function AIAnalyticsPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-        id: '1',
-        role: 'ai',
-        content: 'Halo Bapak/Ibu! Saya asisten Aivola Mind. Saya sudah menganalisis data bisnis Anda hari ini (Health Score: 87/100). Ada yang bisa saya bantu jelaskan lebih lanjut?',
-        timestamp: new Date()
-    }
-  ]);
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Tab-Specific Data Configurations
-  const tabConfigs = {
+  // Tab-Specific Default Configurations
+  const defaultTabConfigs = {
     finance: {
       title: "Revenue Forecast",
       desc: "Prediksi pertumbuhan 14 hari ke depan berdasarkan korelasi data historis.",
@@ -123,7 +115,7 @@ export default function AIAnalyticsPage() {
         { subject: 'Fulfillment', A: 140, B: 130 },
       ],
       aiSug: "Waspada: Stok Biji Kopi Signature kritis.",
-      aiSugDesc: "Dengan kecepatan penjualan saat ini, stok akan habis dalam 48 jam. Disarankan order ke Supplier Utama pagi ini.",
+      aiSugDesc: "Dengan kecepatan penjualan saat ini, stok akan habis dalam 48 jam. Disarankan order to Supplier Utama pagi ini.",
       checklist: [
         { text: "Reorder Biji Kopi Gayo", status: "URGENT" },
         { text: "Cek Expired Susu Oat", status: "HIGH PRIO" },
@@ -131,6 +123,18 @@ export default function AIAnalyticsPage() {
       ]
     }
   };
+
+  const [configs, setConfigs] = useState(defaultTabConfigs);
+
+  const [messages, setMessages] = useState<Message[]>([
+    {
+        id: '1',
+        role: 'ai',
+        content: 'Halo Bapak/Ibu! Saya asisten Aivola Mind. Saya sudah menganalisis data bisnis Anda hari ini (Health Score: 87/100). Ada yang bisa saya bantu jelaskan lebih lanjut?',
+        timestamp: new Date()
+    }
+  ]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const forecastData = [
     { name: 'W1', value: 4500, projected: 4500 },
@@ -143,10 +147,116 @@ export default function AIAnalyticsPage() {
     { name: 'P4', projected: 7500 },
   ];
 
-  const healthData = [{ name: 'Health', value: activeTab === 'finance' ? 87 : activeTab === 'hr' ? 94 : 72, fill: tabConfigs[activeTab].chartColor }];
+  const healthData = [{ name: 'Health', value: activeTab === 'finance' ? 87 : activeTab === 'hr' ? 94 : 72, fill: configs[activeTab].chartColor }];
 
   useEffect(() => {
-    setTimeout(() => setLoading(false), 1200);
+    async function loadBusinessData() {
+      try {
+        // Fetch company details
+        const companyRes = await api.get('/companies/my');
+        const companyName = companyRes.data?.name || '';
+        
+        // Fetch product categories
+        const categoriesRes = await api.get('/pos/categories');
+        const categories = categoriesRes.data || [];
+        
+        // Fetch products
+        const productsRes = await api.get('/inventory/products');
+        const products = productsRes.data || [];
+        
+        // Fetch active staff (optional fallback)
+        let staffNames: string[] = [];
+        try {
+          const usersRes = await api.get('/users');
+          staffNames = (usersRes.data || []).map((u: any) => u.name.split(' ')[0]);
+        } catch (e) {
+          console.log("Could not fetch staff names due to permissions or endpoint failure");
+        }
+
+        // Determine business type & customize recommendations
+        const nameLower = companyName.toLowerCase();
+        const isCoffee = nameLower.includes('kopi') || 
+                        nameLower.includes('coffee') ||
+                        products.some((p: any) => p.name.toLowerCase().includes('kopi') || p.name.toLowerCase().includes('coffee'));
+                        
+        const isKitchen = nameLower.includes('dapur') ||
+                          nameLower.includes('basamo') ||
+                          nameLower.includes('food') ||
+                          nameLower.includes('catering') ||
+                          nameLower.includes('resto') ||
+                          nameLower.includes('masakan');
+
+        // Choose appropriate terms
+        let staffRole = "Staf";
+        if (isCoffee) {
+          staffRole = "Barista";
+        } else if (isKitchen) {
+          staffRole = "Koki/Tim Dapur";
+        }
+
+        // Categories
+        const catName1 = categories.length > 0 ? categories[0].name : (isCoffee ? "Kopi" : isKitchen ? "Makanan Utama" : "Bahan Baku");
+
+        // Products
+        const prodName1 = products.length > 0 ? products[0].name : (isCoffee ? "Biji Kopi Signature" : isKitchen ? "Daging Sapi" : "Stok Utama");
+        const prodName2 = products.length > 1 ? products[1].name : (isCoffee ? "Susu Oat" : isKitchen ? "Minyak Goreng" : "Bahan Pelengkap");
+        const prodName3 = products.length > 2 ? products[2].name : (isCoffee ? "Gula Aren" : isKitchen ? "Bumbu Giling" : "Kemasan");
+
+        // Staff Names fallback
+        const staffName1 = staffNames.length > 0 ? staffNames[0] : (isCoffee ? "Dian" : "Ahmad");
+        const staffName2 = staffNames.length > 1 ? staffNames[1] : (isCoffee ? "Rian" : "Budi");
+
+        // Construct customized config
+        const updatedConfigs = {
+          finance: {
+            ...defaultTabConfigs.finance,
+            checklist: [
+              { text: `Optimasi HPP Kategori ${catName1}`, status: "HIGH PRIO" },
+              { text: `Potong Biaya Listrik Cabang B`, status: "SUGGESTED" },
+              { text: `Review Cashback Vendor`, status: "DUE SOON" }
+            ]
+          },
+          hr: {
+            ...defaultTabConfigs.hr,
+            aiSugDesc: `Namun, 2 ${staffRole} senior (${staffName1} & ${staffName2}) terdeteksi 'High Fatigue'. Disarankan rotasi shift untuk mencegah burnout.`,
+            checklist: [
+              { text: `Review Kontrak 3 Staf`, status: "DUE SOON" },
+              { text: `Restrukturisasi Shift Malam`, status: "SUGGESTED" },
+              { text: `Bonus Tahunan ${staffRole}`, status: "DUE SOON" }
+            ]
+          },
+          stock: {
+            ...defaultTabConfigs.stock,
+            aiSug: `Waspada: Stok ${prodName1} kritis.`,
+            aiSugDesc: `Dengan kecepatan penjualan saat ini, stok akan habis dalam 48 jam. Disarankan order ke Supplier Utama pagi ini.`,
+            checklist: [
+              { text: `Reorder ${prodName1}`, status: "URGENT" },
+              { text: `Cek Expired ${prodName2}`, status: "HIGH PRIO" },
+              { text: `Audit Stok ${prodName3}`, status: "SUGGESTED" }
+            ]
+          }
+        };
+
+        setConfigs(updatedConfigs);
+        
+        // Dynamically update greeting message
+        setMessages([
+          {
+            id: '1',
+            role: 'ai',
+            content: `Halo Bapak/Ibu! Saya asisten Aivola Mind. Saya sudah menganalisis data bisnis ${companyName || 'Anda'} hari ini. Ada yang bisa saya bantu jelaskan lebih lanjut?`,
+            timestamp: new Date()
+          }
+        ]);
+
+      } catch (err) {
+        console.error("Error loading business info for AI Advisor", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadBusinessData();
   }, []);
 
   useEffect(() => {
@@ -225,7 +335,7 @@ export default function AIAnalyticsPage() {
     );
   }
 
-  const currentConfig = tabConfigs[activeTab];
+  const currentConfig = configs[activeTab];
 
   return (
     <DashboardLayout>
