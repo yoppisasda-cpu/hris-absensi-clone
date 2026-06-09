@@ -180,7 +180,10 @@ const requiredFolders = [
   path.join(process.cwd(), 'uploads/face_references'),
   path.join(process.cwd(), 'uploads/reimbursements'),
   path.join(process.cwd(), 'uploads/banners'),
-  path.join(process.cwd(), 'uploads/announcements')
+  path.join(process.cwd(), 'uploads/announcements'),
+  path.join(process.cwd(), 'uploads/logos'),
+  path.join(process.cwd(), 'uploads/products'),
+  path.join(process.cwd(), 'uploads/avatars')
 ];
 
 requiredFolders.forEach(folder => {
