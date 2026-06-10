@@ -4197,8 +4197,12 @@ async function clockInHandler(req: Request, res: Response) {
         console.log(`[Face AI] Clock-In Verification: ${isFaceVerified} (Score: ${faceSimilarityScore})`);
 
         if (!isFaceVerified) {
-          const errMsg = faceResult.errorMessage ? `Error: ${faceResult.errorMessage}` : `Foto selfie tidak cocok dengan data referensi (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%). Pastikan wajah terlihat jelas.`;
-          return res.status(400).json({ error: `Verifikasi Wajah Gagal: ${errMsg}` });
+          if (faceResult.errorMessage && faceResult.errorMessage.includes('AI Sedang Sibuk')) {
+            console.warn('[Face AI] AI Server Down. Fail-safe triggered. Allowing Clock-In.');
+          } else {
+            const errMsg = faceResult.errorMessage ? `Error: ${faceResult.errorMessage}` : `Foto selfie tidak cocok dengan data referensi (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%). Pastikan wajah terlihat jelas.`;
+            return res.status(400).json({ error: `Verifikasi Wajah Gagal: ${errMsg}` });
+          }
         }
       } catch (faceErr) {
         console.error('[Face AI] Error during Clock-In verification:', faceErr);
@@ -4546,8 +4550,12 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         console.log(`[Face AI] Clock-Out Verification: ${isFaceVerified} (Score: ${faceSimilarityScore})`);
 
         if (!isFaceVerified) {
-          const errMsg = faceResult.errorMessage ? `Error: ${faceResult.errorMessage}` : `Foto tidak cocok (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%).`;
-          return res.status(400).json({ error: `Verifikasi Wajah Gagal: ${errMsg}` });
+          if (faceResult.errorMessage && faceResult.errorMessage.includes('AI Sedang Sibuk')) {
+            console.warn('[Face AI] AI Server Down. Fail-safe triggered. Allowing Clock-Out.');
+          } else {
+            const errMsg = faceResult.errorMessage ? `Error: ${faceResult.errorMessage}` : `Foto tidak cocok (Kemiripan: ${(faceSimilarityScore * 100).toFixed(1)}%).`;
+            return res.status(400).json({ error: `Verifikasi Wajah Gagal: ${errMsg}` });
+          }
         }
       } catch (faceErr) {
         console.error('[Face AI] Error during Clock-Out verification:', faceErr);
