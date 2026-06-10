@@ -116,7 +116,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             recipeItems.forEach(item => {
                 const material = productList.find(p => p.id.toString() === item.materialId.toString());
                 if (material) {
-                    const materialCost = material.costPrice || 0;
+                    const materialCost = (material.recipeCogs && material.recipeCogs > 0) ? material.recipeCogs : (material.costPrice || 0);
                     totalMaterialCost += materialCost * (Number(item.quantity) || 0);
                 }
             });
@@ -958,7 +958,11 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                                 />
                                                 {item.materialId && (
                                                     <span className="text-[9px] font-black text-amber-500/80 italic pr-2">
-                                                        = Rp {((productList.find((p: any) => p.id.toString() === item.materialId)?.costPrice || 0) * (Number(item.quantity) || 0)).toLocaleString('id-ID')}
+                                                        = Rp {(() => {
+                                                            const mat = productList.find((p: any) => p.id.toString() === item.materialId);
+                                                            const cost = mat ? ((mat.recipeCogs && mat.recipeCogs > 0) ? mat.recipeCogs : (mat.costPrice || 0)) : 0;
+                                                            return (cost * (Number(item.quantity) || 0)).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                                                        })()}
                                                     </span>
                                                 )}
                                             </div>
