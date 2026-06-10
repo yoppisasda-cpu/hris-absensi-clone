@@ -100,17 +100,15 @@ export async function compareFaces(referencePath: string, capturePath: string): 
 
     const modelNames = [
         "gemini-2.5-flash", 
-        "gemini-flash-latest",
-        "gemini-2.0-flash",
-        "gemini-pro-latest"
+        "gemini-flash-latest"
     ];
 
     let lastError = "Tidak ada model yang merespons.";
     const tempFiles: string[] = [];
 
-    // loop through all potential models
+    // loop through potential models (fail fast)
     for (const modelName of modelNames) {
-        const maxRetries = 2;
+        const maxRetries = 0; // Fail fast: 0 retries
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
                 if (attempt > 0) console.log(`[Face AI] RETRY attempt ${attempt} for model ${modelName}...`);
