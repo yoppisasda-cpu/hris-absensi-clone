@@ -289,26 +289,26 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50 text-[9px] font-black uppercase text-slate-950 tracking-[0.2em] border-b border-slate-200 print:bg-white print:text-black">
                                         <tr>
-                                            <th className="px-8 py-3 text-slate-950 font-black">Nama Produk</th>
-                                            <th className="px-8 py-3 text-center text-slate-950 font-black">Jumlah</th>
-                                            <th className="px-8 py-3 text-right text-slate-950 font-black">Harga Satuan</th>
-                                            <th className="px-8 py-3 text-right text-slate-950 font-black">Total (IDR)</th>
+                                            <th className="px-8 py-2 text-slate-950 font-black">Nama Produk</th>
+                                            <th className="px-8 py-2 text-center text-slate-950 font-black">Jumlah</th>
+                                            <th className="px-8 py-2 text-right text-slate-950 font-black">Harga Satuan</th>
+                                            <th className="px-8 py-2 text-right text-slate-950 font-black">Total (IDR)</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 italic print:divide-black text-slate-950">
                                         {sale.items.map((item: any, idx: number) => (
                                             <tr key={idx} className="group hover:bg-slate-50 transition-colors print:text-black">
-                                                <td className="px-8 py-3">
+                                                <td className="px-8 py-2">
                                                     <p className="font-black text-slate-950 text-[11px] uppercase tracking-tighter print:text-black">{item.product_name}</p>
                                                 </td>
-                                                <td className="px-8 py-3 text-center">
+                                                <td className="px-8 py-2 text-center">
                                                     <span className="font-black text-slate-950 text-[11px] print:text-black">{item.quantity}</span>
                                                     <span className="ml-2 text-[9px] text-slate-500 font-black uppercase tracking-widest print:text-black/60">{item.product_unit}</span>
                                                 </td>
-                                                <td className="px-8 py-3 text-right font-black text-slate-500 text-[11px] tracking-widest print:text-black">
+                                                <td className="px-8 py-2 text-right font-black text-slate-500 text-[11px] tracking-widest print:text-black">
                                                     {parseFloat(item.price).toLocaleString()}
                                                 </td>
-                                                <td className="px-8 py-3 text-right font-black text-slate-950 text-[11px] tracking-widest print:text-black">
+                                                <td className="px-8 py-2 text-right font-black text-slate-950 text-[11px] tracking-widest print:text-black">
                                                     {parseFloat(item.total).toLocaleString()}
                                                 </td>
                                             </tr>
@@ -384,7 +384,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                 <div className="text-center w-48 mt-8 sm:mt-0">
                                     <div className="h-12"></div>
                                     <div className="h-[1px] bg-slate-200 w-full mb-3 print:bg-black"></div>
-                                    <p className="text-[10px] font-black text-slate-950 uppercase tracking-[0.2em] print:text-black">{sale.company?.name || 'OPERATOR_TOKO'}</p>
+                                    <p className="text-[10px] font-black text-slate-950 uppercase tracking-[0.2em] print:text-black">FINANCE</p>
                                 </div>
                             </div>
 
