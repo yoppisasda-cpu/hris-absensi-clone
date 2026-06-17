@@ -48,6 +48,16 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
         }
     };
 
+    const handleShippedDateChange = async (newDate: string) => {
+        setCustomShippedDate(newDate);
+        try {
+            await api.patch(`/sales/orders/${orderId}/shipped-date`, { shippedAt: newDate });
+        } catch (error) {
+            console.error("Gagal memperbarui tanggal kirim", error);
+        }
+    };
+
+
     const handlePrint = () => {
         const printContent = document.getElementById('printable-do');
         if (!printContent) return;
@@ -209,7 +219,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                                                 <input 
                                                     type="date"
                                                     value={customShippedDate}
-                                                    onChange={(e) => setCustomShippedDate(e.target.value)}
+                                                    onChange={(e) => handleShippedDateChange(e.target.value)}
                                                     className="font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded px-2 py-0.5 focus:outline-none focus:border-blue-500 screen-only text-[11px]"
                                                 />
                                                 {/* Display when printing */}

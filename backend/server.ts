@@ -1122,6 +1122,32 @@ app.patch('/api/sales/orders/:id/status', tenantMiddleware, async (req: Request,
   }
 });
 
+// 3b. Update Shipped Date (Delivery Date)
+app.patch('/api/sales/orders/:id/shipped-date', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const orderId = Number(req.params.id);
+    const { shippedAt } = req.body;
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id: orderId, companyId: tenantId }
+    });
+
+    if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan atau bukan milik Anda' });
+
+    const updated = await prisma.salesOrder.update({
+      where: { id: orderId },
+      data: {
+        shippedAt: shippedAt ? new Date(shippedAt) : null
+      }
+    });
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengupdate tanggal kirim: ' + error.message });
+  }
+});
+
+
 // 4. Convert to Invoice (Sale)
 app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request, res: Response) => {
   try {
