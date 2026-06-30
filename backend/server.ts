@@ -14328,100 +14328,143 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const userId = Number((req as any).userId);
     const ExcelJS = require('exceljs');
 
-    // 1. Fetch Data (logic same as List Sales)
+    // 1. Fetch User Data
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
     
-    const { branchId } = req.query;
+    const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
     
-    // 2b. Build query based on branch and role
-    let sales: any[];
+    // 2. Build Query with Filters (Symmetric with List Sales)
     const isPosViewer = (user?.role as string) === 'POS_VIEWER';
-    const invoiceFilter = isPosViewer ? `AND s."invoiceNumber" LIKE 'POS-%'` : '';
+    const invoiceFilter = isPosViewer ? `AND (s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')` : '';
+    
+    let whereConditions = [`s."companyId" = ${tenantId}`];
+    if (isPosViewer) {
+      whereConditions.push(`(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`);
+    }
 
-    if (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER' || (user?.role as string) === 'FINANCE' || isPosViewer) {
-      // Admins and owners see everything for the company, but can filter by branchId if provided
-      let effectiveBranchId = branchId;
+    // Branch Filter
+    let effectiveBranchId = branchId;
+    if (isPosViewer && user?.branchId) {
+      effectiveBranchId = user.branchId.toString();
+    }
 
-      // FORCED ISOLATION: POS_VIEWER with assigned branch cannot see others
-      if (isPosViewer && user?.branchId) {
-          effectiveBranchId = user.branchId.toString();
-      }
-
-      if (effectiveBranchId && effectiveBranchId !== 'all') {
-        const bId = effectiveBranchId === 'null' ? null : parseInt(effectiveBranchId as string);
-        
-        if (bId === null) {
-          sales = await prisma.$queryRawUnsafe(`
-            SELECT s.*, c.name as "customerName"
-            FROM "Sale" s
-            LEFT JOIN "Customer" c ON s."customerId" = c.id
-            WHERE s."companyId" = $1 AND s."branchId" IS NULL ${invoiceFilter}
-            ORDER BY s."date" DESC
-          `, tenantId);
-        } else {
-          sales = await prisma.$queryRawUnsafe(`
-            SELECT s.*, c.name as "customerName"
-            FROM "Sale" s
-            LEFT JOIN "Customer" c ON s."customerId" = c.id
-            WHERE s."companyId" = $1 AND s."branchId" = $2 ${invoiceFilter}
-            ORDER BY s."date" DESC
-          `, tenantId, bId);
-        }
+    if (effectiveBranchId && effectiveBranchId !== 'all') {
+      if (effectiveBranchId === 'null') {
+        whereConditions.push(`s."branchId" IS NULL`);
       } else {
-        sales = await prisma.$queryRawUnsafe(`
-          SELECT s.*, c.name as "customerName"
-          FROM "Sale" s
-          LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 ${invoiceFilter}
-          ORDER BY s."date" DESC
-        `, tenantId);
-      }
-    } else {
-      // Cashiers/Staff see only their branch's sales
-      if (user?.branchId === null) {
-        sales = await prisma.$queryRawUnsafe(`
-          SELECT s.*, c.name as "customerName"
-          FROM "Sale" s
-          JOIN "User" u ON s."cashierId" = u.id
-          LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 AND u."branchId" IS NULL ${invoiceFilter}
-          ORDER BY s."date" DESC
-        `, tenantId);
-      } else {
-        sales = await prisma.$queryRawUnsafe(`
-          SELECT s.*, c.name as "customerName"
-          FROM "Sale" s
-          JOIN "User" u ON s."cashierId" = u.id
-          LEFT JOIN "Customer" c ON s."customerId" = c.id
-          WHERE s."companyId" = $1 AND u."branchId" = $2 ${invoiceFilter}
-          ORDER BY s."date" DESC
-        `, tenantId, user?.branchId);
+        whereConditions.push(`s."branchId" = ${parseInt(effectiveBranchId as string)}`);
       }
     }
 
-    // 2. Create Workbook
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Laporan Penjualan');
+    // Date Filter
+    if (startDate) {
+      whereConditions.push(`s."date" >= '${startDate}'`);
+    }
+    if (endDate) {
+      const d = new Date(endDate as string);
+      d.setDate(d.getDate() + 1);
+      whereConditions.push(`s."date" < '${d.toISOString().split('T')[0]}'`);
+    }
 
-    // 3. Define Columns
-    worksheet.columns = [
+    // Payment Filter (Smart Categorization)
+    if (paymentMethod && paymentMethod !== 'all') {
+      if (paymentMethod === 'TUNAI') {
+        whereConditions.push(`(s."notes" ILIKE '%TUNAI%' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%' OR fa."type" = 'CASH')`);
+      } else if (paymentMethod === 'TRANSFER') {
+        whereConditions.push(`(s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')`);
+      } else if (paymentMethod === 'QRIS') {
+        whereConditions.push(`(s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
+      } else if (paymentMethod === 'DEBIT') {
+        whereConditions.push(`(s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR fa."name" ILIKE '%MANDIRI%' OR fa."name" ILIKE '%BCA%')`);
+      } else {
+        whereConditions.push(`(s."notes" ILIKE '%${paymentMethod}%' OR fa."name" ILIKE '%${paymentMethod}%')`);
+      }
+    }
+
+    // Sale Type Filter
+    if (saleType && saleType !== 'all') {
+      whereConditions.push(`s."saleType" = '${saleType}'`);
+    }
+
+    // Role-based Access (Non-Admin Restricted to their own branch)
+    const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '');
+    if (!isAdmin && !isPosViewer) {
+      if (!user?.branchId) {
+        whereConditions.push(`s."branchId" IS NULL`);
+      } else {
+        whereConditions.push(`s."branchId" = ${Number(user.branchId)}`);
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    const sales: any[] = await prisma.$queryRawUnsafe(`
+      SELECT s.*, c.name as "customerName", fa.name as "accountName", b.name as "branchName"
+      FROM "Sale" s
+      LEFT JOIN "Customer" c ON s."customerId" = c.id
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+      LEFT JOIN "Branch" b ON s."branchId" = b.id
+      ${whereClause}
+      ORDER BY s."date" DESC
+    `);
+
+    // 3. Fetch Sale Items for these transactions
+    let saleItems: any[] = [];
+    const saleIds = sales.map(s => s.id);
+    if (saleIds.length > 0) {
+      saleItems = await prisma.$queryRawUnsafe(`
+        SELECT si.*, p.name as "productName", p.sku as "productSku", pc.name as "categoryName", s."invoiceNumber", s."date"
+        FROM "SaleItem" si
+        JOIN "Product" p ON si."productId" = p.id
+        LEFT JOIN "ProductCategory" pc ON p."categoryId" = pc.id
+        JOIN "Sale" s ON si."saleId" = s.id
+        WHERE si."saleId" IN (${saleIds.join(',')})
+        ORDER BY s."date" DESC, si.id ASC
+      `);
+    }
+
+    // 4. Calculate total quantity and revenue per product (Rekapitulasi)
+    const productSummaryMap: Record<string, { sku: string, name: string, category: string, totalQty: number, totalRevenue: number }> = {};
+    
+    saleItems.forEach(item => {
+      const key = item.productId.toString();
+      if (!productSummaryMap[key]) {
+        productSummaryMap[key] = {
+          sku: item.productSku || '-',
+          name: item.productName || 'Produk Tidak Diketahui',
+          category: item.categoryName || 'Uncategorized',
+          totalQty: 0,
+          totalRevenue: 0
+        };
+      }
+      productSummaryMap[key].totalQty += Number(item.quantity) || 0;
+      productSummaryMap[key].totalRevenue += Number(item.total) || 0;
+    });
+
+    const productSummaries = Object.values(productSummaryMap).sort((a, b) => b.totalQty - a.totalQty);
+
+    // 5. Create Workbook with 3 Sheets
+    const workbook = new ExcelJS.Workbook();
+
+    // Sheet 1: Ringkasan Penjualan
+    const worksheet1 = workbook.addWorksheet('Ringkasan Penjualan');
+    worksheet1.columns = [
       { header: 'Tanggal', key: 'date', width: 15 },
       { header: 'No. Invoice', key: 'invoiceNumber', width: 25 },
+      { header: 'Cabang', key: 'branchName', width: 20 },
       { header: 'Pelanggan', key: 'customerName', width: 25 },
       { header: 'Status', key: 'status', width: 15 },
       { header: 'Total Penjualan', key: 'totalAmount', width: 20 },
       { header: 'Catatan', key: 'notes', width: 30 }
     ];
+    worksheet1.getRow(1).font = { bold: true };
+    worksheet1.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
-    // 4. Style Header
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
-
-    // 5. Add Rows
     sales.forEach(sale => {
-      const row = worksheet.addRow({
+      const row = worksheet1.addRow({
         date: new Date(sale.date).toLocaleDateString('id-ID'),
         invoiceNumber: sale.invoiceNumber,
+        branchName: sale.branchName || 'Kantor Pusat',
         customerName: sale.customerName || 'Umum',
         status: sale.status === 'PAID' ? 'Lunas' : 
                 sale.status === 'RETURNED' ? 'Diretur' :
@@ -14429,8 +14472,62 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
         totalAmount: sale.totalAmount || 0,
         notes: sale.notes || '-'
       });
-      
       row.getCell('totalAmount').numFmt = '#,##0';
+    });
+
+    // Sheet 2: Rekap Produk Terjual
+    const worksheet2 = workbook.addWorksheet('Rekap Produk Terjual');
+    worksheet2.columns = [
+      { header: 'SKU', key: 'sku', width: 15 },
+      { header: 'Nama Produk', key: 'name', width: 30 },
+      { header: 'Kategori', key: 'category', width: 20 },
+      { header: 'Total Terjual', key: 'totalQty', width: 15 },
+      { header: 'Total Pendapatan', key: 'totalRevenue', width: 20 }
+    ];
+    worksheet2.getRow(1).font = { bold: true };
+    worksheet2.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+    productSummaries.forEach(summary => {
+      const row = worksheet2.addRow({
+        sku: summary.sku,
+        name: summary.name,
+        category: summary.category,
+        totalQty: summary.totalQty,
+        totalRevenue: summary.totalRevenue
+      });
+      row.getCell('totalQty').numFmt = '#,##0';
+      row.getCell('totalRevenue').numFmt = '#,##0';
+    });
+
+    // Sheet 3: Detail Item Terjual
+    const worksheet3 = workbook.addWorksheet('Detail Item Terjual');
+    worksheet3.columns = [
+      { header: 'Tanggal', key: 'date', width: 15 },
+      { header: 'No. Invoice', key: 'invoiceNumber', width: 25 },
+      { header: 'SKU', key: 'sku', width: 15 },
+      { header: 'Nama Produk', key: 'name', width: 30 },
+      { header: 'Kategori', key: 'category', width: 20 },
+      { header: 'Jumlah', key: 'quantity', width: 12 },
+      { header: 'Harga Satuan', key: 'price', width: 15 },
+      { header: 'Total', key: 'total', width: 20 }
+    ];
+    worksheet3.getRow(1).font = { bold: true };
+    worksheet3.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+    saleItems.forEach(item => {
+      const row = worksheet3.addRow({
+        date: new Date(item.date).toLocaleDateString('id-ID'),
+        invoiceNumber: item.invoiceNumber,
+        sku: item.productSku || '-',
+        name: item.productName || 'Produk Tidak Diketahui',
+        category: item.categoryName || 'Uncategorized',
+        quantity: item.quantity || 0,
+        price: item.price || 0,
+        total: item.total || 0
+      });
+      row.getCell('quantity').numFmt = '#,##0';
+      row.getCell('price').numFmt = '#,##0';
+      row.getCell('total').numFmt = '#,##0';
     });
 
     // 6. Set Response Headers
