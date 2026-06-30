@@ -157,7 +157,8 @@ export default function POSReportsPage() {
 
     const handleExport = () => {
         const token = localStorage.getItem('jwt_token');
-        const url = `${api.defaults.baseURL}/sales/export?branchId=${selectedBranchId}&startDate=${startDate}&endDate=${endDate}&paymentMethod=${paymentFilter}&saleType=${saleTypeFilter}&token=${token}`;
+        const tenantId = localStorage.getItem('currentTenantId') || '';
+        const url = `${api.defaults.baseURL}/sales/export?branchId=${selectedBranchId}&startDate=${startDate}&endDate=${endDate}&paymentMethod=${paymentFilter}&saleType=${saleTypeFilter}&token=${token}&tenantId=${tenantId}`;
         window.open(url, '_blank');
     };
 

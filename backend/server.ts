@@ -822,7 +822,7 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
       (req as any).userRole = decoded.role;
       (req as any).primaryCompanyId = Number(decoded.companyId);
 
-      const targetTenantId = req.headers['x-tenant-id'];
+      const targetTenantId = req.headers['x-tenant-id'] || req.query.tenantId;
       if (targetTenantId) {
           const requestedTenantId = parseInt(targetTenantId as string);
           
