@@ -1358,6 +1358,12 @@ app.delete('/api/sales/orders/:id', tenantMiddleware, async (req: Request, res: 
   try {
     const tenantId = Number((req as any).tenantId);
     const orderId = Number(req.params.id);
+    const userId = Number((req as any).userId);
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '')) {
+      return res.status(403).json({ error: 'Akses Ditolak. Hanya Admin, Owner, dan Finance yang dapat menghapus pesanan (PO).' });
+    }
 
     const order = await prisma.salesOrder.findFirst({
       where: { id: orderId, companyId: tenantId }
@@ -13894,8 +13900,8 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
 
     // 1. Role Verification
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    if (!['SUPERADMIN', 'ADMIN', 'OWNER'].includes(user?.role || '')) {
-      return res.status(403).json({ error: 'Akses Ditolak. Hanya Admin yang dapat menghapus transaksi penjualan.' });
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '')) {
+      return res.status(403).json({ error: 'Akses Ditolak. Hanya Admin, Owner, dan Finance yang dapat menghapus transaksi penjualan.' });
     }
 
     const sale = await prisma.sale.findFirst({ where: { id: saleId, companyId: tenantId }});
