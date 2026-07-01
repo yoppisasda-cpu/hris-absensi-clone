@@ -29,8 +29,18 @@ export default function SalesOrdersPage() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isDeliveryNoteModalOpen, setIsDeliveryNoteModalOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const sortedOrders = [...orders].sort((a, b) => {
+  const filteredOrders = orders.filter((order) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      order.orderNumber?.toLowerCase().includes(q) ||
+      order.customer?.name?.toLowerCase().includes(q)
+    );
+  });
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
     const dateA = new Date(a.date).getTime();
     const dateB = new Date(b.date).getTime();
     return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
@@ -134,16 +144,28 @@ export default function SalesOrdersPage() {
             <h1 className="text-2xl font-black italic uppercase tracking-widest text-white leading-none">B2B Sales Orders (PO)</h1>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-3 italic">B2B Procurement Tracking & Fulfillment Vector</p>
           </div>
-          <button
-            onClick={() => {
-              setSelectedOrderId(null);
-              setIsModalOpen(true);
-            }}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest italic transition-all shadow-lg shadow-indigo-600/20 border border-white/10 active:scale-95"
-          >
-            <Plus className="h-4 w-4 stroke-[3px]" />
-            <span>Buat Pesanan (PO)</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="CARI NOMOR PO ATAU PELANGGAN..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-950/50 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-[10px] font-bold text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all italic tracking-widest uppercase"
+              />
+            </div>
+            <button
+              onClick={() => {
+                setSelectedOrderId(null);
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest italic transition-all shadow-lg shadow-indigo-600/20 border border-white/10 active:scale-95 w-full sm:w-auto justify-center"
+            >
+              <Plus className="h-4 w-4 stroke-[3px]" />
+              <span>Buat Pesanan (PO)</span>
+            </button>
+          </div>
         </div>
 
         {/* Orders List */}
