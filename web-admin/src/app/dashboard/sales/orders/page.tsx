@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, ChevronRight, CheckCircle, Package, Truck, FileText, ArrowRight, Pencil, Trash2, Printer } from "lucide-react";
+import { Plus, Search, ChevronRight, CheckCircle, Package, Truck, FileText, ArrowRight, Pencil, Trash2, Printer, ArrowDown, ArrowUp } from "lucide-react";
 import { useFeatures } from "@/lib/FeatureContext";
 import api from "@/lib/api";
 import CreateSalesOrderModal from "@/components/sales/CreateSalesOrderModal";
@@ -28,6 +28,13 @@ export default function SalesOrdersPage() {
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isDeliveryNoteModalOpen, setIsDeliveryNoteModalOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+
+  const sortedOrders = [...orders].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+  });
 
   useEffect(() => {
     fetchOrders();
@@ -159,7 +166,21 @@ export default function SalesOrdersPage() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-950 text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] border-b border-white/5 italic">
                   <tr>
-                    <th className="px-8 py-5">Nomor PO / Tanggal</th>
+                    <th 
+                      className="px-8 py-5 cursor-pointer hover:text-white transition-colors group"
+                      onClick={() => setSortOrder(prev => prev === "desc" ? "asc" : "desc")}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>Nomor PO / Tanggal</span>
+                        <div className="bg-white/5 p-1 rounded">
+                          {sortOrder === "desc" ? (
+                            <ArrowDown className="w-3 h-3" />
+                          ) : (
+                            <ArrowUp className="w-3 h-3" />
+                          )}
+                        </div>
+                      </div>
+                    </th>
                     <th className="px-8 py-5">Pelanggan</th>
                     <th className="px-8 py-5 text-right">Total Tagihan</th>
                     <th className="px-8 py-5">Status</th>
@@ -167,7 +188,7 @@ export default function SalesOrdersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 italic">
-                  {orders.map((order) => (
+                  {sortedOrders.map((order) => (
                     <tr key={order.id} className="hover:bg-white/5 transition-colors">
                       <td className="px-8 py-5">
                         <div className="font-black text-white text-[11px] uppercase tracking-tighter">{order.orderNumber}</div>
