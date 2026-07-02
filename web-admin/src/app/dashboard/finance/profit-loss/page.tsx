@@ -282,7 +282,7 @@ export default function ProfitLossPage() {
                             <tr className={`not-italic border-t-4 ${data?.netProfit >= 0 ? 'bg-emerald-600 border-t-emerald-800' : 'bg-red-600 border-t-red-800'}`}>
                                 <td className="px-6 py-6 font-black text-white text-xl tracking-wider uppercase flex items-center gap-3">
                                     {data?.netProfit >= 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6" />}
-                                    LABA / (RUGI) BERSIH TAHUN BERJALAN
+                                    LABA / (RUGI) BERSIH PERIODE INI
                                 </td>
                                 <td className="px-6 py-6 text-right font-black text-white text-2xl drop-shadow-lg shadow-black italic">
                                     Rp {fmtRp(data?.netProfit)}
