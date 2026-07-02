@@ -59,6 +59,22 @@ const Hero = () => (
         <a href="https://admin.Aivola.id/register" className="btn-primary">Coba Gratis 6 Bulan</a>
         <a href="#demo" className="btn-secondary">Konsultasi Gratis</a>
       </div>
+      <div className="store-badges" style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem' }}>
+        <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.1)', padding: '0.5rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', textDecoration: 'none', color: 'white', transition: '0.3s all' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M13.6 15.636l4.288 2.455c.783.447 1.5.022 1.5-.89V6.8c0-.916-.714-1.341-1.5-.892l-4.288 2.456-2.589 2.637 2.589 2.635zM3.473 3.125c-.297.318-.473.805-.473 1.442v14.866c0 .637.176 1.124.473 1.442l.063.059 8.243-8.39v-.288l-8.243-8.39-.063.059zm10.749 13.568l-2.023-2.06-8.39 8.54c.264.07.568.109.896.109.52 0 1.045-.145 1.526-.421l8.093-4.636-.102-1.532zM3.81 2.396c.48-.276 1.006-.421 1.526-.421.328 0 .632.039.896.109l8.39 8.54 2.023-2.06.102-1.532L8.653 2.396z"/></svg>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: '0.65rem', lineHeight: '1', opacity: 0.8 }}>GET IT ON</div>
+            <div style={{ fontSize: '1rem', fontWeight: 'bold', lineHeight: '1.2' }}>Google Play</div>
+          </div>
+        </a>
+        <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.1)', padding: '0.5rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', textDecoration: 'none', color: 'white', transition: '0.3s all' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25"/></svg>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: '0.65rem', lineHeight: '1', opacity: 0.8 }}>Download on the</div>
+            <div style={{ fontSize: '1rem', fontWeight: 'bold', lineHeight: '1.2' }}>App Store</div>
+          </div>
+        </a>
+      </div>
     </div>
   </section>
 );
