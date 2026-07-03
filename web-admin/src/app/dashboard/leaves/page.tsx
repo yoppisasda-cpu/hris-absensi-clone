@@ -42,7 +42,7 @@ export default function LeavesPage() {
         fetchLeaves();
     }, []);
 
-    const handleUpdateStatus = async (id: number, status: 'APPROVED' | 'REJECTED') => {
+    const handleUpdateStatus = async (id: number, status: 'APPROVED' | 'REJECTED' | 'CANCELLED') => {
         try {
             await api.patch(`/leaves/${id}`, { status });
             // Update local state atau fetch ulang
