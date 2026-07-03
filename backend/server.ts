@@ -10241,29 +10241,33 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     let totalOtherIncome = 0;
     let totalTaxCollected = 0;
 
-    // Extract invoice numbers to query tax rates
-    const salesIncomes = incomes.filter(inc => 
-      inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS'
-    );
-    const invoiceNumbers = salesIncomes
-      .map(inc => {
-        if (!inc.description) return null;
-        const match = inc.description.match(/(INV-[A-Za-z0-9\-]+)/);
-        return match ? match[1] : null;
-      })
-      .filter((inv): inv is string => inv !== null);
-
-    const salesWithTax = invoiceNumbers.length > 0 ? await prisma.sale.findMany({
+    // Fetch all sales for Accrual Basis Revenue
+    const accrualSales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
-        invoiceNumber: { in: invoiceNumbers }
-      },
-      select: { invoiceNumber: true, taxRate: true }
-    }) : [];
+        date: { gte: startDate, lte: endDate },
+        status: { not: 'CANCELLED' }
+      }
+    });
 
-    const saleTaxRateMap = new Map<string, number>(
-      salesWithTax.map(s => [s.invoiceNumber, s.taxRate || 0])
-    );
+    accrualSales.forEach(sale => {
+      let amount = sale.totalAmount;
+      const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
+      
+      if (sale.taxRate && sale.taxRate > 0) {
+        if (sale.taxAmount && sale.taxAmount > 0) {
+          amount = amount - sale.taxAmount;
+          totalTaxCollected += sale.taxAmount;
+        } else {
+          const taxAmount = amount * (sale.taxRate / (100 + sale.taxRate));
+          amount = amount - taxAmount;
+          totalTaxCollected += taxAmount;
+        }
+      }
+      
+      salesRevenueByCategory[catName] = (salesRevenueByCategory[catName] || 0) + amount;
+      totalSalesRevenue += amount;
+    });
 
     incomes.forEach(inc => {
       const catName = inc.category?.name || 'Uncategorized';
@@ -10271,21 +10275,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
       
-      if (isSales) {
-        const desc = inc.description || '';
-        const match = desc.match(/(INV-[A-Za-z0-9\-]+)/);
-        const invNum = match ? match[1] : null;
-        if (invNum) {
-          const taxRate = saleTaxRateMap.get(invNum) || 0;
-          if (taxRate > 0) {
-            const taxAmount = amount * (taxRate / (100 + taxRate));
-            amount = amount - taxAmount;
-            totalTaxCollected += taxAmount;
-          }
-        }
-        salesRevenueByCategory[catName] = (salesRevenueByCategory[catName] || 0) + amount;
-        totalSalesRevenue += amount;
-      } else {
+      if (!isSales) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
         totalOtherIncome += amount;
       }
@@ -10444,29 +10434,33 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
     let totalOtherIncome = 0;
     let totalTaxCollected = 0;
 
-    // Extract invoice numbers to query tax rates
-    const salesIncomes = incomes.filter(inc => 
-      inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS'
-    );
-    const invoiceNumbers = salesIncomes
-      .map(inc => {
-        if (!inc.description) return null;
-        const match = inc.description.match(/(INV-[A-Za-z0-9\-]+)/);
-        return match ? match[1] : null;
-      })
-      .filter((inv): inv is string => inv !== null);
-
-    const salesWithTax = invoiceNumbers.length > 0 ? await prisma.sale.findMany({
+    // Fetch all sales for Accrual Basis Revenue
+    const accrualSales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
-        invoiceNumber: { in: invoiceNumbers }
-      },
-      select: { invoiceNumber: true, taxRate: true }
-    }) : [];
+        date: { gte: startDate, lte: endDate },
+        status: { not: 'CANCELLED' }
+      }
+    });
 
-    const saleTaxRateMap = new Map<string, number>(
-      salesWithTax.map(s => [s.invoiceNumber, s.taxRate || 0])
-    );
+    accrualSales.forEach(sale => {
+      let amount = sale.totalAmount;
+      const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
+      
+      if (sale.taxRate && sale.taxRate > 0) {
+        if (sale.taxAmount && sale.taxAmount > 0) {
+          amount = amount - sale.taxAmount;
+          totalTaxCollected += sale.taxAmount;
+        } else {
+          const taxAmount = amount * (sale.taxRate / (100 + sale.taxRate));
+          amount = amount - taxAmount;
+          totalTaxCollected += taxAmount;
+        }
+      }
+      
+      salesRevenueByCategory[catName] = (salesRevenueByCategory[catName] || 0) + amount;
+      totalSalesRevenue += amount;
+    });
 
     incomes.forEach(inc => {
       const catName = inc.category?.name || 'Uncategorized';
@@ -10474,21 +10468,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
       
-      if (isSales) {
-        const desc = inc.description || '';
-        const match = desc.match(/(INV-[A-Za-z0-9\-]+)/);
-        const invNum = match ? match[1] : null;
-        if (invNum) {
-          const taxRate = saleTaxRateMap.get(invNum) || 0;
-          if (taxRate > 0) {
-            const taxAmount = amount * (taxRate / (100 + taxRate));
-            amount = amount - taxAmount;
-            totalTaxCollected += taxAmount;
-          }
-        }
-        salesRevenueByCategory[catName] = (salesRevenueByCategory[catName] || 0) + amount;
-        totalSalesRevenue += amount;
-      } else {
+      if (!isSales) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
         totalOtherIncome += amount;
       }
