@@ -10164,44 +10164,48 @@ async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Da
   `);
 
   if (saleItems.length === 0) return 0;
-  const productIds = [...new Set(saleItems.map(item => item.productId))];
 
-  const products: any[] = await prisma.$queryRawUnsafe(`
-    SELECT id, "costPrice", "recipeYield" FROM "Product" 
-    WHERE id IN (${productIds.join(',')})
-  `);
-  const productMap = new Map<number, any>(products.map(p => [p.id, p]));
-
-  const recipes: any[] = await prisma.$queryRawUnsafe(`
-    SELECT pr."productId", pr."quantity", p."costPrice"
-    FROM "ProductRecipe" pr
-    JOIN "Product" p ON pr."materialId" = p.id
-    WHERE pr."productId" IN (${productIds.join(',')})
-  `);
-
-  const recipesByProduct = new Map<number, any[]>();
-  for (const r of recipes) {
-    if (!recipesByProduct.has(r.productId)) {
-      recipesByProduct.set(r.productId, []);
+  // We need to fetch ALL products and recipes for this tenant to correctly resolve recursive recipes
+  const allProducts = await prisma.product.findMany({
+    where: { companyId: tenantId },
+    include: {
+      Recipes: {
+        include: { Material: true }
+      }
     }
-    recipesByProduct.get(r.productId)!.push(r);
-  }
+  });
 
+  const getProductCost = (product: any, visited = new Set<number>()): number => {
+    if (!product || visited.has(product.id)) return 0;
+    visited.add(product.id);
+
+    if (product.Recipes && product.Recipes.length > 0) {
+      const totalBatchCost = product.Recipes.reduce((sum: number, r: any) => {
+        const material = allProducts.find(m => m.id === r.materialId);
+        // Fallback to raw Material costPrice if not found in current products
+        const materialUnitCost = material ? getProductCost(material, new Set(visited)) : (r.Material?.costPrice || 0);
+        return sum + (Number(r.quantity || 0) * Number(materialUnitCost || 0));
+      }, 0);
+      return totalBatchCost / (product.recipeYield || 1);
+    }
+    return product.costPrice || 0;
+  };
+
+  const productCostCache = new Map<number, number>();
+  
   let calculatedCogsFromSales = 0;
   for (const item of saleItems) {
     const prodId = item.productId;
-    const qty = item.quantity;
-    const product = productMap.get(prodId);
-    const costPrice = product?.costPrice || 0;
-    const yieldVal = parseFloat(product?.recipeYield as any) || 1;
+    const qty = Number(item.quantity) || 0;
     
-    const prodRecipes = recipesByProduct.get(prodId);
-    if (prodRecipes && prodRecipes.length > 0) {
-      const recipeCost = prodRecipes.reduce((sum, r) => sum + (parseFloat(r.quantity) * (r.costPrice || 0)), 0);
-      calculatedCogsFromSales += qty * (recipeCost / yieldVal);
-    } else {
-      calculatedCogsFromSales += qty * costPrice;
+    let unitCogs = productCostCache.get(prodId);
+    if (unitCogs === undefined) {
+      const product = allProducts.find(p => p.id === prodId);
+      unitCogs = product ? getProductCost(product) : 0;
+      productCostCache.set(prodId, unitCogs);
     }
+
+    calculatedCogsFromSales += qty * unitCogs;
   }
 
   return calculatedCogsFromSales;
