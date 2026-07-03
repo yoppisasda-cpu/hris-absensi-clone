@@ -10152,6 +10152,7 @@ async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Da
   const sales: any[] = await prisma.$queryRawUnsafe(`
     SELECT id FROM "Sale" 
     WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
+    AND "status" NOT IN ('CANCELLED', 'PENDING')
   `, tenantId, startDate, endDate);
 
   if (sales.length === 0) return 0;
@@ -10246,7 +10247,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       where: {
         companyId: tenantId,
         date: { gte: startDate, lte: endDate },
-        status: { not: 'CANCELLED' }
+        status: { notIn: ['CANCELLED', 'PENDING'] }
       }
     });
 
@@ -10439,7 +10440,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       where: {
         companyId: tenantId,
         date: { gte: startDate, lte: endDate },
-        status: { not: 'CANCELLED' }
+        status: { notIn: ['CANCELLED', 'PENDING'] }
       }
     });
 
