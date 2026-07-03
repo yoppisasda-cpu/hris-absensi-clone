@@ -20,6 +20,10 @@ import toast from "react-hot-toast";
 
 export default function SalesOrdersPage() {
   const { hasFeature } = useFeatures();
+  const d = new Date();
+  const [month, setMonth] = useState(d.getMonth() + 1);
+  const [year, setYear] = useState(d.getFullYear());
+
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,12 +52,12 @@ export default function SalesOrdersPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [month, year]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/sales/orders");
+      const res = await api.get(`/sales/orders?month=${month}&year=${year}`);
       setOrders(res.data);
     } catch (error) {
       console.error("Failed to fetch sales orders:", error);
@@ -125,6 +129,9 @@ export default function SalesOrdersPage() {
     }
   };
 
+  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
+
   if (!hasFeature("CRM") && !hasFeature("INVENTORY")) {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center">
@@ -154,6 +161,26 @@ export default function SalesOrdersPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-950/50 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-[10px] font-bold text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all italic tracking-widest uppercase"
               />
+            </div>
+            <div className="flex items-center gap-3 w-full sm:w-auto text-[10px] uppercase tracking-widest font-bold text-slate-300">
+                <select
+                    value={month}
+                    onChange={(e) => setMonth(parseInt(e.target.value))}
+                    className="bg-slate-950/50 border border-white/10 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+                >
+                    {months.map((m, i) => (
+                        <option key={i} value={i + 1}>{m}</option>
+                    ))}
+                </select>
+                <select
+                    value={year}
+                    onChange={(e) => setYear(parseInt(e.target.value))}
+                    className="bg-slate-950/50 border border-white/10 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+                >
+                    {years.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                    ))}
+                </select>
             </div>
             <button
               onClick={() => {

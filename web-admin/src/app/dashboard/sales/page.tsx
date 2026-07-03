@@ -9,6 +9,10 @@ import ReturnSaleModal from "@/components/sales/ReturnSaleModal";
 import { Plus, Search, Filter, ShoppingCart, TrendingUp, CreditCard, Calendar, MoreVertical, FileText, Download, CheckCircle2, Eye, Printer, RotateCcw, Trash2 } from "lucide-react";
 
 export default function SalesPage() {
+    const d = new Date();
+    const [month, setMonth] = useState(d.getMonth() + 1);
+    const [year, setYear] = useState(d.getFullYear());
+    
     const [sales, setSales] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,7 +25,7 @@ export default function SalesPage() {
     const fetchSales = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/sales');
+            const res = await api.get(`/sales?month=${month}&year=${year}`);
             setSales(res.data);
         } catch (error) {
             console.error("Gagal mengambil data penjualan", error);
@@ -32,7 +36,7 @@ export default function SalesPage() {
 
     useEffect(() => {
         fetchSales();
-    }, []);
+    }, [month, year]);
 
     const stats = useMemo(() => {
         // Pengecualian transaksi yang sudah diretur (RETURNED) dari perhitungan omset utama
@@ -81,6 +85,9 @@ export default function SalesPage() {
         }
     };
 
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
+
     return (
         <DashboardLayout>
             <div className="print:hidden">
@@ -121,16 +128,39 @@ export default function SalesPage() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 p-6">
-                        <div className="relative w-full sm:w-96 group text-white">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-200 p-6">
+                        <div className="relative w-full sm:w-96 group text-slate-900">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Cari nomor invoice atau catatan..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full rounded-xl border border-slate-700 bg-slate-900/50 py-2.5 pl-10 pr-4 text-sm text-white focus:border-blue-500 focus:bg-slate-900 focus:outline-none transition-all font-medium placeholder:text-slate-500"
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none transition-all font-medium placeholder:text-slate-400"
                             />
+                        </div>
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <select
+                                value={month}
+                                onChange={(e) => setMonth(parseInt(e.target.value))}
+                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                {months.map((m, i) => (
+                                    <option key={i} value={i + 1}>{m}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={year}
+                                onChange={(e) => setYear(parseInt(e.target.value))}
+                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                {years.map(y => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 

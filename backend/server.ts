@@ -1021,9 +1021,19 @@ app.get('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respons
   try {
     const tenantId = Number((req as any).tenantId);
     if (!tenantId) return res.status(401).json({ error: 'Tenant ID required' });
+    const { month, year } = req.query;
+
+    let dateFilter = {};
+    if (month && year) {
+      const m = parseInt(month as string);
+      const y = parseInt(year as string);
+      const startDate = new Date(y, m - 1, 1);
+      const endDate = new Date(y, m, 0, 23, 59, 59);
+      dateFilter = { date: { gte: startDate, lte: endDate } };
+    }
     
     const orders = await prisma.salesOrder.findMany({
-      where: { companyId: tenantId },
+      where: { companyId: tenantId, ...dateFilter },
       include: {
         customer: true,
         items: {
@@ -13933,7 +13943,16 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     // 1. Get user branch
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
-    const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
+    let { branchId, startDate, endDate, paymentMethod, saleType, month, year } = req.query;
+
+    if (month && year && !startDate && !endDate) {
+      const m = parseInt(month as string);
+      const y = parseInt(year as string);
+      const startD = new Date(y, m - 1, 1);
+      const endD = new Date(y, m, 0, 23, 59, 59);
+      startDate = startD.toISOString();
+      endDate = endD.toISOString();
+    }
 
     // 2. Build query based on branch and role
     const isPosViewer = (user?.role as string) === 'POS_VIEWER';
