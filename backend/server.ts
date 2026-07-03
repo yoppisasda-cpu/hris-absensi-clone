@@ -2727,7 +2727,7 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
     const id = parseInt(req.params.id as string);
     const { status } = req.body; // APPROVED or REJECTED
 
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
+    if (!['APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) {
       return res.status(400).json({ error: 'Status tidak valid.' });
     }
 
@@ -2863,7 +2863,7 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
       timeout: 30000 // 30 seconds to handle large PO lists safely
     });
 
-    res.json({ message: `PO berhasil ${status === 'APPROVED' ? 'disetujui' : 'ditolak'}`, result });
+    res.json({ message: `PO berhasil ${status === 'APPROVED' ? 'disetujui' : status === 'CANCELLED' ? 'dibatalkan' : 'ditolak'}`, result });
   } catch (error: any) {
     console.error("PO STATUS ERROR:", error);
     res.status(500).json({ error: 'Gagal memproses PO: ' + error.message });
@@ -5147,7 +5147,7 @@ app.patch('/api/leaves/:id', tenantMiddleware, async (req: Request, res: Respons
     const leaveId = parseInt(req.params.id as string);
     const { status } = req.body; // 'APPROVED' or 'REJECTED'
 
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
+    if (!['APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) {
       return res.status(400).json({ error: 'Status tidak valid' });
     }
 
@@ -5178,10 +5178,10 @@ app.patch('/api/leaves/:id', tenantMiddleware, async (req: Request, res: Respons
       tenantId,
       updatedLeave.userId,
       `Status Cuti: ${status}`,
-      `Pengajuan cuti Anda untuk tanggal ${new Date(updatedLeave.startDate).toLocaleDateString('id-ID')} telah ${status === 'APPROVED' ? 'DISETUJUI' : 'DITOLAK'}.`
+      `Pengajuan cuti Anda untuk tanggal ${new Date(updatedLeave.startDate).toLocaleDateString('id-ID')} telah ${status === 'APPROVED' ? 'DISETUJUI' : status === 'CANCELLED' ? 'DIBATALKAN' : 'DITOLAK'}.`
     );
 
-    res.json({ message: `Cuti telah ${status === 'APPROVED' ? 'disetujui' : 'ditolak'}`, updatedLeave });
+    res.json({ message: `Cuti telah ${status === 'APPROVED' ? 'disetujui' : status === 'CANCELLED' ? 'dibatalkan' : 'ditolak'}`, updatedLeave });
   } catch (error) {
     res.status(500).json({ error: 'Gagal memperbarui status cuti' });
   }
@@ -6629,7 +6629,7 @@ app.patch('/api/reimbursements/:id', tenantMiddleware, async (req: Request, res:
       tenantId,
       reimbursement.userId,
       `Klaim Biaya: ${status}`,
-      `Pengajuan reimbursement "${reimbursement.title}" Anda telah ${status === 'APPROVED' ? 'DISETUJUI' : 'DITOLAK'}.`
+      `Pengajuan reimbursement "${reimbursement.title}" Anda telah ${status === 'APPROVED' ? 'DISETUJUI' : status === 'CANCELLED' ? 'DIBATALKAN' : 'DITOLAK'}.`
     );
 
     res.json(reimbursement);
@@ -6722,7 +6722,7 @@ app.patch('/api/leaves/:id', tenantMiddleware, async (req: Request, res: Respons
     const userRole = (req as any).userRole;
     const { status } = req.body;
 
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
+    if (!['APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) {
       return res.status(400).json({ error: 'Status tidak valid' });
     }
 
@@ -6749,10 +6749,10 @@ app.patch('/api/leaves/:id', tenantMiddleware, async (req: Request, res: Respons
       tenantId,
       updated.userId,
       `Status Cuti: ${status}`,
-      `Pengajuan cuti Anda untuk tanggal ${new Date(updated.startDate).toLocaleDateString('id-ID')} telah ${status === 'APPROVED' ? 'DISETUJUI' : 'DITOLAK'}.`
+      `Pengajuan cuti Anda untuk tanggal ${new Date(updated.startDate).toLocaleDateString('id-ID')} telah ${status === 'APPROVED' ? 'DISETUJUI' : status === 'CANCELLED' ? 'DIBATALKAN' : 'DITOLAK'}.`
     );
 
-    res.json({ message: `Cuti berhasil ${status === 'APPROVED' ? 'disetujui' : 'ditolak'}`, updated });
+    res.json({ message: `Cuti berhasil ${status === 'APPROVED' ? 'disetujui' : status === 'CANCELLED' ? 'dibatalkan' : 'ditolak'}`, updated });
   } catch (error) {
     res.status(500).json({ error: 'Gagal memperbarui status cuti.' });
   }
@@ -7516,7 +7516,7 @@ app.patch('/api/overtimes/:id', tenantMiddleware, async (req: Request, res: Resp
     const userRole = (req as any).userRole;
     const { status } = req.body;
 
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
+    if (!['APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) {
       return res.status(400).json({ error: 'Status tidak valid.' });
     }
 
@@ -7543,10 +7543,10 @@ app.patch('/api/overtimes/:id', tenantMiddleware, async (req: Request, res: Resp
       tenantId,
       updated.userId,
       `Status Lembur: ${status}`,
-      `Pengajuan lembur Anda untuk tanggal ${new Date(updated.date).toLocaleDateString('id-ID')} telah ${status === 'APPROVED' ? 'DISETUJUI' : 'DITOLAK'}.`
+      `Pengajuan lembur Anda untuk tanggal ${new Date(updated.date).toLocaleDateString('id-ID')} telah ${status === 'APPROVED' ? 'DISETUJUI' : status === 'CANCELLED' ? 'DIBATALKAN' : 'DITOLAK'}.`
     );
 
-    res.json({ message: `Lembur berhasil ${status === 'APPROVED' ? 'disetujui' : 'ditolak'}`, updated });
+    res.json({ message: `Lembur berhasil ${status === 'APPROVED' ? 'disetujui' : status === 'CANCELLED' ? 'dibatalkan' : 'ditolak'}`, updated });
   } catch (error) {
     res.status(500).json({ error: 'Gagal memperbarui status lembur.' });
   }

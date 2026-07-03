@@ -180,8 +180,8 @@ export default function LeavesPage() {
                                             <p className="text-slate-400 italic font-medium text-xs">"{leave.reason}"</p>
                                         </td>
                                         <td className="px-6 py-5 text-center">
-                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black italic uppercase tracking-[0.15em] border ${leave.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : leave.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>
-                                                {leave.status === 'PENDING' ? 'Menunggu' : leave.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black italic uppercase tracking-[0.15em] border ${leave.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : leave.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border-red-500/30' : leave.status === 'CANCELLED' ? 'bg-slate-500/10 text-slate-400 border-slate-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>
+                                                {leave.status === 'PENDING' ? 'Menunggu' : leave.status === 'APPROVED' ? 'Disetujui' : leave.status === 'CANCELLED' ? 'Dibatalkan' : 'Ditolak'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-5 text-right">
@@ -200,6 +200,20 @@ export default function LeavesPage() {
                                                         title="Tolak"
                                                     >
                                                         <XCircle className="h-5 w-5" />
+                                                    </button>
+                                                </div>
+                                            ) : leave.status === 'APPROVED' && new Date(leave.startDate) > new Date() ? (
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm('Yakin ingin membatalkan cuti ini? Kuota cuti karyawan akan dikembalikan.')) {
+                                                                handleUpdateStatus(leave.id, 'CANCELLED');
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1.5 text-[10px] font-bold text-white bg-slate-700 hover:bg-rose-600 rounded-lg transition-all"
+                                                        title="Batalkan Cuti"
+                                                    >
+                                                        Batalkan
                                                     </button>
                                                 </div>
                                             ) : (
