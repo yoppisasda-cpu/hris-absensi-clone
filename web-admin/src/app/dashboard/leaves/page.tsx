@@ -17,7 +17,7 @@ interface LeaveRequest {
     startDate: string;
     endDate: string;
     reason: string;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
     createdAt: string;
 }
 
