@@ -149,6 +149,7 @@ const runAutoMigration = async () => {
     `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "paidAt" TIMESTAMP`,
     `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "bankName" TEXT`,
     `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "accountNumber" TEXT`,
+    `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "priceQpoon" FLOAT DEFAULT 0`,
   ];
   console.log('[AUTO-MIGRATION] Checking and applying missing columns...');
   for (const sql of migrations) {
@@ -12088,7 +12089,7 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
+    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create Product
@@ -12110,6 +12111,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           priceGofood: Number(priceGofood) || 0,
           priceGrabfood: Number(priceGrabfood) || 0,
           priceShopeefood: Number(priceShopeefood) || 0,
+          priceQpoon: Number(priceQpoon) || 0,
           recipeYield: Number(recipeYield) || 1,
           imageUrl: imageUrl || null,
           purchaseUnit: String(purchaseUnit || unit || "Pcs"),
@@ -12212,7 +12214,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
   try {
     const tenantId = Number((req as any).tenantId);
     const id = parseInt(req.params.id as string);
-    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, recipeYield, purchaseUnit, purchaseFactor } = req.body;
+    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, purchaseUnit, purchaseFactor } = req.body;
 
     // Verify ownership
     const existingProduct = await prisma.product.findFirst({
@@ -12240,6 +12242,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
         priceGofood: priceGofood !== undefined ? Number(priceGofood) : existingProduct.priceGofood,
         priceGrabfood: priceGrabfood !== undefined ? Number(priceGrabfood) : existingProduct.priceGrabfood,
         priceShopeefood: priceShopeefood !== undefined ? Number(priceShopeefood) : existingProduct.priceShopeefood,
+        priceQpoon: priceQpoon !== undefined ? Number(priceQpoon) : (existingProduct as any).priceQpoon,
         recipeYield: recipeYield !== undefined ? Number(recipeYield) : existingProduct.recipeYield,
         imageUrl: req.body.imageUrl !== undefined ? req.body.imageUrl : existingProduct.imageUrl,
         purchaseUnit: purchaseUnit !== undefined ? String(purchaseUnit) : existingProduct.purchaseUnit,
@@ -13548,7 +13551,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       // 2. Calculate Commission (Logic: If notes contain platform name, calculate 20%)
       let totalCommission = 0;
       const lowerNotes = (notes || '').toLowerCase();
-      if (lowerNotes.includes('gofood') || lowerNotes.includes('grabfood') || lowerNotes.includes('shopeefood')) {
+      if (lowerNotes.includes('gofood') || lowerNotes.includes('grabfood') || lowerNotes.includes('shopeefood') || lowerNotes.includes('qpoon')) {
         totalCommission = totalAmount * 0.20; // 20% Platform Fee
       }
 
@@ -14133,6 +14136,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
             WHEN s."notes" ILIKE '%GOFOOD%' OR fa."name" ILIKE '%GOFOOD%' THEN 'GOFOOD'
             WHEN s."notes" ILIKE '%GRABFOOD%' OR fa."name" ILIKE '%GRABFOOD%' THEN 'GRABFOOD'
             WHEN s."notes" ILIKE '%SHOPEEFOOD%' OR fa."name" ILIKE '%SHOPEEFOOD%' THEN 'SHOPEEFOOD'
+            WHEN s."notes" ILIKE '%QPOON%' OR fa."name" ILIKE '%QPOON%' THEN 'QPOON'
             WHEN s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' THEN 'TRANSFER'
             ELSE 'TUNAI'
           END as method,
@@ -14832,6 +14836,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
         priceGofood: true,
         priceGrabfood: true,
         priceShopeefood: true,
+        priceQpoon: true,
         imageUrl: true,
         categoryId: true,
         trackStock: true,

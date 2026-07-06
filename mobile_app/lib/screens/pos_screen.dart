@@ -213,6 +213,7 @@ class _POSScreenState extends State<POSScreen> {
     double pGofood = double.tryParse(item['priceGofood']?.toString() ?? '0') ?? 0;
     double pGrabfood = double.tryParse(item['priceGrabfood']?.toString() ?? '0') ?? 0;
     double pShopeefood = double.tryParse(item['priceShopeefood']?.toString() ?? '0') ?? 0;
+    double pQpoon = double.tryParse(item['priceQpoon']?.toString() ?? '0') ?? 0;
     double pNormal = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
 
     if (_saleType == 'GOFOOD' && pGofood > 0) {
@@ -221,6 +222,8 @@ class _POSScreenState extends State<POSScreen> {
       basePrice = pGrabfood;
     } else if (_saleType == 'SHOPEEFOOD' && pShopeefood > 0) {
       basePrice = pShopeefood;
+    } else if (_saleType == 'QPOON' && pQpoon > 0) {
+      basePrice = pQpoon;
     } else {
       basePrice = pNormal;
     }
@@ -288,6 +291,7 @@ class _POSScreenState extends State<POSScreen> {
           'priceGofood': product['priceGofood'],
           'priceGrabfood': product['priceGrabfood'],
           'priceShopeefood': product['priceShopeefood'],
+          'priceQpoon': product['priceQpoon'],
           'quantity': 1,
           'maxStock': product['stock'],
           'trackStock': product['trackStock'] ?? true,
@@ -326,7 +330,7 @@ class _POSScreenState extends State<POSScreen> {
     if (name.contains('qris')) return Icons.qr_code_scanner;
     if (name.contains('debit') || name.contains('credit')) return Icons.credit_card_outlined;
     if (name.contains('transfer')) return Icons.account_balance_outlined;
-    if (name.contains('gofood') || name.contains('grabfood') || name.contains('shopeefood')) return Icons.delivery_dining;
+    if (name.contains('gofood') || name.contains('grabfood') || name.contains('shopeefood') || name.contains('qpoon')) return Icons.delivery_dining;
     return Icons.account_balance_wallet_outlined;
   }
 
@@ -576,6 +580,7 @@ class _POSScreenState extends State<POSScreen> {
                     _buildCompactSaleTypeChip('GOFOOD', 'GoFood', Icons.delivery_dining, setPanelState),
                     _buildCompactSaleTypeChip('GRABFOOD', 'GrabFood', Icons.delivery_dining, setPanelState),
                     _buildCompactSaleTypeChip('SHOPEEFOOD', 'ShopeeFood', Icons.delivery_dining, setPanelState),
+                    _buildCompactSaleTypeChip('QPOON', 'QPoon', Icons.delivery_dining, setPanelState),
                   ],
                 ),
                 SizedBox(height: 24),
@@ -964,12 +969,18 @@ class _POSScreenState extends State<POSScreen> {
 
   Widget _buildCompactSaleTypeChip(String type, String label, IconData icon, StateSetter setPanelState) {
     bool isSelected = _saleType == type;
+    Color activeColor = Colors.blue[800]!;
+    if (type == 'GOFOOD') activeColor = Colors.red[800]!;
+    if (type == 'GRABFOOD') activeColor = Colors.green[800]!;
+    if (type == 'SHOPEEFOOD') activeColor = Colors.orange[800]!;
+    if (type == 'QPOON') activeColor = Colors.amber[600]!;
+
     return GestureDetector(
       onTap: () {
         setPanelState(() {
           _saleType = type;
-          if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD') {
-            _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : 'ShopeeFood');
+          if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD' || type == 'QPOON') {
+            _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : (type == 'SHOPEEFOOD' ? 'ShopeeFood' : 'QPoon'));
             final marketAcc = _accounts.firstWhere(
               (a) => a['name'].toString().toLowerCase().contains('market') || a['name'].toString().toLowerCase().contains('delivery'),
               orElse: () => _accounts.isNotEmpty ? _accounts.first : null
@@ -986,8 +997,8 @@ class _POSScreenState extends State<POSScreen> {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue[800] : Colors.white,
-          border: Border.all(color: isSelected ? Colors.blue[800]! : Colors.grey[300]!),
+          color: isSelected ? activeColor : Colors.white,
+          border: Border.all(color: isSelected ? activeColor : Colors.grey[300]!),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -1004,13 +1015,19 @@ class _POSScreenState extends State<POSScreen> {
 
   Widget _buildSaleTypeChip(String type, String label, IconData icon, StateSetter setPanelState) {
     bool isSelected = _saleType == type;
+    Color activeColor = Colors.blue[800]!;
+    if (type == 'GOFOOD') activeColor = Colors.red[800]!;
+    if (type == 'GRABFOOD') activeColor = Colors.green[800]!;
+    if (type == 'SHOPEEFOOD') activeColor = Colors.orange[800]!;
+    if (type == 'QPOON') activeColor = Colors.amber[600]!;
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
           setPanelState(() {
             _saleType = type;
-            if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD') {
-              _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : 'ShopeeFood');
+            if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD' || type == 'QPOON') {
+              _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : (type == 'SHOPEEFOOD' ? 'ShopeeFood' : 'QPoon'));
               
               final marketAcc = _accounts.firstWhere(
                 (a) => a['name'].toString().toLowerCase().contains('market') || a['name'].toString().toLowerCase().contains('delivery'),
@@ -1030,15 +1047,15 @@ class _POSScreenState extends State<POSScreen> {
         child: Container(
           padding: EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.blue[800] : Colors.white,
-            border: Border.all(color: isSelected ? Colors.blue[800]! : Colors.grey[300]!),
+            color: isSelected ? activeColor : Colors.white,
+            border: Border.all(color: isSelected ? activeColor : Colors.grey[300]!),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             children: [
               Icon(icon, color: isSelected ? Colors.white : Colors.blueGrey[600], size: 20),
               SizedBox(height: 4),
-              Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.blueGrey[600], fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.blueGrey[600], fontSize: 12, fontWeight: FontWeight.bold)),
             ],
           ),
         ),

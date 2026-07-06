@@ -24,6 +24,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         priceGofood: 0,
         priceGrabfood: 0,
         priceShopeefood: 0,
+        priceQpoon: 0,
         recipeYield: 0,
         imageUrl: "",
         purchaseUnit: "Pcs",
@@ -68,6 +69,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     priceGofood: product.priceGofood || 0,
                     priceGrabfood: product.priceGrabfood || 0,
                     priceShopeefood: product.priceShopeefood || 0,
+                    priceQpoon: product.priceQpoon || 0,
                     recipeYield: product.recipeYield !== undefined ? product.recipeYield : 0,
                     imageUrl: product.imageUrl || "",
                     purchaseUnit: product.purchaseUnit || product.unit || "Pcs",
@@ -82,7 +84,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 setVendorPrice((product.costPrice || 0) * (product.purchaseFactor || 1));
             } else {
                 setFormData({
-                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
@@ -319,6 +321,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             priceGofood: Number(formData.priceGofood) || 0,
             priceGrabfood: Number(formData.priceGrabfood) || 0,
             priceShopeefood: Number(formData.priceShopeefood) || 0,
+            priceQpoon: Number(formData.priceQpoon) || 0,
             recipeYield: formData.recipeYield !== undefined ? Number(formData.recipeYield) : 0,
             purchaseFactor: Number(formData.purchaseFactor) || 1
         };
@@ -345,7 +348,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
 
             setFormData({
-                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
             });
             setHasRecipe(false);
             setRecipeItems([]);
@@ -846,6 +849,18 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setFormData({ ...formData, priceShopeefood: val === "" ? 0 : parseFloat(val) });
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="block text-[9px] font-black uppercase text-slate-600 tracking-widest italic ml-1">QPoon SKU Price</label>
+                                        <input
+                                            type="number"
+                                            className="w-full rounded-2xl bg-slate-900 border border-slate-800 py-3.5 px-5 text-sm font-black text-white focus:border-indigo-500/50 outline-none transition-all shadow-inner text-glow-sm"
+                                            value={formData.priceQpoon || ""}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, priceQpoon: val === "" ? 0 : parseFloat(val) });
                                             }}
                                         />
                                     </div>

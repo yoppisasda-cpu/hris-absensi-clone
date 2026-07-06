@@ -539,6 +539,7 @@ export default function POSReportsPage() {
                                 <option value="GOFOOD">GOFOOD</option>
                                 <option value="GRABFOOD">GRABFOOD</option>
                                 <option value="SHOPEEFOOD">SHOPEEFOOD</option>
+                                <option value="QPOON">QPOON</option>
                             </select>
                         </div>
 
@@ -622,6 +623,7 @@ export default function POSReportsPage() {
                                                     (sale.accountName?.toUpperCase().includes('GOFOOD') || sale.notes?.includes('GOFOOD')) ? 'bg-red-500/10 text-red-400 border-red-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('GRABFOOD') || sale.notes?.includes('GRABFOOD')) ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('SHOPEE') || sale.notes?.includes('SHOPEE')) ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('QPOON') || sale.notes?.includes('QPOON')) ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('TRANSFER') || sale.notes?.includes('TRANSFER')) ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('DEBIT') || sale.accountName?.toUpperCase().includes('EDC') || sale.notes?.includes('DEBIT')) ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                                     'bg-slate-500/10 text-slate-400 border-slate-500/20'
