@@ -10,30 +10,59 @@ import {
     ArrowUpRight,
     Info,
     CheckCircle2,
-    BarChart3
+    BarChart3,
+    Sparkles
 } from 'lucide-react';
 import api from '@/lib/api';
 
 const FinancialHealthScore = () => {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
+    const [aiUsageCount, setAiUsageCount] = useState(0);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const [isChecking, setIsChecking] = useState(true);
+
+    const checkQuotaOrCache = async () => {
+        try {
+            setIsChecking(true);
+            const res = await api.get('/stats/financial-health?checkOnly=true');
+            if (res.data.overallScore) {
+                setData(res.data);
+            }
+            if (typeof res.data.usageCount === 'number') {
+                setAiUsageCount(res.data.usageCount);
+            }
+        } catch (err) {
+            console.error("Failed to check AI Health score quota", err);
+        } finally {
+            setIsChecking(false);
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchHealthScore = async () => {
-            try {
-                setLoading(true);
-                const res = await api.get('/stats/financial-health');
-                setData(res.data);
-            } catch (err) {
-                console.error("Failed to load health score", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchHealthScore();
+        checkQuotaOrCache();
     }, []);
 
-    if (loading) {
+    const handleStartAiAnalysis = async () => {
+        try {
+            setLoading(true);
+            setAiError(null);
+            const res = await api.get('/stats/financial-health');
+            setData(res.data);
+            if (typeof res.data.usageCount === 'number') {
+                setAiUsageCount(res.data.usageCount);
+            }
+        } catch (err: any) {
+            console.error("Failed to run AI Health score", err);
+            const errMsg = err.response?.data?.error || "AI gagal memproses skor kesehatan keuangan saat ini.";
+            setAiError(errMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading || isChecking) {
         return (
             <div className="rounded-[2.5rem] border border-white/5 bg-slate-900/40 backdrop-blur-3xl p-10 shadow-2xl animate-pulse h-80 flex items-center justify-center">
                  <div className="flex flex-col items-center gap-4">
@@ -44,7 +73,62 @@ const FinancialHealthScore = () => {
         );
     }
 
-    if (!data) return null;
+    if (!data) {
+        return (
+            <div className="w-full animate-in fade-in zoom-in-95 duration-1000">
+                <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-3xl p-8 shadow-2xl transition-all hover:border-white/20 flex flex-col justify-between min-h-[320px]">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shadow-inner">
+                                <ShieldCheck className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-black text-white tracking-tighter uppercase italic">Fiscal Health Monitor</h3>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+                                    <span className="text-[9px] font-black text-white/30 uppercase tracking-widest italic">Asset Liquidity Index</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Kuota:</span>
+                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                                aiUsageCount >= 2 
+                                    ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                                    : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                            }`}>
+                                {aiUsageCount} / 2 Terpakai
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="py-6 px-4 rounded-[2rem] bg-blue-500/5 border border-dashed border-blue-500/20 text-center flex-grow flex flex-col justify-center items-center gap-4">
+                        <p className="text-sm font-bold text-white">Analisis Skor Kesehatan Keuangan</p>
+                        <p className="text-xs text-slate-400 max-w-md">Gunakan kecerdasan buatan untuk menghitung rasio likuiditas kas, profit margin, serta rasio hutang terhadap pendapatan Anda.</p>
+                        
+                        {aiError && (
+                            <div className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold">
+                                {aiError}
+                            </div>
+                        )}
+                        
+                        <button
+                            onClick={handleStartAiAnalysis}
+                            disabled={aiUsageCount >= 2}
+                            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest italic flex items-center gap-2 transition-all duration-300 mt-2 ${
+                                aiUsageCount >= 2
+                                    ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                                    : 'bg-blue-500 hover:bg-blue-600 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] border border-blue-400/30'
+                            }`}
+                        >
+                            <Sparkles className="h-4 w-4 animate-pulse" />
+                            Mulai Analisa AI
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const score = data.overallScore || 0;
     const strokeDasharray = 2 * Math.PI * 45;
@@ -77,8 +161,13 @@ const FinancialHealthScore = () => {
                         </div>
                     </div>
                 </div>
-                <div className={`px-4 py-2 bg-white/5 rounded-2xl border text-[9px] font-black uppercase tracking-widest italic ${getStatusColor(data.status)} border-current/20`}>
-                    Status: {data.status}
+                <div className="flex items-center gap-4">
+                    <span className="text-[9px] text-white/40 uppercase tracking-widest font-black italic">
+                        Kuota: {aiUsageCount}/2
+                    </span>
+                    <div className={`px-4 py-2 bg-white/5 rounded-2xl border text-[9px] font-black uppercase tracking-widest italic ${getStatusColor(data.status)} border-current/20`}>
+                        Status: {data.status}
+                    </div>
                 </div>
             </div>
 

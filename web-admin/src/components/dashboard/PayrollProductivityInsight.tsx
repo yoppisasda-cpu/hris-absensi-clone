@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -11,7 +10,8 @@ import {
     BrainCircuit, 
     PieChart, 
     ArrowUpRight,
-    Users
+    Users,
+    Sparkles
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -33,26 +33,56 @@ interface ProductivityData {
 export default function PayrollProductivityInsight() {
     const [data, setData] = useState<ProductivityData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [aiUsageCount, setAiUsageCount] = useState(0);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const [isChecking, setIsChecking] = useState(true);
+
+    const checkQuotaOrCache = async () => {
+        try {
+            setIsChecking(true);
+            const res = await api.get('/stats/payroll-productivity?checkOnly=true');
+            if (res.data.productivityScore) {
+                // Already in cache!
+                setData(res.data);
+            }
+            if (typeof res.data.usageCount === 'number') {
+                setAiUsageCount(res.data.usageCount);
+            }
+        } catch (err) {
+            console.error("Failed to check AI Payroll Insights quota", err);
+        } finally {
+            setIsChecking(false);
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchInsights = async () => {
-            try {
-                const res = await api.get('/stats/payroll-productivity');
-                setData(res.data);
-            } catch (err) {
-                console.error("Failed to load AI Payroll Insights", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchInsights();
+        checkQuotaOrCache();
     }, []);
+
+    const handleStartAiAnalysis = async () => {
+        try {
+            setLoading(true);
+            setAiError(null);
+            const res = await api.get('/stats/payroll-productivity');
+            setData(res.data);
+            if (typeof res.data.usageCount === 'number') {
+                setAiUsageCount(res.data.usageCount);
+            }
+        } catch (err: any) {
+            console.error("Failed to run AI Payroll Insights", err);
+            const errMsg = err.response?.data?.error || "AI gagal memproses korelasi produktivitas gaji saat ini.";
+            setAiError(errMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const formatROI = (val: number) => {
         return val.toFixed(2) + 'x';
     };
 
-    if (loading) return (
+    if (loading || isChecking) return (
         <div className="w-full h-48 bg-white/5 border border-white/10 rounded-[2rem] flex items-center justify-center animate-pulse mb-8">
             <div className="flex flex-col items-center gap-4">
                 <BrainCircuit className="h-8 w-8 text-purple-400 animate-bounce" />
@@ -61,7 +91,60 @@ export default function PayrollProductivityInsight() {
         </div>
     );
 
-    if (!data) return null;
+    // If no analysis has been loaded yet, show the preview state with a manual trigger button
+    if (!data) {
+        return (
+            <div className="w-full mb-10 animate-in fade-in zoom-in-95 duration-700">
+                <div className="relative overflow-hidden rounded-[2.5rem] border border-purple-500/20 bg-gradient-to-br from-[#0c051a] to-[#050505] p-8 shadow-[0_20px_50px_rgba(139,92,246,0.1)] flex flex-col justify-between min-h-[260px]">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-2xl bg-purple-500/20 border border-purple-500/30">
+                                <Zap className="h-5 w-5 text-purple-400" />
+                            </div>
+                            <div className="flex flex-col">
+                                <h3 className="text-[10px] font-black text-purple-400/70 uppercase tracking-[0.4em] leading-none mb-1">Human Capital Intelligence</h3>
+                                <h4 className="text-sm font-black text-white tracking-widest uppercase italic">Payroll Productivity Insight</h4>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Kuota:</span>
+                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                                aiUsageCount >= 2 
+                                    ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                                    : 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                            }`}>
+                                {aiUsageCount} / 2 Terpakai
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="py-6 px-4 rounded-[2rem] bg-purple-500/5 border border-dashed border-purple-500/20 text-center flex-grow flex flex-col justify-center items-center gap-4">
+                        <p className="text-sm font-bold text-white">Analisis Produktivitas & ROI Gaji Karyawan</p>
+                        <p className="text-xs text-slate-400 max-w-xl">Ukur ROI pengeluaran gaji karyawan terhadap omzet pendapatan perusahaan serta peroleh saran efisiensi struktur gaji.</p>
+                        
+                        {aiError && (
+                            <div className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold">
+                                {aiError}
+                            </div>
+                        )}
+                        
+                        <button
+                            onClick={handleStartAiAnalysis}
+                            disabled={aiUsageCount >= 2}
+                            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest italic flex items-center gap-2 transition-all duration-300 mt-2 ${
+                                aiUsageCount >= 2
+                                    ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                                    : 'bg-purple-500 hover:bg-purple-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] border border-purple-400/30'
+                            }`}
+                        >
+                            <Sparkles className="h-4 w-4 animate-pulse" />
+                            Mulai Analisa AI
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full mb-10 animate-in fade-in zoom-in-95 duration-700">
@@ -75,14 +158,19 @@ export default function PayrollProductivityInsight() {
                         
                         {/* Left: Score & ROI */}
                         <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-8">
-                                <div className="p-2.5 rounded-2xl bg-purple-500/20 border border-purple-500/30">
-                                    <Zap className="h-5 w-5 text-purple-400" />
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-2xl bg-purple-500/20 border border-purple-500/30">
+                                        <Zap className="h-5 w-5 text-purple-400" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <h3 className="text-[10px] font-black text-purple-400/70 uppercase tracking-[0.4em] leading-none mb-1">Human Capital Intelligence</h3>
+                                        <h4 className="text-lg font-black text-white tracking-widest uppercase italic">Payroll Productivity Insight</h4>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col">
-                                    <h3 className="text-[10px] font-black text-purple-400/70 uppercase tracking-[0.4em] leading-none mb-1">Human Capital Intelligence</h3>
-                                    <h4 className="text-lg font-black text-white tracking-widest uppercase italic">Payroll Productivity Insight</h4>
-                                </div>
+                                <span className="text-[10px] text-white/40 uppercase tracking-widest font-black italic">
+                                    Kuota: {aiUsageCount}/2
+                                </span>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -172,4 +260,3 @@ export default function PayrollProductivityInsight() {
         </div>
     );
 }
-

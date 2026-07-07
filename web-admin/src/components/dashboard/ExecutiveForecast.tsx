@@ -1,6 +1,8 @@
 
 'use client';
 
+'use client';
+
 import React, { useEffect, useState } from 'react';
 import { Sparkles, TrendingUp, TrendingDown, AlertCircle, Info, BrainCircuit, CheckCircle2, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
@@ -23,26 +25,56 @@ interface ForecastData {
 export default function ExecutiveForecast() {
     const [data, setData] = useState<ForecastData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [aiUsageCount, setAiUsageCount] = useState(0);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const [isChecking, setIsChecking] = useState(true);
+
+    const checkQuotaOrCache = async () => {
+        try {
+            setIsChecking(true);
+            const res = await api.get('/stats/predictive-insights?checkOnly=true');
+            if (res.data.forecast) {
+                // Already in cache!
+                setData(res.data);
+            }
+            if (typeof res.data.usageCount === 'number') {
+                setAiUsageCount(res.data.usageCount);
+            }
+        } catch (err) {
+            console.error("Failed to check AI Forecast quota", err);
+        } finally {
+            setIsChecking(false);
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchForecast = async () => {
-            try {
-                const res = await api.get('/stats/predictive-insights');
-                setData(res.data);
-            } catch (err) {
-                console.error("Failed to load AI Forecast", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchForecast();
+        checkQuotaOrCache();
     }, []);
+
+    const handleStartAiAnalysis = async () => {
+        try {
+            setLoading(true);
+            setAiError(null);
+            const res = await api.get('/stats/predictive-insights');
+            setData(res.data);
+            if (typeof res.data.usageCount === 'number') {
+                setAiUsageCount(res.data.usageCount);
+            }
+        } catch (err: any) {
+            console.error("Failed to run AI Forecast", err);
+            const errMsg = err.response?.data?.error || "AI gagal memproses prediksi keuangan saat ini.";
+            setAiError(errMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const formatCurrency = (val: number) => {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
     };
 
-    if (loading) return (
+    if (loading || isChecking) return (
         <div className="w-full h-80 bg-slate-900/40 border border-white/5 rounded-[2.5rem] flex items-center justify-center animate-pulse backdrop-blur-3xl">
             <div className="flex flex-col items-center gap-4">
                 <div className="h-12 w-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
@@ -51,7 +83,63 @@ export default function ExecutiveForecast() {
         </div>
     );
 
-    if (!data) return null;
+    // If no analysis has been loaded yet, show the preview state with a manual trigger button
+    if (!data) {
+        return (
+            <div className="w-full animate-in fade-in zoom-in-95 duration-1000">
+                <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-3xl p-8 shadow-2xl transition-all hover:border-white/20 flex flex-col justify-between min-h-[320px]">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-500 shadow-inner">
+                                <BrainCircuit className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-black text-white tracking-tighter uppercase italic">AI Predictive Engine</h3>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+                                    <span className="text-[9px] font-black text-white/30 uppercase tracking-widest italic">Live Projection Matrix</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Kuota:</span>
+                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                                aiUsageCount >= 2 
+                                    ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                                    : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                            }`}>
+                                {aiUsageCount} / 2 Terpakai
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="py-6 px-4 rounded-[2rem] bg-indigo-500/5 border border-dashed border-indigo-500/20 text-center flex-grow flex flex-col justify-center items-center gap-4">
+                        <p className="text-sm font-bold text-white">Analisis Proyeksi Arus Kas & Risiko Finansial</p>
+                        <p className="text-xs text-slate-400 max-w-md">Gunakan kecerdasan buatan untuk memproyeksikan arus kas 30 hari ke depan serta mendeteksi potensi anomali pengeluaran.</p>
+                        
+                        {aiError && (
+                            <div className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold">
+                                {aiError}
+                            </div>
+                        )}
+                        
+                        <button
+                            onClick={handleStartAiAnalysis}
+                            disabled={aiUsageCount >= 2}
+                            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest italic flex items-center gap-2 transition-all duration-300 mt-2 ${
+                                aiUsageCount >= 2
+                                    ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                                    : 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:shadow-[0_0_25px_rgba(99,102,241,0.5)] border border-indigo-400/30'
+                            }`}
+                        >
+                            <Sparkles className="h-4 w-4 animate-pulse" />
+                            Mulai Analisa AI
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full animate-in fade-in zoom-in-95 duration-1000">
@@ -70,8 +158,13 @@ export default function ExecutiveForecast() {
                             </div>
                         </div>
                     </div>
-                    <div className="px-4 py-2 bg-white/5 rounded-2xl border border-white/5 text-[9px] font-black text-white/40 uppercase tracking-widest italic">
-                        Confidence: {data.forecast.confidence}%
+                    <div className="flex items-center gap-4">
+                        <span className="text-[9px] text-white/40 uppercase tracking-widest font-black italic">
+                            Kuota: {aiUsageCount}/2
+                        </span>
+                        <div className="px-4 py-2 bg-white/5 rounded-2xl border border-white/5 text-[9px] font-black text-white/40 uppercase tracking-widest italic">
+                            Confidence: {data.forecast.confidence}%
+                        </div>
                     </div>
                 </div>
 

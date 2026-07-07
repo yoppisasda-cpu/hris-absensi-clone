@@ -8267,13 +8267,73 @@ const getPosAiCurrentCount = (tenantId: number): number => {
   return usage[key] || 0;
 };
 
+// Helpers for Dashboard AI endpoints
+const checkDashboardAiLimit = (tenantId: number, endpointKey: string): { allowed: boolean, count: number } => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const key = `${tenantId}_${endpointKey}_${todayStr}`;
+  const usage = getAiUsage();
+  
+  const currentCount = usage[key] || 0;
+  if (currentCount >= 2) {
+    return { allowed: false, count: currentCount };
+  }
+  
+  const newCount = currentCount + 1;
+  usage[key] = newCount;
+  saveAiUsage(usage);
+  return { allowed: true, count: newCount };
+};
+
+const getDashboardAiCurrentCount = (tenantId: number, endpointKey: string): number => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const key = `${tenantId}_${endpointKey}_${todayStr}`;
+  const usage = getAiUsage();
+  return usage[key] || 0;
+};
 
 app.get('/api/stats/predictive-insights', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const { checkOnly } = req.query;
     const cacheKey = `forecast_${tenantId}`;
+    const cached = insightCache[cacheKey];
+
+    if (checkOnly === 'true') {
+      const currentCount = getDashboardAiCurrentCount(tenantId, 'predictive-insights');
+      if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_TTL) {
+        return res.json({
+          ...cached.data,
+          usageCount: currentCount,
+          isFromCache: true
+        });
+      }
+      return res.json({ usageCount: currentCount });
+    }
+
+    // Check cache first (does not consume limit)
+    if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_TTL) {
+      const currentCount = getDashboardAiCurrentCount(tenantId, 'predictive-insights');
+      return res.json({
+        ...cached.data,
+        usageCount: currentCount,
+        isFromCache: true
+      });
+    }
+
+    // Check and increment daily limit
+    const limitStatus = checkDashboardAiLimit(tenantId, 'predictive-insights');
+    if (!limitStatus.allowed) {
+      return res.status(429).json({
+        error: 'Limit Harian Tercapai: Analisa AI dibatasi maksimal 2 kali per hari untuk efisiensi biaya.',
+        usageCount: limitStatus.count
+      });
+    }
+
     const forecast = await getCachedInsight(cacheKey, () => getFinancialForecast(tenantId));
-    res.json(forecast);
+    res.json({
+      ...forecast,
+      usageCount: limitStatus.count
+    });
   } catch (error) {
     console.error('[Predictive Error]:', error);
     res.status(500).json({ error: 'AI gagal memproses prediksi keuangan.' });
@@ -8283,9 +8343,46 @@ app.get('/api/stats/predictive-insights', tenantMiddleware, async (req: Request,
 app.get('/api/stats/payroll-productivity', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const { checkOnly } = req.query;
     const cacheKey = `payroll_${tenantId}`;
+    const cached = insightCache[cacheKey];
+
+    if (checkOnly === 'true') {
+      const currentCount = getDashboardAiCurrentCount(tenantId, 'payroll-productivity');
+      if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_TTL) {
+        return res.json({
+          ...cached.data,
+          usageCount: currentCount,
+          isFromCache: true
+        });
+      }
+      return res.json({ usageCount: currentCount });
+    }
+
+    // Check cache first
+    if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_TTL) {
+      const currentCount = getDashboardAiCurrentCount(tenantId, 'payroll-productivity');
+      return res.json({
+        ...cached.data,
+        usageCount: currentCount,
+        isFromCache: true
+      });
+    }
+
+    // Check and increment daily limit
+    const limitStatus = checkDashboardAiLimit(tenantId, 'payroll-productivity');
+    if (!limitStatus.allowed) {
+      return res.status(429).json({
+        error: 'Limit Harian Tercapai: Analisa AI dibatasi maksimal 2 kali per hari untuk efisiensi biaya.',
+        usageCount: limitStatus.count
+      });
+    }
+
     const insights = await getCachedInsight(cacheKey, () => getPayrollProductivityInsights(tenantId));
-    res.json(insights);
+    res.json({
+      ...insights,
+      usageCount: limitStatus.count
+    });
   } catch (error) {
     console.error('[Payroll Impact Error]:', error);
     res.status(500).json({ error: 'AI gagal memproses korelasi produktivitas gaji.' });
@@ -8295,9 +8392,46 @@ app.get('/api/stats/payroll-productivity', tenantMiddleware, async (req: Request
 app.get('/api/stats/financial-health', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const { checkOnly } = req.query;
     const cacheKey = `health_${tenantId}`;
+    const cached = insightCache[cacheKey];
+
+    if (checkOnly === 'true') {
+      const currentCount = getDashboardAiCurrentCount(tenantId, 'financial-health');
+      if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_TTL) {
+        return res.json({
+          ...cached.data,
+          usageCount: currentCount,
+          isFromCache: true
+        });
+      }
+      return res.json({ usageCount: currentCount });
+    }
+
+    // Check cache first
+    if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_TTL) {
+      const currentCount = getDashboardAiCurrentCount(tenantId, 'financial-health');
+      return res.json({
+        ...cached.data,
+        usageCount: currentCount,
+        isFromCache: true
+      });
+    }
+
+    // Check and increment daily limit
+    const limitStatus = checkDashboardAiLimit(tenantId, 'financial-health');
+    if (!limitStatus.allowed) {
+      return res.status(429).json({
+        error: 'Limit Harian Tercapai: Analisa AI dibatasi maksimal 2 kali per hari untuk efisiensi biaya.',
+        usageCount: limitStatus.count
+      });
+    }
+
     const health = await getCachedInsight(cacheKey, () => getFinancialHealthScore(tenantId));
-    res.json(health);
+    res.json({
+      ...health,
+      usageCount: limitStatus.count
+    });
   } catch (error) {
     console.error('[Financial Health Error]:', error);
     res.status(500).json({ error: 'AI gagal memproses skor kesehatan keuangan.' });
