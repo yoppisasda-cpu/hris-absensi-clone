@@ -8209,17 +8209,64 @@ app.get('/api/stats/financial-flow', tenantMiddleware, async (req: Request, res:
 
 // Cache for AI Insights to prevent 429 Too Many Requests
 const insightCache: { [key: string]: { data: any, timestamp: number } } = {};
-const INSIGHT_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const INSIGHT_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours (Dashboard)
+const POS_INSIGHT_CACHE_TTL = 60 * 60 * 1000; // 1 hour (POS Reports)
 
-const getCachedInsight = async (key: string, fetcher: () => Promise<any>) => {
+const getCachedInsight = async (key: string, fetcher: () => Promise<any>, ttl: number = INSIGHT_CACHE_TTL) => {
   const cached = insightCache[key];
-  if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_TTL) {
+  if (cached && Date.now() - cached.timestamp < ttl) {
     return cached.data;
   }
   const data = await fetcher();
   insightCache[key] = { data, timestamp: Date.now() };
   return data;
 };
+
+// Helper to manage daily AI limit per tenant
+const AI_USAGE_FILE = path.join(__dirname, 'ai_usage.json');
+
+const getAiUsage = (): Record<string, number> => {
+  try {
+    if (fs.existsSync(AI_USAGE_FILE)) {
+      return JSON.parse(fs.readFileSync(AI_USAGE_FILE, 'utf8'));
+    }
+  } catch (err) {
+    console.error('Failed to read AI usage file:', err);
+  }
+  return {};
+};
+
+const saveAiUsage = (data: Record<string, number>) => {
+  try {
+    fs.writeFileSync(AI_USAGE_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed to write AI usage file:', err);
+  }
+};
+
+const checkPosAiLimit = (tenantId: number): { allowed: boolean, count: number } => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const key = `${tenantId}_${todayStr}`;
+  const usage = getAiUsage();
+  
+  const currentCount = usage[key] || 0;
+  if (currentCount >= 2) {
+    return { allowed: false, count: currentCount };
+  }
+  
+  const newCount = currentCount + 1;
+  usage[key] = newCount;
+  saveAiUsage(usage);
+  return { allowed: true, count: newCount };
+};
+
+const getPosAiCurrentCount = (tenantId: number): number => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const key = `${tenantId}_${todayStr}`;
+  const usage = getAiUsage();
+  return usage[key] || 0;
+};
+
 
 app.get('/api/stats/predictive-insights', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -14265,7 +14312,35 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
 app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { branchId, startDate, endDate } = req.query;
+    const { branchId, startDate, endDate, checkOnly } = req.query;
+
+    // 1. Support checkOnly to query current daily usage without running AI or consuming limit
+    if (checkOnly === 'true') {
+      const currentCount = getPosAiCurrentCount(tenantId);
+      return res.json({ usageCount: currentCount });
+    }
+
+    const cacheKey = `pos_insights_${tenantId}_${branchId || 'all'}_${startDate || 'none'}_${endDate || 'none'}`;
+    const cached = insightCache[cacheKey];
+    
+    // 2. If cached in the last 1 hour, return it directly (does not consume daily limit)
+    if (cached && Date.now() - cached.timestamp < POS_INSIGHT_CACHE_TTL) {
+      const currentCount = getPosAiCurrentCount(tenantId);
+      return res.json({
+        ...cached.data,
+        usageCount: currentCount,
+        isFromCache: true
+      });
+    }
+
+    // 3. Check and increment daily limit (max 2 per day)
+    const limitStatus = checkPosAiLimit(tenantId);
+    if (!limitStatus.allowed) {
+      return res.status(429).json({
+        error: 'Limit Harian Tercapai: Analisa AI dibatasi maksimal 2 kali per hari untuk efisiensi biaya.',
+        usageCount: limitStatus.count
+      });
+    }
 
     // Fetch same data as comprehensive to provide to AI
     // (Simplified for prompt context)
@@ -14284,7 +14359,10 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
     });
 
     if (sales.length === 0) {
-      return res.json({ insight: "Belum ada data penjualan POS untuk dianalisa periode ini." });
+      return res.json({ 
+        insights: ["Belum ada data penjualan POS untuk dianalisa periode ini."],
+        usageCount: limitStatus.count 
+      });
     }
 
     const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
@@ -14328,7 +14406,13 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
     const jsonMatch = responseText.match(/\{.*\}/s);
     const finalData = jsonMatch ? JSON.parse(jsonMatch[0]) : { insights: ["Gagal menganalisa data."] };
 
-    res.json(finalData);
+    // Cache the result
+    insightCache[cacheKey] = { data: finalData, timestamp: Date.now() };
+
+    res.json({
+      ...finalData,
+      usageCount: limitStatus.count
+    });
   } catch (error: any) {
     console.error("AI Insights Error:", error);
     res.json({ insights: ["Maaf, AI sedang istirahat sejenak. Silakan coba lagi nanti."] });

@@ -28,6 +28,8 @@ export default function POSReportsPage() {
     const [comprehensive, setComprehensive] = useState<any>(null);
     const [aiInsights, setAiInsights] = useState<string[]>([]);
     const [isAiLoading, setIsAiLoading] = useState(false);
+    const [aiUsageCount, setAiUsageCount] = useState<number>(0);
+    const [aiError, setAiError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [branches, setBranches] = useState<any[]>([]);
     
@@ -102,19 +104,6 @@ export default function POSReportsPage() {
             });
             setComprehensive(compRes.data);
 
-            // Fetch AI Insights
-            setIsAiLoading(true);
-            try {
-                const aiRes = await api.get('/pos/analytics/ai-insights', {
-                    params: { branchId: selectedBranchId, startDate, endDate }
-                });
-                setAiInsights(aiRes.data.insights || []);
-            } catch (err) {
-                console.error("AI Insights fail", err);
-            } finally {
-                setIsAiLoading(false);
-            }
-
             // Fetch Shift Closings
             const closingsRes = await api.get('/pos/closings', {
                 params: { branchId: selectedBranchId, startDate, endDate }
@@ -127,11 +116,46 @@ export default function POSReportsPage() {
         }
     };
 
+    const checkAiUsage = async () => {
+        try {
+            const res = await api.get('/pos/analytics/ai-insights', {
+                params: { checkOnly: true }
+            });
+            setAiUsageCount(res.data.usageCount || 0);
+        } catch (err) {
+            console.error("Gagal memeriksa limit AI:", err);
+        }
+    };
+
+    const handleStartAiAnalysis = async () => {
+        setIsAiLoading(true);
+        setAiError(null);
+        try {
+            const aiRes = await api.get('/pos/analytics/ai-insights', {
+                params: { branchId: selectedBranchId, startDate, endDate }
+            });
+            setAiInsights(aiRes.data.insights || []);
+            setAiUsageCount(aiRes.data.usageCount || 0);
+        } catch (err: any) {
+            console.error("AI Insights fail", err);
+            const msg = err.response?.data?.error || "Gagal melakukan analisa AI. Silakan coba lagi nanti.";
+            setAiError(msg);
+            if (err.response?.data?.usageCount !== undefined) {
+                setAiUsageCount(err.response.data.usageCount);
+            }
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchBranches();
     }, []);
 
     useEffect(() => {
+        setAiInsights([]);
+        setAiError(null);
+        checkAiUsage();
         fetchData();
     }, [selectedBranchId, startDate, endDate, paymentFilter, saleTypeFilter]);
 
@@ -299,42 +323,83 @@ export default function POSReportsPage() {
             </div>
 
             {/* AI Smart Insights Section */}
-            {(aiInsights.length > 0 || isAiLoading) && (
-                <div className="mb-8 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-6 backdrop-blur-md relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-4 opacity-10">
-                        <Sparkles className="h-24 w-24 text-emerald-400 animate-pulse" />
-                    </div>
-                    <div className="flex items-center gap-3 mb-6">
+            <div className="mb-8 rounded-3xl border border-emerald-500/30 bg-slate-900/40 p-6 backdrop-blur-md relative overflow-hidden group">
+                <div className="absolute right-0 top-0 p-4 opacity-10">
+                    <Sparkles className="h-24 w-24 text-emerald-400 animate-pulse" />
+                </div>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
                         <div className="p-2 bg-emerald-500 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.4)]">
                             <BrainCircuit className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-black text-white tracking-tight">Aivola AI <span className="text-emerald-400 text-xs font-black ml-2 px-2 py-0.5 border border-emerald-400/30 rounded-full">BETA</span></h2>
-                            <p className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-widest">Smart Business Recommendations</p>
+                            <h2 className="text-lg font-black text-white tracking-tight">
+                                Aivola AI <span className="text-emerald-400 text-xs font-black ml-2 px-2 py-0.5 border border-emerald-400/30 rounded-full">BETA</span>
+                            </h2>
+                            <p className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-widest">
+                                Smart Business Recommendations
+                            </p>
                         </div>
                     </div>
-
-                    {isAiLoading ? (
-                        <div className="flex flex-col gap-3">
-                            <div className="h-4 w-3/4 bg-emerald-500/20 animate-pulse rounded-full" />
-                            <div className="h-4 w-1/2 bg-emerald-500/20 animate-pulse rounded-full" />
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {aiInsights.map((insight, idx) => (
-                                <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all flex gap-3 group/item">
-                                    <div className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5 text-emerald-400 text-[10px] font-black group-hover/item:bg-emerald-500 group-hover/item:text-white transition-all">
-                                        {idx + 1}
-                                    </div>
-                                    <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                                        {insight}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {/* Usage quota indicator */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            Kuota Harian:
+                        </span>
+                        <span className={`text-xs font-black px-2.5 py-1 rounded-full border ${
+                            aiUsageCount >= 2 
+                                ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        }`}>
+                            {aiUsageCount} / 2 Terpakai
+                        </span>
+                    </div>
                 </div>
-            )}
+
+                {isAiLoading ? (
+                    <div className="flex flex-col gap-3 py-4">
+                        <div className="h-4 w-3/4 bg-emerald-500/20 animate-pulse rounded-full" />
+                        <div className="h-4 w-1/2 bg-emerald-500/20 animate-pulse rounded-full" />
+                    </div>
+                ) : aiError ? (
+                    <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold flex items-center gap-2">
+                        <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                        {aiError}
+                    </div>
+                ) : aiInsights.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {aiInsights.map((insight, idx) => (
+                            <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all flex gap-3 group/item">
+                                <div className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5 text-emerald-400 text-[10px] font-black group-hover/item:bg-emerald-500 group-hover/item:text-white transition-all">
+                                    {idx + 1}
+                                </div>
+                                <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                                    {insight}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="py-6 px-4 rounded-2xl bg-emerald-500/5 border border-dashed border-emerald-500/20 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="max-w-xl text-center md:text-left">
+                            <p className="text-sm font-bold text-white mb-1">Analisa Laporan Penjualan Anda dengan AI</p>
+                            <p className="text-xs text-slate-400">Temukan 3 rekomendasi strategis, tren tersembunyi, dan peluang bisnis berdasarkan data transaksi periode ini.</p>
+                        </div>
+                        <button
+                            onClick={handleStartAiAnalysis}
+                            disabled={aiUsageCount >= 2}
+                            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest italic flex items-center gap-2 transition-all duration-300 ${
+                                aiUsageCount >= 2
+                                    ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] border border-emerald-400/30'
+                            }`}
+                        >
+                            <Sparkles className="h-4 w-4" />
+                            Mulai Analisa AI
+                        </button>
+                    </div>
+                )}
+            </div>
 
             {/* Middle Section: Trends & Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
