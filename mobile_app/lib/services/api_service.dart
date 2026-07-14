@@ -3,6 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
 class ApiService {
+  // Callback to notify auth provider on token expiration/unauthorized access
+  static void Function()? onUnauthorized;
+
   // URL API akan otomatis berubah tergantung mode (Debug vs Release/Google Play)
   // PENTING: Jika menggunakan HP asli (Debug), ganti IP di bawah jika tidak menggunakan emulator
   static const String baseUrl = 'https://api.aivola.id/api'; // POINT TO PRODUCTION BACKEND
@@ -33,6 +36,9 @@ class ApiService {
             final prefs = await SharedPreferences.getInstance();
             await prefs.remove('jwt_token');
             print('Token expired or invalid. Cleared.');
+            if (onUnauthorized != null) {
+              onUnauthorized!();
+            }
           }
           return handler.next(e);
         },

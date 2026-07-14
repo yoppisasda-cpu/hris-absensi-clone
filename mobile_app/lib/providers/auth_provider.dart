@@ -10,6 +10,12 @@ class AuthProvider with ChangeNotifier {
   String? _userRole;
   String _language = 'id';
 
+  AuthProvider() {
+    ApiService.onUnauthorized = () {
+      logout();
+    };
+  }
+
   bool get isAuthenticated => _isAuthenticated;
   String? get companyId => _companyId;
   String? get userName => _userName;
