@@ -16,6 +16,7 @@ import {
 
 interface Loan {
     id: number;
+    userId: number;
     amount: number;
     monthlyDeduction: number;
     remainingAmount: number;
@@ -51,6 +52,7 @@ export default function LoanPage() {
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [selectedLoanHistory, setSelectedLoanHistory] = useState<LoanHistory[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [editId, setEditId] = useState<number | null>(null);
 
     const [formData, setFormData] = useState({
         userId: '',
@@ -79,20 +81,47 @@ export default function LoanPage() {
         }
     };
 
-    const handleCreateLoan = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
         try {
-            await api.post('/loans', formData);
+            if (editId) {
+                await api.put(`/loans/${editId}`, formData);
+            } else {
+                await api.post('/loans', formData);
+            }
             setIsModalOpen(false);
             setFormData({ userId: '', amount: '', monthlyDeduction: '', description: '' });
+            setEditId(null);
             fetchData();
         } catch (error) {
-            alert("Gagal membuat pinjaman");
+            alert(editId ? "Gagal memperbarui pinjaman" : "Gagal membuat pinjaman");
         } finally {
             setIsSaving(false);
         }
     };
+    
+    const handleEdit = (loan: Loan) => {
+        setFormData({
+            userId: loan.userId.toString(),
+            amount: loan.amount.toString(),
+            monthlyDeduction: loan.monthlyDeduction.toString(),
+            description: loan.description || ''
+        });
+        setEditId(loan.id);
+        setIsModalOpen(true);
+    };
+
+    const handleDeleteLoan = async (id: number) => {
+        if (!window.confirm("Yakin ingin menghapus data pinjaman ini?")) return;
+        try {
+            await api.delete(`/loans/${id}`);
+            fetchData();
+        } catch (error) {
+            alert("Gagal menghapus pinjaman");
+        }
+    };
+
     const handleUpdateStatus = async (id: number, status: 'ACTIVE' | 'PAUSED') => {
         try {
             await api.patch(`/loans/${id}`, { status });
@@ -158,8 +187,12 @@ export default function LoanPage() {
                             />
                         </div>
                         <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95 whitespace-nowrap"
+                            onClick={() => {
+                                setFormData({ userId: '', amount: '', monthlyDeduction: '', description: '' });
+                                setEditId(null);
+                                setIsModalOpen(true);
+                            }}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/30 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 w-full md:w-auto"
                         >
                             <Plus className="h-5 w-5" />
                             Catat Pinjaman Baru
@@ -268,6 +301,20 @@ export default function LoanPage() {
                                                 >
                                                     Detail
                                                 </button>
+                                                <button
+                                                    onClick={() => handleEdit(loan)}
+                                                    className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
+                                                    title="Edit Pinjaman"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteLoan(loan.id)}
+                                                    className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors"
+                                                    title="Hapus Pinjaman"
+                                                >
+                                                    Hapus
+                                                </button>
                                                 {loan.status === 'ACTIVE' && (
                                                     <button
                                                         onClick={() => {
@@ -303,18 +350,17 @@ export default function LoanPage() {
                     </table>
                 </div>
 
-                {/* Modal Tambah Pinjaman */}
+                {/* Modal Tambah/Edit Pinjaman */}
                 {isModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
                             <div className="mb-6 flex items-center justify-between">
-                                <h2 className="text-xl font-bold text-slate-800">Catat Pinjaman Baru</h2>
-                                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                <h2 className="text-xl font-bold text-slate-800">{editId ? 'Edit Pinjaman' : 'Tambah Pinjaman Baru'}</h2>
+                                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                                     <XCircle className="h-6 w-6" />
                                 </button>
                             </div>
-
-                            <form onSubmit={handleCreateLoan} className="space-y-4">
+                            <form onSubmit={handleSubmit} className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-1">Pilih Karyawan</label>
                                     <select
