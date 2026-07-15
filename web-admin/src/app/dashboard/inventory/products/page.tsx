@@ -116,17 +116,24 @@ export default function ProductsPage() {
             return;
         }
 
-        const dataToExport = filteredProducts.map(p => ({
-            'SKU': p.sku || '-',
-            'Nama Produk': p.name,
-            'Kategori': p.category?.name || '-',
-            'Tipe': p.type === 'RAW_MATERIAL' ? 'Bahan Baku' : p.type === 'SEMI_FINISHED' ? 'Setengah Jadi' : 'Barang Jadi',
-            'Stok Terpusat (Default)': p.stock,
-            'Satuan': p.unit,
-            'Harga Beli': p.costPrice || 0,
-            'Harga Jual': p.price || 0,
-            'Stok Minimum': p.minStock || 0,
-        }));
+        const dataToExport = filteredProducts.map(p => {
+            const recipeStr = p.Recipes && p.Recipes.length > 0 
+                ? p.Recipes.map((r: any) => `${r.Material?.name || 'Unknown'} (${r.quantity}${r.Material?.unit || ''})`).join(', ')
+                : '-';
+
+            return {
+                'SKU': p.sku || '-',
+                'Nama Produk': p.name,
+                'Kategori': p.category?.name || '-',
+                'Tipe': p.type === 'RAW_MATERIAL' ? 'Bahan Baku' : p.type === 'SEMI_FINISHED' ? 'Setengah Jadi' : 'Barang Jadi',
+                'Stok Terpusat (Default)': p.stock,
+                'Satuan': p.unit,
+                'Harga Beli': p.costPrice || 0,
+                'Harga Jual': p.price || 0,
+                'Stok Minimum': p.minStock || 0,
+                'Resep (BOM)': recipeStr
+            };
+        });
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
