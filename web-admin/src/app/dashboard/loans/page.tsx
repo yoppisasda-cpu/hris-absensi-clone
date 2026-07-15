@@ -33,6 +33,14 @@ interface Employee {
     name: string;
 }
 
+interface LoanHistory {
+    id: number;
+    month: number;
+    year: number;
+    loanDeduction: number;
+    createdAt: string;
+}
+
 export default function LoanPage() {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -40,6 +48,9 @@ export default function LoanPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [selectedLoanHistory, setSelectedLoanHistory] = useState<LoanHistory[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
     const [formData, setFormData] = useState({
         userId: '',
@@ -88,6 +99,19 @@ export default function LoanPage() {
             fetchData();
         } catch (error: any) {
             alert('Gagal memperbarui status pinjaman: ' + (error.response?.data?.error || 'Kesalahan Server'));
+        }
+    };
+
+    const handleViewHistory = async (id: number) => {
+        setIsHistoryModalOpen(true);
+        setIsLoadingHistory(true);
+        try {
+            const res = await api.get(`/loans/${id}/history`);
+            setSelectedLoanHistory(res.data);
+        } catch (error) {
+            alert('Gagal mengambil riwayat potongan');
+        } finally {
+            setIsLoadingHistory(false);
         }
     };
 
@@ -236,32 +260,41 @@ export default function LoanPage() {
                                             {new Date(loan.createdAt).toLocaleDateString('id-ID')}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            {loan.status === 'ACTIVE' && (
+                                            <div className="flex justify-end gap-2">
                                                 <button
-                                                    onClick={() => {
-                                                        if (window.confirm('Yakin ingin menjeda potongan pinjaman ini untuk bulan ini?')) {
-                                                            handleUpdateStatus(loan.id, 'PAUSED');
-                                                        }
-                                                    }}
-                                                    className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
-                                                    title="Jeda Potongan"
+                                                    onClick={() => handleViewHistory(loan.id)}
+                                                    className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                                                    title="Lihat Riwayat"
                                                 >
-                                                    Jeda
+                                                    Detail
                                                 </button>
-                                            )}
-                                            {loan.status === 'PAUSED' && (
-                                                <button
-                                                    onClick={() => {
-                                                        if (window.confirm('Yakin ingin melanjutkan potongan pinjaman ini?')) {
-                                                            handleUpdateStatus(loan.id, 'ACTIVE');
-                                                        }
-                                                    }}
-                                                    className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors"
-                                                    title="Lanjutkan Potongan"
-                                                >
-                                                    Lanjutkan
-                                                </button>
-                                            )}
+                                                {loan.status === 'ACTIVE' && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm('Yakin ingin menjeda potongan pinjaman ini untuk bulan ini?')) {
+                                                                handleUpdateStatus(loan.id, 'PAUSED');
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+                                                        title="Jeda Potongan"
+                                                    >
+                                                        Jeda
+                                                    </button>
+                                                )}
+                                                {loan.status === 'PAUSED' && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm('Yakin ingin melanjutkan potongan pinjaman ini?')) {
+                                                                handleUpdateStatus(loan.id, 'ACTIVE');
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors"
+                                                        title="Lanjutkan Potongan"
+                                                    >
+                                                        Lanjutkan
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -331,6 +364,62 @@ export default function LoanPage() {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal Riwayat Pinjaman */}
+                {isHistoryModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+                            <div className="mb-6 flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-slate-800">Riwayat Potongan Pinjaman</h2>
+                                <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                    <XCircle className="h-6 w-6" />
+                                </button>
+                            </div>
+
+                            <div className="max-h-[60vh] overflow-y-auto">
+                                {isLoadingHistory ? (
+                                    <p className="text-center text-slate-500 py-10">Memuat riwayat...</p>
+                                ) : selectedLoanHistory.length === 0 ? (
+                                    <div className="text-center text-slate-500 py-10">
+                                        <p>Belum ada riwayat potongan untuk pinjaman ini.</p>
+                                        <p className="text-sm mt-1">Potongan akan muncul setelah slip gaji karyawan berstatus PAID.</p>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-slate-50 text-slate-600">
+                                            <tr>
+                                                <th className="px-4 py-3">Bulan/Tahun</th>
+                                                <th className="px-4 py-3">Tgl Slip Gaji</th>
+                                                <th className="px-4 py-3 text-right">Nominal Potongan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y text-slate-600">
+                                            {selectedLoanHistory.map(history => (
+                                                <tr key={history.id} className="hover:bg-slate-50">
+                                                    <td className="px-4 py-3 font-medium text-slate-700">
+                                                        {new Date(history.year, history.month - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs">
+                                                        {new Date(history.createdAt).toLocaleDateString('id-ID')}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-semibold text-orange-600">
+                                                        {formatCurrency(history.loanDeduction)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+
+                            <div className="mt-6 flex justify-end">
+                                <button onClick={() => setIsHistoryModalOpen(false)} className="rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200">
+                                    Tutup
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

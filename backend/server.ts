@@ -6430,6 +6430,44 @@ app.patch('/api/loans/:id', tenantMiddleware, async (req: Request, res: Response
   }
 });
 
+// 2.5 Admin melihat riwayat potongan pinjaman
+app.get('/api/loans/:id/history', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const loanId = parseInt(req.params.id as string);
+
+    const loan = await prisma.loan.findUnique({
+      where: { id: loanId, companyId: tenantId }
+    });
+
+    if (!loan) {
+      return res.status(404).json({ error: 'Pinjaman tidak ditemukan' });
+    }
+
+    const history = await prisma.payroll.findMany({
+      where: {
+        userId: loan.userId,
+        companyId: tenantId,
+        loanDeduction: { gt: 0 },
+        status: 'PAID',
+        createdAt: { gte: loan.createdAt }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        month: true,
+        year: true,
+        loanDeduction: true,
+        createdAt: true
+      }
+    });
+
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal mengambil riwayat pinjaman' });
+  }
+});
+
 // 3. Admin melihat semua pinjaman
 app.get('/api/loans', tenantMiddleware, async (req: Request, res: Response) => {
   try {
