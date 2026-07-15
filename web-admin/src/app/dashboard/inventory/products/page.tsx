@@ -13,6 +13,7 @@ import WarehouseModal from "@/components/inventory/WarehouseModal";
 import StockTransferModal from "@/components/inventory/StockTransferModal";
 import ImportProductModal from "@/components/inventory/ImportProductModal";
 import { Download } from "lucide-react";
+import * as XLSX from 'xlsx';
 
 export default function ProductsPage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -108,6 +109,30 @@ export default function ProductsPage() {
         setSelectedProduct(product);
         setIsAddModalOpen(true);
     };
+
+    const handleExportExcel = () => {
+        if (filteredProducts.length === 0) {
+            toast.error("Tidak ada data untuk diekspor");
+            return;
+        }
+
+        const dataToExport = filteredProducts.map(p => ({
+            'SKU': p.sku || '-',
+            'Nama Produk': p.name,
+            'Kategori': p.category?.name || '-',
+            'Tipe': p.type === 'RAW_MATERIAL' ? 'Bahan Baku' : p.type === 'SEMI_FINISHED' ? 'Setengah Jadi' : 'Barang Jadi',
+            'Stok Terpusat (Default)': p.stock,
+            'Satuan': p.unit,
+            'Harga Beli': p.costPrice || 0,
+            'Harga Jual': p.price || 0,
+            'Stok Minimum': p.minStock || 0,
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Produk");
+        XLSX.writeFile(workbook, `Data_Produk_${new Date().getTime()}.xlsx`);
+    };
     const handleDeleteProduct = async (id: number, name: string) => {
         if (!window.confirm(`Apakah Anda yakin ingin menghapus produk "${name}"? Seluruh riwayat stok dan resep terkait juga akan dihapus.`)) {
             return;
@@ -162,6 +187,12 @@ export default function ProductsPage() {
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-400 transition-all uppercase tracking-widest italic"
                     >
                         <Download className="h-4 w-4" /> Import Produk
+                    </button>
+                    <button 
+                        onClick={handleExportExcel}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-emerald-400/80 hover:bg-emerald-500/10 hover:text-emerald-400 transition-all uppercase tracking-widest italic"
+                    >
+                        <Download className="h-4 w-4" /> Export Excel
                     </button>
                     <button 
                         onClick={() => {
