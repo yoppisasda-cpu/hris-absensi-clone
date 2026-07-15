@@ -19,7 +19,7 @@ interface Loan {
     amount: number;
     monthlyDeduction: number;
     remainingAmount: number;
-    status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'REJECTED';
+    status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'REJECTED' | 'PAUSED';
     description: string;
     createdAt: string;
     user: {
@@ -82,6 +82,14 @@ export default function LoanPage() {
             setIsSaving(false);
         }
     };
+    const handleUpdateStatus = async (id: number, status: 'ACTIVE' | 'PAUSED') => {
+        try {
+            await api.patch(`/loans/${id}`, { status });
+            fetchData();
+        } catch (error: any) {
+            alert('Gagal memperbarui status pinjaman: ' + (error.response?.data?.error || 'Kesalahan Server'));
+        }
+    };
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', {
@@ -99,6 +107,8 @@ export default function LoanPage() {
                 return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Lunas</span>;
             case 'PENDING':
                 return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Menunggu</span>;
+            case 'PAUSED':
+                return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Dijeda</span>;
             default:
                 return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{status}</span>;
         }
@@ -172,12 +182,13 @@ export default function LoanPage() {
                                 <th className="px-6 py-4">Sisa Saldo</th>
                                 <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4">Tgl Dibuat</th>
+                                <th className="px-6 py-4 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y text-slate-600">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={6} className="py-20 text-center text-slate-400">Memuat data pinjaman...</td>
+                                    <td colSpan={7} className="py-20 text-center text-slate-400">Memuat data pinjaman...</td>
                                 </tr>
                             ) : loans.filter(l =>
                                 l.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -185,7 +196,7 @@ export default function LoanPage() {
                                 l.description.toLowerCase().includes(searchQuery.toLowerCase())
                             ).length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="py-20 text-center text-slate-500">
+                                    <td colSpan={7} className="py-20 text-center text-slate-500">
                                         <Search className="h-12 w-12 text-slate-200 mx-auto mb-4" />
                                         <p className="font-medium text-lg mb-1">Tidak ada hasil ditemukan</p>
                                         <p className="text-sm">Tidak ada data pinjaman yang cocok dengan "{searchQuery}"</p>
@@ -223,6 +234,34 @@ export default function LoanPage() {
                                         </td>
                                         <td className="px-6 py-4 text-xs">
                                             {new Date(loan.createdAt).toLocaleDateString('id-ID')}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            {loan.status === 'ACTIVE' && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm('Yakin ingin menjeda potongan pinjaman ini untuk bulan ini?')) {
+                                                            handleUpdateStatus(loan.id, 'PAUSED');
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+                                                    title="Jeda Potongan"
+                                                >
+                                                    Jeda
+                                                </button>
+                                            )}
+                                            {loan.status === 'PAUSED' && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm('Yakin ingin melanjutkan potongan pinjaman ini?')) {
+                                                            handleUpdateStatus(loan.id, 'ACTIVE');
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors"
+                                                    title="Lanjutkan Potongan"
+                                                >
+                                                    Lanjutkan
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))

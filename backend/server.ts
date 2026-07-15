@@ -6408,7 +6408,29 @@ app.post('/api/loans', tenantMiddleware, async (req: Request, res: Response) => 
   }
 });
 
-// 2. Admin melihat semua pinjaman
+// 2. Admin mengubah status pinjaman (misal Jeda Potongan)
+app.patch('/api/loans/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const loanId = parseInt(req.params.id as string);
+    const { status } = req.body; // 'PAUSED' | 'ACTIVE'
+
+    if (!['ACTIVE', 'PAUSED'].includes(status)) {
+      return res.status(400).json({ error: 'Status hanya bisa ACTIVE atau PAUSED' });
+    }
+
+    const updatedLoan = await prisma.loan.update({
+      where: { id: loanId, companyId: tenantId },
+      data: { status }
+    });
+
+    res.json(updatedLoan);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal memperbarui status pinjaman' });
+  }
+});
+
+// 3. Admin melihat semua pinjaman
 app.get('/api/loans', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
