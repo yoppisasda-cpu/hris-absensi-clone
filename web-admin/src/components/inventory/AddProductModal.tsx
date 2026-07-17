@@ -478,6 +478,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                                 >
                                     <option value="Pcs">PIECES (PCS)</option>
+                                    <option value="Botol">BOTOL (BOTTLE)</option>
+                                    <option value="Cup">CUP (CUP)</option>
                                     <option value="Porsi">PORSI (PORTION)</option>
                                     <option value="Trip">TRIP / KIRIMAN (JASA)</option>
                                     <option value="Layanan">LAYANAN (SERVICE)</option>
@@ -512,6 +514,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     }}
                                 >
                                     <option value="Pcs">PIECES (PCS)</option>
+                                    <option value="Botol">BOTOL (BOTTLE)</option>
+                                    <option value="Cup">CUP (CUP)</option>
                                     <option value="Trip">TRIP / KIRIMAN (JASA)</option>
                                     <option value="Layanan">LAYANAN (SERVICE)</option>
                                     <option value="Box">BOX / DUS</option>
