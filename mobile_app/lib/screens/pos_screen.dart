@@ -33,6 +33,7 @@ class _POSScreenState extends State<POSScreen> {
   String _selectedPaymentMethod = 'Tunai';
   String _searchQuery = "";
   String _saleType = 'WALK_IN';
+  int? _activePendingBillId;
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerPhoneController = TextEditingController();
   final TextEditingController _cashReceivedController = TextEditingController();
@@ -380,8 +381,13 @@ class _POSScreenState extends State<POSScreen> {
               Navigator.pop(context);
               
               try {
+                if (_activePendingBillId != null) {
+                  try {
+                    await _apiService.deletePendingPosBill(_activePendingBillId!);
+                  } catch (_) {}
+                }
                 await _apiService.holdPosBill(name, _cart, 'WALK_IN');
-                setState(() => _cart = []);
+                _clearCartAndInputs();
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pesanan $name Berhasil Terkirim ke Kasir')));
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red));
@@ -1109,7 +1115,14 @@ class _POSScreenState extends State<POSScreen> {
         pointsEarned: _pointsEarned,
         taxRate: _globalTaxRate,
         taxAmount: _taxAmount,
+        pendingBillId: _activePendingBillId,
       );
+
+      if (_activePendingBillId != null) {
+        try {
+          await _apiService.deletePendingPosBill(_activePendingBillId!);
+        } catch (_) {}
+      }
 
       final saleData = {
         'invoiceNumber': response['invoiceNumber'],
@@ -1380,6 +1393,7 @@ class _POSScreenState extends State<POSScreen> {
   void _clearCartAndInputs() {
     setState(() {
       _cart.clear();
+      _activePendingBillId = null;
       _customerNameController.clear();
       _customerPhoneController.clear();
       _activeCustomerId = null;
@@ -1580,6 +1594,7 @@ class _POSScreenState extends State<POSScreen> {
                 if (selectedBill != null) {
                   setState(() {
                     _cart = List<Map<String, dynamic>>.from(selectedBill['items']);
+                    _activePendingBillId = selectedBill['id'];
                   });
                 }
               });

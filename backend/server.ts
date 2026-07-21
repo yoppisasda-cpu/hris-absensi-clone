@@ -11872,9 +11872,9 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
       SELECT 
         si.id, 
         si."productId", 
-        si.quantity, 
+        GREATEST(0, si.quantity - COALESCE(sri."returnedQty", 0)) as quantity, 
         si.price, 
-        si.total, 
+        GREATEST(0, si.total - COALESCE(sri."returnedTotal", 0)) as total, 
         s.date, 
         p.name as "productName", 
         p.sku, 
@@ -11885,7 +11885,16 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
       JOIN "Sale" s ON si."saleId" = s.id
       JOIN "Product" p ON si."productId" = p.id
       LEFT JOIN "ProductCategory" pc ON p."categoryId" = pc.id
-      WHERE s."companyId" = ${tenantId} AND s.date >= ${startDate} AND s.date <= ${endDate}
+      LEFT JOIN (
+        SELECT sri."productId", sr."saleId", SUM(sri.quantity) as "returnedQty", SUM(sri.total) as "returnedTotal"
+        FROM "SaleReturnItem" sri
+        JOIN "SaleReturn" sr ON sri."returnId" = sr.id
+        GROUP BY sri."productId", sr."saleId"
+      ) sri ON sri."productId" = si."productId" AND sri."saleId" = si."saleId"
+      WHERE s."companyId" = ${tenantId} 
+        AND s.date >= ${startDate} 
+        AND s.date <= ${endDate}
+        AND s.status NOT IN ('CANCELLED', 'VOID')
     `;
 
     // 2. Fetch all products and recipes to support recursive HPP calculation
@@ -14265,13 +14274,15 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     // Date Filter
     if (startDate) {
-      whereConditions.push(`s."date" >= '${startDate}'`);
+      const sDate = (startDate as string).split('T')[0];
+      whereConditions.push(`s."date" >= '${sDate} 00:00:00'`);
     }
     if (endDate) {
-      // Add one day to endDate to include the entire day
-      const d = new Date(endDate as string);
+      const eDate = (endDate as string).split('T')[0];
+      const d = new Date(eDate);
       d.setDate(d.getDate() + 1);
-      whereConditions.push(`s."date" < '${d.toISOString().split('T')[0]}'`);
+      const nextDayStr = d.toISOString().split('T')[0];
+      whereConditions.push(`s."date" < '${nextDayStr} 00:00:00'`);
     }
 
     // Payment Method Filter (Smart Categorization)
@@ -14748,12 +14759,31 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const saleIds = sales.map(s => s.id);
     if (saleIds.length > 0) {
       saleItems = await prisma.$queryRawUnsafe(`
-        SELECT si.*, p.name as "productName", p.sku as "productSku", pc.name as "categoryName", s."invoiceNumber", s."date"
+        SELECT 
+          si.id,
+          si."productId",
+          si."saleId",
+          si.price,
+          GREATEST(0, si.quantity - COALESCE(sri."returnedQty", 0)) as quantity,
+          GREATEST(0, si.total - COALESCE(sri."returnedTotal", 0)) as total,
+          p.name as "productName", 
+          p.sku as "productSku", 
+          pc.name as "categoryName", 
+          s."invoiceNumber", 
+          s."date"
         FROM "SaleItem" si
         JOIN "Product" p ON si."productId" = p.id
         LEFT JOIN "ProductCategory" pc ON p."categoryId" = pc.id
         JOIN "Sale" s ON si."saleId" = s.id
+        LEFT JOIN (
+          SELECT sri."productId", sr."saleId", SUM(sri.quantity) as "returnedQty", SUM(sri.total) as "returnedTotal"
+          FROM "SaleReturnItem" sri
+          JOIN "SaleReturn" sr ON sri."returnId" = sr.id
+          WHERE sr."saleId" IN (${saleIds.join(',')})
+          GROUP BY sri."productId", sr."saleId"
+        ) sri ON sri."productId" = si."productId" AND sri."saleId" = si."saleId"
         WHERE si."saleId" IN (${saleIds.join(',')})
+          AND s.status NOT IN ('CANCELLED', 'VOID')
         ORDER BY s."date" DESC, si.id ASC
       `);
     }
@@ -15447,10 +15477,17 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       pointsUsed = 0,
       pointsEarned = 0,
       taxRate = 0,
-      taxAmount = 0
+      taxAmount = 0,
+      pendingBillId = null
     } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
+      // 0. Delete Pending Bill if this checkout resolved a held bill
+      if (pendingBillId) {
+        await tx.pendingBill.deleteMany({
+          where: { id: Number(pendingBillId), companyId: tenantId }
+        });
+      }
       // 0. Find correct warehouse for the cashier's branch
       const user = await tx.user.findUnique({ where: { id: userId }, select: { branchId: true } });
       const warehouse = await tx.warehouse.findFirst({
@@ -15464,7 +15501,24 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       if (!warehouse) throw new Error("Gudang penjualan tidak ditemukan. Hubungin admin.");
       
       // 0. Get Account Name for notes
-      const account = accountId ? await tx.financialAccount.findUnique({ where: { id: Number(accountId) } }) : null;
+      let finalAccountId = accountId ? Number(accountId) : null;
+      if (!finalAccountId) {
+        const defaultCashAcc = await tx.financialAccount.findFirst({
+          where: {
+            companyId: tenantId,
+            OR: [
+              { type: 'CASH' },
+              { name: { contains: 'Tunai', mode: 'insensitive' } },
+              { name: { contains: 'Cash', mode: 'insensitive' } }
+            ]
+          }
+        }) || await tx.financialAccount.findFirst({ where: { companyId: tenantId } });
+        if (defaultCashAcc) {
+          finalAccountId = defaultCashAcc.id;
+        }
+      }
+
+      const account = finalAccountId ? await tx.financialAccount.findUnique({ where: { id: finalAccountId } }) : null;
       const paymentMethodTag = account ? `[Metode: ${account.name.toUpperCase()}]` : '';
       const finalNotes = notes ? `${notes} ${paymentMethodTag}` : paymentMethodTag;
 
@@ -15518,7 +15572,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           customerId: finalCustomerId,
           customerName: customerName || null,
           customerPhone: customerPhone || null,
-          accountId: accountId ? Number(accountId) : null,
+          accountId: finalAccountId,
           invoiceNumber,
           totalAmount: Number(totalAmount),
           totalCommission: Number(totalCommission),
@@ -15810,7 +15864,7 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
           { branchId: null } // Include transactions that don't have a branch assigned
         ],
         date: { gt: startTime, lte: new Date() },
-        invoiceNumber: { startsWith: 'POS-' } // Ensure only POS transactions
+        status: { notIn: ['CANCELLED', 'VOID'] }
       }
     });
 
@@ -15820,23 +15874,79 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
     const totalCommission = sales.reduce((sum, s) => sum + (s.totalCommission || 0), 0);
     const totalNetSales = totalGrossSales - totalCommission;
 
-    // 4. Breakdown by Financial Account (Expected Cash vs Bank)
+    // 4. Detailed Breakdown by Payment Method (Tunai, QRIS, Transfer Bank, Debit, Credit)
     const accounts = await prisma.financialAccount.findMany({ where: { companyId: tenantId } });
-    const methodBreakdown = accounts.map(acc => {
-      const amount = sales
-        .filter(s => s.accountId === acc.id)
-        .reduce((sum, s) => sum + s.totalAmount, 0);
-      return {
-        accountId: acc.id,
-        accountName: acc.name,
-        accountType: acc.type,
-        expectedAmount: amount
-      };
-    }).filter(m => m.expectedAmount > 0);
+    const accountMap = new Map(accounts.map(a => [a.id, a]));
 
-    // Calculate expectedCash ONLY from accounts marked with type 'CASH'
-    // This ensures physical cash reconciliation is separate from digital/3rd-party transfers
-    const cashTotal = methodBreakdown
+    const methodMap = new Map<string, { accountId: number | null; accountName: string; accountType: string; expectedAmount: number }>();
+
+    for (const sale of sales) {
+      const notes = (sale.notes || '').toUpperCase();
+      const account = sale.accountId ? accountMap.get(sale.accountId) : null;
+      const accName = (account?.name || '').toUpperCase();
+      const accType = (account?.type || '').toUpperCase();
+
+      let methodLabel = '';
+      let methodType = 'OTHER';
+
+      if (notes.includes('QRIS')) {
+        methodLabel = 'QRIS';
+        methodType = 'QRIS';
+      } else if (notes.includes('DEBIT/CREDIT') || notes.includes('DEBIT / CREDIT')) {
+        methodLabel = 'Debit / Credit';
+        methodType = 'DEBIT';
+      } else if (notes.includes('DEBIT')) {
+        methodLabel = 'Debit';
+        methodType = 'DEBIT';
+      } else if (notes.includes('CREDIT')) {
+        methodLabel = 'Credit';
+        methodType = 'CREDIT';
+      } else if (notes.includes('TRANSFER')) {
+        methodLabel = 'Transfer Bank';
+        methodType = 'TRANSFER';
+      } else if (notes.includes('TUNAI') || notes.includes('CASH')) {
+        methodLabel = 'Tunai';
+        methodType = 'CASH';
+      } else if (accName.includes('QRIS')) {
+        methodLabel = 'QRIS';
+        methodType = 'QRIS';
+      } else if (accName.includes('DEBIT')) {
+        methodLabel = 'Debit';
+        methodType = 'DEBIT';
+      } else if (accName.includes('CREDIT')) {
+        methodLabel = 'Credit';
+        methodType = 'CREDIT';
+      } else if (accName.includes('TRANSFER') || accType === 'BANK') {
+        methodLabel = account?.name || 'Transfer Bank';
+        methodType = 'TRANSFER';
+      } else if (accType === 'CASH' || accName.includes('TUNAI') || accName.includes('CASH')) {
+        methodLabel = 'Tunai';
+        methodType = 'CASH';
+      } else if (sale.saleType === 'WALK_IN' || !sale.accountId) {
+        methodLabel = 'Tunai';
+        methodType = 'CASH';
+      } else {
+        methodLabel = account ? account.name : 'Tunai';
+        methodType = account ? (account.type || 'OTHER') : 'CASH';
+      }
+
+      if (!methodMap.has(methodLabel)) {
+        methodMap.set(methodLabel, {
+          accountId: sale.accountId || null,
+          accountName: methodLabel,
+          accountType: methodType,
+          expectedAmount: 0
+        });
+      }
+
+      const item = methodMap.get(methodLabel)!;
+      item.expectedAmount += Number(sale.totalAmount);
+    }
+
+    const methodBreakdown = Array.from(methodMap.values()).filter(m => m.expectedAmount > 0);
+
+    // Calculate expectedCash ONLY from items tagged as CASH or Tunai
+    let cashTotal = methodBreakdown
       .filter(m => m.accountType?.toUpperCase() === 'CASH' || m.accountName.toLowerCase().includes('tunai') || m.accountName.toLowerCase().includes('cash'))
       .reduce((sum, m) => sum + m.expectedAmount, 0);
 
@@ -15846,16 +15956,29 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       select: { posBlindClosing: true }
     });
 
-    // 6. Aggregate items sold during this shift for stock checking
+    // 6. Aggregate items sold during this shift for stock checking (subtracting refunds)
     const saleIds = sales.map(s => s.id);
     let itemsSummary: { productId: number; productName: string; totalQty: number }[] = [];
     if (saleIds.length > 0) {
       const saleItems: any[] = await prisma.$queryRawUnsafe(`
-        SELECT si."productId", p.name as "productName", SUM(si.quantity) as "totalQty"
+        SELECT 
+          si."productId", 
+          p.name as "productName", 
+          (COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(sri."returnedQty"), 0)) as "totalQty"
         FROM "SaleItem" si
         JOIN "Product" p ON si."productId" = p.id
+        JOIN "Sale" s ON si."saleId" = s.id
+        LEFT JOIN (
+          SELECT sri."productId", sr."saleId", SUM(sri.quantity) as "returnedQty"
+          FROM "SaleReturnItem" sri
+          JOIN "SaleReturn" sr ON sri."returnId" = sr.id
+          WHERE sr."saleId" = ANY($1::int[])
+          GROUP BY sri."productId", sr."saleId"
+        ) sri ON sri."productId" = si."productId" AND sri."saleId" = si."saleId"
         WHERE si."saleId" = ANY($1::int[])
+          AND s.status NOT IN ('CANCELLED', 'VOID')
         GROUP BY si."productId", p.name
+        HAVING (COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(sri."returnedQty"), 0)) > 0
         ORDER BY "totalQty" DESC
       `, saleIds);
       itemsSummary = saleItems.map(i => ({

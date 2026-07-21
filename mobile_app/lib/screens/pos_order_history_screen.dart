@@ -15,6 +15,11 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
   final ApiService _apiService = ApiService();
   List<dynamic> _orders = [];
   bool _isLoading = true;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  String _selectedFilterLabel = 'Semua Tanggal';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -25,7 +30,10 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
   Future<void> _fetchOrders() async {
     setState(() => _isLoading = true);
     try {
-      final onlineData = await _apiService.getPosOrders();
+      final onlineData = await _apiService.getPosOrders(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
       
       // Mengambil transaksi offline yang BELUM tersinkron
       final offlineSales = PosLocalDbService.getOfflineSales();
@@ -55,6 +63,65 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _selectDateRange(BuildContext context) async {
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(Duration(days: 1)),
+      initialDateRange: _startDate != null && _endDate != null
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : DateTimeRange(start: DateTime.now().subtract(Duration(days: 7)), end: DateTime.now()),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: ColorScheme.light(primary: Colors.blue[800]!),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+        _selectedFilterLabel = '${DateFormat('dd/MM/yy').format(picked.start)} - ${DateFormat('dd/MM/yy').format(picked.end)}';
+      });
+      _fetchOrders();
+    }
+  }
+
+  void _setPresetDate(String preset) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    setState(() {
+      if (preset == 'today') {
+        _startDate = today;
+        _endDate = today;
+        _selectedFilterLabel = 'Hari Ini';
+      } else if (preset == 'yesterday') {
+        final yesterday = today.subtract(Duration(days: 1));
+        _startDate = yesterday;
+        _endDate = yesterday;
+        _selectedFilterLabel = 'Kemarin';
+      } else if (preset == 'week') {
+        _startDate = today.subtract(Duration(days: 7));
+        _endDate = today;
+        _selectedFilterLabel = '7 Hari Terakhir';
+      } else if (preset == 'month') {
+        _startDate = DateTime(now.year, now.month, 1);
+        _endDate = today;
+        _selectedFilterLabel = 'Bulan Ini';
+      } else if (preset == 'all') {
+        _startDate = null;
+        _endDate = null;
+        _selectedFilterLabel = 'Semua Tanggal';
+      }
+    });
+    _fetchOrders();
   }
 
   void _handleRefund(dynamic saleDetail) async {
@@ -400,45 +467,177 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredOrders = _orders.where((order) {
+      if (_searchQuery.trim().isEmpty) return true;
+      final q = _searchQuery.toLowerCase();
+      final inv = (order['invoiceNumber'] ?? '').toString().toLowerCase();
+      final cust = (order['customerName'] ?? '').toString().toLowerCase();
+      return inv.contains(q) || cust.contains(q);
+    }).toList();
+
+    final double totalSum = filteredOrders.fold(0.0, (sum, o) => sum + (double.tryParse(o['totalAmount'].toString()) ?? 0));
+
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Text('Riwayat Pesanan POS'),
+        title: Text('Riwayat Pesanan POS', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.blue[800],
         foregroundColor: Colors.white,
+        elevation: 1,
         actions: [
-          IconButton(icon: Icon(Icons.refresh), onPressed: _fetchOrders),
+          IconButton(
+            icon: Icon(Icons.date_range),
+            tooltip: 'Filter Tanggal (Backdate)',
+            onPressed: () => _selectDateRange(context),
+          ),
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: _fetchOrders,
+          ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _orders.isEmpty
-              ? Center(child: Text('Belum ada riwayat pesanan.'))
-              : ListView.builder(
-                  padding: EdgeInsets.all(12),
-                  itemCount: _orders.length,
-                  itemBuilder: (context, index) {
-                    final order = _orders[index];
-                    final date = DateTime.parse(order['date']).toLocal();
-                    return Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      margin: EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        onTap: () => _showOrderDetail(order),
-                        title: Text(order['invoiceNumber'], style: TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(DateFormat('dd MMM yyyy, HH:mm').format(date)),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('Rp ${order['totalAmount']}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[700])),
-                            SizedBox(height: 4),
-                            _buildStatusBadge(order['status'] ?? 'PAID'),
-                          ],
+      body: Column(
+        children: [
+          // Filter & Search Header
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            color: Colors.white,
+            child: Column(
+              children: [
+                // Search Input Bar
+                TextField(
+                  controller: _searchController,
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  decoration: InputDecoration(
+                    hintText: 'Cari No. Faktur / Pelanggan...',
+                    prefixIcon: Icon(Icons.search, color: Colors.blue[800]),
+                    suffixIcon: _searchQuery.isNotEmpty 
+                        ? IconButton(icon: Icon(Icons.clear), onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          }) 
+                        : null,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.blue[800]!)),
+                  ),
+                ),
+                SizedBox(height: 8),
+
+                // Quick Date Preset Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip('Hari Ini', () => _setPresetDate('today'), isSelected: _selectedFilterLabel == 'Hari Ini'),
+                      SizedBox(width: 6),
+                      _buildFilterChip('Kemarin', () => _setPresetDate('yesterday'), isSelected: _selectedFilterLabel == 'Kemarin'),
+                      SizedBox(width: 6),
+                      _buildFilterChip('7 Hari', () => _setPresetDate('week'), isSelected: _selectedFilterLabel == '7 Hari Terakhir'),
+                      SizedBox(width: 6),
+                      _buildFilterChip('Bulan Ini', () => _setPresetDate('month'), isSelected: _selectedFilterLabel == 'Bulan Ini'),
+                      SizedBox(width: 6),
+                      _buildFilterChip('Semua', () => _setPresetDate('all'), isSelected: _selectedFilterLabel == 'Semua Tanggal'),
+                      SizedBox(width: 6),
+                      InkWell(
+                        onTap: () => _selectDateRange(context),
+                        child: Chip(
+                          avatar: Icon(Icons.calendar_month, size: 14, color: Colors.blue[800]),
+                          label: Text(_selectedFilterLabel.startsWith('Hari') || _selectedFilterLabel.startsWith('Kemarin') || _selectedFilterLabel.startsWith('7') || _selectedFilterLabel.startsWith('Bulan') || _selectedFilterLabel.startsWith('Semua') ? 'Pilih Tanggal 📅' : _selectedFilterLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                          backgroundColor: Colors.blue[50],
+                          side: BorderSide(color: Colors.blue[200]!),
                         ),
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
+              ],
+            ),
+          ),
+
+          // Total Summary Strip
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.blue[50],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('${filteredOrders.length} Pesanan Ditemukan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                Text('Total: Rp ${NumberFormat('#,###', 'id').format(totalSum)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+              ],
+            ),
+          ),
+
+          // Orders List
+          Expanded(
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : filteredOrders.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.history_toggle_off, size: 48, color: Colors.grey[400]),
+                            SizedBox(height: 8),
+                            Text('Tidak ada riwayat pesanan ditemukan.', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _fetchOrders,
+                        child: ListView.builder(
+                          padding: EdgeInsets.all(12),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) {
+                            final order = filteredOrders[index];
+                            final date = DateTime.parse(order['date']).toLocal();
+                            return Card(
+                              elevation: 1.5,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              margin: EdgeInsets.only(bottom: 10),
+                              child: ListTile(
+                                onTap: () => _showOrderDetail(order),
+                                title: Row(
+                                  children: [
+                                    Text(order['invoiceNumber'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                    if (order['customerName'] != null && order['customerName'].toString().isNotEmpty) ...[
+                                      SizedBox(width: 8),
+                                      Text('(${order['customerName']})', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+                                    ],
+                                  ],
+                                ),
+                                subtitle: Text(DateFormat('dd MMM yyyy, HH:mm').format(date), style: TextStyle(fontSize: 12, color: Colors.blueGrey[600])),
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text('Rp ${NumberFormat('#,###', 'id').format(order['totalAmount'])}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[800], fontSize: 14)),
+                                    SizedBox(height: 4),
+                                    _buildStatusBadge(order['status'] ?? 'PAID'),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, VoidCallback onTap, {required bool isSelected}) {
+    return InkWell(
+      onTap: onTap,
+      child: Chip(
+        label: Text(label, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : Colors.black87, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+        backgroundColor: isSelected ? Colors.blue[800] : Colors.grey[200],
+        padding: EdgeInsets.symmetric(horizontal: 4),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 class ApiService {
   // Callback to notify auth provider on token expiration/unauthorized access
@@ -688,6 +689,7 @@ class ApiService {
     String? offlineInvoiceNumber,
     double taxRate = 0,
     double taxAmount = 0,
+    int? pendingBillId,
   }) async {
     try {
       final response = await _dio.post('/pos/checkout', data: {
@@ -709,6 +711,7 @@ class ApiService {
         'offlineInvoiceNumber': offlineInvoiceNumber,
         'taxRate': taxRate,
         'taxAmount': taxAmount,
+        'pendingBillId': pendingBillId,
       });
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
@@ -732,10 +735,17 @@ class ApiService {
     }
   }
 
-  // Tarik riwayat pesanan (Semua penjualan di cabang)
-  Future<List<dynamic>> getPosOrders() async {
+  // Tarik riwayat pesanan (Semua penjualan di cabang dengan filter tanggal / backdate)
+  Future<List<dynamic>> getPosOrders({DateTime? startDate, DateTime? endDate}) async {
     try {
-      final response = await _dio.get('/sales');
+      final queryParams = <String, dynamic>{};
+      if (startDate != null) {
+        queryParams['startDate'] = DateFormat('yyyy-MM-dd').format(startDate);
+      }
+      if (endDate != null) {
+        queryParams['endDate'] = DateFormat('yyyy-MM-dd').format(endDate);
+      }
+      final response = await _dio.get('/sales', queryParameters: queryParams);
       return response.data as List<dynamic>;
     } catch (e) {
       throw Exception('Gagal mengambil riwayat pesanan.');

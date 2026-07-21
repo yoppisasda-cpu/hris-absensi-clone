@@ -180,15 +180,39 @@ class _PosClosingScreenState extends State<PosClosingScreen> {
                           child: Column(
                             children: [
                               ...(_summary?['methodBreakdown'] as List<dynamic>? ?? []).map((m) {
-                                final isCash = m['accountType']?.toUpperCase() == 'CASH' || m['accountName'].toLowerCase().contains('tunai') || m['accountName'].toLowerCase().contains('cash');
+                                final name = (m['accountName'] ?? 'Metode Pembayaran').toString();
+                                final nameLower = name.toLowerCase();
+                                final typeUpper = (m['accountType'] ?? '').toString().toUpperCase();
+                                final isCash = typeUpper == 'CASH' || nameLower.contains('tunai') || nameLower.contains('cash');
+
+                                IconData methodIcon = Icons.account_balance_wallet_outlined;
+                                Color iconColor = Colors.blue[800]!;
+
+                                if (isCash) {
+                                  methodIcon = Icons.payments_outlined;
+                                  iconColor = Colors.green[700]!;
+                                } else if (nameLower.contains('qris')) {
+                                  methodIcon = Icons.qr_code_scanner;
+                                  iconColor = Colors.purple[700]!;
+                                } else if (nameLower.contains('debit') || nameLower.contains('credit') || nameLower.contains('kartu')) {
+                                  methodIcon = Icons.credit_card_outlined;
+                                  iconColor = Colors.amber[800]!;
+                                } else if (nameLower.contains('transfer')) {
+                                  methodIcon = Icons.account_balance_outlined;
+                                  iconColor = Colors.blue[700]!;
+                                }
+
                                 return ListTile(
                                   dense: true,
-                                  leading: Icon(isCash ? Icons.money : Icons.account_balance_wallet, color: isCash ? Colors.green : Colors.blue),
-                                  title: Text(m['accountName'] ?? 'Akun', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(isCash ? 'Uang Tunai' : 'Non-Tunai/Transfer'),
+                                  leading: CircleAvatar(
+                                    backgroundColor: iconColor.withOpacity(0.1),
+                                    child: Icon(methodIcon, color: iconColor, size: 20),
+                                  ),
+                                  title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Text(isCash ? 'Uang Tunai' : 'Non-Tunai'),
                                   trailing: Text(
                                     (_summary?['blindClosing'] == true) ? '*******' : currencyFormat.format(m['expectedAmount']), 
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: isCash ? Colors.green[800] : Colors.blue[800])
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isCash ? Colors.green[800] : Colors.blue[900])
                                   ),
                                 );
                               }).toList(),
