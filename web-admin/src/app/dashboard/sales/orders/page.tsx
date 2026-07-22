@@ -337,6 +337,16 @@ export default function SalesOrdersPage() {
                                 <Truck className="w-4 h-4 stroke-[2.5px]" />
                               </button>
                               <button
+                                onClick={() => {
+                                  setSelectedOrderId(order.id);
+                                  setIsModalOpen(true);
+                                }}
+                                className="p-2.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-xl transition-all border border-blue-500/20 active:scale-90"
+                                title="Edit Pesanan"
+                              >
+                                <Pencil className="w-4 h-4 stroke-[2.5px]" />
+                              </button>
+                              <button
                                 onClick={() => handleDeleteOrder(order.id)}
                                 className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all border border-rose-500/20 active:scale-90"
                                 title="Hapus Pesanan"
