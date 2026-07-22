@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, ChevronRight, CheckCircle, Package, Truck, FileText, ArrowRight, Pencil, Trash2, Printer, ArrowDown, ArrowUp } from "lucide-react";
+import { Plus, Search, ChevronRight, CheckCircle, Package, Truck, FileText, ArrowRight, Pencil, Trash2, Printer, ArrowDown, ArrowUp, RotateCcw } from "lucide-react";
 import { useFeatures } from "@/lib/FeatureContext";
 import api from "@/lib/api";
 import CreateSalesOrderModal from "@/components/sales/CreateSalesOrderModal";
@@ -96,6 +96,17 @@ export default function SalesOrdersPage() {
       fetchOrders();
     } catch (error: any) {
       toast.error(error.response?.data?.error || "Gagal mengonversi pesanan");
+    }
+  };
+
+  const handleRevertInvoice = async (id: number) => {
+    if (!confirm("Apakah Anda yakin ingin membatalkan Invoice ini?\n\nStok barang yang sudah terpotong akan dikembalikan ke gudang, dan pesanan ini akan kembali berstatus PO (Dikemas) agar dapat diedit.")) return;
+    try {
+      const res = await api.post(`/sales/orders/${id}/revert-invoice`);
+      toast.success(res.data.message || "Berhasil membatalkan invoice");
+      fetchOrders();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Gagal membatalkan invoice");
     }
   };
 
@@ -389,6 +400,13 @@ export default function SalesOrdersPage() {
                               >
                                 <Truck className="w-3.5 h-3.5 stroke-[3.5px]" />
                                 <span>Surat Jalan</span>
+                              </button>
+                              <button
+                                onClick={() => handleRevertInvoice(order.id)}
+                                className="p-2.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 rounded-xl transition-all border border-orange-500/20 active:scale-90"
+                                title="Batalkan Invoice & Edit PO"
+                              >
+                                <RotateCcw className="w-4 h-4 stroke-[2.5px]" />
                               </button>
                               <button
                                 onClick={() => handleDeleteOrder(order.id)}

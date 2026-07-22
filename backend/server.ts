@@ -1257,6 +1257,101 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
   }
 });
 
+// 4.5 Batalkan Invoice dan kembalikan ke PO
+app.post('/api/sales/orders/:id/revert-invoice', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const orderId = Number(req.params.id);
+    const userId = Number((req as any).userId);
+
+    // 1. Role Verification
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '')) {
+      return res.status(403).json({ error: 'Akses Ditolak. Hanya Admin, Owner, dan Finance yang dapat membatalkan invoice.' });
+    }
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id: orderId, companyId: tenantId },
+      include: { items: true }
+    });
+
+    if (!order) return res.status(404).json({ error: 'Pesanan (PO) tidak ditemukan' });
+    if (order.status !== 'INVOICED' || !order.saleId) {
+      return res.status(400).json({ error: 'Pesanan ini belum ditagihkan atau tidak memiliki referensi invoice.' });
+    }
+
+    const saleId = order.saleId;
+    const sale = await prisma.sale.findFirst({ where: { id: saleId, companyId: tenantId } });
+    if (!sale) return res.status(404).json({ error: 'Data Invoice tidak ditemukan' });
+
+    // --- CHECK CLOSING ---
+    if (await isPeriodClosed(tenantId, sale.date)) {
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat membatalkan invoice pada tanggal ini.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Hapus Pemasukan (Income) terkait
+      await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+
+      // 2. Hapus Riwayat Poin 
+      await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+
+      // 3. Hapus SaleReturnItem dan SaleReturn (Jika pernah diretur)
+      const returns = await tx.saleReturn.findMany({ where: { saleId }});
+      for (const r of returns) {
+         await tx.saleReturnItem.deleteMany({ where: { returnId: r.id }});
+         await tx.saleReturn.delete({ where: { id: r.id }});
+      }
+
+      // 4. Hapus SaleItem (Detail barang di invoice)
+      await tx.saleItem.deleteMany({ where: { saleId }});
+
+      // 5. Kembalikan stok untuk trackable items
+      const productIds = order.items.map((item: any) => item.productId);
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } }
+      });
+      const productMap = new Map(products.map((p: any) => [p.id, p]));
+
+      for (const item of order.items) {
+        const product = productMap.get(item.productId);
+        if (product && product.trackStock && (product as any).type === 'FINISHED_GOOD') {
+           await tx.product.update({
+             where: { id: product.id },
+             data: { stock: { increment: item.quantity } }
+           });
+           
+           await tx.stockTransaction.create({
+               data: {
+                   productId: product.id,
+                   type: 'IN',
+                   quantity: item.quantity,
+                   reference: `Revert B2B Sale Order: ${order.orderNumber}`
+               }
+           });
+        }
+      }
+
+      // 6. Hapus Penjualan Utama (Invoice)
+      await tx.sale.delete({ where: { id: saleId }});
+
+      // 7. Revert Sales Order status
+      await tx.salesOrder.update({
+        where: { id: order.id },
+        data: { status: 'PREPARING', saleId: null }
+      });
+    }, {
+      maxWait: 15000,
+      timeout: 30000
+    });
+
+    res.json({ message: 'Invoice berhasil dibatalkan dan dikembalikan menjadi status Dikemas.' });
+  } catch (error: any) {
+    console.error("REVERT INVOICE ERROR:", error);
+    res.status(500).json({ error: error.message || 'Gagal membatalkan invoice' });
+  }
+});
+
 // 5. Get Single Sales Order
 app.get('/api/sales/orders/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
