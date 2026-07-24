@@ -3778,6 +3778,49 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
   }
 });
 
+// Endpoint untuk Reset Password Karyawan
+app.put('/api/users/:id/reset-password', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const requestorRole = (req as any).userRole;
+    const reqUserId = parseInt(req.params.id as string);
+
+    // Hanya Admin, Owner, atau Superadmin yang boleh reset password
+    if (requestorRole !== 'SUPERADMIN' && requestorRole !== 'ADMIN' && requestorRole !== 'OWNER' && requestorRole !== 'MANAGER') {
+      return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki wewenang untuk me-reset password karyawan.' });
+    }
+
+    const checkUser = await prisma.user.findFirst({ where: { id: reqUserId } });
+    if (!checkUser) return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+
+    // Validasi Akses: Harus Tenant yang sama ATAU Superadmin
+    if (requestorRole !== 'SUPERADMIN' && checkUser.companyId !== tenantId) {
+      return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki wewenang mengedit data tenant lain' });
+    }
+
+    // Default password baru adalah "123456"
+    const newPassword = "123456";
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const updatedUser = await (prisma.user as any).update({
+      where: { id: reqUserId },
+      data: {
+        password: hashedPassword
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true
+      }
+    });
+
+    res.json({ message: `Password untuk ${updatedUser.name} berhasil di-reset menjadi 123456`, user: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Gagal me-reset password karyawan' });
+  }
+});
+
 // B1.6 Endpoint Hapus Karyawan (Permanen)
 app.delete('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {

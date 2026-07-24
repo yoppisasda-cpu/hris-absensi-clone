@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2, Camera, ShieldCheck, Smartphone } from 'lucide-react';
+import { UserPlus, Mail, Briefcase, X, Save, Edit2, Search, FileText, Clock, Laptop, UserX, UserCheck, Trash2, Camera, ShieldCheck, Smartphone, Key } from 'lucide-react';
 import EmployeeDocumentsModal from '@/components/dashboard/EmployeeDocumentsModal';
 import EmployeeAssetsModal from '@/components/dashboard/EmployeeAssetsModal';
 
@@ -254,6 +254,17 @@ export default function EmployeesPage() {
         } catch (error) {
             const err = error as { response?: { data?: { error?: string } } };
             alert(err.response?.data?.error || 'Gagal mereset Device ID.');
+        }
+    };
+
+    const handleResetPassword = async (user: User) => {
+        if (!confirm(`Apakah Anda yakin ingin me-reset password untuk ${user.name} menjadi "123456"?\nKaryawan bisa menggantinya sendiri setelah berhasil login.`)) return;
+        try {
+            const res = await api.put(`/users/${user.id}/reset-password`);
+            alert(res.data.message || 'Password berhasil direset.');
+        } catch (error) {
+            const err = error as { response?: { data?: { error?: string } } };
+            alert(err.response?.data?.error || 'Gagal mereset password.');
         }
     };
 
@@ -521,6 +532,13 @@ export default function EmployeesPage() {
                                                     <>
                                                         <button onClick={() => handleOpenEdit(user)} className="p-1 px-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors" title="Edit Karyawan">
                                                             <Edit2 className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleResetPassword(user)}
+                                                            className="p-1 px-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                                                            title="Reset Password (123456)"
+                                                        >
+                                                            <Key className="h-4 w-4" />
                                                         </button>
                                                         <button
                                                             onClick={() => {
