@@ -160,12 +160,13 @@ export default function POSReportsPage() {
     }, [selectedBranchId, startDate, endDate, paymentFilter, saleTypeFilter]);
 
     const stats = useMemo(() => {
-        const gross = sales.reduce((sum, s) => sum + s.totalAmount, 0);
-        const commission = sales.reduce((sum, s) => sum + (s.totalCommission || 0), 0);
+        const validSales = sales.filter(s => s.status !== 'RETURNED' && s.status !== 'CANCELLED');
+        const gross = validSales.reduce((sum, s) => sum + s.totalAmount, 0);
+        const commission = validSales.reduce((sum, s) => sum + (s.totalCommission || 0), 0);
         const net = gross - commission;
-        const avgValue = sales.length > 0 ? gross / sales.length : 0;
+        const avgValue = validSales.length > 0 ? gross / validSales.length : 0;
         
-        return { gross, commission, net, count: sales.length, avgValue };
+        return { gross, commission, net, count: validSales.length, avgValue };
     }, [sales]);
 
     const filteredSales = sales.filter(sale => 
