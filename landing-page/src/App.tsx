@@ -37,6 +37,7 @@ const Header = () => (
       <a href="#ai-showcase" className="nav-ai-link">AI Co-Pilot</a>
       <a href="#finance" className="nav-finance-link">Finance & POS</a>
       <a href="#pricing">Harga</a>
+      <a href="https://order.aivola.id" className="btn-login" style={{ background: '#ff7a00', color: 'white', border: 'none' }}>Pesan Makanan</a>
       <a href="https://admin.Aivola.id" className="btn-login">Masuk</a>
     </div>
   </nav>
