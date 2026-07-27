@@ -8,6 +8,7 @@ import '../providers/branch_provider.dart';
 import '../providers/branding_provider.dart';
 import '../services/api_service.dart';
 import '../models/voucher.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CurrencyFormat {
   static String convertToIdr(dynamic number, int decimalDigit) {
@@ -197,7 +198,7 @@ class _CartScreenState extends State<CartScreen> {
       if (method == "Dine-in") {
         _paymentMethod = "Bayar di Kasir";
       } else {
-        _paymentMethod = "Midtrans (Online Payment)";
+        _paymentMethod = "Xendit (Online Payment)";
       }
     });
   }
@@ -457,7 +458,7 @@ class _CartScreenState extends State<CartScreen> {
     final prefs = await SharedPreferences.getInstance();
     final customerId = prefs.getInt('userId');
 
-    final success = await ApiService.createOrder(
+    final response = await ApiService.createOrder(
       items: items,
       customerId: customerId,
       branchId: branchProvider.selectedBranch?.id,
@@ -469,11 +470,17 @@ class _CartScreenState extends State<CartScreen> {
 
     Navigator.pop(context); // Close loading
 
-    if (success) {
+    if (response['success'] == true) {
       cartProvider.clearCart();
+      if (response['invoiceUrl'] != null) {
+        final url = Uri.parse(response['invoiceUrl']);
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        }
+      }
       _showSuccessDialog(primaryColor);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal memproses pesanan. Silakan coba lagi."), backgroundColor: Colors.redAccent));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal memproses pesanan: ${response['message'] ?? ''}"), backgroundColor: Colors.redAccent));
     }
   }
 
@@ -515,7 +522,7 @@ class _CartScreenState extends State<CartScreen> {
     } else {
       return Column(
         children: [
-          _buildPaymentItem("Midtrans (Online Payment)", Icons.language_rounded, primaryColor),
+          _buildPaymentItem("Xendit (Online Payment)", Icons.language_rounded, primaryColor),
           SizedBox(height: 10),
           Container(
             padding: EdgeInsets.all(12),

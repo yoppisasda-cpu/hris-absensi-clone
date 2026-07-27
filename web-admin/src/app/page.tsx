@@ -213,6 +213,20 @@ export default function LoginPage() {
               Coba Gratis 14 Hari
             </a>
           </p>
+
+          {/* Customer Portal Entry Point */}
+          <div className="mt-8 pt-6 border-t border-slate-200">
+            <p className="text-center text-xs text-slate-400 mb-3 uppercase tracking-wider font-semibold">Bukan Admin?</p>
+            <a 
+              href="https://order.aivola.id" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="group flex w-full items-center justify-center gap-2 rounded-lg bg-orange-50 px-4 py-3 text-sm font-bold text-orange-600 hover:bg-orange-100 hover:text-orange-700 transition-all border border-orange-200"
+            >
+              <span className="text-lg group-hover:scale-110 transition-transform">🍔</span>
+              Masuk ke Portal Customer (Pesan Makanan)
+            </a>
+          </div>
         </div>
       </div>
 

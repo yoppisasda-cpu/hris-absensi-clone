@@ -14160,13 +14160,54 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         });
       }
 
-      return { saleId, invoiceNumber, totalAmount };
+      let customerEmail = null;
+      if (finalCustomerId) {
+        const cust = await tx.customer.findUnique({where: {id: finalCustomerId}});
+        customerEmail = cust?.email;
+      }
+      return { saleId, invoiceNumber, totalAmount, paymentMethod: paymentMethod || 'Bayar di Kasir', customerEmail };
     }, {
       maxWait: 5000,
       timeout: 30000
     });
 
-    res.status(201).json(result);
+    let invoiceUrl = null;
+    if (result.paymentMethod.includes('Online Payment')) {
+      const axios = require('axios');
+      const XENDIT_SECRET = process.env.XENDIT_SECRET_KEY || '';
+      if (XENDIT_SECRET) {
+        try {
+          const xenditRes = await axios.post('https://api.xendit.co/v2/invoices', {
+            external_id: result.invoiceNumber,
+            amount: result.totalAmount,
+            payer_email: result.customerEmail || 'customer@aivola.id',
+            description: `Pembayaran Pesanan Aivola GO: ${result.invoiceNumber}`,
+            success_redirect_url: 'https://aivolago.vercel.app/' // Atau order.aivola.id
+          }, {
+            headers: {
+              'Authorization': `Basic ${Buffer.from(XENDIT_SECRET + ':').toString('base64')}`
+            }
+          });
+
+          invoiceUrl = xenditRes.data.invoice_url;
+          
+          // Simpan URL di notes sebagai referensi
+          await prisma.sale.update({
+            where: { id: result.saleId },
+            data: { notes: notes ? `${notes}\n[XENDIT] ${invoiceUrl}` : `[XENDIT] ${invoiceUrl}` }
+          });
+        } catch (err: any) {
+          console.error("[XENDIT ERROR]:", err.response?.data || err.message);
+        }
+      } else {
+        console.warn("[XENDIT WARNING]: XENDIT_SECRET_KEY belum di-set di .env");
+      }
+    }
+
+    res.status(201).json({
+      ...result,
+      invoiceUrl
+    });
 
     // --- SOCKET NOTIFICATION ---
     const orderStatus = req.body.status;
@@ -16719,6 +16760,41 @@ app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response
     res.json(vouchers);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch vouchers.' });
+  }
+});
+
+// Webhook dari Xendit saat pembayaran berhasil
+app.post('/api/payments/xendit/webhook', async (req: Request, res: Response) => {
+  try {
+    const { external_id, status } = req.body;
+    
+    // Log the incoming webhook for debugging
+    console.log(`[XENDIT WEBHOOK] Received for invoice: ${external_id}, status: ${status}`);
+
+    if (status === 'PAID' && external_id) {
+      // Find the sale record by invoice number
+      const sale = await prisma.sale.findUnique({
+        where: { invoiceNumber: external_id }
+      });
+
+      if (sale && sale.status !== 'PAID') {
+        // Update sale status to PAID
+        await prisma.sale.update({
+          where: { id: sale.id },
+          data: { status: 'PAID' }
+        });
+
+        // Optional: Trigger finance integration or socket update here if needed
+
+        console.log(`[XENDIT WEBHOOK] Sale ${external_id} marked as PAID.`);
+      }
+    }
+    
+    // Xendit expects a 200 OK response quickly
+    res.status(200).json({ message: 'Webhook received' });
+  } catch (error: any) {
+    console.error("[XENDIT WEBHOOK ERROR]:", error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 

@@ -208,7 +208,7 @@ class ApiService {
     }
   }
 
-  static Future<bool> createOrder({
+  static Future<Map<String, dynamic>> createOrder({
     required List<Map<String, dynamic>> items,
     int? customerId,
     int? branchId,
@@ -242,10 +242,17 @@ class ApiService {
           "date": DateTime.now().toIso8601String(),
         }),
       );
-      return response.statusCode == 201 || response.statusCode == 200;
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          "success": true,
+          "invoiceUrl": data['invoiceUrl']
+        };
+      }
+      return {"success": false};
     } catch (e) {
       print("Error creating order: $e");
-      return false;
+      return {"success": false, "message": e.toString()};
     }
   }
 
