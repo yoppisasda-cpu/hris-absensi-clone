@@ -14383,7 +14383,16 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
     }
 
     await prisma.$transaction(async (tx) => {
-      // 1. Hapus Pemasukan (Income) terkait
+      // 1. Hapus Pemasukan (Income) terkait & Kurangi Saldo
+      const incomes = await tx.income.findMany({ where: { description: { contains: sale.invoiceNumber } } });
+      for (const inc of incomes) {
+        if (inc.accountId) {
+          await tx.financialAccount.update({
+            where: { id: inc.accountId },
+            data: { balance: { decrement: inc.amount } }
+          });
+        }
+      }
       await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
 
       // 2. Hapus Riwayat Poin (Jika ada poin yang digunakan atau didapat dari pesanan ini)
@@ -14395,6 +14404,47 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
       for (const r of returns) {
          await tx.saleReturnItem.deleteMany({ where: { returnId: r.id }});
          await tx.saleReturn.delete({ where: { id: r.id }});
+      }
+
+      // 3.5. Kembalikan Stok Barang & Bahan Baku (BOM)
+      const saleItems = await tx.saleItem.findMany({ where: { saleId } });
+      for (const item of saleItems) {
+        const qty = parseFloat(item.quantity as any);
+        
+        // Return product stock
+        await tx.$executeRawUnsafe(`
+          UPDATE "Product" SET "stock" = "stock" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3
+        `, qty, item.productId, tenantId);
+
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+          VALUES ($1, 'IN', $2, $3, NOW())
+        `, item.productId, qty, `Pembatalan Penjualan Inv ${sale.invoiceNumber}`);
+
+        // Return materials stock if it has a recipe
+        const recipes: any[] = await tx.$queryRawUnsafe(`
+          SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr
+          JOIN "Product" p ON pr."productId" = p.id
+          WHERE pr."productId" = $1
+        `, item.productId);
+
+        if (recipes.length > 0) {
+          const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
+          for (const recipe of recipes) {
+            const materialId = recipe.materialId;
+            const recipeQty = parseFloat(recipe.quantity);
+            const totalMaterialNeeded = (recipeQty / yieldVal) * qty;
+
+            await tx.$executeRawUnsafe(`
+              UPDATE "Product" SET "stock" = "stock" + $1, "updatedAt" = NOW() WHERE "id" = $2
+            `, totalMaterialNeeded, materialId);
+
+            await tx.$executeRawUnsafe(`
+              INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
+              VALUES ($1, 'IN', $2, $3, NOW())
+            `, materialId, totalMaterialNeeded, `Pembatalan Penjualan (BOM) Inv ${sale.invoiceNumber}`);
+          }
+        }
       }
 
       // 4. Hapus SaleItem (Detail barang)
