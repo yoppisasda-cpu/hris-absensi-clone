@@ -4,11 +4,12 @@ import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 import InvoiceModal from "@/components/sales/InvoiceModal";
+import toast from "react-hot-toast";
 import { 
     Search, Monitor, Download, Eye, Printer, 
     Building2, Calendar, Filter, CreditCard, 
     TrendingUp, ShoppingCart, ArrowUpRight, ArrowDownRight,
-    Trophy, Sparkles, Receipt, BrainCircuit
+    Trophy, Sparkles, Receipt, BrainCircuit, Trash2
 } from "lucide-react";
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -178,6 +179,18 @@ export default function POSReportsPage() {
     const handleViewInvoice = (id: number) => {
         setSelectedSaleId(id);
         setIsInvoiceModalOpen(true);
+    };
+
+    const handleDeleteSale = async (sale: any) => {
+        if (!confirm(`Apakah Anda yakin ingin menghapus transaksi penjualan ${sale.invoiceNumber}?\n\nStok produk & bahan baku akan dikembalikan otomatis, dan saldo keuangan akan disesuaikan.`)) return;
+        try {
+            await api.delete(`/sales/${sale.id}`);
+            toast.success(`Penjualan ${sale.invoiceNumber} berhasil dihapus.`);
+            fetchData();
+        } catch (error: any) {
+            console.error("Gagal menghapus transaksi penjualan", error);
+            toast.error(error.response?.data?.error || "Gagal menghapus transaksi penjualan");
+        }
     };
 
     const handleExport = () => {
@@ -731,6 +744,13 @@ export default function POSReportsPage() {
                                                     title="Lihat Data"
                                                 >
                                                     <Sparkles className="h-4 w-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteSale(sale)}
+                                                    className="p-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 transition-all shadow-xl active:scale-90"
+                                                    title="Hapus Transaksi (Batalkan Transaksi Tes)"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>
                                         </td>

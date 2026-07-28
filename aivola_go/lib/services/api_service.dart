@@ -10,10 +10,8 @@ class ApiService {
     return "10.0.2.2"; // Standard for Android Emulator to hit Localhost
   }
 
-  // Gunakan domain live jika Release (di HP), gunakan IP lokal jika Debug (di Emulator)
-  static String get baseUrl => kReleaseMode 
-      ? "https://api.aivola.id/api"
-      : "http://$host:5000/api";
+  // Gunakan domain live api.aivola.id untuk koneksi backend
+  static String get baseUrl => "https://api.aivola.id/api";
 
   // Helper for images and other direct URLs
   static String resolveUrl(String? path) {
