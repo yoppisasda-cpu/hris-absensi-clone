@@ -377,6 +377,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                                         >
                                             <option value="OPERATIONAL">OPERASIONAL</option>
                                             <option value="COGS">BAHAN BAKU / HPP</option>
+                                            <option value="CAPEX">CAPEX / PEMBELIAN ASET</option>
                                         </select>
                                         <div className="flex gap-2">
                                             <button 
@@ -402,6 +403,11 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess, expenseToE
                                     <optgroup label="OPERATIONAL_TYPE" className="bg-slate-900 text-slate-700 font-black text-[9px] uppercase tracking-widest">
                                         {categories.filter(c => c.type === 'OPERATIONAL').map(cat => (
                                             <option key={cat.id} value={cat.id} className="text-white font-black">{cat.name.toUpperCase()}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="CAPITAL_EXPENDITURE (ASET)" className="bg-slate-900 text-slate-700 font-black text-[9px] uppercase tracking-widest mt-2">
+                                        {categories.filter(c => c.type === 'CAPEX').map(cat => (
+                                            <option key={cat.id} value={cat.id} className="text-emerald-400 font-black">{cat.name.toUpperCase()}</option>
                                         ))}
                                     </optgroup>
                                 </select>

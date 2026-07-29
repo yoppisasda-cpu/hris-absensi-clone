@@ -10790,8 +10790,11 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     expenses.forEach(exp => {
       const catName = exp.category?.name || 'Uncategorized';
       const isCOGS = exp.category?.type === 'COGS';
+      const isCapex = exp.category?.type === 'CAPEX';
       
-      if (isCOGS) {
+      if (isCapex) {
+        // Exclude CAPEX from P&L completely
+      } else if (isCOGS) {
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
       } else {
@@ -11316,7 +11319,13 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const ytdRevenue = (revenueRes._sum.amount || 0) - ytdTaxCollected;
 
     const expenseRes = await prisma.expense.aggregate({
-      where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
+      where: { 
+        companyId: tenantId, 
+        date: { gte: startOfYear, lte: endOfToday },
+        category: {
+          type: { not: 'CAPEX' }
+        }
+      },
       _sum: { amount: true }
     });
     const ytdExpense = expenseRes._sum.amount || 0;
