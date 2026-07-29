@@ -9901,11 +9901,12 @@ app.get('/api/finance/income-categories', tenantMiddleware, async (req: Request,
 // F2.2. Create Income Category
 app.post('/api/finance/income-categories', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name } = req.body;
+    const { name, type } = req.body;
     const category = await prisma.incomeCategory.create({
       data: {
         companyId: (req as any).tenantId,
-        name
+        name,
+        type: type || 'OPERATIONAL'
       }
     });
     res.status(201).json(category);
@@ -10767,7 +10768,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       let amount = inc.amount;
       
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
-      const isEquity = catName.toLowerCase().includes('modal') || catName.toLowerCase().includes('ekuitas') || catName.toLowerCase().includes('equity');
+      const isEquity = inc.category?.type === 'EQUITY';
       
       if (!isSales && !isEquity) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
@@ -11261,11 +11262,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         companyId: tenantId, 
         date: { gte: startOfYear, lte: endOfToday },
         category: {
-          NOT: [
-            { name: { contains: 'Modal', mode: 'insensitive' } },
-            { name: { contains: 'Ekuitas', mode: 'insensitive' } },
-            { name: { contains: 'Equity', mode: 'insensitive' } }
-          ]
+          type: { not: 'EQUITY' }
         }
       },
       _sum: { amount: true }

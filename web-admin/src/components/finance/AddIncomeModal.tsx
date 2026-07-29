@@ -25,6 +25,7 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
     const [loading, setLoading] = useState(false);
     const [showNewCategory, setShowNewCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryType, setNewCategoryType] = useState('OPERATIONAL');
 
     useEffect(() => {
         if (isOpen) {
@@ -75,11 +76,15 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
     const handleCreateCategory = async () => {
         if (!newCategoryName) return;
         try {
-            const res = await api.post('/finance/income-categories', { name: newCategoryName });
+            const res = await api.post('/finance/income-categories', { 
+                name: newCategoryName,
+                type: newCategoryType
+            });
             setCategories([...categories, res.data]);
             setFormData({ ...formData, categoryId: res.data.id.toString() });
             setShowNewCategory(false);
             setNewCategoryName('');
+            setNewCategoryType('OPERATIONAL');
         } catch (error) {
             alert("Gagal membuat kategori");
         }
@@ -180,16 +185,29 @@ export default function AddIncomeModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                         
                         {showNewCategory ? (
-                            <div className="flex gap-4 animate-in fade-in slide-in-from-top-2 duration-300 p-2 bg-slate-950 border border-emerald-500/20 rounded-[2rem]">
-                                <input
-                                    type="text"
-                                    placeholder="MASUKKAN KATEGORI BARU..."
-                                    value={newCategoryName}
-                                    onChange={(e) => setNewCategoryName(e.target.value)}
-                                    className="flex-1 bg-transparent px-6 py-3 text-xs font-black text-white outline-none italic uppercase tracking-widest placeholder:text-slate-900"
-                                />
-                                <button type="button" onClick={handleCreateCategory} className="bg-emerald-600 text-white px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic shadow-lg shadow-emerald-600/20">SIMPAN</button>
-                                <button type="button" onClick={() => setShowNewCategory(false)} className="text-slate-500 px-3 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+                            <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300 p-4 bg-slate-950 border border-emerald-500/20 rounded-[1.5rem]">
+                                <div className="flex gap-4 items-center">
+                                    <input
+                                        type="text"
+                                        placeholder="MASUKKAN NAMA KATEGORI BARU..."
+                                        value={newCategoryName}
+                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                        className="flex-1 bg-transparent px-2 py-3 text-xs font-black text-white outline-none italic uppercase tracking-widest placeholder:text-slate-900 border-b border-white/5"
+                                    />
+                                    <select
+                                        value={newCategoryType}
+                                        onChange={(e) => setNewCategoryType(e.target.value)}
+                                        className="w-[180px] bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-[10px] font-black text-white outline-none uppercase italic tracking-widest appearance-none"
+                                    >
+                                        <option value="OPERATIONAL">OPERASIONAL</option>
+                                        <option value="NON_OPERATIONAL">NON-OPERASIONAL</option>
+                                        <option value="EQUITY">MODAL/EKUITAS</option>
+                                    </select>
+                                </div>
+                                <div className="flex justify-end gap-2 mt-2">
+                                    <button type="button" onClick={() => setShowNewCategory(false)} className="text-slate-500 px-4 py-2 hover:text-white transition-colors text-[9px] font-black uppercase tracking-widest italic">BATAL</button>
+                                    <button type="button" onClick={handleCreateCategory} className="bg-emerald-600 text-white px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest italic shadow-lg shadow-emerald-600/20">SIMPAN</button>
+                                </div>
                             </div>
                         ) : (
                             <select
