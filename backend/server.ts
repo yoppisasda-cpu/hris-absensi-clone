@@ -10767,8 +10767,9 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       let amount = inc.amount;
       
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
+      const isEquity = catName.toLowerCase().includes('modal') || catName.toLowerCase().includes('ekuitas') || catName.toLowerCase().includes('equity');
       
-      if (!isSales) {
+      if (!isSales && !isEquity) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
         totalOtherIncome += amount;
       }
@@ -11256,7 +11257,17 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const endOfToday = new Date();
 
     const revenueRes = await prisma.income.aggregate({
-      where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
+      where: { 
+        companyId: tenantId, 
+        date: { gte: startOfYear, lte: endOfToday },
+        category: {
+          NOT: [
+            { name: { contains: 'Modal', mode: 'insensitive' } },
+            { name: { contains: 'Ekuitas', mode: 'insensitive' } },
+            { name: { contains: 'Equity', mode: 'insensitive' } }
+          ]
+        }
+      },
       _sum: { amount: true }
     });
 
