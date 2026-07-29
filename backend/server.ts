@@ -2926,7 +2926,7 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
         if (!category) {
           const catResult: any[] = await tx.$queryRawUnsafe(`
             INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
-            VALUES ($1, 'Pembelian (Auto-PO)', 'OPERATIONAL', NOW())
+            VALUES ($1, 'Pembelian (Auto-PO)', 'INVENTORY', NOW())
             RETURNING id
           `, tenantId);
           
