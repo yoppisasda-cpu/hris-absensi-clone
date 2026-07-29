@@ -10205,6 +10205,23 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
         });
       }
 
+      // 4. Auto-create Asset if Category is CAPEX
+      if (finalCategoryId) {
+        const cat = await tx.expenseCategory.findUnique({ where: { id: finalCategoryId } });
+        if (cat && cat.type === 'CAPEX') {
+          await tx.asset.create({
+            data: {
+              companyId: tenantId,
+              name: description || (paidTo ? `Pembelian dari ${paidTo}` : 'Aset Tetap Baru'),
+              condition: 'NEW',
+              purchasePrice: parseFloat(amount),
+              purchaseDate: dateVal,
+              isDepreciating: false
+            }
+          });
+        }
+      }
+
       return expense;
     });
 
