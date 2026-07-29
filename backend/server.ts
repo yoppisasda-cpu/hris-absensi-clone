@@ -10144,7 +10144,7 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
         if (!category) {
           const catResult: any[] = await tx.$queryRawUnsafe(`
             INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
-            VALUES ($1, 'Belanja Bahan Baku (Inventori)', 'COGS', NOW())
+            VALUES ($1, 'Belanja Bahan Baku (Inventori)', 'INVENTORY', NOW())
             RETURNING id
           `, tenantId);
           category = { id: catResult[0].id };
@@ -10808,9 +10808,10 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       const catName = exp.category?.name || 'Uncategorized';
       const isCOGS = exp.category?.type === 'COGS';
       const isCapex = exp.category?.type === 'CAPEX';
+      const isInventory = exp.category?.type === 'INVENTORY';
       
-      if (isCapex) {
-        // Exclude CAPEX from P&L completely
+      if (isCapex || isInventory) {
+        // Exclude CAPEX and INVENTORY from P&L completely
       } else if (isCOGS) {
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
@@ -11340,7 +11341,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         companyId: tenantId, 
         date: { gte: startOfYear, lte: endOfToday },
         category: {
-          type: { not: 'CAPEX' }
+          type: { notIn: ['CAPEX', 'INVENTORY'] }
         }
       },
       _sum: { amount: true }

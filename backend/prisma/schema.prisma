@@ -1314,6 +1314,7 @@ enum ExpenseType {
   OPERATIONAL
   COGS
   CAPEX
+  INVENTORY
 }
 
 enum IncomeType {
