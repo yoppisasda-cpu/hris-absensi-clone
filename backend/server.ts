@@ -2814,6 +2814,61 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
   }
 });
 
+// PO2.5 Edit Purchase Order
+app.put('/api/inventory/purchase-orders/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+    const poId = parseInt(req.params.id as string);
+    const { supplierId, date, items, notes, warehouseId } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Minimal harus ada 1 barang yang dipesan.' });
+    }
+
+    const existingPo = await prisma.purchaseOrder.findFirst({
+      where: { id: poId, companyId: tenantId }
+    });
+
+    if (!existingPo) return res.status(404).json({ error: 'Data PO tidak ditemukan' });
+    if (existingPo.status !== 'PENDING') {
+      return res.status(403).json({ error: 'PO yang sudah diproses tidak dapat diedit.' });
+    }
+
+    const totalAmount = items.reduce((sum: number, item: any) => sum + (Number(item.quantity) * Number(item.price)), 0);
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Update PO Header
+      await tx.$executeRawUnsafe(`
+        UPDATE "PurchaseOrder" 
+        SET "supplierId" = $1, "date" = $2, "totalAmount" = $3, "notes" = $4, "warehouseId" = $5, "updatedAt" = NOW()
+        WHERE "id" = $6
+      `, parseInt(supplierId), date ? new Date(date) : existingPo.date, totalAmount, notes, warehouseId ? parseInt(warehouseId) : existingPo.warehouseId, poId);
+
+      // 2. Delete old items
+      await tx.purchaseOrderItem.deleteMany({
+        where: { purchaseOrderId: poId }
+      });
+
+      // 3. Create new items
+      await tx.purchaseOrderItem.createMany({
+        data: items.map((item: any) => ({
+          purchaseOrderId: poId,
+          productId: parseInt(item.productId),
+          quantity: parseFloat(item.quantity),
+          price: parseFloat(item.price),
+          total: parseFloat(item.quantity) * parseFloat(item.price)
+        }))
+      });
+    });
+
+    res.json({ message: 'PO berhasil diperbarui' });
+  } catch (error: any) {
+    console.error("PO UPDATE ERROR:", error);
+    res.status(500).json({ error: 'Gagal memperbarui PO: ' + error.message });
+  }
+});
+
 // PO3. Update PO Status (Approve/Reject)
 app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (req: Request, res: Response) => {
   try {

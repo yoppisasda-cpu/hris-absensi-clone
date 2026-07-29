@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
     ShoppingBag, Search, Filter, MoreVertical, CheckCircle2, XCircle, 
-    Clock, FileText, Plus, ArrowUpRight, ArrowDownRight, Package, Truck, User, Download, MessageCircle, Mail, Printer 
+    Clock, FileText, Plus, ArrowUpRight, ArrowDownRight, Package, Truck, User, Download, MessageCircle, Mail, Printer, Edit3 
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import PurchaseOrderModal from "@/components/inventory/PurchaseOrderModal";
+import EditPurchaseOrderModal from "@/components/inventory/EditPurchaseOrderModal";
 import PODetailModal from "@/components/inventory/PODetailModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -19,7 +20,9 @@ export default function PurchaseOrdersPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedPo, setSelectedPo] = useState<any>(null);
+    const [selectedEditPo, setSelectedEditPo] = useState<any>(null);
     const [role, setRole] = useState<string>("");
     const [selectedStatus, setSelectedStatus] = useState<string>("all");
     const [company, setCompany] = useState<any>(null);
@@ -440,6 +443,16 @@ export default function PurchaseOrdersPage() {
                                                     <div className="flex items-center gap-3">
                                                         <button 
                                                             onClick={() => {
+                                                                setSelectedEditPo(po);
+                                                                setIsEditModalOpen(true);
+                                                            }}
+                                                            title="EDIT MANIFEST"
+                                                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 hover:bg-slate-800 transition-all border border-amber-500/20 active:scale-95 shadow-inner shadow-amber-500/5"
+                                                        >
+                                                            <Edit3 className="h-4 w-4 stroke-[2.5px]" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
                                                                 setSelectedPo(po);
                                                                 setIsDetailModalOpen(true);
                                                             }}
@@ -545,6 +558,15 @@ export default function PurchaseOrdersPage() {
                     handleUpdateStatus(id, status);
                     setIsDetailModalOpen(false);
                 }}
+            />
+            <EditPurchaseOrderModal
+                isOpen={isEditModalOpen}
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedEditPo(null);
+                }}
+                onSuccess={fetchPos}
+                po={selectedEditPo}
             />
         </DashboardLayout>
     );
