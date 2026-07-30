@@ -11278,78 +11278,88 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const startOfYear = new Date(currentYear, 0, 1);
     const endOfToday = new Date();
 
-    const revenueRes = await prisma.income.aggregate({
-      where: { 
-        companyId: tenantId, 
-        date: { gte: startOfYear, lte: endOfToday },
-        category: {
-          type: { not: 'EQUITY' }
-        }
-      },
-      _sum: { amount: true }
-    });
-
-    // Calculate YTD Tax Collected from incomes to ensure matching YTD Net Profit
-    const ytdIncomes = await prisma.income.findMany({
+    // 1. Fetch YTD Accrual Sales
+    const ytdAccrualSales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
         date: { gte: startOfYear, lte: endOfToday },
-        category: {
-          name: { in: ['Penjualan Produk', 'Penjualan POS'] }
+        status: { notIn: ['CANCELLED', 'PENDING'] }
+      }
+    });
+
+    let ytdTotalSalesRevenue = 0;
+    ytdAccrualSales.forEach(sale => {
+      let amount = sale.totalAmount;
+      if (sale.taxRate && sale.taxRate > 0) {
+        if (sale.taxAmount && sale.taxAmount > 0) {
+          amount -= sale.taxAmount;
+        } else {
+          amount -= (amount * (sale.taxRate / (100 + sale.taxRate)));
         }
+      }
+      ytdTotalSalesRevenue += amount;
+    });
+
+    // 2. Fetch YTD Other Incomes
+    const ytdIncomesAll = await prisma.income.findMany({
+      where: {
+        companyId: tenantId,
+        date: { gte: startOfYear, lte: endOfToday }
       },
-      select: { amount: true, description: true }
+      include: { category: true }
     });
     
-    const ytdInvoiceNumbers = ytdIncomes
-      .map(inc => {
-        if (!inc.description) return null;
-        const match = inc.description.match(/(INV-[A-Za-z0-9\-]+)/);
-        return match ? match[1] : null;
-      })
-      .filter((inv): inv is string => inv !== null);
+    let ytdTotalOtherIncome = 0;
+    ytdIncomesAll.forEach(inc => {
+      const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
+      const isEquity = inc.category?.type === 'EQUITY';
+      if (!isSales && !isEquity) {
+        ytdTotalOtherIncome += inc.amount;
+      }
+    });
+    const ytdRevenue = ytdTotalSalesRevenue + ytdTotalOtherIncome;
 
-    const ytdSalesWithTax = ytdInvoiceNumbers.length > 0 ? await prisma.sale.findMany({
+    // 3. Fetch YTD Expenses
+    const ytdExpensesList = await prisma.expense.findMany({
       where: {
         companyId: tenantId,
-        invoiceNumber: { in: ytdInvoiceNumbers }
+        date: { gte: startOfYear, lte: endOfToday }
       },
-      select: { invoiceNumber: true, taxRate: true }
-    }) : [];
+      include: { category: true }
+    });
 
-    const ytdSaleTaxRateMap = new Map<string, number>(
-      ytdSalesWithTax.map(s => [s.invoiceNumber, s.taxRate || 0])
-    );
+    let ytdExpense = 0;
+    ytdExpensesList.forEach(exp => {
+      const isCapex = exp.category?.type === 'CAPEX';
+      const isInventory = exp.category?.type === 'INVENTORY';
+      if (!isCapex && !isInventory) {
+        ytdExpense += exp.amount;
+      }
+    });
 
-    let ytdTaxCollected = 0;
-    ytdIncomes.forEach(inc => {
-      const desc = inc.description || '';
-      const match = desc.match(/(INV-[A-Za-z0-9\-]+)/);
-      const invNum = match ? match[1] : null;
-      if (invNum) {
-        const taxRate = ytdSaleTaxRateMap.get(invNum) || 0;
-        if (taxRate > 0) {
-          ytdTaxCollected += inc.amount * (taxRate / (100 + taxRate));
+    // 4. Fetch YTD Sales COGS
+    const ytdSalesCogs = await calculateSalesCOGS(tenantId, startOfYear, endOfToday);
+
+    // 5. Calculate YTD Asset Depreciation
+    let ytdAssetDepreciation = 0;
+    const currentMonthNum = endOfToday.getMonth(); // 0-11
+    
+    physicalAssets.forEach(asset => {
+      if (asset.isDepreciating && asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
+        const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
+        
+        // We only depreciate up to the current month for the current year.
+        for (let m = 0; m <= currentMonthNum; m++) {
+           const monthsFromPurchase = (currentYear - purchaseDate.getFullYear()) * 12 + (m - purchaseDate.getMonth());
+           if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
+             const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+             ytdAssetDepreciation += monthlyDepreciation;
+           }
         }
       }
     });
 
-    const ytdRevenue = (revenueRes._sum.amount || 0) - ytdTaxCollected;
-
-    const expenseRes = await prisma.expense.aggregate({
-      where: { 
-        companyId: tenantId, 
-        date: { gte: startOfYear, lte: endOfToday },
-        category: {
-          type: { notIn: ['CAPEX', 'INVENTORY'] }
-        }
-      },
-      _sum: { amount: true }
-    });
-    const ytdExpense = expenseRes._sum.amount || 0;
-
-    const ytdSalesCogs = await calculateSalesCOGS(tenantId, startOfYear, endOfToday);
-    const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs)) * 100) / 100;
+    const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs + ytdAssetDepreciation)) * 100) / 100;
     const modalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
 
     res.json({
@@ -11439,66 +11449,88 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     const startOfYear = new Date(currentYear, 0, 1);
     const endOfToday = new Date();
 
-    const revenueRes = await prisma.income.aggregate({
-      where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
-      _sum: { amount: true }
-    });
-
-    // Calculate YTD Tax Collected from incomes to ensure matching YTD Net Profit
-    const ytdIncomes = await prisma.income.findMany({
+    // 1. Fetch YTD Accrual Sales
+    const ytdAccrualSales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
         date: { gte: startOfYear, lte: endOfToday },
-        category: {
-          name: { in: ['Penjualan Produk', 'Penjualan POS'] }
-        }
-      },
-      select: { amount: true, description: true }
+        status: { notIn: ['CANCELLED', 'PENDING'] }
+      }
     });
-    
-    const ytdInvoiceNumbers = ytdIncomes
-      .map(inc => {
-        if (!inc.description) return null;
-        const match = inc.description.match(/(INV-[A-Za-z0-9\-]+)/);
-        return match ? match[1] : null;
-      })
-      .filter((inv): inv is string => inv !== null);
 
-    const ytdSalesWithTax = ytdInvoiceNumbers.length > 0 ? await prisma.sale.findMany({
+    let ytdTotalSalesRevenue = 0;
+    ytdAccrualSales.forEach(sale => {
+      let amount = sale.totalAmount;
+      if (sale.taxRate && sale.taxRate > 0) {
+        if (sale.taxAmount && sale.taxAmount > 0) {
+          amount -= sale.taxAmount;
+        } else {
+          amount -= (amount * (sale.taxRate / (100 + sale.taxRate)));
+        }
+      }
+      ytdTotalSalesRevenue += amount;
+    });
+
+    // 2. Fetch YTD Other Incomes
+    const ytdIncomesAll = await prisma.income.findMany({
       where: {
         companyId: tenantId,
-        invoiceNumber: { in: ytdInvoiceNumbers }
+        date: { gte: startOfYear, lte: endOfToday }
       },
-      select: { invoiceNumber: true, taxRate: true }
-    }) : [];
+      include: { category: true }
+    });
+    
+    let ytdTotalOtherIncome = 0;
+    ytdIncomesAll.forEach(inc => {
+      const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
+      const isEquity = inc.category?.type === 'EQUITY';
+      if (!isSales && !isEquity) {
+        ytdTotalOtherIncome += inc.amount;
+      }
+    });
+    const ytdRevenue = ytdTotalSalesRevenue + ytdTotalOtherIncome;
 
-    const ytdSaleTaxRateMap = new Map<string, number>(
-      ytdSalesWithTax.map(s => [s.invoiceNumber, s.taxRate || 0])
-    );
+    // 3. Fetch YTD Expenses
+    const ytdExpensesList = await prisma.expense.findMany({
+      where: {
+        companyId: tenantId,
+        date: { gte: startOfYear, lte: endOfToday }
+      },
+      include: { category: true }
+    });
 
-    let ytdTaxCollected = 0;
-    ytdIncomes.forEach(inc => {
-      const desc = inc.description || '';
-      const match = desc.match(/(INV-[A-Za-z0-9\-]+)/);
-      const invNum = match ? match[1] : null;
-      if (invNum) {
-        const taxRate = ytdSaleTaxRateMap.get(invNum) || 0;
-        if (taxRate > 0) {
-          ytdTaxCollected += inc.amount * (taxRate / (100 + taxRate));
+    let ytdExpense = 0;
+    ytdExpensesList.forEach(exp => {
+      const isCapex = exp.category?.type === 'CAPEX';
+      const isInventory = exp.category?.type === 'INVENTORY';
+      if (!isCapex && !isInventory) {
+        ytdExpense += exp.amount;
+      }
+    });
+
+    // 4. Fetch YTD Sales COGS
+    const ytdSalesCogs = await calculateSalesCOGS(tenantId, startOfYear, endOfToday);
+
+    // 5. Calculate YTD Asset Depreciation
+    let ytdAssetDepreciation = 0;
+    const currentMonthNum = endOfToday.getMonth(); // 0-11
+    
+    physicalAssets.forEach(asset => {
+      if (asset.isDepreciating && asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
+        const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
+        
+        // We only depreciate up to the current month for the current year.
+        for (let m = 0; m <= currentMonthNum; m++) {
+           const monthsFromPurchase = (currentYear - purchaseDate.getFullYear()) * 12 + (m - purchaseDate.getMonth());
+           if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
+             const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+             ytdAssetDepreciation += monthlyDepreciation;
+           }
         }
       }
     });
 
-    const ytdRevenue = (revenueRes._sum.amount || 0) - ytdTaxCollected;
-
-    const expenseRes = await prisma.expense.aggregate({
-      where: { companyId: tenantId, date: { gte: startOfYear, lte: endOfToday } },
-      _sum: { amount: true }
-    });
-    const ytdExpense = expenseRes._sum.amount || 0;
-
-    const ytdSalesCogs = await calculateSalesCOGS(tenantId, startOfYear, endOfToday);
-    const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs)) * 100) / 100;
+    const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs + ytdAssetDepreciation)) * 100) / 100;
     const modalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
 
     // --- CREATE EXCEL ---
