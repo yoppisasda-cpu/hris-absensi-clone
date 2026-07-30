@@ -344,77 +344,85 @@ export default function Sidebar() {
                 {activeModule === 'ABSENSI' && userRole !== 'POS_VIEWER' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
                         <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manajemen SDM</div>
-                        <Link href="/dashboard/employees" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Users className="h-5 w-5" />
-                            {t('sidebar.employees')}
-                        </Link>
-                        <Link href="/dashboard/branches" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <MapPin className="h-5 w-5" />
-                            Cabang
-                        </Link>
+                        {userRole !== 'OPERATIONAL' && (
+                            <>
+                                <Link href="/dashboard/employees" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Users className="h-5 w-5" />
+                                    {t('sidebar.employees')}
+                                </Link>
+                                <Link href="/dashboard/branches" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <MapPin className="h-5 w-5" />
+                                    Cabang
+                                </Link>
+                            </>
+                        )}
                         <Link href="/dashboard/shifts" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <Clock className="h-5 w-5" />
                             Manajemen Shift
                         </Link>
-                        <Link href="/dashboard/attendance" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <FileSpreadsheet className="h-5 w-5" />
-                            Laporan Absensi
-                        </Link>
-                        <Link href="/dashboard/attendance/schedule" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <CalendarCheck className="h-5 w-5 text-indigo-400" />
-                            Penjadwalan Karyawan
-                        </Link>
-                        <Link href="/dashboard/leaves" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <CalendarDays className="h-5 w-5" />
-                            {t('sidebar.leaves')}
-                        </Link>
-                        <Link href="/dashboard/overtimes" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Watch className="h-5 w-5" />
-                            Lembur
-                        </Link>
+                        {userRole !== 'OPERATIONAL' && (
+                            <>
+                                <Link href="/dashboard/attendance" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <FileSpreadsheet className="h-5 w-5" />
+                                    Laporan Absensi
+                                </Link>
+                                <Link href="/dashboard/attendance/schedule" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <CalendarCheck className="h-5 w-5 text-indigo-400" />
+                                    Penjadwalan Karyawan
+                                </Link>
+                                <Link href="/dashboard/leaves" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <CalendarDays className="h-5 w-5" />
+                                    {t('sidebar.leaves')}
+                                </Link>
+                                <Link href="/dashboard/overtimes" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Watch className="h-5 w-5" />
+                                    Lembur
+                                </Link>
 
-                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Komunikasi & CRM</div>
-                        <Link href="/dashboard/crm" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <MessageSquare className="h-5 w-5 text-blue-400" />
-                            CRM Live Chat
-                        </Link>
-                        <Link href="/dashboard/prospecting" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Sparkles className="h-5 w-5 text-amber-400" />
-                            Prospecting AI (Maps)
-                        </Link>
+                                <div className="px-3 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Komunikasi & CRM</div>
+                                <Link href="/dashboard/crm" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <MessageSquare className="h-5 w-5 text-blue-400" />
+                                    CRM Live Chat
+                                </Link>
+                                <Link href="/dashboard/prospecting" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Sparkles className="h-5 w-5 text-amber-400" />
+                                    Prospecting AI (Maps)
+                                </Link>
 
-                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Performa & Budaya</div>
-                        <Link href="/dashboard/performance" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <TrendingUp className="h-5 w-5" />
-                            Performa KPI
-                        </Link>
-                        <Link href="/dashboard/assignments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Briefcase className="h-5 w-5 text-indigo-400" />
-                            Penugasan & Monitoring
-                        </Link>
-                        <Link href="/dashboard/learning" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <GraduationCap className="h-5 w-5" />
-                            Learning & Development
-                        </Link>
-                        <Link href="/dashboard/vents" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Heart className="h-5 w-5 text-pink-500" />
-                            Pulse of Company
-                        </Link>
+                                <div className="px-3 py-2 mt-4 text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Performa & Budaya</div>
+                                <Link href="/dashboard/performance" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <TrendingUp className="h-5 w-5" />
+                                    Performa KPI
+                                </Link>
+                                <Link href="/dashboard/assignments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Briefcase className="h-5 w-5 text-indigo-400" />
+                                    Penugasan & Monitoring
+                                </Link>
+                                <Link href="/dashboard/learning" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <GraduationCap className="h-5 w-5" />
+                                    Learning & Development
+                                </Link>
+                                <Link href="/dashboard/vents" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Heart className="h-5 w-5 text-pink-500" />
+                                    Pulse of Company
+                                </Link>
 
-                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Operasional SDM</div>
-                        <Link href="/dashboard/bonuses" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Banknote className="h-5 w-5" />
-                            Bonus & THR
-                        </Link>
-                        <Link href="/dashboard/assets" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Laptop className="h-5 w-5" />
-                            Aset Perusahaan
-                        </Link>
-                        {isMounted && (userRole === 'OWNER' || userRole === 'SUPERADMIN') && (
-                            <Link href="/dashboard/billing" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-red-600/10 text-red-400 hover:bg-slate-800 transition-colors">
-                                <CreditCard className="h-5 w-5" />
-                                Histori Tagihan
-                            </Link>
+                                <div className="px-3 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Operasional SDM</div>
+                                <Link href="/dashboard/bonuses" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Banknote className="h-5 w-5" />
+                                    Bonus & THR
+                                </Link>
+                                <Link href="/dashboard/assets" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Laptop className="h-5 w-5" />
+                                    Aset Perusahaan
+                                </Link>
+                                {isMounted && (userRole === 'OWNER' || userRole === 'SUPERADMIN') && (
+                                    <Link href="/dashboard/billing" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-red-600/10 text-red-400 hover:bg-slate-800 transition-colors">
+                                        <CreditCard className="h-5 w-5" />
+                                        Histori Tagihan
+                                    </Link>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
