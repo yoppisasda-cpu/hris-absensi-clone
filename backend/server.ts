@@ -11231,7 +11231,8 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         if (asset.isDepreciating && Number(asset.purchasePrice) > 0 && Number(asset.usefulLife) > 0) {
             const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
             const now = new Date();
-            const monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
+            let monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
+            if (monthsPassed >= 0) monthsPassed += 1; // Count purchase month as 1 full month
             const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
             accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
             bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
@@ -11421,7 +11422,8 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
         if (asset.isDepreciating && Number(asset.purchasePrice) > 0 && Number(asset.usefulLife) > 0) {
             const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
             const now = new Date();
-            const monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
+            let monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
+            if (monthsPassed >= 0) monthsPassed += 1; // Count purchase month as 1 full month
             const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
             accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
             bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
