@@ -11,6 +11,9 @@ export default function ExpensesPage() {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState<string>("all");
+    const [selectedStatus, setSelectedStatus] = useState<string>("all");
+    const [categories, setCategories] = useState<any[]>([]);
     const [editingExpense, setEditingExpense] = useState<any>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; amount: number } | null>(null);
 
@@ -26,8 +29,18 @@ export default function ExpensesPage() {
         }
     };
 
+    const fetchCategories = async () => {
+        try {
+            const res = await api.get('/finance/expense-categories');
+            setCategories(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil kategori", error);
+        }
+    };
+
     useEffect(() => {
         fetchExpenses();
+        fetchCategories();
     }, []);
 
     const handleDelete = async () => {
@@ -51,11 +64,16 @@ export default function ExpensesPage() {
         setIsModalOpen(true);
     };
 
-    const filteredExpenses = expenses.filter(exp => 
-        exp.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exp.paidTo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exp.category?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredExpenses = expenses.filter(exp => {
+        const matchesSearch = exp.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            exp.paidTo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            exp.category?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesCategory = selectedCategory === "all" || exp.categoryId?.toString() === selectedCategory;
+        const matchesStatus = selectedStatus === "all" || exp.status === selectedStatus;
+
+        return matchesSearch && matchesCategory && matchesStatus;
+    });
 
     const totalExpenseThisMonth = expenses
         .filter(exp => new Date(exp.date).getMonth() === new Date().getMonth() && exp.status === 'PAID')
@@ -122,6 +140,27 @@ export default function ExpensesPage() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full rounded-xl border border-slate-700 bg-slate-900/50 py-2.5 pl-10 pr-4 text-sm text-white focus:border-red-500 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-red-500 transition-all font-medium placeholder:text-slate-500"
                         />
+                    </div>
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <select 
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-red-500"
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                        >
+                            <option value="all">Semua Kategori</option>
+                            {categories.map((cat: any) => (
+                                <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
+                            ))}
+                        </select>
+                        <select 
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-red-500"
+                            value={selectedStatus}
+                            onChange={(e) => setSelectedStatus(e.target.value)}
+                        >
+                            <option value="all">Semua Status</option>
+                            <option value="PAID">LUNAS</option>
+                            <option value="PENDING">TEMPO</option>
+                        </select>
                     </div>
                 </div>
 

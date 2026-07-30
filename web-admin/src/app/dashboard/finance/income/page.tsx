@@ -14,7 +14,9 @@ export default function IncomesPage() {
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
+    const [selectedAccount, setSelectedAccount] = useState<string>("all");
     const [categories, setCategories] = useState<any[]>([]);
+    const [accounts, setAccounts] = useState<any[]>([]);
     const [editingIncome, setEditingIncome] = useState<any>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; amount: number } | null>(null);
 
@@ -39,9 +41,19 @@ export default function IncomesPage() {
         }
     };
 
+    const fetchAccounts = async () => {
+        try {
+            const res = await api.get('/finance/accounts');
+            setAccounts(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil akun kas", error);
+        }
+    };
+
     useEffect(() => {
         fetchIncomes();
         fetchCategories();
+        fetchAccounts();
     }, []);
 
     const handleDelete = async () => {
@@ -70,9 +82,10 @@ export default function IncomesPage() {
             inc.receivedFrom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             inc.category?.name?.toLowerCase().includes(searchTerm.toLowerCase());
         
-        const matchesCategory = selectedCategory === "all" || inc.categoryId.toString() === selectedCategory;
+        const matchesCategory = selectedCategory === "all" || inc.categoryId?.toString() === selectedCategory;
+        const matchesAccount = selectedAccount === "all" || inc.accountId?.toString() === selectedAccount;
         
-        return matchesSearch && matchesCategory;
+        return matchesSearch && matchesCategory && matchesAccount;
     });
 
     const totalIncomeThisMonth = incomes
@@ -144,7 +157,7 @@ export default function IncomesPage() {
                             className="w-full rounded-xl border border-slate-700 bg-slate-900/50 py-2.5 pl-10 pr-4 text-sm text-white focus:border-blue-500 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-medium placeholder:text-slate-500"
                         />
                     </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                         <select 
                             className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-blue-500"
                             value={selectedCategory}
@@ -153,6 +166,16 @@ export default function IncomesPage() {
                             <option value="all">Semua Kategori</option>
                             {categories.map((cat: any) => (
                                 <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
+                            ))}
+                        </select>
+                        <select 
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-blue-500"
+                            value={selectedAccount}
+                            onChange={(e) => setSelectedAccount(e.target.value)}
+                        >
+                            <option value="all">Semua Akun Kas</option>
+                            {accounts.map((acc: any) => (
+                                <option key={acc.id} value={acc.id.toString()}>{acc.name}</option>
                             ))}
                         </select>
                     </div>
