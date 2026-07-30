@@ -15,6 +15,8 @@ export default function IncomesPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [selectedAccount, setSelectedAccount] = useState<string>("all");
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
     const [categories, setCategories] = useState<any[]>([]);
     const [accounts, setAccounts] = useState<any[]>([]);
     const [editingIncome, setEditingIncome] = useState<any>(null);
@@ -85,7 +87,24 @@ export default function IncomesPage() {
         const matchesCategory = selectedCategory === "all" || inc.categoryId?.toString() === selectedCategory;
         const matchesAccount = selectedAccount === "all" || inc.accountId?.toString() === selectedAccount;
         
-        return matchesSearch && matchesCategory && matchesAccount;
+        let matchesDate = true;
+        if (startDate || endDate) {
+            const incDate = new Date(inc.date);
+            incDate.setHours(0,0,0,0);
+            
+            if (startDate) {
+                const sDate = new Date(startDate);
+                sDate.setHours(0,0,0,0);
+                if (incDate < sDate) matchesDate = false;
+            }
+            if (endDate) {
+                const eDate = new Date(endDate);
+                eDate.setHours(0,0,0,0);
+                if (incDate > eDate) matchesDate = false;
+            }
+        }
+        
+        return matchesSearch && matchesCategory && matchesAccount && matchesDate;
     });
 
     const totalIncomeThisMonth = incomes
@@ -158,6 +177,21 @@ export default function IncomesPage() {
                         />
                     </div>
                     <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <input 
+                            type="date" 
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-blue-500 min-w-[130px] custom-date-picker"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            title="Tanggal Mulai"
+                        />
+                        <span className="text-slate-500 self-center font-bold">s/d</span>
+                        <input 
+                            type="date" 
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-blue-500 min-w-[130px] custom-date-picker"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            title="Tanggal Akhir"
+                        />
                         <select 
                             className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-blue-500"
                             value={selectedCategory}

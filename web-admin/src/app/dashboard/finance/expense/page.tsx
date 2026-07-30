@@ -13,6 +13,8 @@ export default function ExpensesPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [selectedStatus, setSelectedStatus] = useState<string>("all");
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
     const [categories, setCategories] = useState<any[]>([]);
     const [editingExpense, setEditingExpense] = useState<any>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; amount: number } | null>(null);
@@ -71,8 +73,25 @@ export default function ExpensesPage() {
         
         const matchesCategory = selectedCategory === "all" || exp.categoryId?.toString() === selectedCategory;
         const matchesStatus = selectedStatus === "all" || exp.status === selectedStatus;
+        
+        let matchesDate = true;
+        if (startDate || endDate) {
+            const expDate = new Date(exp.date);
+            expDate.setHours(0,0,0,0);
+            
+            if (startDate) {
+                const sDate = new Date(startDate);
+                sDate.setHours(0,0,0,0);
+                if (expDate < sDate) matchesDate = false;
+            }
+            if (endDate) {
+                const eDate = new Date(endDate);
+                eDate.setHours(0,0,0,0);
+                if (expDate > eDate) matchesDate = false;
+            }
+        }
 
-        return matchesSearch && matchesCategory && matchesStatus;
+        return matchesSearch && matchesCategory && matchesStatus && matchesDate;
     });
 
     const totalExpenseThisMonth = expenses
@@ -142,6 +161,21 @@ export default function ExpensesPage() {
                         />
                     </div>
                     <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <input 
+                            type="date" 
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-red-500 min-w-[130px] custom-date-picker"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            title="Tanggal Mulai"
+                        />
+                        <span className="text-slate-500 self-center font-bold">s/d</span>
+                        <input 
+                            type="date" 
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-red-500 min-w-[130px] custom-date-picker"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            title="Tanggal Akhir"
+                        />
                         <select 
                             className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm outline-none focus:border-red-500"
                             value={selectedCategory}
