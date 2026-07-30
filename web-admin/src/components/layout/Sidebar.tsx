@@ -422,122 +422,135 @@ export default function Sidebar() {
                 {/* MODUL FINANCE & AKUNTING (HANYA UNTUK STAFF FINANCE / OWNER) */}
                 {activeModule === 'FINANCE' && userRole !== 'POS_VIEWER' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                        <div className="px-3 py-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Penjualan & Operasional</div>
-                        <Link href="/dashboard/sales" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors">
-                            <ShoppingCart className="h-5 w-5" />
-                            Penjualan B2B (Invoice)
-                        </Link>
-                        <Link href="/dashboard/sales/orders" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors">
-                            <FileText className="h-5 w-5" />
-                            Sales Orders (PO)
-                        </Link>
-                        <Link href="/dashboard/pos/reports" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors">
-                            <Monitor className="h-5 w-5" />
-                            Laporan Kasir (POS)
-                        </Link>
-                        <Link href="/dashboard/customers" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Users className="h-5 w-5 text-indigo-400" />
-                            Data Pelanggan
-                        </Link>
-                        <Link href="/dashboard/loyalty" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Gift className="h-5 w-5 text-fuchsia-400" />
-                            Loyalty & Promo
-                        </Link>
-                        <Link href="/dashboard/banners" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <ImageIcon className="h-5 w-5 text-orange-400" />
-                            Banner Promo
-                        </Link>
-                        <Link href="/dashboard/suppliers" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Truck className="h-5 w-5 text-amber-400" />
-                            Data Supplier
-                        </Link>
-                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Hutang & Piutang</div>
-                        <Link href="/dashboard/finance/payables" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <ArrowDownCircle className="h-5 w-5 text-red-400" />
-                            Buku Hutang (Payables)
-                        </Link>
-                        <Link href="/dashboard/finance/receivables" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <ArrowUpCircle className="h-5 w-5 text-blue-400" />
-                            Buku Piutang (Receivables)
-                        </Link>
-                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Keuangan & Kas (GL)</div>
-                        <Link href="/dashboard/finance/income" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <TrendingUp className="h-5 w-5 text-emerald-400" />
-                            Pemasukan (Income)
-                        </Link>
-                        <Link href="/dashboard/finance/expense" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <TrendingUp className="h-5 w-5 text-red-400 rotate-180" />
-                            Pengeluaran (Expense)
-                        </Link>
-                        <Link href="/dashboard/finance/accounts" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Coins className="h-5 w-5 text-amber-400" />
-                            Kas & Bank
-                        </Link>
-                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Laporan Keuangan</div>
-                        <Link href="/dashboard/finance/profit-loss" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <BarChart3 className="h-5 w-5" />
-                            Laba Rugi
-                        </Link>
+                        {userRole !== 'OPERATIONAL' && (
+                            <>
+                                <div className="px-3 py-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Penjualan & Operasional</div>
+                                <Link href="/dashboard/sales" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors">
+                                    <ShoppingCart className="h-5 w-5" />
+                                    Penjualan B2B (Invoice)
+                                </Link>
+                                <Link href="/dashboard/sales/orders" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors">
+                                    <FileText className="h-5 w-5" />
+                                    Sales Orders (PO)
+                                </Link>
+                                <Link href="/dashboard/pos/reports" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors">
+                                    <Monitor className="h-5 w-5" />
+                                    Laporan Kasir (POS)
+                                </Link>
+                                <Link href="/dashboard/customers" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Users className="h-5 w-5 text-indigo-400" />
+                                    Data Pelanggan
+                                </Link>
+                                <Link href="/dashboard/loyalty" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Gift className="h-5 w-5 text-fuchsia-400" />
+                                    Loyalty & Promo
+                                </Link>
+                                <Link href="/dashboard/banners" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <ImageIcon className="h-5 w-5 text-orange-400" />
+                                    Banner Promo
+                                </Link>
+                                <Link href="/dashboard/suppliers" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Truck className="h-5 w-5 text-amber-400" />
+                                    Data Supplier
+                                </Link>
+                                <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Hutang & Piutang</div>
+                                <Link href="/dashboard/finance/payables" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <ArrowDownCircle className="h-5 w-5 text-red-400" />
+                                    Buku Hutang (Payables)
+                                </Link>
+                                <Link href="/dashboard/finance/receivables" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <ArrowUpCircle className="h-5 w-5 text-blue-400" />
+                                    Buku Piutang (Receivables)
+                                </Link>
+                                <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Keuangan & Kas (GL)</div>
+                                <Link href="/dashboard/finance/income" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <TrendingUp className="h-5 w-5 text-emerald-400" />
+                                    Pemasukan (Income)
+                                </Link>
+                                <Link href="/dashboard/finance/expense" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <TrendingUp className="h-5 w-5 text-red-400 rotate-180" />
+                                    Pengeluaran (Expense)
+                                </Link>
+                                <Link href="/dashboard/finance/accounts" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Coins className="h-5 w-5 text-amber-400" />
+                                    Kas & Bank
+                                </Link>
+                                <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Laporan Keuangan</div>
+                                <Link href="/dashboard/finance/profit-loss" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <BarChart3 className="h-5 w-5" />
+                                    Laba Rugi
+                                </Link>
 
-                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Keuangan Karyawan</div>
-                        <Link href="/dashboard/payroll" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Banknote className="h-5 w-5 text-emerald-400" />
-                            Manajemen Gaji (Payroll)
-                        </Link>
-                        <Link href="/dashboard/reimbursements" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Receipt className="h-5 w-5 text-amber-400" />
-                            Reimbursement (Klaim)
-                        </Link>
-                        <Link href="/dashboard/loans" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <CreditCard className="h-5 w-5 text-indigo-400" />
-                            Pinjaman & Kasbon
-                        </Link>
-                        <Link href="/dashboard/finance/balance-sheet" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <PieChart className="h-5 w-5" />
-                            Neraca Keuangan
-                        </Link>
-                        <Link href="/dashboard/finance/equity" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <PieChart className="h-5 w-5" />
-                            Dividen & Modal
-                        </Link>
-                        <Link href="/dashboard/finance/cash-flow" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <TrendingUp className="h-5 w-5 text-emerald-400" />
-                            Arus Kas (Cash Flow)
-                        </Link>
-                        <Link href="/dashboard/finance/profitability" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <BarChart3 className="h-5 w-5 text-blue-400" />
-                            Analisis Margin
-                        </Link>
-                        <Link href="/dashboard/finance/journal" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <FileText className="h-5 w-5 text-indigo-400" />
-                            Jurnal Umum
-                        </Link>
-                        <Link href="/dashboard/finance/closing" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <FileText className="h-5 w-5 text-orange-400" />
-                            Tutup Buku (Closing)
-                        </Link>
-                        <Link href="/dashboard/assets" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Laptop className="h-5 w-5 text-indigo-400" />
-                            Manajemen Aset (Fixed Assets)
-                        </Link>
+                                <div className="px-3 py-2 mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Keuangan Karyawan</div>
+                                <Link href="/dashboard/payroll" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Banknote className="h-5 w-5 text-emerald-400" />
+                                    Manajemen Gaji (Payroll)
+                                </Link>
+                                <Link href="/dashboard/reimbursements" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Receipt className="h-5 w-5 text-amber-400" />
+                                    Reimbursement (Klaim)
+                                </Link>
+                                <Link href="/dashboard/loans" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <CreditCard className="h-5 w-5 text-indigo-400" />
+                                    Pinjaman & Kasbon
+                                </Link>
+                                <Link href="/dashboard/finance/balance-sheet" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <PieChart className="h-5 w-5" />
+                                    Neraca Keuangan
+                                </Link>
+                                <Link href="/dashboard/finance/equity" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <PieChart className="h-5 w-5" />
+                                    Dividen & Modal
+                                </Link>
+                                <Link href="/dashboard/finance/cash-flow" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <TrendingUp className="h-5 w-5 text-emerald-400" />
+                                    Arus Kas (Cash Flow)
+                                </Link>
+                                <Link href="/dashboard/finance/profitability" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <BarChart3 className="h-5 w-5 text-blue-400" />
+                                    Analisis Margin
+                                </Link>
+                                <Link href="/dashboard/finance/journal" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <FileText className="h-5 w-5 text-indigo-400" />
+                                    Jurnal Umum
+                                </Link>
+                                <Link href="/dashboard/finance/closing" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <FileText className="h-5 w-5 text-orange-400" />
+                                    Tutup Buku (Closing)
+                                </Link>
+                                <Link href="/dashboard/assets" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Laptop className="h-5 w-5 text-indigo-400" />
+                                    Manajemen Aset (Fixed Assets)
+                                </Link>
+                            </>
+                        )}
 
                         <div className="px-3 py-2 mt-4 text-[10px] font-bold text-orange-400 uppercase tracking-widest">Manajemen Inventori</div>
-                        <Link href="/dashboard/inventory/products" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Box className="h-5 w-5 text-orange-400" />
-                            Produk & Stok
-                        </Link>
-                        <Link href="/dashboard/inventory/adjustments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <Clock className="h-5 w-5 text-slate-400" />
-                            Penyesuaian Stok (Stock Opname)
-                        </Link>
+                        
+                        {userRole !== 'OPERATIONAL' && (
+                            <>
+                                <Link href="/dashboard/inventory/products" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Box className="h-5 w-5 text-orange-400" />
+                                    Produk & Stok
+                                </Link>
+                                <Link href="/dashboard/inventory/adjustments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                    <Clock className="h-5 w-5 text-slate-400" />
+                                    Penyesuaian Stok (Stock Opname)
+                                </Link>
+                            </>
+                        )}
+                        
                         <Link href="/dashboard/inventory/purchase-orders" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                             <ShoppingBag className="h-5 w-5 text-blue-400" />
                             Purchase Order (PO)
                         </Link>
-                        <Link href="/dashboard/inventory/warehouses" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                            <MapPin className="h-5 w-5 text-blue-400" />
-                            Manajemen Gudang
-                        </Link>
+                        
+                        {userRole !== 'OPERATIONAL' && (
+                            <Link href="/dashboard/inventory/warehouses" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                                <MapPin className="h-5 w-5 text-blue-400" />
+                                Manajemen Gudang
+                            </Link>
+                        )}
                     </div>
                 )}
 
