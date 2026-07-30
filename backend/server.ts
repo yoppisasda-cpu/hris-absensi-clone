@@ -11222,18 +11222,23 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     });
 
     let totalFixedAssets = 0;
+    let totalFixedAssetsGross = 0;
+    let totalAccumulatedDepreciation = 0;
     const assetsWithBookValue = physicalAssets.map(asset => {
         let bookValue = Number(asset.purchasePrice || 0);
+        let accumulatedDepreciation = 0;
+        totalFixedAssetsGross += bookValue;
         if (asset.isDepreciating && Number(asset.purchasePrice) > 0 && Number(asset.usefulLife) > 0) {
             const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
             const now = new Date();
             const monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
             const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-            const accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
-        bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
+            accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
+            bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
         }
+        totalAccumulatedDepreciation += accumulatedDepreciation;
         totalFixedAssets += bookValue;
-        return { ...asset, bookValue };
+        return { ...asset, bookValue, accumulatedDepreciation };
     });
 
     // 3. Assets: Employee Loans (Piutang Karyawan)
@@ -11367,6 +11372,8 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         total: totalAssets,
         totalCurrent: totalCurrentAssets,
         totalFixed: totalFixedAssets,
+        totalFixedGross: totalFixedAssetsGross,
+        totalAccumulatedDepreciation: totalAccumulatedDepreciation,
         totalLoans: totalLoans,
         totalCustomerReceivables: totalCustomerReceivables,
         totalInventoryValue: totalInventoryValue,
@@ -11405,18 +11412,23 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
 
     const physicalAssets = await prisma.asset.findMany({ where: { companyId: tenantId } });
     let totalFixedAssets = 0;
+    let totalFixedAssetsGross = 0;
+    let totalAccumulatedDepreciation = 0;
     const assetsWithBookValue = physicalAssets.map(asset => {
         let bookValue = Number(asset.purchasePrice || 0);
+        let accumulatedDepreciation = 0;
+        totalFixedAssetsGross += bookValue;
         if (asset.isDepreciating && Number(asset.purchasePrice) > 0 && Number(asset.usefulLife) > 0) {
             const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
             const now = new Date();
             const monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
             const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-            const accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
+            accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
             bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
         }
+        totalAccumulatedDepreciation += accumulatedDepreciation;
         totalFixedAssets += bookValue;
-        return { ...asset, bookValue };
+        return { ...asset, bookValue, accumulatedDepreciation };
     });
 
     const activeLoans = await prisma.loan.findMany({ where: { companyId: tenantId, status: 'ACTIVE' } });
@@ -11566,14 +11578,35 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 
-    worksheet.addRow(['Aset Tetap (Nilai Perolehan - Akm. Penyusutan)']);
-    worksheet.getRow(currentRow).font = { italic: true };
+    worksheet.addRow(['Aset Tetap (Harga Perolehan)']);
+    worksheet.getRow(currentRow).font = { italic: true, bold: true };
     currentRow++;
+    
+    const groupedAssets: Record<string, { gross: number, dep: number }> = {};
     assetsWithBookValue.forEach(asset => {
-      worksheet.addRow([asset.name, '', asset.bookValue]);
-      currentRow++;
+        const cat = asset.category || 'Lainnya';
+        if (!groupedAssets[cat]) groupedAssets[cat] = { gross: 0, dep: 0 };
+        groupedAssets[cat].gross += asset.purchasePrice || 0;
+        groupedAssets[cat].dep += asset.accumulatedDepreciation || 0;
     });
-    worksheet.addRow(['Total Aset Tetap', '', totalFixedAssets]);
+
+    Object.entries(groupedAssets).forEach(([cat, vals]) => {
+        worksheet.addRow([cat, '', vals.gross]);
+        currentRow++;
+    });
+
+    worksheet.addRow(['Penyusutan']);
+    worksheet.getRow(currentRow).font = { italic: true, bold: true };
+    currentRow++;
+
+    Object.entries(groupedAssets).forEach(([cat, vals]) => {
+        if (vals.dep > 0) {
+            worksheet.addRow([`Akumulasi Penyusutan ${cat}`, '', -vals.dep]);
+            currentRow++;
+        }
+    });
+
+    worksheet.addRow(['Total Aset Tetap Bersih', '', totalFixedAssets]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 

@@ -63,6 +63,17 @@ export default function BalanceSheetPage() {
         year: 'numeric'
     });
 
+    // GROUP FIXED ASSETS
+    const groupedAssets: Record<string, { gross: number, dep: number }> = {};
+    if (data?.assets?.fixedAssets) {
+        data.assets.fixedAssets.forEach((asset: any) => {
+            const cat = asset.category || 'Lainnya';
+            if (!groupedAssets[cat]) groupedAssets[cat] = { gross: 0, dep: 0 };
+            groupedAssets[cat].gross += Number(asset.purchasePrice || 0);
+            groupedAssets[cat].dep += Number(asset.accumulatedDepreciation || 0);
+        });
+    }
+
     return (
         <DashboardLayout>
             <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -193,17 +204,44 @@ export default function BalanceSheetPage() {
                                     {/* ASSET TETAP */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-emerald-50/10 not-italic border-t border-slate-100">ASET TETAP (Fixed Assets)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-emerald-600 italic border-t border-slate-100">Rp {data?.assets.totalFixed.toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-emerald-600 italic border-t border-slate-100">Rp {(data?.assets.totalFixed || 0).toLocaleString()}</td>
                                     </tr>
-                                    {data?.assets.fixedAssets?.map((asset: any) => (
-                                        <tr key={asset.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">
-                                                {asset.name} 
-                                                <span className="ml-2 text-[10px] bg-slate-100 px-1 rounded not-italic text-slate-400">{asset.category}</span>
-                                            </td>
-                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {asset.bookValue.toLocaleString()}</td>
-                                        </tr>
-                                    )) || (
+                                    {data?.assets.fixedAssets && data.assets.fixedAssets.length > 0 ? (
+                                        <>
+                                            {/* HARGA PEROLEHAN PER KATEGORI */}
+                                            {Object.entries(groupedAssets).map(([cat, vals]) => (
+                                                <tr key={`gross-${cat}`} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">
+                                                        {cat}
+                                                    </td>
+                                                    <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">
+                                                        Rp {vals.gross.toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            
+                                            {/* PENYUSUTAN */}
+                                            <tr>
+                                                <td className="px-6 py-3 font-bold text-slate-800 text-[11px] tracking-wider uppercase bg-slate-50/50 not-italic border-t border-slate-50">PENYUSUTAN</td>
+                                                <td className="border-t border-slate-50"></td>
+                                            </tr>
+                                            {Object.entries(groupedAssets).map(([cat, vals]) => vals.dep > 0 ? (
+                                                <tr key={`dep-${cat}`} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic text-red-500">
+                                                        Akumulasi Penyusutan {cat}
+                                                    </td>
+                                                    <td className="px-6 py-3 text-right text-sm font-bold text-red-500">
+                                                        (Rp {vals.dep.toLocaleString()})
+                                                    </td>
+                                                </tr>
+                                            ) : null)}
+
+                                            <tr className="bg-slate-50 border-t border-slate-100">
+                                                <td className="px-10 py-3 font-bold text-slate-700 text-xs not-italic">Total Aset Tetap Bersih</td>
+                                                <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {(data?.assets.totalFixed || 0).toLocaleString()}</td>
+                                            </tr>
+                                        </>
+                                    ) : (
                                         <tr>
                                             <td colSpan={2} className="px-10 py-2 text-xs italic text-slate-300">Belum ada aset tetap terdaftar</td>
                                         </tr>
