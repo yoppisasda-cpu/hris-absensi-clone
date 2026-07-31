@@ -150,6 +150,9 @@ const runAutoMigration = async () => {
     `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "bankName" TEXT`,
     `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "accountNumber" TEXT`,
     `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "priceQpoon" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "openTime" TEXT DEFAULT '08:00'`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "closeTime" TEXT DEFAULT '22:00'`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "isOpenManual" BOOLEAN DEFAULT true`,
   ];
   console.log('[AUTO-MIGRATION] Checking and applying missing columns...');
   for (const sql of migrations) {

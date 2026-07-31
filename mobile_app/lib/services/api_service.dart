@@ -120,7 +120,9 @@ class ApiService {
       return response.data;
     } on DioException catch (e) {
       if (e.response != null && e.response?.data['error'] != null) {
-        throw Exception(e.response?.data['error']);
+        final errorMsg = e.response?.data['error'];
+        final detailMsg = e.response?.data['detail'];
+        throw Exception(detailMsg != null ? '$errorMsg ($detailMsg)' : errorMsg);
       }
       throw Exception('Gagal menghubungi server.');
     } catch (e) {
