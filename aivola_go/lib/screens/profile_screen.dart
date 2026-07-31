@@ -148,7 +148,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               border: Border.all(color: primaryColor, width: 2),
               image: DecorationImage(
                 image: (_userAvatar != null && _userAvatar!.isNotEmpty)
-                    ? CachedNetworkImageProvider(ApiService.resolveUrl(_userAvatar))
+                    ? CachedNetworkImageProvider(ApiService.resolveUrl(_userAvatar) ?? "")
                     : NetworkImage("https://ui-avatars.com/api/?name=$_userName&background=random") as ImageProvider,
                 fit: BoxFit.cover,
               ),

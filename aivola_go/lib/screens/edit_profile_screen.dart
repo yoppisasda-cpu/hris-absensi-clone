@@ -188,7 +188,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       )
                     : DecorationImage(
                         image: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
-                            ? CachedNetworkImageProvider(ApiService.resolveUrl(_avatarUrl))
+                            ? CachedNetworkImageProvider(ApiService.resolveUrl(_avatarUrl) ?? "")
                             : NetworkImage("https://ui-avatars.com/api/?name=${_nameController.text}&background=random&size=200") as ImageProvider,
                         fit: BoxFit.cover,
                       ),

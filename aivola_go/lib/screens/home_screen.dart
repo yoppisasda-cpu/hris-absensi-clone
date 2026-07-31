@@ -53,7 +53,11 @@ class _HomeScreenState extends State<HomeScreen> {
       await branchProvider.loadBranches(companyId: productProvider.selectedCompanyId);
       
       if (branchProvider.branches.isNotEmpty) {
-        await branchProvider.findNearestBranch();
+        try {
+          await branchProvider.findNearestBranch().timeout(Duration(seconds: 3));
+        } catch (e) {
+          print("Location request timed out or failed: $e");
+        }
       }
       
       if (mounted) {
@@ -76,8 +80,23 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: secondaryColor,
-      appBar: AppBar(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF1E293B), // Slate 800
+              Color(0xFF0F172A), // Slate 900
+              Color(0xFF020617), // Slate 950
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -164,19 +183,36 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         ],
       ),
-      body: pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        backgroundColor: Color(0xFF1E293B),
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Color(0xFF94A3B8),
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu_rounded), label: "Menu"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: "Profile"),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 800),
+          child: pages[_currentIndex],
+        ),
+      ),
+      bottomNavigationBar: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 800),
+              child: BottomNavigationBar(
+                currentIndex: _currentIndex,
+                onTap: (index) => setState(() => _currentIndex = index),
+                backgroundColor: Color(0xFF1E293B),
+                selectedItemColor: primaryColor,
+                unselectedItemColor: Color(0xFF94A3B8),
+                type: BottomNavigationBarType.fixed,
+                items: [
+                  BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
+                  BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu_rounded), label: "Menu"),
+                  BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: "Profile"),
+                ],
+              ),
+            ),
+          ),
         ],
+      ),
+      ),
       ),
     );
   }
@@ -241,7 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final brandingProvider = Provider.of<BrandingProvider>(context);
     final filteredProducts = _selectedCategoryId == 0 ? productProvider.products : productProvider.products.where((p) => p.categoryId == _selectedCategoryId).toList();
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
       child: Column(
         children: [
@@ -253,9 +289,17 @@ class _HomeScreenState extends State<HomeScreen> {
           SizedBox(height: 20),
           SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [_buildCategoryChip("Semua", 0), ...productProvider.categories.map((cat) => _buildCategoryChip(cat.name, cat.id))])),
           SizedBox(height: 20),
-          Expanded(
-            child: productProvider.isLoading ? Center(child: CircularProgressIndicator(color: brandingProvider.primaryColor)) : (filteredProducts.isEmpty ? Center(child: Text("Produk tidak ditemukan", style: TextStyle(color: Color(0xFF94A3B8)))) : GridView.builder(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.75, crossAxisSpacing: 15, mainAxisSpacing: 15), itemCount: filteredProducts.length, itemBuilder: (context, index) => _buildProductCard(filteredProducts[index]))),
-          ),
+          productProvider.isLoading 
+            ? Center(child: CircularProgressIndicator(color: brandingProvider.primaryColor)) 
+            : (filteredProducts.isEmpty 
+                ? Center(child: Text("Produk tidak ditemukan", style: TextStyle(color: Color(0xFF94A3B8)))) 
+                : GridView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 250, childAspectRatio: 0.75, crossAxisSpacing: 15, mainAxisSpacing: 15), 
+                    itemCount: filteredProducts.length, 
+                    itemBuilder: (context, index) => _buildProductCard(filteredProducts[index])
+                  )),
         ],
       ),
     );
@@ -310,11 +354,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(CurrencyFormat.convertToIdr(product.price, 0), style: GoogleFonts.outfit(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 14)))),
                   GestureDetector(
-                    onTap: product.stock > 0 ? () {
+                    onTap: (!product.trackStock || product.stock > 0) ? () {
                       Provider.of<CartProvider>(context, listen: false).addItem(product);
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("${product.name} added!"), duration: Duration(seconds: 1)));
                     } : null,
-                    child: Container(padding: EdgeInsets.all(4), decoration: BoxDecoration(color: product.stock > 0 ? primaryColor : Color(0xFF334155), borderRadius: BorderRadius.circular(8)), child: Icon(product.stock > 0 ? Icons.add : Icons.block_flipped, color: Colors.white, size: 18)),
+                    child: Container(padding: EdgeInsets.all(4), decoration: BoxDecoration(color: (!product.trackStock || product.stock > 0) ? primaryColor : Color(0xFF334155), borderRadius: BorderRadius.circular(8)), child: Icon((!product.trackStock || product.stock > 0) ? Icons.add : Icons.block_flipped, color: Colors.white, size: 18)),
                   )
                 ]),
               ]),

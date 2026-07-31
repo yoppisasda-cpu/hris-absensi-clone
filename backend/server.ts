@@ -13400,18 +13400,20 @@ app.get('/api/inventory/warehouses', tenantMiddleware, async (req: Request, res:
 app.post('/api/inventory/warehouses', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, location, isMain } = req.body;
+    const { name, location, isMain, branchId } = req.body;
     
     // If isMain is true, unset other main warehouses for this company
     if (isMain) {
       await prisma.$executeRawUnsafe(`UPDATE "Warehouse" SET "isMain" = FALSE WHERE "companyId" = $1`, tenantId);
     }
     
+    const parsedBranchId = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
+
     const result: any[] = await prisma.$queryRawUnsafe(`
-      INSERT INTO "Warehouse" ("companyId", "name", "location", "isMain", "updatedAt")
-      VALUES ($1, $2, $3, $4, NOW())
+      INSERT INTO "Warehouse" ("companyId", "name", "location", "isMain", "branchId", "updatedAt")
+      VALUES ($1, $2, $3, $4, $5, NOW())
       RETURNING id
-    `, tenantId, name, location, isMain || false);
+    `, tenantId, name, location, isMain || false, parsedBranchId);
     
     res.status(201).json({ message: 'Gudang berhasil ditambahkan', warehouseId: result[0].id });
   } catch (error: any) {
@@ -13424,17 +13426,19 @@ app.patch('/api/inventory/warehouses/:id', tenantMiddleware, async (req: Request
   try {
     const tenantId = Number((req as any).tenantId);
     const warehouseId = parseInt(req.params.id as string);
-    const { name, location, isMain } = req.body;
+    const { name, location, isMain, branchId } = req.body;
     
     if (isMain) {
       await prisma.$executeRawUnsafe(`UPDATE "Warehouse" SET "isMain" = FALSE WHERE "companyId" = $1`, tenantId);
     }
     
+    const parsedBranchId = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
+
     await prisma.$executeRawUnsafe(`
       UPDATE "Warehouse" 
-      SET "name" = $1, "location" = $2, "isMain" = $3, "updatedAt" = NOW()
-      WHERE id = $4 AND "companyId" = $5
-    `, name, location, isMain, warehouseId, tenantId);
+      SET "name" = $1, "location" = $2, "isMain" = $3, "branchId" = $4, "updatedAt" = NOW()
+      WHERE id = $5 AND "companyId" = $6
+    `, name, location, isMain, parsedBranchId, warehouseId, tenantId);
     
     res.json({ message: 'Gudang berhasil diperbarui' });
   } catch (error: any) {

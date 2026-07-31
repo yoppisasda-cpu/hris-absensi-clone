@@ -1,4 +1,5 @@
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -139,10 +140,26 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
     final secondaryColor = Color(0xFF0F172A);
 
     return Scaffold(
-      backgroundColor: secondaryColor,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(25.0),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF1E293B), // Slate 800
+              Color(0xFF0F172A), // Slate 900
+              Color(0xFF020617), // Slate 950
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 800),
+            child: Padding(
+              padding: const EdgeInsets.all(25.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -241,8 +258,8 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
                             ),
                           )
                         : GridView.builder(
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
+                            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 250,
                               crossAxisSpacing: 15,
                               mainAxisSpacing: 15,
                               childAspectRatio: 0.7, // Slightly taller to prevent overflow
@@ -275,10 +292,10 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
                                     children: [
                                       Expanded( // Use Expanded to make the logo area flexible
                                         child: Center(
-                                          child: Container(
-                                            height: 80,
-                                            width: 80,
-                                            padding: EdgeInsets.all(3),
+                                          child: AspectRatio(
+                                            aspectRatio: 1,
+                                            child: Container(
+                                              padding: EdgeInsets.all(4),
                                             decoration: BoxDecoration(
                                               gradient: LinearGradient(
                                                 colors: [merchantColor.withOpacity(0.5), merchantColor.withOpacity(0.1)],
@@ -288,16 +305,22 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
                                               shape: BoxShape.circle,
                                             ),
                                             child: Container(
-                                              padding: EdgeInsets.all(10),
+                                              padding: EdgeInsets.all(4),
                                               decoration: BoxDecoration(
                                                 color: Color(0xFF1E293B),
                                                 shape: BoxShape.circle,
                                               ),
                                               child: merchant.logoUrl != null && merchant.logoUrl!.isNotEmpty
                                                   ? ClipOval(
-                                                        child: Image.network(
-                                                          ApiService.resolveUrl(merchant.logoUrl),
-                                                        fit: BoxFit.cover,
+                                                        child: merchant.logoUrl!.startsWith('data:image')
+                                                            ? Image.memory(
+                                                                base64Decode(merchant.logoUrl!.split(',').last),
+                                                                fit: BoxFit.contain,
+                                                                errorBuilder: (c, e, s) => Icon(Icons.store_rounded, color: merchantColor, size: 100),
+                                                              )
+                                                            : Image.network(
+                                                          ApiService.resolveUrl(merchant.logoUrl) ?? "",
+                                                        fit: BoxFit.contain,
                                                         loadingBuilder: (context, child, loadingProgress) {
                                                           if (loadingProgress == null) return child;
                                                           return Center(
@@ -311,13 +334,14 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
                                                             ),
                                                           );
                                                         },
-                                                        errorBuilder: (c, e, s) => Icon(Icons.store_rounded, color: merchantColor, size: 30),
+                                                        errorBuilder: (c, e, s) => Icon(Icons.store_rounded, color: merchantColor, size: 100),
                                                       ),
                                                     )
-                                                  : Icon(Icons.store_rounded, color: merchantColor, size: 30),
+                                                  : Icon(Icons.store_rounded, color: merchantColor, size: 100),
                                             ),
                                           ),
                                         ),
+                                      ),
                                       ),
                                       SizedBox(height: 10),
                                       Text(
@@ -360,6 +384,9 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
                     ),
             ],
           ),
+        ),
+          ),
+        ),
         ),
       ),
     );

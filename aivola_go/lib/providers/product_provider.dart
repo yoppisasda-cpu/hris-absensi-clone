@@ -31,11 +31,10 @@ class ProductProvider with ChangeNotifier {
         companyId: _selectedCompanyId
       );
 
-      _products = productData
+      _products = List<Product>.from(productData
           .map((p) => Product.fromJson(p))
-          .where((product) => product.showInPos)
-          .toList();
-      _categories = categoryData.map((c) => Category.fromJson(c)).toList();
+          .where((product) => product.showInPos));
+      _categories = List<Category>.from(categoryData.map((c) => Category.fromJson(c)));
     } catch (e) {
       print("Failed to load data: $e");
     }

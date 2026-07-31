@@ -69,6 +69,7 @@ class Product {
   final String? categoryName;
   final int categoryId;
   final bool showInPos;
+  final bool trackStock;
   final double stock;
   final List<CustomizationGroup> customizations;
 
@@ -81,6 +82,7 @@ class Product {
     this.categoryName,
     required this.categoryId,
     required this.showInPos,
+    this.trackStock = true,
     this.stock = 0,
     this.customizations = const [],
   });
@@ -99,8 +101,9 @@ class Product {
       categoryName: json['category'] != null ? json['category']['name'] : null,
       categoryId: json['categoryId'] ?? 0,
       showInPos: json['showInPos'] ?? false,
+      trackStock: json['trackStock'] ?? true,
       stock: (json['stock'] as num?)?.toDouble() ?? 0,
-      customizations: customList.map((c) {
+      customizations: List<CustomizationGroup>.from(customList.map((c) {
         // Handle junction table structure if necessary
         if (c['Group'] != null) {
           return CustomizationGroup.fromJson(c['Group']);
@@ -109,7 +112,7 @@ class Product {
           return CustomizationGroup.fromJson(c['CustomizationGroup']);
         }
         return CustomizationGroup.fromJson(c);
-      }).toList(),
+      })),
     );
   }
 }

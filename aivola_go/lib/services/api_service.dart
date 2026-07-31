@@ -14,14 +14,15 @@ class ApiService {
   static String get baseUrl => "https://api.aivola.id/api";
 
   // Helper for images and other direct URLs
-  static String resolveUrl(String? path) {
-    if (path == null || path.isEmpty) return "";
-    if (path.startsWith('http')) return path;
+  static String? resolveUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http') || path.startsWith('data:')) return path;
     
     // Ensure path starts with a slash
     String cleanPath = path.startsWith('/') ? path : "/$path";
     
-    final domain = kReleaseMode ? "https://api.aivola.id" : "http://$host:5005";
+    // Karena baseUrl diarahkan ke live server, gambar juga harus diambil dari live server
+    final domain = "https://api.aivola.id";
     return "$domain$cleanPath";
   }
 

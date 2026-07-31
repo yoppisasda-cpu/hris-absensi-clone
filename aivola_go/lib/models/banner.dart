@@ -18,7 +18,7 @@ class PromoBanner {
   });
 
   factory PromoBanner.fromJson(Map<String, dynamic> json) {
-    String imageUrl = ApiService.resolveUrl(json['imageUrl']);
+    String imageUrl = ApiService.resolveUrl(json['imageUrl']) ?? "";
 
     return PromoBanner(
       id: json['id'],
