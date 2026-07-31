@@ -86,8 +86,14 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-
+    await prefs.remove('jwt_token');
+    await prefs.remove('companyId');
+    await prefs.remove('userId');
+    await prefs.remove('userName');
+    await prefs.remove('userRole');
+    await prefs.remove('branchId');
+    await prefs.remove('globalTaxRate');
+    // Printer settings and language will NOT be removed so they persist across sessions.
     _isAuthenticated = false;
     _companyId = null;
     _userId = null;
