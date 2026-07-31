@@ -229,6 +229,55 @@ class PrinterService {
     bytes += generator.hr();
 
     // Totals
+    final double memberDiscount = (saleData['memberDiscountAmount'] ?? 0).toDouble();
+    final double voucherDiscount = (saleData['voucherDiscountAmount'] ?? 0).toDouble();
+    final double taxAmount = (saleData['taxAmount'] ?? 0).toDouble();
+    final double taxRate = (saleData['taxRate'] ?? 0).toDouble();
+    final double pointsUsed = (saleData['pointsUsed'] ?? 0).toDouble();
+    final double totalAmount = (saleData['totalAmount'] ?? 0).toDouble();
+    
+    // Calculate true subtotal if not provided
+    final double subtotal = saleData['subtotal'] != null 
+        ? saleData['subtotal'].toDouble() 
+        : (totalAmount - taxAmount + memberDiscount + voucherDiscount + pointsUsed);
+
+    // Print Subtotal if there are taxes or discounts
+    if (memberDiscount > 0 || voucherDiscount > 0 || taxAmount > 0 || pointsUsed > 0) {
+      bytes += generator.row([
+        PosColumn(text: 'Subtotal', width: 6),
+        PosColumn(text: subtotal.toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right)),
+      ]);
+    }
+    
+    if (memberDiscount > 0) {
+      bytes += generator.row([
+        PosColumn(text: 'Diskon Member', width: 6),
+        PosColumn(text: '-${memberDiscount.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
+      ]);
+    }
+    
+    if (voucherDiscount > 0) {
+      bytes += generator.row([
+        PosColumn(text: 'Diskon Voucher', width: 6),
+        PosColumn(text: '-${voucherDiscount.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
+      ]);
+    }
+    
+    if (pointsUsed > 0) {
+      bytes += generator.row([
+        PosColumn(text: 'Tukar Poin', width: 6),
+        PosColumn(text: '-${pointsUsed.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
+      ]);
+    }
+    
+    if (taxAmount > 0) {
+      bytes += generator.row([
+        PosColumn(text: 'Pajak (${taxRate.toStringAsFixed(0)}%)', width: 6),
+        PosColumn(text: taxAmount.toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right)),
+      ]);
+    }
+
+    bytes += generator.hr();
     bytes += generator.row([
       PosColumn(text: 'TOTAL', width: 6, styles: PosStyles(bold: true)),
       PosColumn(text: (saleData['totalAmount'] ?? 0).toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right, bold: true)),
@@ -419,7 +468,57 @@ class PrinterService {
                   ],
                 );
               }).toList(),
-              pw.Divider(thickness: 0.5),
+              pw.Divider(thickness: 1),
+              
+              // Totals
+              if ((saleData['memberDiscountAmount'] ?? 0) > 0 || (saleData['voucherDiscountAmount'] ?? 0) > 0 || (saleData['taxAmount'] ?? 0) > 0 || (saleData['pointsUsed'] ?? 0) > 0)
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Subtotal', style: pw.TextStyle(fontSize: 10)),
+                    pw.Text((saleData['subtotal'] != null ? saleData['subtotal'] : ((saleData['totalAmount'] ?? 0) - (saleData['taxAmount'] ?? 0) + (saleData['memberDiscountAmount'] ?? 0) + (saleData['voucherDiscountAmount'] ?? 0) + (saleData['pointsUsed'] ?? 0))).toStringAsFixed(0), style: pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+                
+              if ((saleData['memberDiscountAmount'] ?? 0) > 0)
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Diskon Member', style: pw.TextStyle(fontSize: 10)),
+                    pw.Text('-${(saleData['memberDiscountAmount'] ?? 0).toStringAsFixed(0)}', style: pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+                
+              if ((saleData['voucherDiscountAmount'] ?? 0) > 0)
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Diskon Voucher', style: pw.TextStyle(fontSize: 10)),
+                    pw.Text('-${(saleData['voucherDiscountAmount'] ?? 0).toStringAsFixed(0)}', style: pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+                
+              if ((saleData['pointsUsed'] ?? 0) > 0)
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Tukar Poin', style: pw.TextStyle(fontSize: 10)),
+                    pw.Text('-${(saleData['pointsUsed'] ?? 0).toStringAsFixed(0)}', style: pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+                
+              if ((saleData['taxAmount'] ?? 0) > 0)
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Pajak (${(saleData['taxRate'] ?? 0).toStringAsFixed(0)}%)', style: pw.TextStyle(fontSize: 10)),
+                    pw.Text((saleData['taxAmount'] ?? 0).toStringAsFixed(0), style: pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+                
+              if ((saleData['memberDiscountAmount'] ?? 0) > 0 || (saleData['voucherDiscountAmount'] ?? 0) > 0 || (saleData['taxAmount'] ?? 0) > 0 || (saleData['pointsUsed'] ?? 0) > 0)
+                pw.Divider(thickness: 1),
+
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [

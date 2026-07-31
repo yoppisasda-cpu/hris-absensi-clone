@@ -14161,8 +14161,8 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
       // 3. Create Sale Record (Merged with GitHub's new fields)
       const saleResult: any[] = await tx.$queryRawUnsafe(`
-        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "dueDate", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14, $15, $16, $17, $18)
+        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "dueDate", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod", "taxRate", "taxAmount", "memberDiscountAmount")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14, $15, $16, $17, $18, $19, $20, $21)
         RETURNING id
       `, 
       tenantId, 
@@ -14182,7 +14182,10 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       saleType || 'WALK_IN', 
       pointsUsedNum,
       deliveryMethod || 'Dine-in',
-      paymentMethod || 'Bayar di Kasir');
+      paymentMethod || 'Bayar di Kasir',
+      taxRate || 0,
+      taxAmount || 0,
+      memberDiscountAmount || 0);
       
       const saleId = saleResult[0].id;
 

@@ -1131,6 +1131,12 @@ class _POSScreenState extends State<POSScreen> {
         'cashReceived': _cashReceived > 0 ? _cashReceived : _grandTotal,
         'paymentMethod': _selectedPaymentMethod,
         'customerName': _customerNameController.text.trim(),
+        'taxRate': _globalTaxRate,
+        'taxAmount': _taxAmount,
+        'memberDiscountAmount': _memberDiscountAmount,
+        'voucherDiscountAmount': _voucherDiscountAmount,
+        'pointsUsed': _pointsUsed,
+        'subtotal': _subtotalAmount,
       };
 
       // Print receipt in background to not block UI
