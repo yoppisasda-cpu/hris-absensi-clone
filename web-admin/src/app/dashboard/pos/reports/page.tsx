@@ -161,9 +161,9 @@ export default function POSReportsPage() {
     }, [selectedBranchId, startDate, endDate, paymentFilter, saleTypeFilter]);
 
     const stats = useMemo(() => {
-        const validSales = sales.filter(s => s.status !== 'RETURNED' && s.status !== 'CANCELLED');
-        const gross = validSales.reduce((sum, s) => sum + s.totalAmount, 0);
-        const commission = validSales.reduce((sum, s) => sum + (s.totalCommission || 0), 0);
+        const validSales = sales.filter(s => s.status !== 'RETURNED' && s.status !== 'CANCELLED' && s.status !== 'VOID');
+        const gross = validSales.reduce((sum, s) => sum + Number(s.netTotalAmount !== undefined ? s.netTotalAmount : s.totalAmount), 0);
+        const commission = validSales.reduce((sum, s) => sum + Number(s.totalCommission || 0), 0);
         const net = gross - commission;
         const avgValue = validSales.length > 0 ? gross / validSales.length : 0;
         
@@ -715,7 +715,7 @@ export default function POSReportsPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-slate-300">
-                                            Rp {sale.totalAmount.toLocaleString()}
+                                            Rp {(sale.netTotalAmount !== undefined ? sale.netTotalAmount : sale.totalAmount).toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {sale.totalCommission > 0 ? (
@@ -726,7 +726,7 @@ export default function POSReportsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="font-black text-emerald-400 text-sm">
-                                                Rp {(sale.totalAmount - (sale.totalCommission || 0)).toLocaleString()}
+                                                Rp {((sale.netTotalAmount !== undefined ? sale.netTotalAmount : sale.totalAmount) - (sale.totalCommission || 0)).toLocaleString()}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">

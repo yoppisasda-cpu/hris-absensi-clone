@@ -14727,10 +14727,18 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
     
     // Use explicit column selection to avoid property name issues
     const sales = await prisma.$queryRawUnsafe(`
-      SELECT s.*, c.name as "customerName", fa.name as "accountName"
+      SELECT s.*, 
+             c.name as "customerName", 
+             fa.name as "accountName",
+             (s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "netTotalAmount"
       FROM "Sale" s
       LEFT JOIN "Customer" c ON s."customerId" = c.id
       LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+      LEFT JOIN (
+        SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
+        FROM "SaleReturn"
+        GROUP BY "saleId"
+      ) sr ON sr."saleId" = s.id
       ${whereClause}
       ORDER BY s."date" DESC
     `);
