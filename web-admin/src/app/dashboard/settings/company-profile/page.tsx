@@ -223,6 +223,19 @@ export default function CompanyProfilePage() {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Format file tidak didukung! Harap upload file gambar (JPG, PNG, dll).');
+            return;
+        }
+        
+        // Limit file size to 500 KB
+        const maxSize = 500 * 1024;
+        if (file.size > maxSize) {
+            alert(`Ukuran file terlalu besar! Maksimal ukuran logo adalah 500 KB. Ukuran file Anda: ${(file.size / 1024).toFixed(1)} KB.`);
+            return;
+        }
+
         const formData = new FormData();
         formData.append('logo', file);
 

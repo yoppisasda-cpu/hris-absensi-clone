@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_UM4KY9FFw4pUKtj9i5zZ4eB8Ucl7",
+      "name": "hris-absensi-clone-os1s",
+      "directory": ".",
+      "orgId": "team_UJAfdIG2GO3T3Wmj4pzo9IjG"
+    }
+  ]
+}
