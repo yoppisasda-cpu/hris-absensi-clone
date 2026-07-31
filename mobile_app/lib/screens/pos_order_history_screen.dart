@@ -18,6 +18,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   String _selectedFilterLabel = 'Semua Tanggal';
+  String _selectedPaymentMethod = 'Semua';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -470,6 +471,15 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredOrders = _orders.where((order) {
+      // Filter Pembayaran
+      if (_selectedPaymentMethod != 'Semua') {
+        final orderPayMethod = (order['accountName'] ?? order['paymentMethod'] ?? '-').toString().toLowerCase();
+        if (!orderPayMethod.contains(_selectedPaymentMethod.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // Filter Pencarian
       if (_searchQuery.trim().isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       final inv = (order['invoiceNumber'] ?? '').toString().toLowerCase();
@@ -552,6 +562,23 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                           side: BorderSide(color: Colors.blue[200]!),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 8),
+                
+                // Payment Method Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip('Semua', () => setState(() => _selectedPaymentMethod = 'Semua'), isSelected: _selectedPaymentMethod == 'Semua'),
+                      SizedBox(width: 6),
+                      _buildFilterChip('Tunai', () => setState(() => _selectedPaymentMethod = 'Tunai'), isSelected: _selectedPaymentMethod == 'Tunai'),
+                      SizedBox(width: 6),
+                      _buildFilterChip('QRIS', () => setState(() => _selectedPaymentMethod = 'QRIS'), isSelected: _selectedPaymentMethod == 'QRIS'),
+                      SizedBox(width: 6),
+                      _buildFilterChip('Transfer', () => setState(() => _selectedPaymentMethod = 'Transfer'), isSelected: _selectedPaymentMethod == 'Transfer'),
                     ],
                   ),
                 ),
