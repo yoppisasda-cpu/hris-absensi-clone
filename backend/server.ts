@@ -11261,7 +11261,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     // 3b. Assets: Customer Receivables (Piutang Usaha)
     const unpaidSales: any[] = await prisma.$queryRawUnsafe(`
       SELECT "totalAmount", "paidAmount" FROM "Sale"
-      WHERE "companyId" = $1 AND "status" != 'PAID'
+      WHERE "companyId" = $1 AND "status" NOT IN ('PAID', 'CANCELLED', 'RETURNED', 'VOID')
     `, tenantId);
     const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
 
@@ -11448,7 +11448,7 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
 
     const unpaidSales: any[] = await prisma.$queryRawUnsafe(`
       SELECT "totalAmount", "paidAmount" FROM "Sale"
-      WHERE "companyId" = $1 AND "status" != 'PAID'
+      WHERE "companyId" = $1 AND "status" NOT IN ('PAID', 'CANCELLED', 'RETURNED', 'VOID')
     `, tenantId);
     const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
 
@@ -12335,7 +12335,7 @@ app.get('/api/finance/reports/receivable', tenantMiddleware, async (req: Request
       SELECT s.*, c."name" as "customerName"
       FROM "Sale" s
       LEFT JOIN "Customer" c ON s."customerId" = c.id
-      WHERE s."companyId" = $1 AND s."status" != 'PAID'
+      WHERE s."companyId" = $1 AND s."status" NOT IN ('PAID', 'CANCELLED', 'RETURNED', 'VOID')
       ORDER BY s."isTukarFaktur" ASC, s."date" ASC
     `, tenantId);
 

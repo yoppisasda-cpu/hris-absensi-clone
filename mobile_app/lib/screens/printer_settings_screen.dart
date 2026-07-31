@@ -28,6 +28,10 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
   final TextEditingController _footerController = TextEditingController();
   String? _logoPath;
 
+  // Receipt Printer Controllers
+  String _receiptPrinterType = 'bluetooth'; // 'bluetooth' or 'wifi'
+  final TextEditingController _receiptIpController = TextEditingController();
+  
   // Label Printer Controllers
   String _labelPrinterType = 'bluetooth'; // 'bluetooth' or 'wifi'
   final TextEditingController _labelIpController = TextEditingController();
@@ -47,6 +51,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
     _addressController.dispose();
     _phoneController.dispose();
     _footerController.dispose();
+    _receiptIpController.dispose();
     _labelIpController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -64,6 +69,11 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
       _phoneController.text = store['phone']!;
       _footerController.text = store['footer']!;
       _logoPath = store['logoPath'];
+      
+      _receiptPrinterType = config['receiptType'] ?? 'bluetooth';
+      if (_receiptPrinterType == 'wifi') {
+        _receiptIpController.text = config['receiptAddress'] ?? '';
+      }
       
       _labelPrinterType = config['labelType'] ?? 'bluetooth';
       if (_labelPrinterType == 'wifi') {
@@ -133,6 +143,13 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal terhubung!'), backgroundColor: Colors.red));
     }
+  }
+
+  Future<void> _saveReceiptWifi() async {
+    if (_receiptIpController.text.isEmpty) return;
+    await _printerService.connectReceipt("Wifi Printer", _receiptIpController.text, type: "wifi");
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Alamat IP Receipt Printer Disimpan')));
+    setState(() {});
   }
 
   Future<void> _saveLabelWifi() async {
@@ -233,57 +250,96 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
   Widget _buildReceiptTab() {
     return Column(
       children: [
-        Container(
-          padding: EdgeInsets.all(20),
-          color: Colors.blue[50],
-          child: Row(
-            children: [
-              Icon(Icons.receipt_long, color: Colors.blue[800], size: 40),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _printerService.isConnected ? 'Printer Struk Terhubung' : 'Printer Struk Terputus',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _printerService.isConnected ? Colors.green[800] : Colors.red[800]),
-                    ),
-                    if (_printerService.isConnected) Text(_printerService.connectedName ?? '', style: TextStyle(color: Colors.blueGrey)),
-                  ],
-                ),
-              ),
-              if (_printerService.isConnected)
-                IconButton(icon: Icon(Icons.close, color: Colors.red), onPressed: () async { await _printerService.disconnectReceipt(); setState(() {}); }),
-            ],
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('SCAN BLUETOOTH (Receipt)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-              _isScanning ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : IconButton(icon: Icon(Icons.refresh), onPressed: _scanDevices),
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'bluetooth', label: Text('Bluetooth'), icon: Icon(Icons.bluetooth)),
+              ButtonSegment(value: 'wifi', label: Text('Wifi (Network)'), icon: Icon(Icons.wifi)),
             ],
+            selected: {_receiptPrinterType},
+            onSelectionChanged: (Set<String> newSelection) {
+              setState(() => _receiptPrinterType = newSelection.first);
+              if (_receiptPrinterType == 'wifi' && _receiptIpController.text.isNotEmpty) {
+                 _printerService.connectReceipt("Wifi Printer", _receiptIpController.text, type: "wifi");
+              }
+            },
           ),
         ),
-        Expanded(
-          child: _devices.isEmpty
-              ? Center(child: Text('Tidak ada perangkat ditemukan'))
-              : ListView.builder(
-                  itemCount: _devices.length,
-                  itemBuilder: (context, i) {
-                    final d = _devices[i];
-                    final isCurrent = _printerService.isConnected && _printerService.connectedName == d.name;
-                    return ListTile(
-                      leading: Icon(Icons.bluetooth),
-                      title: Text(d.name),
-                      subtitle: Text(d.macAdress),
-                      trailing: isCurrent ? Icon(Icons.check_circle, color: Colors.green) : TextButton(onPressed: () => _connectReceipt(d), child: Text('Hubungkan')),
-                    );
-                  },
+        if (_receiptPrinterType == 'wifi')
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  _buildTextField(_receiptIpController, 'IP Address Printer (e.g. 192.168.1.100)', Icons.settings_ethernet, (v) => _saveReceiptWifi()),
+                  SizedBox(height: 12),
+                  Text('Pastikan Printer Kasir dan HP berada dalam jaringan yang sama.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  SizedBox(height: 20),
+                  if (_printerService.isConnected)
+                    Text('Printer Struk Terhubung ke WiFi', style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: Column(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(20),
+                  color: Colors.blue[50],
+                  child: Row(
+                    children: [
+                      Icon(Icons.receipt_long, color: Colors.blue[800], size: 40),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _printerService.isConnected ? 'Printer Struk Terhubung' : 'Printer Struk Terputus',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _printerService.isConnected ? Colors.green[800] : Colors.red[800]),
+                            ),
+                            if (_printerService.isConnected) Text(_printerService.connectedName ?? '', style: TextStyle(color: Colors.blueGrey)),
+                          ],
+                        ),
+                      ),
+                      if (_printerService.isConnected)
+                        IconButton(icon: Icon(Icons.close, color: Colors.red), onPressed: () async { await _printerService.disconnectReceipt(); setState(() {}); }),
+                    ],
+                  ),
                 ),
-        ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('SCAN BLUETOOTH (Receipt)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                      _isScanning ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : IconButton(icon: Icon(Icons.refresh), onPressed: _scanDevices),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: _devices.isEmpty
+                      ? Center(child: Text('Tidak ada perangkat ditemukan'))
+                      : ListView.builder(
+                          itemCount: _devices.length,
+                          itemBuilder: (context, i) {
+                            final d = _devices[i];
+                            final isCurrent = _printerService.isConnected && _printerService.connectedName == d.name;
+                            return ListTile(
+                              leading: Icon(Icons.bluetooth),
+                              title: Text(d.name),
+                              subtitle: Text(d.macAdress),
+                              trailing: isCurrent ? Icon(Icons.check_circle, color: Colors.green) : TextButton(onPressed: () => _connectReceipt(d), child: Text('Hubungkan')),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
         if (_printerService.isConnected)
           Padding(
             padding: const EdgeInsets.all(16.0),

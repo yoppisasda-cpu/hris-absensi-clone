@@ -16,6 +16,7 @@ class PrinterService {
   // Settings Keys
   static const String _prefReceiptPrinterName = 'receipt_printer_name';
   static const String _prefReceiptPrinterAddress = 'receipt_printer_address';
+  static const String _prefReceiptPrinterType = 'receipt_printer_type'; // 'bluetooth' or 'wifi'
   static const String _prefLabelPrinterName = 'label_printer_name';
   static const String _prefLabelPrinterAddress = 'label_printer_address';
   static const String _prefLabelPrinterType = 'label_printer_type'; // 'bluetooth' or 'wifi'
@@ -50,6 +51,7 @@ class PrinterService {
     return {
       'receiptName': prefs.getString(_prefReceiptPrinterName),
       'receiptAddress': prefs.getString(_prefReceiptPrinterAddress),
+      'receiptType': prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth',
       'labelName': prefs.getString(_prefLabelPrinterName),
       'labelAddress': prefs.getString(_prefLabelPrinterAddress),
       'labelType': prefs.getString(_prefLabelPrinterType) ?? 'bluetooth',
@@ -77,14 +79,22 @@ class PrinterService {
     return await PrintBluetoothThermal.pairedBluetooths;
   }
 
-  Future<bool> connectReceipt(String name, String address) async {
+  Future<bool> connectReceipt(String name, String address, {String type = 'bluetooth'}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefReceiptPrinterName, name);
+    await prefs.setString(_prefReceiptPrinterAddress, address);
+    await prefs.setString(_prefReceiptPrinterType, type);
+    
+    if (type == 'wifi') {
+      _isConnected = true;
+      _connectedName = name;
+      return true;
+    }
+
     final bool result = await PrintBluetoothThermal.connect(macPrinterAddress: address);
     if (result) {
       _isConnected = true;
       _connectedName = name;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_prefReceiptPrinterName, name);
-      await prefs.setString(_prefReceiptPrinterAddress, address);
     }
     return result;
   }
@@ -97,12 +107,18 @@ class PrinterService {
   }
 
   Future<void> disconnectReceipt() async {
-    await PrintBluetoothThermal.disconnect;
+    final prefs = await SharedPreferences.getInstance();
+    final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
+    
+    if (type == 'bluetooth') {
+      await PrintBluetoothThermal.disconnect;
+    }
     _isConnected = false;
     _connectedName = null;
-    final prefs = await SharedPreferences.getInstance();
+    
     await prefs.remove(_prefReceiptPrinterName);
     await prefs.remove(_prefReceiptPrinterAddress);
+    await prefs.remove(_prefReceiptPrinterType);
   }
 
   // Shim to maintain compatibility with existing code that might call .disconnect()
@@ -133,6 +149,15 @@ class PrinterService {
     bytes += generator.text(DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()), styles: PosStyles(align: PosAlign.center));
     bytes += generator.feed(3);
     bytes += generator.cut();
+
+    final prefs = await SharedPreferences.getInstance();
+    final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
+    final address = prefs.getString(_prefReceiptPrinterAddress);
+    
+    if (type == 'wifi' && address != null) {
+      await _sendToWifiPrinter(address, bytes);
+      return true;
+    }
 
     return await PrintBluetoothThermal.writeBytes(bytes);
   }
@@ -222,6 +247,15 @@ class PrinterService {
     bytes += generator.feed(3);
     bytes += generator.cut();
 
+    final prefs = await SharedPreferences.getInstance();
+    final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
+    final address = prefs.getString(_prefReceiptPrinterAddress);
+    
+    if (type == 'wifi' && address != null) {
+      await _sendToWifiPrinter(address, bytes);
+      return true;
+    }
+
     return await PrintBluetoothThermal.writeBytes(bytes);
   }
 
@@ -261,6 +295,15 @@ class PrinterService {
     bytes += generator.hr();
     bytes += generator.feed(3);
     bytes += generator.cut();
+
+    final prefs = await SharedPreferences.getInstance();
+    final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
+    final address = prefs.getString(_prefReceiptPrinterAddress);
+    
+    if (type == 'wifi' && address != null) {
+      await _sendToWifiPrinter(address, bytes);
+      return true;
+    }
 
     return await PrintBluetoothThermal.writeBytes(bytes);
   }
