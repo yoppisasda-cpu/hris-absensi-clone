@@ -44,6 +44,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
         'totalAmount': sale['totalAmount'],
         'status': 'MENUNGGU SINKRON',
         'saleType': sale['saleType'] ?? 'WALK_IN',
+        'paymentMethod': sale['paymentMethod'],
         'items': (sale['items'] as List).map((it) => {
             ...it,
             'product_name': it['name'] ?? it['productName'] ?? 'Produk',
@@ -608,7 +609,14 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                                     ],
                                   ],
                                 ),
-                                subtitle: Text(DateFormat('dd MMM yyyy, HH:mm').format(date), style: TextStyle(fontSize: 12, color: Colors.blueGrey[600])),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(DateFormat('dd MMM yyyy, HH:mm').format(date), style: TextStyle(fontSize: 12, color: Colors.blueGrey[600])),
+                                    SizedBox(height: 4),
+                                    Text('Bayar: ${order['accountName'] ?? order['paymentMethod'] ?? '-'}', style: TextStyle(fontSize: 11, color: Colors.black54, fontStyle: FontStyle.italic)),
+                                  ],
+                                ),
                                 trailing: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.end,
