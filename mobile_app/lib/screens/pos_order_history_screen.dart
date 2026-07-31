@@ -284,6 +284,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
               ),
               Text('Waktu: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(detail['date']).toLocal())}'),
               Text('Tipe: ${detail['saleType']}'),
+              Text('Metode Bayar: ${(detail['accountName'] ?? detail['paymentMethod'] ?? '-').toString().toUpperCase()}'),
               SizedBox(height: 16),
               Expanded(
                 child: ListView.builder(
@@ -614,7 +615,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                                   children: [
                                     Text(DateFormat('dd MMM yyyy, HH:mm').format(date), style: TextStyle(fontSize: 12, color: Colors.blueGrey[600])),
                                     SizedBox(height: 4),
-                                    Text('Bayar: ${order['accountName'] ?? order['paymentMethod'] ?? '-'}', style: TextStyle(fontSize: 11, color: Colors.black54, fontStyle: FontStyle.italic)),
+                                    Text('Metode Bayar: ${(order['accountName'] ?? order['paymentMethod'] ?? '-').toString().toUpperCase()}', style: TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.w500)),
                                   ],
                                 ),
                                 trailing: Column(
