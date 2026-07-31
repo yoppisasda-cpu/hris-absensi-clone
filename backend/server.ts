@@ -14748,7 +14748,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
 
     const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
 
-    let whereConditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`, `s."status" != 'RETURNED' AND s."status" != 'CANCELLED'`];
+    let whereConditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')`];
     let queryParams: any[] = [tenantId];
     let paramIndex = 2;
     
@@ -14797,11 +14797,19 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
 
     // 1. Top Products
     const topProducts = await prisma.$queryRawUnsafe(`
-      SELECT p.name, SUM(si.quantity) as "totalSold", SUM(si.total) as "totalRevenue"
+      SELECT p.name, 
+             SUM(si.quantity - COALESCE(ret.returnedQty, 0)) as "totalSold", 
+             SUM(si.total - COALESCE(ret.returnedTotal, 0)) as "totalRevenue"
       FROM "SaleItem" si
       JOIN "Sale" s ON si."saleId" = s.id
       JOIN "Product" p ON si."productId" = p.id
       LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+      LEFT JOIN (
+        SELECT sri."productId", sr."saleId", SUM(sri.quantity) as returnedQty, SUM(sri.total) as returnedTotal
+        FROM "SaleReturnItem" sri
+        JOIN "SaleReturn" sr ON sri."returnId" = sr.id
+        GROUP BY sri."productId", sr."saleId"
+      ) ret ON ret."productId" = si."productId" AND ret."saleId" = si."saleId"
       WHERE ${whereClause}
       GROUP BY p.name
       ORDER BY "totalSold" DESC
@@ -14810,9 +14818,16 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
 
     // 2. Sales Trend (Daily)
     const salesTrend = await prisma.$queryRawUnsafe(`
-      SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "date", SUM(s."totalAmount") as "total", COUNT(s.id) as "count"
+      SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "date", 
+             SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "total", 
+             COUNT(s.id) as "count"
       FROM "Sale" s
       LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+      LEFT JOIN (
+        SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
+        FROM "SaleReturn"
+        GROUP BY "saleId"
+      ) sr ON sr."saleId" = s.id
       WHERE ${whereClause}
       GROUP BY DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')
       ORDER BY "date" ASC
@@ -14832,9 +14847,14 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
             WHEN s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' THEN 'TRANSFER'
             ELSE 'TUNAI'
           END as method,
-          s."totalAmount" as totalAmount
+          s."totalAmount" - COALESCE(sr."totalRefund", 0) as totalAmount
         FROM "Sale" s
         LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+        LEFT JOIN (
+          SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
+          FROM "SaleReturn"
+          GROUP BY "saleId"
+        ) sr ON sr."saleId" = s.id
         WHERE ${whereClause}
       ) sub
       GROUP BY method
@@ -14873,7 +14893,7 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     const prevEnd = new Date(currentStart.getTime());
 
     const buildWhere = (start: Date, end: Date) => {
-      let conditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`, `s."date" >= $2`, `s."date" <= $3`, `s."status" != 'RETURNED' AND s."status" != 'CANCELLED'` ];
+      let conditions = [`s."companyId" = $1`, `s."invoiceNumber" LIKE 'POS-%'`, `s."date" >= $2`, `s."date" <= $3`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')` ];
       if (branchId && branchId !== 'all') {
         if (branchId === 'null') conditions.push(`s."branchId" IS NULL`);
         else conditions.push(`s."branchId" = ${parseInt(branchId as string)}`);
@@ -14885,9 +14905,9 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     const getSummary = async (start: Date, end: Date) => {
       const result: any[] = await prisma.$queryRawUnsafe(`
         SELECT 
-          SUM(s."totalAmount") as "revenue", 
+          SUM(s."totalAmount" - COALESCE((SELECT SUM("totalRefundAmount") FROM "SaleReturn" sr WHERE sr."saleId" = s.id), 0)) as "revenue", 
           COUNT(s.id) as "orders",
-          AVG(s."totalAmount") as "aov"
+          AVG(s."totalAmount" - COALESCE((SELECT SUM("totalRefundAmount") FROM "SaleReturn" sr WHERE sr."saleId" = s.id), 0)) as "aov"
         FROM "Sale" s
         WHERE ${buildWhere(start, end)}
       `, tenantId, start, end);
@@ -14901,9 +14921,14 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     const hourlyData = await prisma.$queryRawUnsafe(`
       SELECT 
         EXTRACT(HOUR FROM s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "hour",
-        SUM(s."totalAmount") as "revenue",
+        SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "revenue",
         COUNT(s.id) as "orders"
       FROM "Sale" s
+      LEFT JOIN (
+        SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
+        FROM "SaleReturn"
+        GROUP BY "saleId"
+      ) sr ON sr."saleId" = s.id
       WHERE ${buildWhere(currentStart, currentEnd)}
       GROUP BY 1
       ORDER BY 1 ASC
@@ -14913,11 +14938,17 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     const categoryData = await prisma.$queryRawUnsafe(`
       SELECT 
         COALESCE(c.name, 'Uncategorized') as "category",
-        SUM(si.total) as "revenue"
+        SUM(si.total - COALESCE(ret.returnedTotal, 0)) as "revenue"
       FROM "SaleItem" si
       JOIN "Sale" s ON si."saleId" = s.id
       JOIN "Product" p ON si."productId" = p.id
       LEFT JOIN "ProductCategory" c ON p."categoryId" = c.id
+      LEFT JOIN (
+        SELECT sri."productId", sr."saleId", SUM(sri.total) as returnedTotal
+        FROM "SaleReturnItem" sri
+        JOIN "SaleReturn" sr ON sri."returnId" = sr.id
+        GROUP BY sri."productId", sr."saleId"
+      ) ret ON ret."productId" = si."productId" AND ret."saleId" = si."saleId"
       WHERE ${buildWhere(currentStart, currentEnd)}
       GROUP BY c.name
       ORDER BY "revenue" DESC
@@ -14925,8 +14956,14 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
 
     // 4. Daily Trend (to compare with previous if needed)
     const dailyTrend = await prisma.$queryRawUnsafe(`
-      SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "date", SUM(s."totalAmount") as "total"
+      SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "date", 
+             SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "total"
       FROM "Sale" s
+      LEFT JOIN (
+        SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
+        FROM "SaleReturn"
+        GROUP BY "saleId"
+      ) sr ON sr."saleId" = s.id
       WHERE ${buildWhere(currentStart, currentEnd)}
       GROUP BY DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')
       ORDER BY "date" ASC
@@ -15080,7 +15117,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const isPosViewer = (user?.role as string) === 'POS_VIEWER';
     const invoiceFilter = isPosViewer ? `AND (s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')` : '';
     
-    let whereConditions = [`s."companyId" = ${tenantId}`];
+    let whereConditions = [`s."companyId" = ${tenantId}`, `s."status" NOT IN ('CANCELLED', 'VOID', 'RETURNED')`];
     if (isPosViewer) {
       whereConditions.push(`(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`);
     }
@@ -15142,11 +15179,20 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
     const sales: any[] = await prisma.$queryRawUnsafe(`
-      SELECT s.*, c.name as "customerName", fa.name as "accountName", b.name as "branchName"
+      SELECT s.*, 
+             c.name as "customerName", 
+             fa.name as "accountName", 
+             b.name as "branchName",
+             (s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "netTotalAmount"
       FROM "Sale" s
       LEFT JOIN "Customer" c ON s."customerId" = c.id
       LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       LEFT JOIN "Branch" b ON s."branchId" = b.id
+      LEFT JOIN (
+        SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
+        FROM "SaleReturn"
+        GROUP BY "saleId"
+      ) sr ON sr."saleId" = s.id
       ${whereClause}
       ORDER BY s."date" DESC
     `);
@@ -15229,9 +15275,8 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
         branchName: sale.branchName || 'Kantor Pusat',
         customerName: sale.customerName || 'Umum',
         status: sale.status === 'PAID' ? 'Lunas' : 
-                sale.status === 'RETURNED' ? 'Diretur' :
                 sale.status === 'PARTIALLY_RETURNED' ? 'Retur Sebagian' : 'Belum Bayar',
-        totalAmount: sale.totalAmount || 0,
+        totalAmount: sale.netTotalAmount !== undefined ? sale.netTotalAmount : sale.totalAmount || 0,
         notes: sale.notes || '-'
       });
       row.getCell('totalAmount').numFmt = '#,##0';
