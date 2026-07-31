@@ -14491,6 +14491,57 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
         if (status === 'PAID' && finalAccountId) {
             // (Finance logic here if needed, similar to POST /api/sales)
         }
+      } else if (oldStatus !== 'CANCELLED' && oldStatus !== 'VOID' && (status === 'CANCELLED' || status === 'VOID')) {
+        // --- CANCEL/VOID LOGIC ---
+        // 1. Revert Finance (Income & Balance)
+        const incomes = await tx.income.findMany({ where: { description: { contains: sale.invoiceNumber } } });
+        for (const inc of incomes) {
+          if (inc.accountId) {
+            await tx.financialAccount.update({
+              where: { id: inc.accountId },
+              data: { balance: { decrement: inc.amount } }
+            });
+          }
+        }
+        await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+        
+        // 2. Revert PointHistory
+        const pointHistories = await tx.pointHistory.findMany({ where: { description: { contains: sale.invoiceNumber } } });
+        for (const ph of pointHistories) {
+            if (ph.type === 'EARN') {
+                await tx.customer.update({
+                    where: { id: ph.customerId },
+                    data: { points: { decrement: ph.amount } }
+                });
+            } else if (ph.type === 'REDEEM') {
+                await tx.customer.update({
+                    where: { id: ph.customerId },
+                    data: { points: { increment: ph.amount } }
+                });
+            }
+        }
+        await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+
+        // 3. Revert Inventory (If previously PAID or PROCESSING)
+        if (oldStatus === 'PAID' || oldStatus === 'PROCESSING') {
+          for (const item of sale.SaleItem) {
+            if (!item.productId) continue;
+            const qty = parseFloat(item.quantity as any);
+            
+            await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3`, qty, item.productId, tenantId);
+            await tx.$executeRawUnsafe(`INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date") VALUES ($1, 'IN', $2, $3, NOW())`, item.productId, qty, `Pembatalan Penjualan Inv ${sale.invoiceNumber}`);
+            
+            const recipes: any[] = await tx.$queryRawUnsafe(`SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr JOIN "Product" p ON pr."productId" = p.id WHERE pr."productId" = $1`, item.productId);
+            if (recipes.length > 0) {
+              const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
+              for (const recipe of recipes) {
+                const totalMaterialNeeded = (parseFloat(recipe.quantity) / yieldVal) * qty;
+                await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" + $1, "updatedAt" = NOW() WHERE "id" = $2`, totalMaterialNeeded, recipe.materialId);
+                await tx.$executeRawUnsafe(`INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date") VALUES ($1, 'IN', $2, $3, NOW())`, recipe.materialId, totalMaterialNeeded, `Pembatalan Penjualan (BOM) Inv ${sale.invoiceNumber}`);
+              }
+            }
+          }
+        }
       }
     });
 
