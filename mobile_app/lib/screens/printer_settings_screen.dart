@@ -148,14 +148,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
   Future<void> _saveReceiptWifi() async {
     if (_receiptIpController.text.isEmpty) return;
     await _printerService.connectReceipt("Wifi Printer", _receiptIpController.text, type: "wifi");
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Alamat IP Receipt Printer Disimpan')));
     setState(() {});
   }
 
   Future<void> _saveLabelWifi() async {
     if (_labelIpController.text.isEmpty) return;
     await _printerService.connectLabel("Wifi Printer", _labelIpController.text, "wifi");
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Alamat IP Label Printer Disimpan')));
   }
 
   Future<void> _selectLabelBt(BluetoothInfo device) async {
