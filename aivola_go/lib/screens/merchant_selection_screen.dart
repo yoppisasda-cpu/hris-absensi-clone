@@ -115,6 +115,10 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
       logoUrl: merchant.logoUrl,
       merchantId: merchant.id,
       merchantName: merchant.name,
+      openTime: merchant.openTime,
+      closeTime: merchant.closeTime,
+      isOpenManual: merchant.isOpenManual,
+      timezone: merchant.timezone,
     );
 
     // Scope products to this merchant

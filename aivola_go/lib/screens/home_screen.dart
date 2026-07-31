@@ -224,6 +224,29 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (!brandingProvider.isStoreOpen)
+            Container(
+              width: double.infinity,
+              margin: EdgeInsets.only(bottom: 20),
+              padding: EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withOpacity(0.1),
+                border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.redAccent),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Mohon Maaf, Toko Sedang Tutup. Pemesanan sementara tidak tersedia.",
+                      style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (brandingProvider.banners.isNotEmpty) ...[
             CarouselSlider(
               options: CarouselOptions(

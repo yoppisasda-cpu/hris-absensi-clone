@@ -427,9 +427,13 @@ class _CartScreenState extends State<CartScreen> {
             width: double.infinity,
             height: 55,
             child: ElevatedButton(
-              onPressed: () => _handleCheckout(cartProvider, primaryColor),
-              style: ElevatedButton.styleFrom(backgroundColor: primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 0),
-              child: Text("BAYAR SEKARANG", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              onPressed: brandingProvider.isStoreOpen ? () => _handleCheckout(cartProvider, primaryColor) : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brandingProvider.isStoreOpen ? primaryColor : Colors.grey.withOpacity(0.5), 
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), 
+                elevation: 0
+              ),
+              child: Text(brandingProvider.isStoreOpen ? "BAYAR SEKARANG" : "TOKO SEDANG TUTUP", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           )
         ],

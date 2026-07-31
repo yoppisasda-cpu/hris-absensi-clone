@@ -2113,7 +2113,11 @@ app.get('/api/companies/public', async (req: Request, res: Response) => {
         picPhone: true,
         latitude: true,
         longitude: true,
-        branches: true
+        branches: true,
+        openTime: true,
+        closeTime: true,
+        isOpenManual: true,
+        timezone: true
       }
     });
     res.json(companies);
@@ -3117,7 +3121,10 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         globalTaxRate: parseNum(globalTaxRate),
         timezone: timezone || undefined,
         addons: Array.isArray(addons) ? addons : undefined,
-        deliveryNoteTerms: deliveryNoteTerms !== undefined ? deliveryNoteTerms : undefined
+        deliveryNoteTerms: deliveryNoteTerms !== undefined ? deliveryNoteTerms : undefined,
+        openTime: req.body.openTime !== undefined ? req.body.openTime : undefined,
+        closeTime: req.body.closeTime !== undefined ? req.body.closeTime : undefined,
+        isOpenManual: req.body.isOpenManual !== undefined ? !!req.body.isOpenManual : undefined
       }
     });
 

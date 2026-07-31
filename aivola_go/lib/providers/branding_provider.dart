@@ -14,6 +14,10 @@ class BrandingProvider with ChangeNotifier {
   String? _selectedMerchantName;
   List<PromoBanner> _banners = [];
   List<Voucher> _vouchers = [];
+  String? _openTime;
+  String? _closeTime;
+  bool _isOpenManual = true;
+  String? _timezone;
 
   Color get primaryColor => _primaryColor;
   Color get secondaryColor => _secondaryColor;
@@ -22,6 +26,36 @@ class BrandingProvider with ChangeNotifier {
   String? get selectedMerchantName => _selectedMerchantName;
   List<PromoBanner> get banners => _banners;
   List<Voucher> get vouchers => _vouchers;
+  String? get timezone => _timezone;
+
+  bool get isStoreOpen {
+    if (!_isOpenManual) return false;
+    
+    if (_openTime != null && _closeTime != null) {
+      final now = DateTime.now();
+      try {
+        final openParts = _openTime!.split(':');
+        final closeParts = _closeTime!.split(':');
+        
+        final openMinutes = int.parse(openParts[0]) * 60 + int.parse(openParts[1]);
+        final closeMinutes = int.parse(closeParts[0]) * 60 + int.parse(closeParts[1]);
+        final currentMinutes = now.hour * 60 + now.minute;
+        
+        if (closeMinutes < openMinutes) {
+          if (currentMinutes < openMinutes && currentMinutes > closeMinutes) {
+            return false;
+          }
+        } else {
+          if (currentMinutes < openMinutes || currentMinutes > closeMinutes) {
+            return false;
+          }
+        }
+      } catch (e) {
+        print("Error parsing store hours: $e");
+      }
+    }
+    return true;
+  }
 
   String? get fullLogoUrl {
     return ApiService.resolveUrl(_logoUrl);
@@ -38,6 +72,10 @@ class BrandingProvider with ChangeNotifier {
     _logoUrl = prefs.getString('logoUrl');
     _selectedMerchantId = prefs.getInt('selectedMerchantId');
     _selectedMerchantName = prefs.getString('selectedMerchantName');
+    _openTime = prefs.getString('openTime');
+    _closeTime = prefs.getString('closeTime');
+    _isOpenManual = prefs.getBool('isOpenManual') ?? true;
+    _timezone = prefs.getString('timezone');
 
     if (primary != null) {
       _primaryColor = Color(int.parse(primary.replaceFirst('#', '0xFF')));
@@ -98,6 +136,10 @@ class BrandingProvider with ChangeNotifier {
     _primaryColor = const Color(0xFF3B82F6);
     _secondaryColor = const Color(0xFF1E293B);
     _logoUrl = null;
+    _openTime = null;
+    _closeTime = null;
+    _isOpenManual = true;
+    _timezone = null;
     _banners = [];
     _vouchers = [];
     notifyListeners();
@@ -109,6 +151,10 @@ class BrandingProvider with ChangeNotifier {
     String? logoUrl,
     int? merchantId,
     String? merchantName,
+    String? openTime,
+    String? closeTime,
+    bool isOpenManual = true,
+    String? timezone,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('primaryColor', primaryHex);
@@ -116,12 +162,20 @@ class BrandingProvider with ChangeNotifier {
     if (logoUrl != null) await prefs.setString('logoUrl', logoUrl);
     if (merchantId != null) await prefs.setInt('selectedMerchantId', merchantId);
     if (merchantName != null) await prefs.setString('selectedMerchantName', merchantName);
+    if (openTime != null) await prefs.setString('openTime', openTime);
+    if (closeTime != null) await prefs.setString('closeTime', closeTime);
+    await prefs.setBool('isOpenManual', isOpenManual);
+    if (timezone != null) await prefs.setString('timezone', timezone);
 
     _primaryColor = Color(int.parse(primaryHex.replaceFirst('#', '0xFF')));
     _secondaryColor = Color(int.parse(secondaryHex.replaceFirst('#', '0xFF')));
     _logoUrl = logoUrl;
     _selectedMerchantId = merchantId;
     _selectedMerchantName = merchantName;
+    _openTime = openTime;
+    _closeTime = closeTime;
+    _isOpenManual = isOpenManual;
+    _timezone = timezone;
     
     if (_selectedMerchantId != null) {
       fetchBanners();

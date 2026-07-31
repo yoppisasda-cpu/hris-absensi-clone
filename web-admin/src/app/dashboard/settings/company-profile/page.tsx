@@ -33,6 +33,9 @@ interface Company {
     secondaryColor: string | null;
     posBlindClosing: boolean;
     globalTaxRate: number;
+    openTime: string | null;
+    closeTime: string | null;
+    isOpenManual: boolean;
 }
 
 export default function CompanyProfilePage() {
@@ -57,7 +60,10 @@ export default function CompanyProfilePage() {
         secondaryColor: '#1E293B',
         posBlindClosing: false,
         globalTaxRate: 0,
-        deliveryNoteTerms: ''
+        deliveryNoteTerms: '',
+        openTime: '08:00',
+        closeTime: '22:00',
+        isOpenManual: true
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -103,7 +109,10 @@ export default function CompanyProfilePage() {
                 secondaryColor: response.data.secondaryColor || '#1E293B',
                 posBlindClosing: response.data.posBlindClosing || false,
                 globalTaxRate: response.data.globalTaxRate || 0,
-                deliveryNoteTerms: response.data.deliveryNoteTerms || ''
+                deliveryNoteTerms: response.data.deliveryNoteTerms || '',
+                openTime: response.data.openTime || '08:00',
+                closeTime: response.data.closeTime || '22:00',
+                isOpenManual: response.data.isOpenManual ?? true
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -150,7 +159,10 @@ export default function CompanyProfilePage() {
                 secondaryColor: formData.secondaryColor,
                 posBlindClosing: formData.posBlindClosing,
                 globalTaxRate: formData.globalTaxRate,
-                deliveryNoteTerms: formData.deliveryNoteTerms
+                deliveryNoteTerms: formData.deliveryNoteTerms,
+                openTime: formData.openTime,
+                closeTime: formData.closeTime,
+                isOpenManual: formData.isOpenManual
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -587,7 +599,56 @@ export default function CompanyProfilePage() {
 
                                 <div className="pt-8 border-t border-slate-100">
                                     <div className="flex items-center gap-2 mb-6">
+                                        <div className="h-6 w-1 bg-violet-500 rounded-full"></div>
+                                        <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Jam Operasional Toko</h3>
+                                    </div>
+                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center justify-between mb-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm border ${formData.isOpenManual ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-rose-100 text-rose-600 border-rose-200'}`}>
+                                                {formData.isOpenManual ? <span className="font-bold text-lg">ON</span> : <span className="font-bold text-lg">OFF</span>}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-800">Toko Sedang Buka? (Tutup Paksa Manual)</h4>
+                                                <p className="text-xs text-slate-500 max-w-sm mt-0.5">Matikan saklar ini jika Anda ingin menutup toko secara darurat, terlepas dari jam operasional.</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, isOpenManual: !formData.isOpenManual })}
+                                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none ${formData.isOpenManual ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                        >
+                                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.isOpenManual ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Jam Buka</label>
+                                            <input
+                                                type="time"
+                                                value={formData.openTime}
+                                                onChange={e => setFormData({ ...formData, openTime: e.target.value })}
+                                                className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none hover:border-slate-300"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Jam Tutup</label>
+                                            <input
+                                                type="time"
+                                                value={formData.closeTime}
+                                                onChange={e => setFormData({ ...formData, closeTime: e.target.value })}
+                                                className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm font-semibold text-slate-700 transition-all focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none hover:border-slate-300"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="mt-4 text-[10px] text-slate-400 italic">
+                                        * Jam ini akan membatasi pemesanan melalui aplikasi Aivola GO jika pelanggan mencoba memesan di luar jam ini.
+                                    </p>
+                                </div>
+
+                                <div className="pt-8 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-6">
                                         <div className="h-6 w-1 bg-rose-500 rounded-full"></div>
+
                                         <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Sistem Kasir (POS)</h3>
                                     </div>
                                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center justify-between">
