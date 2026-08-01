@@ -10864,7 +10864,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
         
         if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
           const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-          const depName = `Penyusutan: ${asset.name}`;
+          const depName = `Penyusutan Kategori: ${asset.category || 'Lainnya'}`;
           depreciationByCategory[depName] = (depreciationByCategory[depName] || 0) + monthlyDepreciation;
           totalDepreciation += monthlyDepreciation;
         }
@@ -11057,7 +11057,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
         
         if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
           const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-          const depName = `Penyusutan: ${asset.name}`;
+          const depName = `Penyusutan Kategori: ${asset.category || 'Lainnya'}`;
           depreciationByCategory[depName] = (depreciationByCategory[depName] || 0) + monthlyDepreciation;
           totalDepreciation += monthlyDepreciation;
         }
