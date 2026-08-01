@@ -14083,7 +14083,7 @@ app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Res
 app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { items, accountId, customerId, status, notes, date, dueDate, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod } = req.body;
+    const { items, accountId, customerId, status, notes, date, dueDate, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod, taxRate, taxAmount, memberDiscountAmount } = req.body;
     const userId = Number((req as any).userId);
     let finalCustomerId = customerId ? parseInt(customerId) : null;
     const dueDateVal = (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') ? new Date(dueDate) : null;
