@@ -14934,9 +14934,9 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
     };
 
     res.json(serialize({
-      topProducts,
-      salesTrend,
-      paymentMethods
+      topProducts: topProducts.map((p: any) => ({ ...p, totalSold: Number(p.totalSold) || 0, totalRevenue: Number(p.totalRevenue) || 0 })),
+      salesTrend: salesTrend.map((t: any) => ({ ...t, total: Number(t.total) || 0, count: Number(t.count) || 0 })),
+      paymentMethods: paymentMethods.map((m: any) => ({ ...m, total: Number(m.total) || 0 }))
     }));
   } catch (error: any) {
     console.error("POS Analytics Error Detail:", error);
@@ -15043,12 +15043,12 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
 
     res.json(serialize({
       summary: {
-        current: currentSummary,
-        previous: prevSummary
+        current: { ...currentSummary, revenue: Number(currentSummary.revenue) || 0, aov: Number(currentSummary.aov) || 0, orders: Number(currentSummary.orders) || 0 },
+        previous: { ...prevSummary, revenue: Number(prevSummary.revenue) || 0, aov: Number(prevSummary.aov) || 0, orders: Number(prevSummary.orders) || 0 }
       },
-      hourly: hourlyData,
-      categories: categoryData,
-      trend: dailyTrend
+      hourly: hourlyData.map((h: any) => ({ ...h, revenue: Number(h.revenue) || 0, orders: Number(h.orders) || 0 })),
+      categories: categoryData.map((c: any) => ({ ...c, revenue: Number(c.revenue) || 0 })),
+      trend: dailyTrend.map((t: any) => ({ ...t, total: Number(t.total) || 0 }))
     }));
   } catch (error: any) {
     console.error("POS Comprehensive Analytics Error:", error);
