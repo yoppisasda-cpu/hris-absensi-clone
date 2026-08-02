@@ -14813,7 +14813,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
 
     const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
 
-    let whereConditions = [`s."companyId" = $1`, `(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')`];
+    let whereConditions = [`s."companyId" = $1`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')`];
     let queryParams: any[] = [tenantId];
     let paramIndex = 2;
     
@@ -14958,7 +14958,7 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     const prevEnd = new Date(currentStart.getTime());
 
     const buildWhere = (start: Date, end: Date) => {
-      let conditions = [`s."companyId" = $1`, `(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`, `s."date" >= $2`, `s."date" <= $3`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')` ];
+      let conditions = [`s."companyId" = $1`, `s."date" >= $2`, `s."date" <= $3`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')` ];
       if (branchId && branchId !== 'all') {
         if (branchId === 'null') conditions.push(`s."branchId" IS NULL`);
         else conditions.push(`s."branchId" = ${parseInt(branchId as string)}`);
@@ -15094,10 +15094,6 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
     const sales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
-        OR: [
-          { invoiceNumber: { startsWith: 'POS-' } },
-          { invoiceNumber: { startsWith: 'SLS-' } }
-        ],
         date: {
           gte: startDate ? new Date(startDate as string) : undefined,
           lte: endDate ? new Date(endDate as string) : undefined,
