@@ -692,12 +692,14 @@ class ApiService {
     double taxRate = 0,
     double taxAmount = 0,
     int? pendingBillId,
+    String? date,
   }) async {
     try {
       final response = await _dio.post('/pos/checkout', data: {
         'items': items,
         'accountId': accountId,
         'totalAmount': totalAmount,
+        'date': date,
         'customerId': customerId,
         'customerName': customerName,
         'customerPhone': customerPhone,

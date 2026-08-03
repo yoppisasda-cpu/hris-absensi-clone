@@ -15984,7 +15984,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       pointsEarned = 0,
       taxRate = 0,
       taxAmount = 0,
-      pendingBillId = null
+      pendingBillId = null,
+      date,
     } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
