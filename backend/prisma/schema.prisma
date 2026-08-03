@@ -1443,6 +1443,7 @@ enum POStatus {
   APPROVED
   REJECTED
   PAUSED
+  CANCELLED
 }
 
 enum SOStatus {

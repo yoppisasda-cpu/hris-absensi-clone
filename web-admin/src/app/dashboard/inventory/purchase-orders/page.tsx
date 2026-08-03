@@ -58,6 +58,16 @@ export default function PurchaseOrdersPage() {
         fetchCompany();
     }, []);
 
+    const handleCancelPO = async (id: number) => {
+        try {
+            await api.post(`/inventory/purchase-orders/${id}/cancel`);
+            toast.success('PO berhasil dibatalkan (Void). Hutang dan stok telah dikembalikan.');
+            fetchPos();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Gagal membatalkan PO');
+        }
+    };
+
     const handleUpdateStatus = async (id: number, status: 'APPROVED' | 'REJECTED') => {
         if (!window.confirm(`Apakah Anda yakin ingin ${status === 'APPROVED' ? 'MENYETUJUI' : 'MENOLAK'} pesanan ini?`)) return;
 
@@ -556,6 +566,10 @@ export default function PurchaseOrdersPage() {
                 }}
                 onReject={(id: number, status: 'APPROVED' | 'REJECTED') => {
                     handleUpdateStatus(id, status);
+                    setIsDetailModalOpen(false);
+                }}
+                onCancel={(id: number) => {
+                    handleCancelPO(id);
                     setIsDetailModalOpen(false);
                 }}
             />

@@ -3028,6 +3028,116 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
   }
 });
 
+// PO4. Cancel (Void) Approved PO
+app.post('/api/inventory/purchase-orders/:id/cancel', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userRole = (req as any).userRole;
+    const id = parseInt(req.params.id as string);
+
+    // Role check: Only PURCHASING/ADMIN can cancel
+    if (!['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'FINANCE'].includes(userRole)) {
+      return res.status(403).json({ error: 'Anda tidak memiliki hak untuk membatalkan PO ini.' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const po: any = await tx.$queryRawUnsafe(`
+        SELECT po.*
+        FROM "PurchaseOrder" po
+        WHERE po.id = $1 AND po."companyId" = $2
+      `, id, tenantId);
+
+      if (!po || po.length === 0) throw new Error('PO tidak ditemukan.');
+      const poData = po[0];
+
+      if (poData.status !== 'APPROVED') {
+        throw new Error('Hanya PO yang berstatus APPROVED yang dapat dibatalkan (void).');
+      }
+
+      // 1. Delete associated Expense (Hutang)
+      const expense = await tx.expense.findFirst({
+        where: {
+          companyId: tenantId,
+          description: `Hutang otomatis dari PO #${poData.orderNumber}`
+        }
+      });
+
+      if (expense) {
+        if (expense.status === 'PAID') {
+          throw new Error('Hutang dari PO ini sudah dilunasi. Tidak dapat membatalkan PO.');
+        }
+        await tx.expense.delete({ where: { id: expense.id } });
+      }
+
+      // 2. Reverse Stock (Inventory)
+      const poItems = await tx.purchaseOrderItem.findMany({
+        where: { purchaseOrderId: id }
+      });
+
+      const warehouseId = poData.warehouseId;
+
+      for (const item of poItems) {
+        const currentProduct = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { purchaseFactor: true }
+        });
+
+        if (currentProduct) {
+          const factor = currentProduct.purchaseFactor || 1;
+          const incomingQty = item.quantity * factor;
+
+          // Update Global Stock
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { 
+              stock: { decrement: incomingQty }
+              // Note: We deliberately do NOT reverse the Moving Average Cost (WAC) 
+              // as doing so safely requires a full ledger recalculation.
+            }
+          });
+
+          // Update Warehouse Stock if applicable
+          if (warehouseId) {
+            await tx.$executeRawUnsafe(`
+              UPDATE "WarehouseStock" 
+              SET "quantity" = GREATEST("quantity" - $3, 0), "updatedAt" = NOW()
+              WHERE "productId" = $1 AND "warehouseId" = $2
+            `, item.productId, warehouseId, incomingQty);
+          }
+
+          // Record Stock Transaction (Reversal)
+          await tx.stockTransaction.create({
+            data: {
+              productId: item.productId,
+              type: 'OUT',
+              quantity: incomingQty,
+              reference: `PO #${poData.orderNumber} (Void Reversal)`,
+              date: new Date(),
+              warehouseId: warehouseId || null
+            }
+          });
+        }
+      }
+
+      // 3. Update PO Status
+      const updatedPo = await tx.purchaseOrder.update({
+        where: { id },
+        data: {
+          status: 'CANCELLED',
+          updatedAt: new Date()
+        }
+      });
+
+      return updatedPo;
+    });
+
+    res.json({ message: 'PO berhasil dibatalkan (Void). Hutang dan stok telah dikembalikan.', result });
+  } catch (error: any) {
+    console.error("PO CANCEL ERROR:", error);
+    res.status(500).json({ error: 'Gagal membatalkan PO: ' + error.message });
+  }
+});
+
 // A2.1. Endpoint Menghapus Perusahaan (Super Admin Only)
 app.delete('/api/companies/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {

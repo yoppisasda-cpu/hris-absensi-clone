@@ -2,13 +2,14 @@
 
 import { X, Truck, Package, Clock, User, CheckCircle2, XCircle, FileText, ShoppingBag, Printer } from "lucide-react";
 
-export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject }: any) {
+export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject, onCancel }: any) {
     if (!isOpen || !po) return null;
 
     const getStatusStyle = (status: string) => {
         switch (status) {
             case 'APPROVED': return 'border-slate-950 text-slate-950 bg-slate-50';
             case 'REJECTED': return 'border-slate-300 text-slate-400 bg-slate-50';
+            case 'CANCELLED': return 'border-red-300 text-red-500 bg-red-50';
             default: return 'border-slate-900 text-slate-900 bg-slate-50';
         }
     };
@@ -17,6 +18,7 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
         switch (status) {
             case 'APPROVED': return 'DISETUJUI';
             case 'REJECTED': return 'DITOLAK';
+            case 'CANCELLED': return 'DIBATALKAN (VOID)';
             default: return 'MENUNGGU PERSETUJUAN';
         }
     };
@@ -178,12 +180,26 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                             </button>
                         </>
                     ) : (
-                        <button
-                            onClick={onClose}
-                            className="px-8 py-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-white text-[10px] font-black uppercase italic tracking-[0.2em] transition-all active:scale-95 border border-slate-950"
-                        >
-                            Tutup
-                        </button>
+                        <>
+                            {po.status === 'APPROVED' && onCancel && (
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm('PERINGATAN: Membatalkan PO ini akan menghapus tagihan Hutang dan menarik kembali stok bahan baku. Apakah Anda yakin?')) {
+                                            onCancel(po.id);
+                                        }
+                                    }}
+                                    className="px-6 py-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-[10px] font-black uppercase italic tracking-[0.2em] transition-all active:scale-95 border border-red-200 mr-auto"
+                                >
+                                    Batalkan PO (Void)
+                                </button>
+                            )}
+                            <button
+                                onClick={onClose}
+                                className="px-8 py-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-white text-[10px] font-black uppercase italic tracking-[0.2em] transition-all active:scale-95 border border-slate-950"
+                            >
+                                Tutup
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
