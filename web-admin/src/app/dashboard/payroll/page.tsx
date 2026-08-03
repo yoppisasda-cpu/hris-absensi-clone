@@ -201,8 +201,8 @@ export default function PayrollPage() {
                         onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
                         className="rounded-xl border border-slate-700 bg-slate-950 text-indigo-400 font-black italic uppercase text-xs px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
                     >
-                        {Array.from({ length: 12 }, (_, i) => (
-                            <option key={i + 1} value={i + 1}>Bulan {i + 1}</option>
+                        {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((monthName, i) => (
+                            <option key={i + 1} value={i + 1}>{monthName}</option>
                         ))}
                     </select>
                     <select
