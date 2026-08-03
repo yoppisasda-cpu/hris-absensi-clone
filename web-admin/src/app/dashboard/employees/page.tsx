@@ -43,6 +43,7 @@ interface User {
     mealAllowance?: number;
     taxStatus?: string;
     isTaxable?: boolean;
+    isAttendanceExempt?: boolean;
 }
 
 export default function EmployeesPage() {
@@ -61,7 +62,7 @@ export default function EmployeesPage() {
         id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
         basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
         contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
-        taxStatus: 'TK-0', isTaxable: true
+        taxStatus: 'TK-0', isTaxable: true, isAttendanceExempt: false
     });
 
     // State untuk Modal Dokumen (Phase 26)
@@ -140,7 +141,7 @@ export default function EmployeesPage() {
                 id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
                 basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
                 contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
-                taxStatus: 'TK-0', isTaxable: true
+                taxStatus: 'TK-0', isTaxable: true, isAttendanceExempt: false
             });
             setIsEditMode(false);
 
@@ -204,7 +205,8 @@ export default function EmployeesPage() {
             mealAllowance: user.mealAllowance || 0,
             reportToId: user.reportToId?.toString() || '',
             taxStatus: user.taxStatus || 'TK-0',
-            isTaxable: user.isTaxable !== false
+            isTaxable: user.isTaxable !== false,
+            isAttendanceExempt: user.isAttendanceExempt === true
         });
         setIsEditMode(true);
         setIsModalOpen(true);
@@ -298,7 +300,7 @@ export default function EmployeesPage() {
                                 id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
                                 basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
                                 contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
-                                taxStatus: 'TK-0', isTaxable: true
+                                taxStatus: 'TK-0', isTaxable: true, isAttendanceExempt: false
                             });
                             setIsModalOpen(true);
                         }}
@@ -769,6 +771,29 @@ export default function EmployeesPage() {
                                             <div>
                                                 <p className="text-xs font-black uppercase tracking-tight text-white group-hover:text-indigo-400 transition-colors">Ketenagakerjaan</p>
                                                 <p className="text-[9px] font-bold text-slate-500 mt-1">Potong 3% dari Gaji Pokok</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-950/50 border border-white/5 rounded-[24px]">
+                                    <div className="col-span-2">
+                                         <h4 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-4 italic flex items-center gap-2">
+                                            <Briefcase className="h-3 w-3 text-indigo-400" /> Pengaturan Bebas Absen (Pengecualian)
+                                        </h4>
+                                    </div>
+                                    <div className="col-span-2 md:col-span-1">
+                                        <label className="flex items-start gap-4 p-4 bg-slate-900 border border-slate-800 rounded-2xl cursor-pointer hover:border-indigo-500/30 transition-all group h-full">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.isAttendanceExempt}
+                                                onChange={e => setFormData({ ...formData, isAttendanceExempt: e.target.checked })}
+                                                className="mt-1 h-5 w-5 bg-slate-950 border-slate-700 rounded-lg text-indigo-500 focus:ring-indigo-500/20"
+                                            />
+                                            <div>
+                                                <p className="text-xs font-black uppercase tracking-tight text-white group-hover:text-indigo-400 transition-colors">Bebas Kewajiban Absensi</p>
+                                                <p className="text-[9px] font-bold text-slate-500 mt-1">Tidak ada potongan mangkir & telat</p>
                                             </div>
                                         </label>
                                     </div>

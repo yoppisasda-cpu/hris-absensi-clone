@@ -283,6 +283,7 @@ model User {
   lastDeviceId            String?
   taxStatus               String              @default("TK-0")
   isTaxable               Boolean             @default(true)
+  isAttendanceExempt      Boolean             @default(false)
   assets                  Asset[]
   createdAssignments      Assignment[]        @relation("AssignmentCreator")
   assignments             Assignment[]        @relation("AssignmentUser")

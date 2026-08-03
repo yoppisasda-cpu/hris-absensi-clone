@@ -3724,7 +3724,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
       basicSalary, allowance, overtimeRate, jobTitle, division, 
       grade, joinDate, contractEndDate, reportToId,
       bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance,
-      taxStatus, isTaxable
+      taxStatus, isTaxable, isAttendanceExempt
     } = req.body;
 
     const requestorRole = (req as any).userRole;
@@ -3842,7 +3842,8 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
         bpjsKetenagakerjaan: !!bpjsKetenagakerjaan,
         mealAllowance: mealAllowance ? parseFloat(mealAllowance.toString()) : 0,
         taxStatus: taxStatus || 'TK-0',
-        isTaxable: isTaxable === undefined ? true : !!isTaxable
+        isTaxable: isTaxable === undefined ? true : !!isTaxable,
+        isAttendanceExempt: !!isAttendanceExempt
       }
     });
 
@@ -3883,7 +3884,7 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
       jobTitle, division, grade, joinDate, contractEndDate, 
       reportToId, branchId, isActive, resignDate,
       bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance,
-      taxStatus, isTaxable
+      taxStatus, isTaxable, isAttendanceExempt
     } = req.body;
 
     // 3. Proteksi Role SUPERADMIN
@@ -3948,7 +3949,8 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
         bpjsKetenagakerjaan: bpjsKetenagakerjaan !== undefined ? !!bpjsKetenagakerjaan : undefined,
         mealAllowance: mealAllowance !== undefined ? parseFloat(mealAllowance.toString()) : undefined,
         taxStatus: taxStatus !== undefined ? taxStatus : undefined,
-        isTaxable: isTaxable !== undefined ? !!isTaxable : undefined
+        isTaxable: isTaxable !== undefined ? !!isTaxable : undefined,
+        isAttendanceExempt: isAttendanceExempt !== undefined ? !!isAttendanceExempt : undefined
       }
     });
 
@@ -6193,8 +6195,12 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
       }
 
       // 6. Total Potongan (Telat + Mangkir)
-      const totalDeductions = (lateCount * LATE_RATE) + absentDeductionAmount;
-
+      const isExempt = (user as any).isAttendanceExempt === true;
+      const finalLateCount = isExempt ? 0 : lateCount;
+      const finalAbsentDeduction = isExempt ? 0 : absentDeductionAmount;
+      const totalDeductions = (finalLateCount * LATE_RATE) + finalAbsentDeduction;
+      
+      const finalSickLeaveDeduction = isExempt ? 0 : sickLeaveDeduction;
       const activeLoan = await prisma.loan.findFirst({
         where: { userId: user.id, companyId: tenantId, status: 'ACTIVE' }
       });
@@ -6233,7 +6239,7 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
       // 6. Final Calculation
       // Gaji Bersih = (Pendapatan Kotor) - (Potongan Absensi + Pinjaman + BPJS Karyawan + PPh 21 + Potongan Sakit)
       const totalEarnings = (user.basicSalary + (user.allowance || 0) + (user.mealAllowance || 0) + overtimePay + reimbursementPay + bonusPayTotal);
-      const totalDeductionsAll = totalDeductions + loanDeduction + bpjs.employeeDeduction + pph21 + sickLeaveDeduction;
+      const totalDeductionsAll = totalDeductions + loanDeduction + bpjs.employeeDeduction + pph21 + finalSickLeaveDeduction;
       
       const netSalary = totalEarnings - totalDeductionsAll;
 
