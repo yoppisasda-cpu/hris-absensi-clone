@@ -14133,7 +14133,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           }
           
           // Increment used count
-          await tx.voucher.update({
+          await tx.voucher.updateMany({
             where: { id: voucher.id },
             data: { usedCount: { increment: 1 } }
           });
@@ -16110,8 +16110,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       }
 
       if (voucherCode) {
-        await tx.voucher.update({
-          where: { companyId_code: { companyId: tenantId, code: voucherCode } },
+        await tx.voucher.updateMany({
+          where: { companyId: tenantId, code: voucherCode },
           data: { usedCount: { increment: 1 } }
         });
       }
