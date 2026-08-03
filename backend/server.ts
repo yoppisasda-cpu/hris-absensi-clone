@@ -6041,7 +6041,10 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
     // 1. Ambil semua karyawan di perusahaan ini
     const company = await prisma.company.findUnique({ where: { id: tenantId } });
     const users = await prisma.user.findMany({ 
-      where: { companyId: tenantId },
+      where: { 
+        companyId: tenantId,
+        basicSalary: { gt: 0 }
+      },
       include: { shift: true }
     });
 
