@@ -41,6 +41,8 @@ interface User {
     resignDate?: string;
     faceReferenceUrl?: string;
     mealAllowance?: number;
+    taxStatus?: string;
+    isTaxable?: boolean;
 }
 
 export default function EmployeesPage() {
@@ -58,7 +60,8 @@ export default function EmployeesPage() {
     const [formData, setFormData] = useState({
         id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
         basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
-        contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: ''
+        contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
+        taxStatus: 'TK-0', isTaxable: true
     });
 
     // State untuk Modal Dokumen (Phase 26)
@@ -136,7 +139,8 @@ export default function EmployeesPage() {
             setFormData({
                 id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
                 basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
-                contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: ''
+                contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
+                taxStatus: 'TK-0', isTaxable: true
             });
             setIsEditMode(false);
 
@@ -198,7 +202,9 @@ export default function EmployeesPage() {
             bpjsKesehatan: user.bpjsKesehatan || false,
             bpjsKetenagakerjaan: user.bpjsKetenagakerjaan || false,
             mealAllowance: user.mealAllowance || 0,
-            reportToId: user.reportToId?.toString() || ''
+            reportToId: user.reportToId?.toString() || '',
+            taxStatus: user.taxStatus || 'TK-0',
+            isTaxable: user.isTaxable !== false
         });
         setIsEditMode(true);
         setIsModalOpen(true);
@@ -291,7 +297,8 @@ export default function EmployeesPage() {
                             setFormData({
                                 id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
                                 basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
-                                contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: ''
+                                contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
+                                taxStatus: 'TK-0', isTaxable: true
                             });
                             setIsModalOpen(true);
                         }}
@@ -764,6 +771,41 @@ export default function EmployeesPage() {
                                                 <p className="text-[9px] font-bold text-slate-500 mt-1">Potong 3% dari Gaji Pokok</p>
                                             </div>
                                         </label>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-950/50 border border-white/5 rounded-[24px]">
+                                    <div className="col-span-2">
+                                         <h4 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-4 italic flex items-center gap-2">
+                                            <Briefcase className="h-3 w-3 text-indigo-400" /> Pengaturan Pajak (PPh 21)
+                                        </h4>
+                                    </div>
+                                    <div className="col-span-2 md:col-span-1">
+                                        <label className="flex items-start gap-4 p-4 bg-slate-900 border border-slate-800 rounded-2xl cursor-pointer hover:border-indigo-500/30 transition-all group h-full">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.isTaxable}
+                                                onChange={e => setFormData({ ...formData, isTaxable: e.target.checked })}
+                                                className="mt-1 h-5 w-5 bg-slate-950 border-slate-700 rounded-lg text-indigo-500 focus:ring-indigo-500/20"
+                                            />
+                                            <div>
+                                                <p className="text-xs font-black uppercase tracking-tight text-white group-hover:text-indigo-400 transition-colors">Potong Pajak Otomatis</p>
+                                                <p className="text-[9px] font-bold text-slate-500 mt-1">Aktifkan perhitungan otomatis</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div className="col-span-2 md:col-span-1">
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Status PTKP</label>
+                                        <select value={formData.taxStatus} onChange={e => setFormData({ ...formData, taxStatus: e.target.value })} className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm text-slate-950 font-black italic uppercase tracking-tighter outline-none cursor-pointer">
+                                            <option value="TK-0">TK/0 (Tdk Kawin, 0 Tg)</option>
+                                            <option value="TK-1">TK/1 (Tdk Kawin, 1 Tg)</option>
+                                            <option value="TK-2">TK/2 (Tdk Kawin, 2 Tg)</option>
+                                            <option value="TK-3">TK/3 (Tdk Kawin, 3 Tg)</option>
+                                            <option value="K-0">K/0 (Kawin, 0 Tg)</option>
+                                            <option value="K-1">K/1 (Kawin, 1 Tg)</option>
+                                            <option value="K-2">K/2 (Kawin, 2 Tg)</option>
+                                            <option value="K-3">K/3 (Kawin, 3 Tg)</option>
+                                        </select>
                                     </div>
                                 </div>
 

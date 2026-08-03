@@ -3723,7 +3723,8 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
       name, email, password, role, companyId, branchId, shiftId,
       basicSalary, allowance, overtimeRate, jobTitle, division, 
       grade, joinDate, contractEndDate, reportToId,
-      bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance
+      bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance,
+      taxStatus, isTaxable
     } = req.body;
 
     const requestorRole = (req as any).userRole;
@@ -3839,7 +3840,9 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
         reportToId: reportToId ? parseInt(reportToId) : null,
         bpjsKesehatan: !!bpjsKesehatan,
         bpjsKetenagakerjaan: !!bpjsKetenagakerjaan,
-        mealAllowance: mealAllowance ? parseFloat(mealAllowance.toString()) : 0
+        mealAllowance: mealAllowance ? parseFloat(mealAllowance.toString()) : 0,
+        taxStatus: taxStatus || 'TK-0',
+        isTaxable: isTaxable === undefined ? true : !!isTaxable
       }
     });
 
@@ -3879,7 +3882,8 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
       name, email, role, basicSalary, allowance, overtimeRate, 
       jobTitle, division, grade, joinDate, contractEndDate, 
       reportToId, branchId, isActive, resignDate,
-      bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance
+      bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance,
+      taxStatus, isTaxable
     } = req.body;
 
     // 3. Proteksi Role SUPERADMIN
@@ -3942,7 +3946,9 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
         resignDate: resignDate ? new Date(resignDate) : undefined,
         bpjsKesehatan: bpjsKesehatan !== undefined ? !!bpjsKesehatan : undefined,
         bpjsKetenagakerjaan: bpjsKetenagakerjaan !== undefined ? !!bpjsKetenagakerjaan : undefined,
-        mealAllowance: mealAllowance !== undefined ? parseFloat(mealAllowance.toString()) : undefined
+        mealAllowance: mealAllowance !== undefined ? parseFloat(mealAllowance.toString()) : undefined,
+        taxStatus: taxStatus !== undefined ? taxStatus : undefined,
+        isTaxable: isTaxable !== undefined ? !!isTaxable : undefined
       }
     });
 
@@ -6216,7 +6222,10 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
       // Pengurang PPh 21 = JHT (Employee) + JP (Employee)
       const deductionForTax = bpjs.breakdown.jhtEmp + bpjs.breakdown.jpEmp;
       
-      const pph21 = calculatePPh21(grossForTax, deductionForTax, (user as any).taxStatus || 'TK-0');
+      let pph21 = 0;
+      if ((user as any).isTaxable !== false) {
+          pph21 = calculatePPh21(grossForTax, deductionForTax, (user as any).taxStatus || 'TK-0');
+      }
 
       // 6. Final Calculation
       // Gaji Bersih = (Pendapatan Kotor) - (Potongan Absensi + Pinjaman + BPJS Karyawan + PPh 21 + Potongan Sakit)
