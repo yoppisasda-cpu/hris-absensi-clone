@@ -10571,7 +10571,7 @@ app.post('/api/finance/transfer', tenantMiddleware, async (req: Request, res: Re
 app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const expenseId = parseInt(req.params.id as string);
-    const { accountId, paymentAmount } = req.body; // New: support paymentAmount
+    const { accountId, paymentAmount, paymentDate } = req.body; // New: support paymentAmount and paymentDate
     const tenantId = Number((req as any).tenantId);
 
     if (!accountId) return res.status(400).json({ error: 'Pilih akun pembayaran' });
@@ -10585,7 +10585,8 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
       if (expense.status === 'PAID') throw new Error('Pengeluaran sudah lunas');
 
       // --- CHECK CLOSING ---
-      if (await isPeriodClosed(tenantId, expense.date)) {
+      const payDate = paymentDate ? new Date(paymentDate) : new Date();
+      if (await isPeriodClosed(tenantId, payDate)) {
         throw new Error('Periode buku sudah ditutup. Tidak dapat mengubah transaksi pada tanggal ini.');
       }
 
@@ -10607,7 +10608,8 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
           status: newStatus as any,
           paidAmount: newPaidAmount,
           accountId: parseInt(accountId),
-          updatedAt: new Date()
+          paidAt: isFullyPaid ? payDate : undefined,
+          updatedAt: payDate
         }
       });
 

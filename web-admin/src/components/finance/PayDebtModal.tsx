@@ -6,7 +6,7 @@ import { X, CheckCircle2, Wallet } from "lucide-react";
 interface PayDebtModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (accountId: string, paymentAmount?: number) => void;
+    onConfirm: (accountId: string, paymentAmount?: number, paymentDate?: string) => void;
     accounts: any[];
     expense: any;
     loading: boolean;
@@ -15,6 +15,7 @@ interface PayDebtModalProps {
 export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, expense, loading }: PayDebtModalProps) {
     const [selectedId, setSelectedId] = useState('');
     const [paymentAmount, setPaymentAmount] = useState('');
+    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
 
     const remainingAmount = expense ? (expense.amount - (expense.paidAmount || 0)) : 0;
 
@@ -22,6 +23,7 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
         if (expense) {
             setSelectedId('');
             setPaymentAmount(remainingAmount.toFixed(0));
+            setPaymentDate(new Date().toISOString().split('T')[0]);
         }
     }, [expense, remainingAmount]);
 
@@ -30,7 +32,7 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
     const handleConfirm = () => {
         if (!selectedId) return;
         const amt = paymentAmount ? parseFloat(paymentAmount) : remainingAmount;
-        onConfirm(selectedId, amt);
+        onConfirm(selectedId, amt, paymentDate);
     };
 
     return (
@@ -96,6 +98,16 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
                                     : '⚠ Pembayaran sebagian akan dicatat sebagai Cicilan.'}
                             </p>
                         )}
+                    </div>
+
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Tanggal Pembayaran</label>
+                        <input 
+                            type="date"
+                            value={paymentDate}
+                            onChange={(e) => setPaymentDate(e.target.value)}
+                            className="w-full px-6 py-4 bg-slate-950/50 rounded-[1.8rem] border border-white/5 focus:border-rose-500 outline-none text-white font-bold"
+                        />
                     </div>
 
                     <div className="space-y-4">

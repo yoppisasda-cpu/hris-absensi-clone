@@ -42,11 +42,11 @@ export default function PayablesPage() {
         }
     };
 
-    const handlePay = async (accountId: string, paymentAmount?: number) => {
+    const handlePay = async (accountId: string, paymentAmount?: number, paymentDate?: string) => {
         if (!selectedExpense) return;
         setPayLoading(true);
         try {
-            await api.post(`/finance/expense/${selectedExpense.id}/pay`, { accountId, paymentAmount });
+            await api.post(`/finance/expense/${selectedExpense.id}/pay`, { accountId, paymentAmount, paymentDate });
             alert("Pembayaran berhasil dicatat!");
             setIsPayModalOpen(false);
             fetchPayables(); // Refresh list
