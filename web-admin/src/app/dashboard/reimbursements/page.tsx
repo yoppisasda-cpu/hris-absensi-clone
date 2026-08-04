@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { Receipt, CheckCircle, XCircle, User, Eye, Download, Search, AlertTriangle, Cpu, CreditCard } from 'lucide-react';
+import { Receipt, CheckCircle, XCircle, User, Eye, Download, Search, AlertTriangle, Cpu, CreditCard, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface Reimbursement {
     id: number;
@@ -186,6 +187,38 @@ export default function ReimbursementsPage() {
         }
     };
 
+    const handleExportExcel = () => {
+        const filtered = claims.filter(c =>
+            c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.title.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        if (filtered.length === 0) {
+            alert('Tidak ada data reimbursement yang dapat diexport.');
+            return;
+        }
+
+        const exportData = filtered.map((c, index) => ({
+            'No': index + 1,
+            'Tanggal Dibuat': formatDate(c.createdAt),
+            'Nama Karyawan': c.user.name,
+            'Email Karyawan': c.user.email,
+            'Judul Klaim': c.title,
+            'Deskripsi': c.description || '-',
+            'Nominal (Rp)': c.amount,
+            'Scan AI Nominal': c.ocrAmount || '-',
+            'Status HRD': c.status === 'PENDING' ? 'Menunggu' : c.status === 'APPROVED' ? 'Disetujui' : 'Ditolak',
+            'Status Pembayaran': c.isPaid ? 'LUNAS' : 'BELUM DIBAYAR',
+            'Tanggal Bayar': c.paidAt ? formatDate(c.paidAt) : '-'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Reimbursement");
+        XLSX.writeFile(workbook, `Laporan_Reimbursement_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
     return (
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -193,15 +226,24 @@ export default function ReimbursementsPage() {
                     <h1 className="text-2xl font-bold text-white">Manajemen Reimbursement</h1>
                     <p className="text-sm text-slate-400">Tinjau klaim biaya operasional dan bukti kuitansi dari karyawan.</p>
                 </div>
-                <div className="relative w-full sm:w-auto">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                    <input
-                        type="text"
-                        placeholder="Cari nama, email, atau judul..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-500"
-                    />
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                    <div className="relative w-full sm:w-auto">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                        <input
+                            type="text"
+                            placeholder="Cari nama, email, atau judul..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-500"
+                        />
+                    </div>
+                    <button
+                        onClick={handleExportExcel}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                    >
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Export Excel
+                    </button>
                 </div>
             </div>
 
