@@ -76,6 +76,7 @@ class PrinterService {
   }
 
   Future<List<BluetoothInfo>> getBluetoothDevices() async {
+    if (Platform.isIOS) return [];
     return await PrintBluetoothThermal.pairedBluetooths;
   }
 
@@ -89,6 +90,12 @@ class PrinterService {
       _isConnected = true;
       _connectedName = name;
       return true;
+    }
+
+    if (Platform.isIOS) {
+      _isConnected = true;
+      _connectedName = name;
+      return true; // Mock success on iOS
     }
 
     final bool result = await PrintBluetoothThermal.connect(macPrinterAddress: address);
@@ -111,7 +118,9 @@ class PrinterService {
     final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
     
     if (type == 'bluetooth') {
-      await PrintBluetoothThermal.disconnect;
+      if (!Platform.isIOS) {
+        await PrintBluetoothThermal.disconnect;
+      }
     }
     _isConnected = false;
     _connectedName = null;
@@ -158,6 +167,8 @@ class PrinterService {
       await _sendToWifiPrinter(address, bytes);
       return true;
     }
+
+    if (Platform.isIOS) return true; // Bypass on iOS
 
     return await PrintBluetoothThermal.writeBytes(bytes);
   }
@@ -305,6 +316,8 @@ class PrinterService {
       return true;
     }
 
+    if (Platform.isIOS) return true; // Bypass on iOS
+
     return await PrintBluetoothThermal.writeBytes(bytes);
   }
 
@@ -353,6 +366,8 @@ class PrinterService {
       await _sendToWifiPrinter(address, bytes);
       return true;
     }
+
+    if (Platform.isIOS) return true; // Bypass on iOS
 
     return await PrintBluetoothThermal.writeBytes(bytes);
   }
@@ -405,6 +420,7 @@ class PrinterService {
         final r = await connectReceipt("Label Printer", address);
         if (!r) return false;
       }
+      if (Platform.isIOS) return true;
       return await PrintBluetoothThermal.writeBytes(bytes);
     }
   }

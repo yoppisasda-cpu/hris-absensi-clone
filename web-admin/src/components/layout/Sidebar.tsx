@@ -441,6 +441,18 @@ export default function Sidebar() {
                                     <FileText className="h-5 w-5" />
                                     Sales Orders (PO)
                                 </Link>
+                                <Link href="/dashboard/pos" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors">
+                                    <Monitor className="h-5 w-5" />
+                                    POS Kasir
+                                </Link>
+                                <Link href="/dashboard/kitchen" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-amber-600/10 text-amber-400 hover:bg-slate-800 transition-colors">
+                                    <Monitor className="h-5 w-5" />
+                                    Kitchen Display (KDS)
+                                </Link>
+                                <Link href="/dashboard/queue-display" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-violet-600/10 text-violet-400 hover:bg-slate-800 transition-colors">
+                                    <Monitor className="h-5 w-5" />
+                                    Order Status (OSD)
+                                </Link>
                                 <Link href="/dashboard/pos/reports" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors">
                                     <Monitor className="h-5 w-5" />
                                     Laporan Kasir (POS)

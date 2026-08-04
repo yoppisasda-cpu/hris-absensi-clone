@@ -365,7 +365,7 @@ export default function ReimbursementsPage() {
                                         Bayar Menggunakan (Kas/Bank)
                                     </label>
                                     <select 
-                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
                                         value={payData.accountId}
                                         onChange={(e) => setPayData({...payData, accountId: e.target.value})}
                                     >
@@ -381,7 +381,7 @@ export default function ReimbursementsPage() {
                                         Kategori Pengeluaran
                                     </label>
                                     <select 
-                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
                                         value={payData.categoryId}
                                         onChange={(e) => setPayData({...payData, categoryId: e.target.value})}
                                     >

@@ -16119,11 +16119,31 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
     } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
-      // 0. Delete Pending Bill if this checkout resolved a held bill
+      // 0. Calculate Queue Number & Handle Pending Bill
+      let existingQueueNumber = null;
       if (pendingBillId) {
+        const pb = await tx.pendingBill.findUnique({ where: { id: Number(pendingBillId) } });
+        if (pb && pb.queueNumber) existingQueueNumber = pb.queueNumber;
+
         await tx.pendingBill.deleteMany({
           where: { id: Number(pendingBillId), companyId: tenantId }
         });
+      }
+
+      if (!existingQueueNumber) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const maxSaleQueue = await tx.sale.aggregate({
+          _max: { queueNumber: true },
+          where: { companyId: tenantId, createdAt: { gte: today } }
+        });
+        const maxPendingQueue = await tx.pendingBill.aggregate({
+          _max: { queueNumber: true },
+          where: { companyId: tenantId, createdAt: { gte: today } }
+        });
+
+        existingQueueNumber = Math.max(maxSaleQueue._max.queueNumber || 0, maxPendingQueue._max.queueNumber || 0) + 1;
       }
       // 0. Find correct warehouse for the cashier's branch
       const user = await tx.user.findUnique({ where: { id: userId }, select: { branchId: true } });
@@ -16224,7 +16244,9 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           pointsUsed: Number(pointsUsed),
           pointsEarned: Number(pointsEarned),
           taxRate: Number(taxRate) || 0,
-          taxAmount: Number(taxAmount) || 0
+          taxAmount: Number(taxAmount) || 0,
+          kitchenStatus: 'PREPARING',
+          queueNumber: existingQueueNumber
         }
       });
 
@@ -16405,6 +16427,20 @@ app.post('/api/pos/hold', tenantMiddleware, async (req: Request, res: Response) 
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const maxSaleQueue = await prisma.sale.aggregate({
+      _max: { queueNumber: true },
+      where: { companyId: tenantId, createdAt: { gte: today } }
+    });
+    const maxPendingQueue = await prisma.pendingBill.aggregate({
+      _max: { queueNumber: true },
+      where: { companyId: tenantId, createdAt: { gte: today } }
+    });
+
+    const nextQueueNumber = Math.max(maxSaleQueue._max.queueNumber || 0, maxPendingQueue._max.queueNumber || 0) + 1;
+
     const pendingBill = await prisma.pendingBill.create({
       data: {
         companyId: tenantId,
@@ -16413,6 +16449,8 @@ app.post('/api/pos/hold', tenantMiddleware, async (req: Request, res: Response) 
         label: label || 'Pesanan',
         items: items, // JSON
         saleType: saleType || 'WALK_IN',
+        kitchenStatus: 'PREPARING',
+        queueNumber: nextQueueNumber
       },
     });
 
@@ -16458,6 +16496,195 @@ app.delete('/api/pos/pending/:id', tenantMiddleware, async (req: Request, res: R
     res.json({ message: 'Pending bill dihapus' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal menghapus pending bill: ' + error.message });
+  }
+});
+
+// ================== KITCHEN APIs ==================
+app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const user = (req as any).user;
+    
+    // We only care about orders that are READY or SERVED (i.e. they finished preparing)
+    // and have both createdAt and preparedAt set.
+    const completedSales = await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        branchId: user?.branchId || undefined,
+        kitchenStatus: { in: ['READY', 'SERVED'] },
+        preparedAt: { not: null }
+      },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        customerName: true,
+        createdAt: true,
+        preparedAt: true,
+        queueNumber: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100 // limit to recent 100 for table
+    });
+
+    // Calculate times
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    let todayCount = 0, todayTotalTime = 0;
+    let weekCount = 0, weekTotalTime = 0;
+    let monthCount = 0, monthTotalTime = 0;
+
+    const history = completedSales.map(sale => {
+      // Calculate diff in seconds
+      const diffMs = sale.preparedAt!.getTime() - sale.createdAt.getTime();
+      const diffSeconds = Math.max(0, Math.floor(diffMs / 1000));
+      
+      const saleDate = sale.createdAt;
+      if (saleDate >= today) {
+        todayCount++;
+        todayTotalTime += diffSeconds;
+      }
+      if (saleDate >= startOfWeek) {
+        weekCount++;
+        weekTotalTime += diffSeconds;
+      }
+      if (saleDate >= startOfMonth) {
+        monthCount++;
+        monthTotalTime += diffSeconds;
+      }
+
+      return {
+        id: sale.id,
+        invoiceNumber: sale.invoiceNumber,
+        customerName: sale.customerName,
+        queueNumber: sale.queueNumber,
+        createdAt: sale.createdAt,
+        preparedAt: sale.preparedAt,
+        durationSeconds: diffSeconds
+      };
+    });
+
+    const averageToday = todayCount > 0 ? todayTotalTime / todayCount : 0;
+    const averageWeek = weekCount > 0 ? weekTotalTime / weekCount : 0;
+    const averageMonth = monthCount > 0 ? monthTotalTime / monthCount : 0;
+
+    res.json({
+      averages: {
+        today: averageToday,
+        week: averageWeek,
+        month: averageMonth
+      },
+      history
+    });
+  } catch (error: any) {
+    console.error('Kitchen Reports Error:', error);
+    res.status(500).json({ error: 'Gagal mengambil laporan dapur.' });
+  }
+});
+
+app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    
+    // Fetch from Pending Bills
+    const pendingBills = await prisma.pendingBill.findMany({
+      where: { companyId: tenantId, kitchenStatus: { in: ['PREPARING', 'READY'] } },
+      orderBy: { createdAt: 'asc' }
+    });
+    
+    // Fetch from Sales
+    const sales = await prisma.sale.findMany({
+      where: { companyId: tenantId, kitchenStatus: { in: ['PREPARING', 'READY'] } },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        SaleItem: {
+          include: { product: true }
+        }
+      }
+    });
+
+    const formattedPending = pendingBills.map(pb => ({
+      id: pb.id,
+      type: 'pending',
+      label: pb.label || 'Pesanan ' + pb.id,
+      items: typeof pb.items === 'string' ? JSON.parse(pb.items) : pb.items,
+      status: pb.kitchenStatus,
+      queueNumber: pb.queueNumber,
+      createdAt: pb.createdAt,
+      preparedAt: pb.preparedAt
+    }));
+
+    const formattedSales = sales.map(s => ({
+      id: s.id,
+      type: 'sale',
+      label: s.customerName ? `${s.customerName} (${s.invoiceNumber})` : s.invoiceNumber,
+      items: s.SaleItem.map((si: any) => ({
+        productId: si.productId,
+        name: si.product?.name || 'Item Terhapus',
+        quantity: si.quantity,
+        price: si.price,
+        modifiers: typeof si.modifiers === 'string' ? JSON.parse(si.modifiers) : si.modifiers
+      })),
+      status: s.kitchenStatus,
+      queueNumber: s.queueNumber,
+      createdAt: s.createdAt,
+      preparedAt: s.preparedAt
+    }));
+
+    const allOrders = [...formattedPending, ...formattedSales].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    res.json(allOrders);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil pesanan dapur: ' + error.message });
+  }
+});
+
+app.patch('/api/kitchen/orders/:type/:id/ready', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { type, id } = req.params;
+    
+    if (type === 'pending') {
+      await prisma.pendingBill.update({
+        where: { id: Number(id), companyId: tenantId },
+        data: { kitchenStatus: 'READY', preparedAt: new Date() }
+      });
+    } else if (type === 'sale') {
+      await prisma.sale.update({
+        where: { id: Number(id), companyId: tenantId },
+        data: { kitchenStatus: 'READY', preparedAt: new Date() }
+      });
+    }
+    res.json({ message: 'Status diubah ke READY' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal update status: ' + error.message });
+  }
+});
+
+app.patch('/api/kitchen/orders/:type/:id/serve', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { type, id } = req.params;
+    
+    if (type === 'pending') {
+      await prisma.pendingBill.update({
+        where: { id: Number(id), companyId: tenantId },
+        data: { kitchenStatus: 'SERVED' }
+      });
+    } else if (type === 'sale') {
+      await prisma.sale.update({
+        where: { id: Number(id), companyId: tenantId },
+        data: { kitchenStatus: 'SERVED' }
+      });
+    }
+    res.json({ message: 'Status diubah ke SERVED' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal update status: ' + error.message });
   }
 });
 

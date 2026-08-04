@@ -12,11 +12,12 @@ import {
     CheckCircle2, 
     CreditCard, 
     Wallet, 
-    User, 
-    Tag,
-    X,
+    User,
+    Tag, 
     Printer,
-    Monitor
+    Monitor,
+    Scan,
+    X
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -47,7 +48,14 @@ export default function POSPage() {
     const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [showReceipt, setShowReceipt] = useState(false);
     const [lastSale, setLastSale] = useState<any>(null);
+    const [lastCart, setLastCart] = useState<CartItem[]>([]);
     const [taxRate, setTaxRate] = useState<number>(0);
+
+    // NEW CHECKOUT FIELDS
+    const [saleType, setSaleType] = useState<string>('WALK_IN');
+    const [customerName, setCustomerName] = useState("");
+    const [customerPhone, setCustomerPhone] = useState("");
+    const [voucherCode, setVoucherCode] = useState("");
 
     const fetchData = async () => {
         setLoading(true);
@@ -153,11 +161,15 @@ export default function POSPage() {
                 accountId: selectedAccount,
                 totalAmount: finalTotalAmount,
                 taxRate,
-                taxAmount
+                taxAmount,
+                saleType,
+                customerName,
+                customerPhone,
+                voucherCode
             };
 
             const res = await api.post('/pos/checkout', payload);
-            setLastSale(res.data.sale);
+            setLastSale(res.data);
             toast.success("Transaksi Berhasil!");
             
             // OPTIMIZATION: Update local stock instantly without full re-fetch flicker
@@ -167,6 +179,7 @@ export default function POSPage() {
                 return qtySold ? { ...p, stock: p.stock - qtySold } : p;
             }));
 
+            setLastCart([...cart]);
             setCart([]);
             setShowReceipt(true);
         } catch (error: any) {
@@ -340,8 +353,8 @@ export default function POSPage() {
                         </button>
                     </div>
 
-                    {/* Cart Items */}
-                    <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 scrollbar-hide bg-slate-950/20">
+                    {/* Checkout Details Area */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide bg-slate-950/20">
                         {cart.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-800 uppercase tracking-[0.3em] font-black italic text-[10px] text-center gap-6">
                                 <div className="h-24 w-24 rounded-[40px] bg-slate-900 border border-white/5 flex items-center justify-center shadow-inner">
@@ -350,124 +363,178 @@ export default function POSPage() {
                                 <p>MANIFEST_EMPTY: Waiting for Product Input</p>
                             </div>
                         ) : (
-                            cart.map(item => (
-                                <div key={item.id} className="flex items-center gap-5 group animate-in slide-in-from-right-8 duration-500">
-                                    <div className="h-14 w-14 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-center text-blue-500 font-black text-xs group-hover:bg-blue-600 group-hover:text-white transition-all shadow-inner relative overflow-hidden">
-                                        {item.image ? (
-                                            <img src={item.image} className="w-full h-full object-cover opacity-60" />
-                                        ) : (
-                                            item.name.substring(0, 2).toUpperCase()
-                                        )}
-                                        <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-all"></div>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-black text-[11px] tracking-tight text-white uppercase group-hover:text-blue-400 transition-colors truncate italic">{item.name}</h4>
-                                        <p className="text-[9px] text-slate-500 font-black tracking-widest uppercase italic mt-1.5 flex items-center gap-2">
-                                            Rp {item.price.toLocaleString()} <span className="text-slate-700">|</span> QTY: {item.qty}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center bg-slate-950/80 rounded-2xl p-1 gap-1 border border-white/5 shadow-inner">
-                                        <button 
-                                            onClick={() => updateQty(item.id, -1)}
-                                            className="h-8 w-8 flex items-center justify-center hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white active:scale-90"
-                                        >
-                                            <Minus className="h-3 w-3" />
-                                        </button>
-                                        <span className="w-8 text-center text-xs font-black italic tracking-tighter text-blue-500">{item.qty}</span>
-                                        <button 
-                                            onClick={() => updateQty(item.id, 1)}
-                                            className="h-8 w-8 flex items-center justify-center hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white active:scale-90"
-                                        >
-                                            <Plus className="h-3 w-3" />
-                                        </button>
-                                    </div>
-                                    <button 
-                                        onClick={() => removeFromCart(item.id)}
-                                        className="h-10 w-10 flex items-center justify-center text-slate-700 hover:text-red-500 transition-all hover:bg-red-500/10 rounded-xl"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </button>
+                            <div className="space-y-6">
+                                {/* CART ITEMS */}
+                                <div className="space-y-4">
+                                    {cart.map(item => (
+                                        <div key={item.id} className="flex items-center gap-4 group animate-in slide-in-from-right-8 duration-500">
+                                            <div className="h-12 w-12 rounded-xl bg-slate-950 border border-white/5 flex items-center justify-center text-blue-500 font-black text-xs group-hover:bg-blue-600 group-hover:text-white transition-all shadow-inner relative overflow-hidden shrink-0">
+                                                {item.image ? (
+                                                    <img src={item.image} className="w-full h-full object-cover opacity-60" />
+                                                ) : (
+                                                    item.name.substring(0, 2).toUpperCase()
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-black text-[11px] tracking-tight text-white uppercase truncate">{item.name}</h4>
+                                                <p className="text-[10px] text-blue-400 font-black uppercase mt-1">
+                                                    Rp {item.price.toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center bg-slate-900 rounded-xl p-1 gap-1 border border-white/10 shrink-0">
+                                                <button 
+                                                    onClick={() => updateQty(item.id, -1)}
+                                                    className="h-6 w-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+                                                >
+                                                    <Minus className="h-3 w-3" />
+                                                </button>
+                                                <span className="w-6 text-center text-[10px] font-black text-white">{item.qty}</span>
+                                                <button 
+                                                    onClick={() => updateQty(item.id, 1)}
+                                                    className="h-6 w-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+                                                >
+                                                    <Plus className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                            <button 
+                                                onClick={() => removeFromCart(item.id)}
+                                                className="h-8 w-8 flex items-center justify-center text-slate-600 hover:text-red-500 transition-all hover:bg-red-500/10 rounded-lg shrink-0"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))
+
+                                <hr className="border-white/5" />
+
+                                {/* TIPE PENJUALAN */}
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tipe Penjualan</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { id: 'WALK_IN', label: 'Pelanggan Walk-in', icon: <User className="h-3 w-3" /> },
+                                            { id: 'GOFOOD', label: 'GoFood', icon: <ShoppingCart className="h-3 w-3" /> },
+                                            { id: 'GRABFOOD', label: 'GrabFood', icon: <ShoppingCart className="h-3 w-3" /> },
+                                            { id: 'SHOPEEFOOD', label: 'ShopeeFood', icon: <ShoppingCart className="h-3 w-3" /> },
+                                            { id: 'QPOON', label: 'QPoon', icon: <ShoppingCart className="h-3 w-3" /> }
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.id}
+                                                onClick={() => setSaleType(opt.id)}
+                                                className={`flex items-center gap-2 px-3 py-2 rounded-full text-[10px] font-bold border transition-all ${
+                                                    saleType === opt.id 
+                                                    ? 'bg-blue-600 text-white border-blue-500' 
+                                                    : 'bg-slate-900 text-slate-400 border-white/5 hover:border-white/20'
+                                                }`}
+                                            >
+                                                {opt.icon} {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* DATA PELANGGAN */}
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nama Pelanggan</label>
+                                        <div className="relative">
+                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
+                                            <input 
+                                                type="text"
+                                                placeholder="Cari atau ketik nama pembeli..."
+                                                value={customerName}
+                                                onChange={(e) => setCustomerName(e.target.value)}
+                                                className="w-full pl-12 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nomor HP Pelanggan (Opsional)</label>
+                                            <span className="text-[10px] font-black text-emerald-500 cursor-pointer hover:underline">DAFTAR MEMBER</span>
+                                        </div>
+                                        <input 
+                                            type="text"
+                                            placeholder="0812xxxxxxxxx"
+                                            value={customerPhone}
+                                            onChange={(e) => setCustomerPhone(e.target.value)}
+                                            className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* VOUCHER */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Kode Voucher</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text"
+                                            placeholder="Masukkan kode voucher"
+                                            value={voucherCode}
+                                            onChange={(e) => setVoucherCode(e.target.value)}
+                                            className="flex-1 px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 uppercase"
+                                        />
+                                        <button className="px-4 py-3 bg-purple-500/10 text-purple-400 font-bold rounded-xl border border-purple-500/20 text-sm hover:bg-purple-500/20 transition-all">
+                                            Terapkan
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* METODE PEMBAYARAN */}
+                                <div className="space-y-3 pt-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Metode Pembayaran</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {accounts.map(acc => {
+                                            let icon = <Wallet className="h-4 w-4" />;
+                                            let badgeText = "Tunai";
+                                            if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-4 w-4" /> || <CreditCard className="h-4 w-4" />; }
+                                            else if (acc.type === 'BANK') { badgeText = "Transfer"; icon = <CreditCard className="h-4 w-4" />; }
+                                            
+                                            return (
+                                                <button 
+                                                    key={acc.id}
+                                                    onClick={() => setSelectedAccount(acc.id)}
+                                                    className={`flex items-center gap-3 p-4 rounded-2xl border transition-all ${
+                                                        selectedAccount === acc.id 
+                                                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' 
+                                                        : 'bg-slate-900 border-white/5 text-slate-500 hover:border-emerald-500/30'
+                                                    }`}
+                                                >
+                                                    {icon}
+                                                    <span className="text-xs font-bold">{badgeText} - {acc.name}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
                         )}
                     </div>
 
-                    {/* Summary & Checkout */}
-                    <div className="p-8 bg-slate-950/80 border-t border-white/5 space-y-8 relative overflow-hidden">
-                        {/* Sub-pulsing ambient glow */}
-                        <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-blue-500/5 blur-[100px] animate-pulse"></div>
-
-                        <div className="space-y-4 relative z-10">
-                            <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] italic">
-                                <span>Subtotal Processing</span>
-                                <span className="text-slate-300">Rp {subtotal.toLocaleString()}</span>
+                    {/* Summary & Checkout (Bottom Stick) */}
+                    <div className="p-6 bg-slate-950/80 border-t border-white/5 space-y-4">
+                        <div className="bg-slate-900 rounded-xl p-4 border border-white/5 space-y-3">
+                            <div className="flex justify-between items-center text-sm font-medium text-slate-400">
+                                <span>Subtotal Items</span>
+                                <span>Rp {subtotal.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between items-center text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] italic">
-                                <span>Tax Load Engine ({taxRate}%)</span>
-                                <span className="text-slate-300">Rp {taxAmount.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between items-end border-t border-white/5 pt-6 text-white group">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 italic mb-1">Final Transaction Total</span>
-                                    <span className="text-4xl font-black italic tracking-tighter text-glow-md group-hover:scale-110 transition-transform origin-left duration-500">
-                                         Rp <span className="text-white group-hover:text-blue-400 transition-colors uppercase">{finalTotalAmount.toLocaleString()}</span>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Tax Selection Protocol */}
-                        <div className="space-y-4 relative z-10">
-                            <label className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600 italic flex items-center gap-2">
-                                <div className="h-1 w-4 bg-amber-500 rounded-full"></div> Tax Protocol
-                            </label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {[
-                                    { label: "NON (0%)", value: 0 },
-                                    { label: "PB1 (10%)", value: 10 },
-                                    { label: "PPN (11%)", value: 11 }
-                                ].map(opt => (
+                            <div className="flex justify-between items-center text-sm font-medium text-slate-400">
+                                <span className="flex items-center gap-2">
+                                    Pajak (11%)
                                     <button 
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => setTaxRate(opt.value)}
-                                        className={`py-3 rounded-xl text-[9px] font-black border transition-all uppercase tracking-widest italic relative overflow-hidden group ${
-                                            taxRate === opt.value 
-                                            ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-lg shadow-amber-500/20' 
-                                            : 'bg-slate-900 border-white/5 text-slate-500 hover:border-amber-500/40 hover:text-amber-400'
-                                        }`}
+                                        onClick={() => setTaxRate(taxRate === 11 ? 0 : 11)} 
+                                        className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-blue-400"
                                     >
-                                        {opt.value > 0 ? opt.label : "NON TAX"}
+                                        TOGGLE
                                     </button>
-                                ))}
+                                </span>
+                                <span>+ Rp {taxAmount.toLocaleString()}</span>
                             </div>
-                        </div>
-
-                        {/* Account Selector */}
-                        <div className="space-y-4 relative z-10">
-                            <label className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600 italic flex items-center gap-2">
-                                <div className="h-1 w-4 bg-blue-600 rounded-full"></div> Settlement Protocol
-                            </label>
-                            <div className="grid grid-cols-2 gap-3">
-                                {accounts.map(acc => (
-                                    <button 
-                                        key={acc.id}
-                                        onClick={() => setSelectedAccount(acc.id)}
-                                        className={`flex items-center gap-3 p-4 rounded-2xl text-[10px] font-black border transition-all uppercase tracking-widest italic relative overflow-hidden group ${
-                                            selectedAccount === acc.id 
-                                            ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-500/20' 
-                                            : 'bg-slate-900 border-white/5 text-slate-500 hover:border-blue-500/40 hover:text-blue-400'
-                                        }`}
-                                    >
-                                        <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors ${selectedAccount === acc.id ? 'bg-white/20' : 'bg-slate-950'}`}>
-                                            {acc.type === 'CASH' ? <Wallet className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
-                                        </div>
-                                        {acc.name}
-                                        {selectedAccount === acc.id && (
-                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-white animate-ping"></div>
-                                        )}
-                                    </button>
-                                ))}
+                            <hr className="border-white/5" />
+                            <div className="flex justify-between items-end">
+                                <span className="text-base font-black text-white uppercase tracking-wider">TOTAL BAYAR</span>
+                                <span className="text-3xl font-black text-blue-500">Rp {finalTotalAmount.toLocaleString()}</span>
                             </div>
                         </div>
 
@@ -495,7 +562,97 @@ export default function POSPage() {
 
             {/* RECEIPT MODAL */}
             {showReceipt && lastSale && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 animate-in fade-in duration-500">
+                <>
+                    {/* CSS khusus untuk print struk Thermal */}
+                    <style dangerouslySetInnerHTML={{__html: `
+                        @media print {
+                            body * {
+                                visibility: hidden;
+                            }
+                            #thermal-receipt, #thermal-receipt * {
+                                visibility: visible;
+                            }
+                            #thermal-receipt {
+                                position: absolute;
+                                left: 0;
+                                top: 0;
+                                width: 58mm; /* Ukuran thermal standar 58mm */
+                                margin: 0;
+                                padding: 0;
+                                background-color: white !important;
+                                color: black !important;
+                            }
+                            @page {
+                                margin: 0;
+                            }
+                        }
+                    `}} />
+
+                    {/* HIDDEN PRINTABLE RECEIPT */}
+                    <div id="thermal-receipt" className="hidden print:block font-mono text-[11px] p-2 bg-white text-black w-[58mm] leading-tight">
+                        <div className="text-center mb-4">
+                            <h2 className="font-bold text-sm">AIVOLA POS</h2>
+                            <p>Jl. Contoh Resto No. 123</p>
+                            <p>Telp: 0812-3456-7890</p>
+                        </div>
+                        
+                        <div className="border-t border-dashed border-black py-2 mb-2">
+                            <div className="flex justify-between">
+                                <span>Tgl: {new Date(lastSale.createdAt).toLocaleDateString('id-ID')}</span>
+                                <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            <div>No: {lastSale.invoiceNumber}</div>
+                            <div>Kasir: {lastSale.saleType}</div>
+                            {lastSale.customerName && <div>Plg: {lastSale.customerName}</div>}
+                        </div>
+
+                        <div className="border-t border-b border-dashed border-black py-2 mb-2">
+                            {lastCart.map((item, idx) => (
+                                <div key={idx} className="mb-2">
+                                    <div className="font-bold">{item.name}</div>
+                                    {item.modifiers && Object.keys(item.modifiers).length > 0 && (
+                                        <div className="text-[9px] pl-2 text-gray-700 italic">
+                                            {Object.entries(item.modifiers).map(([k, v]: [string, any]) => `${k}: ${v.name || v}`).join(', ')}
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between">
+                                        <span>{item.qty} x {item.price.toLocaleString()}</span>
+                                        <span>{(item.qty * item.price).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="space-y-1 mb-2">
+                            <div className="flex justify-between">
+                                <span>Subtotal</span>
+                                <span>Rp {(lastSale.totalAmount - lastSale.taxAmount).toLocaleString()}</span>
+                            </div>
+                            {lastSale.taxAmount > 0 && (
+                                <div className="flex justify-between">
+                                    <span>Pajak ({lastSale.taxRate}%)</span>
+                                    <span>Rp {lastSale.taxAmount.toLocaleString()}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between font-bold text-[12px] pt-1 border-t border-dashed border-black">
+                                <span>TOTAL</span>
+                                <span>Rp {lastSale.totalAmount.toLocaleString()}</span>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-dashed border-black py-2 mt-4 text-center">
+                            <p>Metode Pembayaran:</p>
+                            <p className="font-bold">{accounts.find(a => a.id === selectedAccount)?.name}</p>
+                        </div>
+
+                        <div className="text-center mt-4">
+                            <p>Terima kasih atas kunjungan Anda!</p>
+                            <p className="text-[9px] mt-1">Powered by Aivola</p>
+                        </div>
+                    </div>
+
+                    {/* ON-SCREEN MODAL */}
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 animate-in fade-in duration-500 print:hidden">
                     <div className="bg-slate-900 w-full max-w-sm rounded-[48px] shadow-[0_0_100px_rgba(59,130,246,0.1)] overflow-hidden animate-in zoom-in-95 duration-500 border border-white/5">
                         <div className="p-10 text-center border-b border-dashed border-white/10 bg-slate-950/30">
                             <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-[32px] border border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/10">
@@ -544,6 +701,7 @@ export default function POSPage() {
                         </div>
                     </div>
                 </div>
+                </>
             )}
         </DashboardLayout>
     );
