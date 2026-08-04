@@ -488,7 +488,7 @@ export default function POSPage() {
                                         {accounts.map(acc => {
                                             let icon = <Wallet className="h-4 w-4" />;
                                             let badgeText = "Tunai";
-                                            if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-4 w-4" /> || <CreditCard className="h-4 w-4" />; }
+                                            if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-4 w-4" />; }
                                             else if (acc.type === 'BANK') { badgeText = "Transfer"; icon = <CreditCard className="h-4 w-4" />; }
                                             
                                             return (
