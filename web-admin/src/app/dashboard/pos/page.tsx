@@ -34,6 +34,7 @@ interface Product {
 
 interface CartItem extends Product {
     qty: number;
+    modifiers?: any;
 }
 
 export default function POSPage() {
