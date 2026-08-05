@@ -158,9 +158,9 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Minimal Belanja (Rp)</label>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Min Belanja (Rp)</label>
                                 <input 
                                     type="number" 
                                     min="0"
@@ -171,12 +171,23 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Maksimal Diskon (Rp)</label>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Min Barang (Qty)</label>
+                                <input 
+                                    type="number" 
+                                    min="0"
+                                    placeholder="0 (Tanpa minimal)"
+                                    value={formData.minQuantity}
+                                    onChange={e => setFormData({...formData, minQuantity: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white font-bold focus:border-indigo-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Maks Diskon (Rp)</label>
                                 <input 
                                     type="number" 
                                     min="0"
                                     disabled={formData.discountType === 'FIXED'}
-                                    placeholder={formData.discountType === 'FIXED' ? "Tidak berlaku" : "Kosong = Tanpa batas"}
+                                    placeholder={formData.discountType === 'FIXED' ? "Tidak berlaku" : "0 = Tanpa batas"}
                                     value={formData.discountType === 'FIXED' ? "" : formData.maxDiscount}
                                     onChange={e => setFormData({...formData, maxDiscount: e.target.value})}
                                     className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white font-bold focus:border-indigo-500 outline-none disabled:opacity-50"
