@@ -1274,6 +1274,7 @@ model Voucher {
   discountType  String    @default("PERCENTAGE")
   discountValue Float
   minPurchase   Float     @default(0)
+  minQuantity   Float     @default(0)
   maxDiscount   Float?
   validFrom     DateTime?
   validUntil    DateTime?

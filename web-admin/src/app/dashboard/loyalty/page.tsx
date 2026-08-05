@@ -295,7 +295,8 @@ export default function LoyaltyPage() {
                                                         {v.maxDiscount ? <span className="block text-[10px] text-slate-500 font-normal mt-1">Maks: Rp {v.maxDiscount.toLocaleString()}</span> : null}
                                                     </td>
                                                     <td className="px-6 py-4 text-sm font-bold text-slate-300">
-                                                        {v.minPurchase ? `Rp ${v.minPurchase.toLocaleString()}` : '-'}
+                                                        <div>Belanja: {v.minPurchase ? `Rp ${v.minPurchase.toLocaleString()}` : '-'}</div>
+                                                        <div className="text-[10px] text-slate-400 mt-1">Barang: {v.minQuantity ? `${v.minQuantity} item` : '-'}</div>
                                                     </td>
                                                     <td className="px-6 py-4 text-sm font-bold text-slate-300">
                                                         {v.validFrom ? new Date(v.validFrom).toLocaleDateString() : '-'} <br/>

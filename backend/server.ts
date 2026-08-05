@@ -13846,7 +13846,7 @@ app.get('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) =
 app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { code, discountType, discountValue, minPurchase, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
+    const { code, discountType, discountValue, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
     const voucher = await prisma.voucher.create({
       data: {
         companyId: tenantId,
@@ -13854,7 +13854,8 @@ app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) 
         discountType,
         discountValue: Number(discountValue),
         minPurchase: Number(minPurchase || 0),
-        maxDiscount: maxDiscount ? parseFloat(maxDiscount) : null,
+        minQuantity: Number(minQuantity || 0),
+        maxDiscount: maxDiscount ? Number(maxDiscount) : null,
         validFrom: validFrom ? new Date(validFrom) : null,
         validUntil: validUntil ? new Date(validUntil) : null,
         quota: Number(quota || 0),
@@ -13872,7 +13873,7 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
   try {
     const tenantId = Number((req as any).tenantId);
     const voucherId = Number(req.params.id);
-    const { code, discountType, discountValue, minPurchase, maxDiscount, validFrom, validUntil, quota, isActive } = req.body;
+    const { code, discountType, discountValue, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive } = req.body;
     
     // Ensure voucher belongs to tenant
     const existing = await prisma.voucher.findFirst({ where: { id: voucherId, companyId: tenantId } });
@@ -13885,7 +13886,8 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
         discountType,
         discountValue: discountValue !== undefined ? Number(discountValue) : undefined,
         minPurchase: minPurchase !== undefined ? Number(minPurchase) : undefined,
-        maxDiscount: maxDiscount !== undefined ? (maxDiscount ? parseFloat(maxDiscount) : null) : undefined,
+        minQuantity: minQuantity !== undefined ? Number(minQuantity) : undefined,
+        maxDiscount: maxDiscount !== undefined ? (maxDiscount ? Number(maxDiscount) : null) : undefined,
         validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
         validUntil: validUntil !== undefined ? (validUntil ? new Date(validUntil) : null) : undefined,
         quota: quota !== undefined ? Number(quota) : undefined,
@@ -14251,7 +14253,16 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
       if (voucherId) {
         const voucher = await tx.voucher.findUnique({ where: { id: parseInt(voucherId) } });
-        if (voucher && voucher.isActive && subtotal >= voucher.minPurchase) {
+        
+        let totalQuantity = 0;
+        for (const item of items) {
+          totalQuantity += parseFloat(item.quantity);
+        }
+
+        const validPurchase = voucher && subtotal >= voucher.minPurchase;
+        const validQuantity = voucher && voucher.minQuantity > 0 && totalQuantity >= voucher.minQuantity;
+
+        if (voucher && voucher.isActive && (voucher.minPurchase === 0 || validPurchase || validQuantity)) {
           voucherCode = voucher.code;
           if (voucher.discountType === 'PERCENTAGE') {
             voucherDiscountAmount = subtotal * (voucher.discountValue / 100);
@@ -15997,7 +16008,7 @@ app.get('/api/pos/customers', tenantMiddleware, async (req: Request, res: Respon
 app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { customerId, voucherCode, pointsToUse = 0, subtotal = 0 } = req.body;
+    const { customerId, voucherCode, pointsToUse = 0, subtotal = 0, totalQuantity = 0 } = req.body;
 
     let finalTotal = Number(subtotal);
     let memberDiscountAmount = 0;
@@ -16052,8 +16063,11 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
         return res.status(400).json({ error: 'Kuota voucher sudah habis.' });
       }
 
-      if (finalTotal < voucher.minPurchase) {
-        return res.status(400).json({ error: `Minimal belanja untuk voucher ini adalah Rp ${voucher.minPurchase}` });
+      const validPurchase = voucher.minPurchase === 0 || finalTotal >= voucher.minPurchase;
+      const validQuantity = voucher.minQuantity > 0 && Number(totalQuantity) >= voucher.minQuantity;
+
+      if (!validPurchase && !validQuantity) {
+        return res.status(400).json({ error: `Voucher ini mengharuskan minimal belanja Rp ${voucher.minPurchase} ATAU minimal pembelian ${voucher.minQuantity} barang.` });
       }
 
       if (voucher.discountType === 'PERCENTAGE') {

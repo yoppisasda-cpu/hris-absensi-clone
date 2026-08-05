@@ -652,6 +652,7 @@ class ApiService {
     int? customerId,
     String? voucherCode,
     double pointsToUse = 0,
+    double totalQuantity = 0,
   }) async {
     try {
       final response = await _dio.post('/pos/calculate', data: {
@@ -659,6 +660,7 @@ class ApiService {
         'customerId': customerId,
         'voucherCode': voucherCode,
         'pointsToUse': pointsToUse,
+        'totalQuantity': totalQuantity,
       });
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {

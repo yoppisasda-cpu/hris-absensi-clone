@@ -304,11 +304,13 @@ class _POSScreenState extends State<POSScreen> {
 
   Future<void> _calculateDiscounts(StateSetter setPanelState) async {
     try {
+      double totalQty = _cart.fold(0, (sum, item) => sum + (item['quantity'] as num));
       final res = await _apiService.calculatePosTotal(
         subtotal: _subtotalAmount,
         customerId: _activeCustomerId,
         voucherCode: _voucherController.text.trim(),
         pointsToUse: _usePoints ? _availablePoints : 0,
+        totalQuantity: totalQty,
       );
       setPanelState(() {
         _memberDiscountAmount = (res['memberDiscountAmount'] ?? 0).toDouble();
