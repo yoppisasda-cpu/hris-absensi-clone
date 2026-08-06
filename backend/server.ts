@@ -17418,8 +17418,9 @@ app.get('/api/assignments', tenantMiddleware, async (req: Request, res: Response
 
     const where: any = { companyId: tenantId };
 
-    // If Employee, only show tasks assigned to them OR created by them
-    if (role === 'EMPLOYEE') {
+    // Restrict visibility: Only Admins/Owners see all tasks.
+    // Others only see tasks assigned to them OR created by them.
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER'].includes(role)) {
       where.OR = [
         { userId: userId },
         { assignedById: userId }
@@ -17455,10 +17456,10 @@ app.post('/api/assignments', tenantMiddleware, async (req: Request, res: Respons
     let status: any = 'IN_PROGRESS';
     let targetUserId = userId ? Number(userId) : creatorId;
 
-    // If employee creates for themselves, it starts as PENDING for approval
-    if (role === 'EMPLOYEE') {
+    // If non-admin creates for themselves, it starts as PENDING for approval
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER'].includes(role)) {
       status = 'PENDING';
-      targetUserId = creatorId; // Force self-assignment if employee
+      targetUserId = creatorId; // Force self-assignment if non-admin
     }
 
     const newAssignment = await prisma.assignment.create({
@@ -17483,12 +17484,12 @@ app.post('/api/assignments', tenantMiddleware, async (req: Request, res: Respons
         'Tugas Baru Di-assign', 
         `Anda mendapatkan tugas baru: ${title}. Segera cek aplikasi!`
       );
-    } else if (role === 'EMPLOYEE') {
-      // Notify Admin if employee proposes a task
+    } else if (!['SUPERADMIN', 'ADMIN', 'OWNER'].includes(role)) {
+      // Notify Admin if non-admin proposes a task
       await notifyAdmins(
         tenantId,
         'Pengajuan Tugas Baru',
-        `${newAssignment.user.name} mengajukan tugas baru: ${title}`
+        `${newAssignment.user?.name || 'Seorang karyawan'} mengajukan tugas baru: ${title}. Mohon ditinjau.`
       );
     }
 
