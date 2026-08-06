@@ -5234,11 +5234,14 @@ app.post('/api/leaves', tenantMiddleware, async (req: Request, res: Response) =>
       }
     }
 
-    // 4. Validasi Sisa Kuota (12 Hari) - KECUALI JIKA SAKIT
+    // 4. Validasi Sisa Kuota (berdasarkan annualLeaveQuota) - KECUALI JIKA SAKIT
+    const userQuota = await prisma.user.findUnique({ where: { id: userId }, select: { annualLeaveQuota: true } });
+    const maxQuota = userQuota?.annualLeaveQuota || 12;
+
     if (type !== 'SICK') {
-      if (usedLeaveDays + newLeaveDays > 12) {
+      if (usedLeaveDays + newLeaveDays > maxQuota) {
         return res.status(400).json({
-          error: `Jatah cuti tahunan (12 hari) tidak mencukupi.\nSisa: ${12 - usedLeaveDays} hari.\nMeminta: ${newLeaveDays} hari.`
+          error: `Jatah cuti tahunan (${maxQuota} hari) tidak mencukupi.\nSisa: ${maxQuota - usedLeaveDays} hari.\nMeminta: ${newLeaveDays} hari.`
         });
       }
     }
@@ -5328,10 +5331,13 @@ app.get('/api/leaves/quota', tenantMiddleware, async (req: Request, res: Respons
       }
     }
 
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { annualLeaveQuota: true } });
+    const maxQuota = user?.annualLeaveQuota || 12;
+
     res.json({
-      totalQuota: 12,
+      totalQuota: maxQuota,
       used: usedLeaveDays,
-      remaining: 12 - usedLeaveDays,
+      remaining: maxQuota - usedLeaveDays,
       year
     });
   } catch (error) {
@@ -5426,7 +5432,7 @@ app.get('/api/leaves/bank', tenantMiddleware, async (req: Request, res: Response
     // 1. Ambil semua karyawan aktif
     const users = await prisma.user.findMany({
       where: { companyId: tenantId, isActive: true },
-      select: { id: true, name: true, email: true, jobTitle: true, division: true }
+      select: { id: true, name: true, email: true, jobTitle: true, division: true, annualLeaveQuota: true }
     });
 
     // 2. Ambil data hari libur nasional
@@ -5470,17 +5476,50 @@ app.get('/api/leaves/bank', tenantMiddleware, async (req: Request, res: Response
     // 5. Gabungkan menjadi bank cuti
     const bankCuti = users.map(user => {
       const used = userUsedQuota[user.id] || 0;
+      const maxQuota = user.annualLeaveQuota;
       return {
         ...user,
-        totalQuota: 12,
+        totalQuota: maxQuota,
         usedQuota: used,
-        remainingQuota: 12 - used
+        remainingQuota: maxQuota - used
       };
     });
 
     res.json(bankCuti);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil data bank cuti karyawan' });
+  }
+});
+
+// E2.1.1. Update Bank Cuti Karyawan
+app.patch('/api/leaves/bank/:userId', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userRole = (req as any).userRole;
+    const targetUserId = parseInt(req.params.userId as string);
+    const { annualLeaveQuota } = req.body;
+
+    if (!['ADMIN', 'OWNER', 'SUPERADMIN'].includes(userRole)) {
+      return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki izin untuk mengubah jatah cuti.' });
+    }
+
+    if (typeof annualLeaveQuota !== 'number' || annualLeaveQuota < 0) {
+      return res.status(400).json({ error: 'Jatah cuti harus berupa angka valid.' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser || (targetUser.companyId !== tenantId && userRole !== 'SUPERADMIN')) {
+      return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
+    }
+
+    await prisma.user.update({
+      where: { id: targetUserId },
+      data: { annualLeaveQuota }
+    });
+
+    res.json({ message: 'Jatah cuti berhasil diperbarui' });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal memperbarui jatah cuti karyawan' });
   }
 });
 

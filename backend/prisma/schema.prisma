@@ -284,6 +284,7 @@ model User {
   taxStatus               String              @default("TK-0")
   isTaxable               Boolean             @default(true)
   isAttendanceExempt      Boolean             @default(false)
+  annualLeaveQuota        Int                 @default(12)
   assets                  Asset[]
   createdAssignments      Assignment[]        @relation("AssignmentCreator")
   assignments             Assignment[]        @relation("AssignmentUser")

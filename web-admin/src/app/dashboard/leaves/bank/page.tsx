@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { CalendarDays, User, Download, Search, ArrowLeft } from 'lucide-react';
+import { CalendarDays, User, Download, Search, ArrowLeft, Edit2, CheckCircle, XCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Link from 'next/link';
 
@@ -23,6 +23,12 @@ export default function LeavesBankPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [userRole, setUserRole] = useState<string | null>(null);
+
+    // Modal state
+    const [editingUser, setEditingUser] = useState<LeaveBankData | null>(null);
+    const [newQuota, setNewQuota] = useState<number>(12);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     const fetchBankData = async () => {
         try {
@@ -37,7 +43,31 @@ export default function LeavesBankPage() {
 
     useEffect(() => {
         fetchBankData();
+        setUserRole(localStorage.getItem('userRole'));
     }, []);
+
+    const handleUpdateQuota = async () => {
+        if (!editingUser) return;
+        setIsUpdating(true);
+        try {
+            await api.patch(`/leaves/bank/${editingUser.id}`, {
+                annualLeaveQuota: newQuota
+            });
+            // Update local state
+            setBankData(prev => prev.map(u => 
+                u.id === editingUser.id ? { 
+                    ...u, 
+                    totalQuota: newQuota, 
+                    remainingQuota: newQuota - u.usedQuota 
+                } : u
+            ));
+            setEditingUser(null);
+        } catch (err: any) {
+            alert('Gagal mengupdate kuota cuti: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     const handleExportExcel = () => {
         if (bankData.length === 0) return;
@@ -121,6 +151,9 @@ export default function LeavesBankPage() {
                                     <th className="px-6 py-5 italic text-center">Jatah Tahunan</th>
                                     <th className="px-6 py-5 italic text-center">Terpakai</th>
                                     <th className="px-6 py-5 italic text-center">Sisa Cuti</th>
+                                    {['ADMIN', 'OWNER', 'SUPERADMIN'].includes(userRole || '') && (
+                                        <th className="px-6 py-5 italic text-center">Aksi</th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800 transition-all">
@@ -152,6 +185,20 @@ export default function LeavesBankPage() {
                                                 {data.remainingQuota} Hari
                                             </span>
                                         </td>
+                                        {['ADMIN', 'OWNER', 'SUPERADMIN'].includes(userRole || '') && (
+                                            <td className="px-6 py-5 text-center">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingUser(data);
+                                                        setNewQuota(data.totalQuota);
+                                                    }}
+                                                    className="p-2 text-indigo-400 hover:text-white hover:bg-indigo-500/20 rounded-xl transition-all border border-indigo-500/20"
+                                                    title="Edit Jatah Cuti"
+                                                >
+                                                    <Edit2 className="h-4 w-4" />
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -159,6 +206,61 @@ export default function LeavesBankPage() {
                     </div>
                 )}
             </div>
+
+            {/* Edit Modal */}
+            {editingUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-[32px] bg-[#050505] p-8 border border-slate-800 shadow-2xl">
+                        <div className="mb-6 text-center">
+                            <h2 className="text-xl font-black italic text-white uppercase tracking-tighter">Edit Jatah Cuti</h2>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">{editingUser.name}</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                                    Jatah Cuti Tahunan (Hari)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={newQuota}
+                                    onChange={(e) => setNewQuota(parseInt(e.target.value) || 0)}
+                                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+                                />
+                            </div>
+
+                            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl mt-4">
+                                <p className="text-[10px] font-bold text-amber-500/80 uppercase tracking-widest leading-relaxed">
+                                    Peringatan: Mengubah jatah tahunan akan secara langsung mempengaruhi sisa saldo cuti milik karyawan saat ini.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex gap-3">
+                            <button
+                                onClick={() => setEditingUser(null)}
+                                className="flex-1 px-4 py-3 rounded-xl border border-slate-700 text-xs font-black italic text-slate-400 uppercase tracking-widest hover:bg-slate-800 transition"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleUpdateQuota}
+                                disabled={isUpdating}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-indigo-600 text-xs font-black italic text-white uppercase tracking-widest hover:bg-indigo-700 transition disabled:opacity-50"
+                            >
+                                {isUpdating ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                ) : (
+                                    <>
+                                        <CheckCircle className="h-4 w-4" /> Simpan
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
