@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { X, Package, Tag, Box, AlertCircle, Layers, Plus, Trash2, ChefHat, ScanLine, MapPin, Save, Info, TrendingUp, Calculator, Image as ImageIcon, Upload, Loader2 } from "lucide-react";
+import { X, Package, Tag, Box, AlertCircle, Layers, Plus, Trash2, ChefHat, ScanLine, MapPin, Save, Info, TrendingUp, Calculator, Image as ImageIcon, Upload, Loader2, RefreshCcw } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import SearchableSelect from "../common/SearchableSelect";
@@ -44,6 +44,57 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     const [totalBatchCost, setTotalBatchCost] = useState(0);
     const [unitHpp, setUnitHpp] = useState(0);
     const [vendorPrice, setVendorPrice] = useState<number | string>("");
+
+    const handleRefresh = async () => {
+        setLoading(true);
+        try {
+            await Promise.all([
+                fetchProducts(),
+                fetchWarehouses(),
+                fetchCategories(),
+                fetchCustomizations()
+            ]);
+            
+            if (product) {
+                const res = await api.get(`/inventory/products`);
+                const freshProduct = res.data.find((p: any) => p.id === product.id) || product;
+                
+                setFormData({
+                    name: freshProduct.name || "",
+                    sku: freshProduct.sku || "",
+                    categoryId: freshProduct.categoryId?.toString() || "",
+                    unit: freshProduct.unit || "Pcs",
+                    description: freshProduct.description || "",
+                    minStock: freshProduct.minStock || 0,
+                    price: freshProduct.price || 0,
+                    costPrice: freshProduct.costPrice || 0,
+                    warehouseId: "",
+                    stock: freshProduct.stock || 0,
+                    showInPos: freshProduct.showInPos !== undefined ? freshProduct.showInPos : true,
+                    type: freshProduct.type || "FINISHED_GOOD",
+                    trackStock: freshProduct.trackStock !== undefined ? freshProduct.trackStock : true,
+                    priceGofood: freshProduct.priceGofood || 0,
+                    priceGrabfood: freshProduct.priceGrabfood || 0,
+                    priceShopeefood: freshProduct.priceShopeefood || 0,
+                    priceQpoon: freshProduct.priceQpoon || 0,
+                    recipeYield: freshProduct.recipeYield !== undefined ? freshProduct.recipeYield : 0,
+                    imageUrl: freshProduct.imageUrl || "",
+                    purchaseUnit: freshProduct.purchaseUnit || freshProduct.unit || "Pcs",
+                    purchaseFactor: freshProduct.purchaseFactor || 1
+                });
+                fetchRecipe(freshProduct.id);
+                if (freshProduct.customizations) {
+                    setSelectedCustomizations(freshProduct.customizations.map((c: any) => c.groupId));
+                }
+                setVendorPrice((freshProduct.costPrice || 0) * (freshProduct.purchaseFactor || 1));
+            }
+            toast.success("Data berhasil disinkronisasi ulang");
+        } catch (error) {
+            toast.error("Gagal melakukan sinkronisasi");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -381,9 +432,19 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Global SKU & Lifecycle Management</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
-                        <X className="h-5 w-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={handleRefresh}
+                            disabled={loading}
+                            title="Force Sync / Refresh Data"
+                            className="h-10 w-10 rounded-2xl bg-indigo-500/10 hover:bg-indigo-500/20 flex items-center justify-center border border-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-all disabled:opacity-50"
+                        >
+                            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                        <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto flex-grow custom-scrollbar bg-slate-950/20">
