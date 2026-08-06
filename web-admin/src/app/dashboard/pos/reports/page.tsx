@@ -798,9 +798,9 @@ export default function POSReportsPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-xs text-slate-300 font-medium">
-                                                {format(new Date(closing.startTime), 'dd MMM yyyy HH:mm', { locale: id })}
+                                                {format(new Date(closing.endTime), 'dd MMM yyyy HH:mm', { locale: id })}
                                             </div>
-                                            <div className="text-[10px] text-slate-500">s/d {format(new Date(closing.endTime), 'HH:mm')}</div>
+                                            <div className="text-[10px] text-slate-500">Dimulai: {format(new Date(closing.startTime), 'dd MMM HH:mm', { locale: id })}</div>
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-slate-300">
                                             Rp {closing.totalGrossSales.toLocaleString()}
