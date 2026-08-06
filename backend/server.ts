@@ -5417,6 +5417,73 @@ app.get('/api/leaves', tenantMiddleware, async (req: Request, res: Response) => 
   }
 });
 
+// E2.1. Get Bank Cuti Karyawan (Semua Karyawan)
+app.get('/api/leaves/bank', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const year = new Date().getFullYear();
+
+    // 1. Ambil semua karyawan aktif
+    const users = await prisma.user.findMany({
+      where: { companyId: tenantId, isActive: true },
+      select: { id: true, name: true, email: true, jobTitle: true, division: true }
+    });
+
+    // 2. Ambil data hari libur nasional
+    const holidays = await prisma.holiday.findMany({
+      where: { companyId: tenantId, date: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59) } }
+    });
+    const holidayDates = holidays.map((h: any) => h.date.toISOString().split('T')[0]);
+
+    // 3. Ambil cuti tahunan berjalan yang sudah APPROVED/PENDING
+    const activeLeaves = await prisma.leaveRequest.findMany({
+      where: {
+        companyId: tenantId,
+        type: 'ANNUAL',
+        status: { in: ['APPROVED', 'PENDING'] },
+        OR: [
+          { startDate: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59) } },
+          { endDate: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59) } }
+        ]
+      }
+    });
+
+    // 4. Kalkulasi pemakaian cuti per user
+    const userUsedQuota: Record<number, number> = {};
+    for (const leave of activeLeaves) {
+      let ld = new Date(leave.startDate);
+      const lend = new Date(leave.endDate);
+      while (ld <= lend) {
+        if (ld.getFullYear() === year) {
+          const dayOfWeek = ld.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            const dString = ld.toISOString().split('T')[0];
+            if (!holidayDates.includes(dString)) {
+              userUsedQuota[leave.userId] = (userUsedQuota[leave.userId] || 0) + 1;
+            }
+          }
+        }
+        ld.setDate(ld.getDate() + 1);
+      }
+    }
+
+    // 5. Gabungkan menjadi bank cuti
+    const bankCuti = users.map(user => {
+      const used = userUsedQuota[user.id] || 0;
+      return {
+        ...user,
+        totalQuota: 12,
+        usedQuota: used,
+        remainingQuota: 12 - used
+      };
+    });
+
+    res.json(bankCuti);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal mengambil data bank cuti karyawan' });
+  }
+});
+
 // E2.2. Get Pending Approvals (Leaves & Overtimes) - Phase SUPERVISOR
 app.get('/api/approvals/pending', tenantMiddleware, async (req: Request, res: Response) => {
   try {

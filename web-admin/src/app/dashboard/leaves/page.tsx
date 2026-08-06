@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { CalendarDays, CheckCircle, XCircle, Clock, User, Download, Search } from 'lucide-react';
+import { CalendarDays, CheckCircle, XCircle, Clock, User, Download, Search, Database } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Link from 'next/link';
 
 interface LeaveRequest {
     id: number;
@@ -106,6 +107,12 @@ export default function LeavesPage() {
                             className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-500"
                         />
                     </div>
+                    <Link
+                        href="/dashboard/leaves/bank"
+                        className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600/20 px-4 py-2 text-xs font-black italic uppercase tracking-widest text-indigo-400 hover:bg-indigo-600/30 transition shadow-lg shadow-indigo-500/10 border border-indigo-500/20"
+                    >
+                        <Database className="h-4 w-4" /> Bank Cuti
+                    </Link>
                     <button
                         onClick={handleExportExcel}
                         disabled={isLoading || leaves.length === 0}
