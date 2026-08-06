@@ -4129,10 +4129,10 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
 
     const users = await (prisma.user as any).findMany({
       where: {
+        companyId: tenantId,
         ...(userRole === 'SUPERADMIN' 
           ? {} 
           : { 
-              companyId: tenantId, 
               role: { not: 'SUPERADMIN' },
               name: { not: 'Aivola Owner' }
             }
