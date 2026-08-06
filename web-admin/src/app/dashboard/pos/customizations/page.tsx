@@ -39,7 +39,7 @@ export default function CustomizationsPage() {
     try {
       const [customRes, prodRes] = await Promise.all([
         api.get("/pos/customizations"),
-        api.get("/pos/products")
+        api.get("/inventory/products")
       ]);
       setGroups(customRes.data);
       setProducts(prodRes.data);
@@ -213,7 +213,7 @@ export default function CustomizationsPage() {
                     </div>
                     <div className="flex gap-2 items-center">
                       <span className="text-xs text-slate-500 whitespace-nowrap">Potong Stok:</span>
-                      <select value={opt.linkedProductId || ""} onChange={(e) => updateOption(i, "linkedProductId", e.target.value ? Number(e.target.value) : null)} className="flex-1 border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none bg-white truncate">
+                      <select value={opt.linkedProductId || ""} onChange={(e) => updateOption(i, "linkedProductId", e.target.value ? Number(e.target.value) : null)} className="flex-1 border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-900 outline-none bg-white truncate">
                         <option value="">Tidak potong stok (Hanya instruksi)</option>
                         {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock})</option>)}
                       </select>
