@@ -344,7 +344,7 @@ export default function Sidebar() {
                 {activeModule === 'ABSENSI' && userRole !== 'POS_VIEWER' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
                         <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manajemen SDM</div>
-                        {userRole !== 'OPERATIONAL' && (
+                        {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
                             <>
                                 <Link href="/dashboard/employees" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                                     <Users className="h-5 w-5" />
@@ -360,7 +360,7 @@ export default function Sidebar() {
                             <Clock className="h-5 w-5" />
                             Manajemen Shift
                         </Link>
-                        {userRole !== 'OPERATIONAL' && (
+                        {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
                             <>
                                 <Link href="/dashboard/attendance" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                                     <FileSpreadsheet className="h-5 w-5" />
@@ -430,7 +430,7 @@ export default function Sidebar() {
                 {/* MODUL FINANCE & AKUNTING (HANYA UNTUK STAFF FINANCE / OWNER) */}
                 {activeModule === 'FINANCE' && userRole !== 'POS_VIEWER' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                        {userRole !== 'OPERATIONAL' && (
+                        {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
                             <>
                                 <div className="px-3 py-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Penjualan & Operasional</div>
                                 <Link href="/dashboard/sales" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors">
@@ -547,7 +547,7 @@ export default function Sidebar() {
 
                         <div className="px-3 py-2 mt-4 text-[10px] font-bold text-orange-400 uppercase tracking-widest">Manajemen Inventori</div>
                         
-                        {userRole !== 'OPERATIONAL' && (
+                        {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
                             <>
                                 <Link href="/dashboard/inventory/products" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                                     <Box className="h-5 w-5 text-orange-400" />
@@ -565,7 +565,7 @@ export default function Sidebar() {
                             Purchase Order (PO)
                         </Link>
                         
-                        {userRole !== 'OPERATIONAL' && (
+                        {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
                             <Link href="/dashboard/inventory/warehouses" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                                 <MapPin className="h-5 w-5 text-blue-400" />
                                 Manajemen Gudang
