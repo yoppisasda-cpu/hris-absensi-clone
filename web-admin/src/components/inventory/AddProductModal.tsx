@@ -149,15 +149,24 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         let isMounted = true;
         try {
             const res = await api.get(`/inventory/products/${id}/recipe`);
-            if (isMounted && res.data && res.data.length > 0) {
-                setRecipeItems(res.data.map((r: any) => ({ 
-                    materialId: r.materialId.toString(), 
-                    quantity: r.quantity 
-                })));
-                setHasRecipe(true);
+            if (isMounted) {
+                if (res.data && res.data.length > 0) {
+                    setRecipeItems(res.data.map((r: any) => ({ 
+                        materialId: r.materialId.toString(), 
+                        quantity: r.quantity 
+                    })));
+                    setHasRecipe(true);
+                } else {
+                    setRecipeItems([]);
+                    setHasRecipe(false);
+                }
             }
         } catch (error) {
             console.error("Gagal mengambil resep", error);
+            if (isMounted) {
+                setRecipeItems([]);
+                setHasRecipe(false);
+            }
         }
         return () => { isMounted = false; };
     };
