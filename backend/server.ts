@@ -10798,14 +10798,14 @@ async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Da
   const sales: any[] = await prisma.$queryRawUnsafe(`
     SELECT id FROM "Sale" 
     WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
-    AND "status" NOT IN ('CANCELLED', 'PENDING')
+    AND "status" NOT IN ('CANCELLED', 'PENDING', 'RETURNED', 'VOID')
   `, tenantId, startDate, endDate);
 
   if (sales.length === 0) return 0;
   const saleIds = sales.map(s => s.id);
 
   const saleItems: any[] = await prisma.$queryRawUnsafe(`
-    SELECT "productId", "quantity" FROM "SaleItem" 
+    SELECT "productId", "quantity", "modifiers" FROM "SaleItem" 
     WHERE "saleId" IN (${saleIds.join(',')})
   `);
 
@@ -10852,6 +10852,26 @@ async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Da
     }
 
     calculatedCogsFromSales += qty * unitCogs;
+    
+    // Add modifier COGS
+    if (item.modifiers) {
+       const mods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
+       Object.values(mods).forEach((val: any) => {
+          if (val && val.linkedProductId) {
+             const linkedProdId = Number(val.linkedProductId);
+             const linkedQty = Number(val.linkedQuantity) || 1;
+             
+             let modUnitCogs = productCostCache.get(linkedProdId);
+             if (modUnitCogs === undefined) {
+                 const modProduct = allProducts.find(p => p.id === linkedProdId);
+                 modUnitCogs = modProduct ? getProductCost(modProduct) : 0;
+                 productCostCache.set(linkedProdId, modUnitCogs);
+             }
+             
+             calculatedCogsFromSales += qty * linkedQty * modUnitCogs;
+          }
+       });
+    }
   }
 
   return calculatedCogsFromSales;
@@ -10897,7 +10917,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       where: {
         companyId: tenantId,
         date: { gte: startDate, lte: endDate },
-        status: { notIn: ['CANCELLED', 'PENDING'] }
+        status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] }
       }
     });
 
@@ -11095,7 +11115,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       where: {
         companyId: tenantId,
         date: { gte: startDate, lte: endDate },
-        status: { notIn: ['CANCELLED', 'PENDING'] }
+        status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] }
       }
     });
 
@@ -12392,7 +12412,22 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
       const product = allProducts.find(p => p.id === pid);
       const calculatedUnitCost = product ? getProductCost(product) : (item.currentCostPrice || 0);
 
-      const itemCogs = item.quantity * calculatedUnitCost;
+      let itemCogs = item.quantity * calculatedUnitCost;
+      
+      // Calculate Modifiers COGS
+      if (item.modifiers) {
+         const mods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
+         Object.values(mods).forEach((val: any) => {
+            if (val && val.linkedProductId) {
+               const linkedProdId = Number(val.linkedProductId);
+               const linkedQty = Number(val.linkedQuantity) || 1;
+               const modProduct = allProducts.find(p => p.id === linkedProdId);
+               const modUnitCogs = modProduct ? getProductCost(modProduct) : 0;
+               itemCogs += (item.quantity * linkedQty * modUnitCogs);
+            }
+         });
+      }
+
       const itemRevenue = item.total;
       const itemProfit = itemRevenue - itemCogs;
       
@@ -16353,6 +16388,23 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             const price = Number(item.price);
             const originalPrice = Number(item.originalPrice || item.price);
 
+            // Pre-process modifiers to include linked product info for accurate COGS calculation later
+            const finalModifiers: any = {};
+            if (item.modifiers) {
+                Object.entries(item.modifiers).forEach(([key, val]: [string, any]) => {
+                    const finalVal = { ...val };
+                    if (val && val.id && optionMap[val.id]) {
+                        const opt = optionMap[val.id];
+                        if (opt.linkedProductId) {
+                           finalVal.linkedProductId = opt.linkedProductId;
+                           finalVal.linkedQuantity = opt.linkedQuantity;
+                        }
+                    }
+                    finalModifiers[key] = finalVal;
+                });
+            }
+            const hasModifiers = Object.keys(finalModifiers).length > 0;
+
             // Add Sale Item creation to operations
             operations.push(tx.saleItem.create({
                 data: {
@@ -16362,7 +16414,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                     price: price,
                     originalPrice: originalPrice,
                     total: price * quantity,
-                    modifiers: item.modifiers ? item.modifiers : null
+                    modifiers: hasModifiers ? finalModifiers : null
                 }
             }));
 
