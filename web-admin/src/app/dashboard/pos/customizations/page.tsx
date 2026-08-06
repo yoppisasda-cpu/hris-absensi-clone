@@ -208,8 +208,8 @@ export default function CustomizationsPage() {
                       <Trash2 size={16} />
                     </button>
                     <div className="flex gap-2 mb-2 pr-8">
-                      <input type="text" value={opt.name} onChange={(e) => updateOption(i, "name", e.target.value)} placeholder="Nama Opsi (Cth: Boba)" className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm outline-none" />
-                      <input type="number" value={opt.price} onChange={(e) => updateOption(i, "price", e.target.value)} placeholder="Harga (+Rp)" className="w-28 border border-slate-300 rounded-lg px-3 py-1.5 text-sm outline-none" />
+                      <input type="text" value={opt.name} onChange={(e) => updateOption(i, "name", e.target.value)} placeholder="Nama Opsi (Cth: Boba)" className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none" />
+                      <input type="number" value={opt.price} onChange={(e) => updateOption(i, "price", e.target.value)} placeholder="Harga (+Rp)" className="w-28 border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none" />
                     </div>
                     <div className="flex gap-2 items-center">
                       <span className="text-xs text-slate-500 whitespace-nowrap">Potong Stok:</span>
@@ -218,7 +218,7 @@ export default function CustomizationsPage() {
                         {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock})</option>)}
                       </select>
                       {opt.linkedProductId && (
-                         <input type="number" step="0.01" min="0" value={opt.linkedQuantity || ""} onChange={(e) => updateOption(i, "linkedQuantity", e.target.value)} placeholder="Qty (Cth: 1)" className="w-24 border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none" title="Jumlah stok yang dipotong" />
+                         <input type="number" step="0.01" min="0" value={opt.linkedQuantity || ""} onChange={(e) => updateOption(i, "linkedQuantity", e.target.value)} placeholder="Qty (Cth: 1)" className="w-24 border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none" title="Jumlah stok yang dipotong" />
                       )}
                     </div>
                   </div>
