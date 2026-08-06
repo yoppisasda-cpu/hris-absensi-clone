@@ -157,7 +157,8 @@ export default function POSPage() {
                 items: cart.map(item => ({
                     productId: item.id,
                     quantity: item.qty,
-                    price: item.price
+                    price: item.price,
+                    modifiers: item.modifiers || null
                 })),
                 accountId: selectedAccount,
                 totalAmount: finalTotalAmount,

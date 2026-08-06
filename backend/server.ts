@@ -15902,6 +15902,13 @@ app.post('/api/pos/customizations', tenantMiddleware, async (req: Request, res: 
   try {
     const tenantId = Number((req as any).tenantId);
     const { name, isRequired, minSelections, maxSelections, options } = req.body;
+    const parsedOptions = options.map((opt: any) => ({
+      name: opt.name,
+      price: Number(opt.price || 0),
+      linkedProductId: opt.linkedProductId ? Number(opt.linkedProductId) : null,
+      linkedQuantity: opt.linkedQuantity ? Number(opt.linkedQuantity) : null
+    }));
+    
     const group = await prisma.customizationGroup.create({
       data: {
         companyId: tenantId,
@@ -15909,7 +15916,7 @@ app.post('/api/pos/customizations', tenantMiddleware, async (req: Request, res: 
         isRequired,
         minSelections,
         maxSelections,
-        options: { create: options }
+        options: { create: parsedOptions }
       },
       include: { options: true }
     });
@@ -15924,12 +15931,19 @@ app.put('/api/pos/customizations/:id', tenantMiddleware, async (req: Request, re
     const tenantId = Number((req as any).tenantId);
     const { id } = req.params;
     const { name, isRequired, minSelections, maxSelections, options } = req.body;
+    const parsedOptions = options.map((opt: any) => ({
+      name: opt.name,
+      price: Number(opt.price || 0),
+      linkedProductId: opt.linkedProductId ? Number(opt.linkedProductId) : null,
+      linkedQuantity: opt.linkedQuantity ? Number(opt.linkedQuantity) : null
+    }));
+
     await prisma.customizationOption.deleteMany({ where: { groupId: Number(id) } });
     const group = await prisma.customizationGroup.update({
       where: { id: Number(id), companyId: tenantId },
       data: {
         name, isRequired, minSelections, maxSelections,
-        options: { create: options }
+        options: { create: parsedOptions }
       },
       include: { options: true }
     });
@@ -16300,6 +16314,21 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             });
         });
 
+        // Pre-fetch customization options for stock deduction
+        const optionIds: number[] = [];
+        for (const item of items) {
+            if (item.modifiers) {
+                Object.values(item.modifiers).forEach((val: any) => {
+                    if (val && val.id) optionIds.push(Number(val.id));
+                });
+            }
+        }
+        const linkedOptions = await tx.customizationOption.findMany({
+            where: { id: { in: optionIds }, linkedProductId: { not: null } }
+        });
+        const optionMap: Record<number, any> = {};
+        linkedOptions.forEach((opt: any) => optionMap[opt.id] = opt);
+
         // 1.7 Validate Stock before proceeding (Skip validation for offline synchronized sales since they have already been finalized)
         const productsInCart = await tx.product.findMany({
             where: { id: { in: productIds } },
@@ -16360,6 +16389,40 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                     date: new Date()
                 }
             }));
+
+            // --- MODIFIER STOCK DEDUCTION ---
+            if (item.modifiers) {
+                Object.values(item.modifiers).forEach((val: any) => {
+                    if (val && val.id && optionMap[val.id]) {
+                        const opt = optionMap[val.id];
+                        if (opt.linkedProductId) {
+                            const modQty = quantity * (opt.linkedQuantity || 1);
+                            
+                            operations.push(tx.product.update({
+                                where: { id: opt.linkedProductId },
+                                data: { stock: { decrement: modQty } }
+                            }));
+
+                            operations.push(tx.warehouseStock.upsert({
+                                where: { productId_warehouseId: { productId: opt.linkedProductId, warehouseId: warehouse.id } },
+                                update: { quantity: { decrement: modQty } },
+                                create: { productId: opt.linkedProductId, warehouseId: warehouse.id, quantity: -modQty }
+                            }));
+
+                            operations.push(tx.stockTransaction.create({
+                                data: {
+                                    productId: opt.linkedProductId,
+                                    warehouseId: warehouse.id,
+                                    type: 'OUT',
+                                    quantity: modQty,
+                                    reference: `POS Add-on ${invoiceNumber}`,
+                                    date: new Date()
+                                }
+                            }));
+                        }
+                    }
+                });
+            }
 
             // If it has a recipe, ALSO decrement the MATERIALS
             const recipes = recipeMap[productId] || [];

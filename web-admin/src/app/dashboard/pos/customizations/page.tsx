@@ -8,6 +8,8 @@ interface Option {
   id?: number;
   name: string;
   price: number;
+  linkedProductId?: number | null;
+  linkedQuantity?: number | null;
 }
 
 interface CustomizationGroup {
@@ -21,6 +23,7 @@ interface CustomizationGroup {
 
 export default function CustomizationsPage() {
   const [groups, setGroups] = useState<CustomizationGroup[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<CustomizationGroup | null>(null);
@@ -30,12 +33,16 @@ export default function CustomizationsPage() {
   const [isRequired, setIsRequired] = useState(false);
   const [minSelections, setMinSelections] = useState(0);
   const [maxSelections, setMaxSelections] = useState(1);
-  const [options, setOptions] = useState<Option[]>([{ name: "", price: 0 }]);
+  const [options, setOptions] = useState<Option[]>([{ name: "", price: 0, linkedProductId: null, linkedQuantity: null }]);
 
   const fetchGroups = async () => {
     try {
-      const { data } = await api.get("/pos/customizations");
-      setGroups(data);
+      const [customRes, prodRes] = await Promise.all([
+        api.get("/pos/customizations"),
+        api.get("/pos/products")
+      ]);
+      setGroups(customRes.data);
+      setProducts(prodRes.data);
     } catch (error) {
       console.error(error);
     } finally {
@@ -54,21 +61,21 @@ export default function CustomizationsPage() {
       setIsRequired(group.isRequired);
       setMinSelections(group.minSelections);
       setMaxSelections(group.maxSelections);
-      setOptions(group.options.length > 0 ? [...group.options] : [{ name: "", price: 0 }]);
+      setOptions(group.options.length > 0 ? [...group.options] : [{ name: "", price: 0, linkedProductId: null, linkedQuantity: null }]);
     } else {
       setEditingGroup(null);
       setName("");
       setIsRequired(false);
       setMinSelections(0);
       setMaxSelections(1);
-      setOptions([{ name: "", price: 0 }]);
+      setOptions([{ name: "", price: 0, linkedProductId: null, linkedQuantity: null }]);
     }
     setIsModalOpen(true);
   };
 
   const closeModal = () => setIsModalOpen(false);
 
-  const addOption = () => setOptions([...options, { name: "", price: 0 }]);
+  const addOption = () => setOptions([...options, { name: "", price: 0, linkedProductId: null, linkedQuantity: null }]);
   
   const removeOption = (index: number) => {
     if (options.length > 1) {
@@ -76,7 +83,7 @@ export default function CustomizationsPage() {
     }
   };
 
-  const updateOption = (index: number, field: "name" | "price", value: string | number) => {
+  const updateOption = (index: number, field: string, value: any) => {
     const newOptions = [...options];
     newOptions[index] = { ...newOptions[index], [field]: value };
     setOptions(newOptions);
@@ -96,7 +103,9 @@ export default function CustomizationsPage() {
         maxSelections,
         options: options.map(o => ({
           name: o.name.trim(),
-          price: Number(o.price) || 0
+          price: Number(o.price) || 0,
+          linkedProductId: o.linkedProductId || null,
+          linkedQuantity: o.linkedQuantity ? Number(o.linkedQuantity) : 1
         }))
       };
 
@@ -194,12 +203,24 @@ export default function CustomizationsPage() {
                 </div>
                 
                 {options.map((opt, i) => (
-                  <div key={i} className="flex gap-2 mb-3 items-start">
-                    <input type="text" value={opt.name} onChange={(e) => updateOption(i, "name", e.target.value)} placeholder="Misal: Less Sugar" className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none" />
-                    <input type="number" value={opt.price} onChange={(e) => updateOption(i, "price", e.target.value)} placeholder="Harga (0 jika gratis)" className="w-32 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none" />
-                    <button onClick={() => removeOption(i)} disabled={options.length <= 1} className="p-2 text-red-500 disabled:opacity-30">
-                      <Trash2 size={20} />
+                  <div key={i} className="mb-4 p-3 border border-slate-200 rounded-xl bg-slate-50 relative">
+                    <button onClick={() => removeOption(i)} disabled={options.length <= 1} className="absolute right-2 top-2 p-1 text-red-500 hover:bg-red-100 rounded disabled:opacity-30">
+                      <Trash2 size={16} />
                     </button>
+                    <div className="flex gap-2 mb-2 pr-8">
+                      <input type="text" value={opt.name} onChange={(e) => updateOption(i, "name", e.target.value)} placeholder="Nama Opsi (Cth: Boba)" className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm outline-none" />
+                      <input type="number" value={opt.price} onChange={(e) => updateOption(i, "price", e.target.value)} placeholder="Harga (+Rp)" className="w-28 border border-slate-300 rounded-lg px-3 py-1.5 text-sm outline-none" />
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <span className="text-xs text-slate-500 whitespace-nowrap">Potong Stok:</span>
+                      <select value={opt.linkedProductId || ""} onChange={(e) => updateOption(i, "linkedProductId", e.target.value ? Number(e.target.value) : null)} className="flex-1 border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none bg-white truncate">
+                        <option value="">Tidak potong stok (Hanya instruksi)</option>
+                        {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock})</option>)}
+                      </select>
+                      {opt.linkedProductId && (
+                         <input type="number" step="0.01" min="0" value={opt.linkedQuantity || ""} onChange={(e) => updateOption(i, "linkedQuantity", e.target.value)} placeholder="Qty (Cth: 1)" className="w-24 border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none" title="Jumlah stok yang dipotong" />
+                      )}
+                    </div>
                   </div>
                 ))}
                 
