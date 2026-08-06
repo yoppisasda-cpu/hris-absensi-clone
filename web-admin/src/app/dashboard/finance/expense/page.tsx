@@ -5,11 +5,14 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Plus, Search, Filter, ArrowDownLeft, Wallet, Banknote, Calendar, MoreVertical, FileText, Download, Edit3, Trash2, AlertTriangle, X, Package } from "lucide-react";
 import api from "@/lib/api";
 import AddExpenseModal from "@/components/finance/AddExpenseModal";
+import ExpenseCategoryModal from "@/components/finance/ExpenseCategoryModal";
 
 export default function ExpensesPage() {
     const [expenses, setExpenses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    console.log("Rendering Expense Page..."); // Force hot reload
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -108,6 +111,12 @@ export default function ExpensesPage() {
                 <div className="flex gap-3">
                     <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
                         <Download className="h-4 w-4" /> Export
+                    </button>
+                    <button 
+                        onClick={() => setIsCategoryModalOpen(true)}
+                        className="flex items-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-200 hover:bg-rose-700 active:scale-95 transition-all"
+                    >
+                        Kelola Kategori
                     </button>
                     <button 
                         onClick={() => {
@@ -339,6 +348,12 @@ export default function ExpensesPage() {
                 }} 
                 onSuccess={fetchExpenses} 
                 expenseToEdit={editingExpense}
+            />
+
+            <ExpenseCategoryModal
+                isOpen={isCategoryModalOpen}
+                onClose={() => setIsCategoryModalOpen(false)}
+                onSuccess={fetchCategories}
             />
         </DashboardLayout>
     );

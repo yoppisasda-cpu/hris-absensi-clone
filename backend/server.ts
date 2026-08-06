@@ -10225,6 +10225,45 @@ app.post('/api/finance/expense-categories', tenantMiddleware, async (req: Reques
   }
 });
 
+// F4.3. Update Expense Category
+app.patch('/api/finance/expense-categories/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, type } = req.body;
+    const tenantId = Number((req as any).tenantId);
+    
+    const result = await prisma.$queryRawUnsafe<any[]>(
+      `UPDATE "ExpenseCategory" 
+       SET "name" = COALESCE($1, "name"), "type" = COALESCE($2::"ExpenseType", "type"), "updatedAt" = NOW() 
+       WHERE "id" = $3 AND "companyId" = $4
+       RETURNING *`,
+      name, type, parseInt(String(id)), tenantId
+    );
+    
+    if (result.length === 0) return res.status(404).json({ error: 'Kategori tidak ditemukan' });
+    res.json(result[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal update kategori: ' + error.message });
+  }
+});
+
+// F4.4. Delete Expense Category
+app.delete('/api/finance/expense-categories/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { id } = req.params;
+    
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM "ExpenseCategory" WHERE "id" = $1 AND "companyId" = $2`,
+      parseInt(String(id)), tenantId
+    );
+    
+    res.json({ message: 'Kategori dihapus' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menghapus kategori: ' + error.message });
+  }
+});
+
 // F5.1. Get Expenses
 app.get('/api/finance/expense', tenantMiddleware, async (req: Request, res: Response) => {
   try {
