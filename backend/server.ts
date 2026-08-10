@@ -12198,24 +12198,32 @@ app.get('/api/finance/reports/cash-flow/export', tenantMiddleware, async (req: R
 app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    
+    const { month, year } = req.query;
+    const whereClause: any = { companyId: tenantId };
+    if (month && year && month !== 'all' && year !== 'all') {
+      const startDate = new Date(Number(year), Number(month) - 1, 1);
+      const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
+      whereClause.date = { gte: startDate, lte: endDate };
+    }
 
     // 1. Fetch Incomes
     const incomes = await prisma.income.findMany({
-      where: { companyId: tenantId },
+      where: whereClause,
       include: { account: true, category: true },
       orderBy: { date: 'desc' }
     });
 
     // 2. Fetch Expenses
     const expenses = await prisma.expense.findMany({
-      where: { companyId: tenantId },
+      where: whereClause,
       include: { account: true, category: true },
       orderBy: { date: 'desc' }
     });
 
     // 3. Fetch Transfers
     const transfers = await prisma.transfer.findMany({
-      where: { companyId: tenantId },
+      where: whereClause,
       include: { fromAccount: true, toAccount: true },
       orderBy: { date: 'desc' }
     });
@@ -12370,21 +12378,29 @@ app.get('/api/finance/journal/export', tenantMiddleware, async (req: Request, re
     const tenantId = Number((req as any).tenantId);
     const ExcelJS = require('exceljs');
 
+    const { month, year } = req.query;
+    const whereClause: any = { companyId: tenantId };
+    if (month && year && month !== 'all' && year !== 'all') {
+      const startDate = new Date(Number(year), Number(month) - 1, 1);
+      const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
+      whereClause.date = { gte: startDate, lte: endDate };
+    }
+
     // 1. Fetch Data (Same as journal route)
     const incomes = await prisma.income.findMany({
-      where: { companyId: tenantId },
+      where: whereClause,
       include: { account: true, category: true },
       orderBy: { date: 'asc' } // Sorted by date for better readability in excel
     });
 
     const expenses = await prisma.expense.findMany({
-      where: { companyId: tenantId },
+      where: whereClause,
       include: { account: true, category: true },
       orderBy: { date: 'asc' }
     });
 
     const transfers = await prisma.transfer.findMany({
-      where: { companyId: tenantId },
+      where: whereClause,
       include: { fromAccount: true, toAccount: true },
       orderBy: { date: 'asc' }
     });

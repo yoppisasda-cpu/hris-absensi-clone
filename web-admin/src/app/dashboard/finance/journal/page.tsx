@@ -10,11 +10,13 @@ export default function JournalPage() {
     const [entries, setEntries] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
     const fetchJournal = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/finance/journal');
+            const res = await api.get(`/finance/journal?month=${selectedMonth}&year=${selectedYear}`);
             setEntries(res.data);
         } catch (error) {
             console.error("Gagal mengambil data jurnal", error);
@@ -32,7 +34,7 @@ export default function JournalPage() {
                 setSearchTerm(account);
             }
         }
-    }, []);
+    }, [selectedMonth, selectedYear]);
 
     const filteredEntries = entries.filter(entry => 
         entry.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -42,7 +44,7 @@ export default function JournalPage() {
 
     const handleExportExcel = async () => {
         try {
-            const response = await api.get('/finance/journal/export', {
+            const response = await api.get(`/finance/journal/export?month=${selectedMonth}&year=${selectedYear}`, {
                 responseType: 'blob',
             });
             
@@ -99,9 +101,36 @@ export default function JournalPage() {
                             />
                         </div>
                         <div className="flex gap-2">
-                            <button className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
-                                <Filter className="h-4 w-4" /> Filter Periode
-                            </button>
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all bg-white"
+                            >
+                                <option value="all">Semua Bulan</option>
+                                <option value="1">Januari</option>
+                                <option value="2">Februari</option>
+                                <option value="3">Maret</option>
+                                <option value="4">April</option>
+                                <option value="5">Mei</option>
+                                <option value="6">Juni</option>
+                                <option value="7">Juli</option>
+                                <option value="8">Agustus</option>
+                                <option value="9">September</option>
+                                <option value="10">Oktober</option>
+                                <option value="11">November</option>
+                                <option value="12">Desember</option>
+                            </select>
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(e.target.value)}
+                                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all bg-white"
+                            >
+                                <option value="all">Semua Tahun</option>
+                                {[...Array(5)].map((_, i) => {
+                                    const year = new Date().getFullYear() - i;
+                                    return <option key={year} value={year}>{year}</option>;
+                                })}
+                            </select>
                         </div>
                     </div>
 
