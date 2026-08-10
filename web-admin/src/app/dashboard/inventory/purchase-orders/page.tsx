@@ -71,8 +71,15 @@ export default function PurchaseOrdersPage() {
     const handleUpdateStatus = async (id: number, status: 'APPROVED' | 'REJECTED') => {
         if (!window.confirm(`Apakah Anda yakin ingin ${status === 'APPROVED' ? 'MENYETUJUI' : 'MENOLAK'} pesanan ini?`)) return;
 
+        let approvedDate = new Date().toISOString().split('T')[0];
+        if (status === 'APPROVED') {
+            const inputDate = window.prompt("Masukkan TANGGAL PERSETUJUAN (YYYY-MM-DD) untuk pencatatan hutang/stok. Biarkan untuk pakai tanggal hari ini:", approvedDate);
+            if (inputDate === null) return; // Dibatalkan
+            if (inputDate.trim() !== '') approvedDate = inputDate.trim();
+        }
+
         try {
-            await api.patch(`/inventory/purchase-orders/${id}/status`, { status });
+            await api.patch(`/inventory/purchase-orders/${id}/status`, { status, approvedDate });
             toast.success(`Berhasil ${status === 'APPROVED' ? 'menyetujui' : 'menolak'} PO.`);
             fetchPos();
         } catch (error: any) {

@@ -2883,7 +2883,7 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
     const userId = (req as any).userId;
     const userRole = (req as any).userRole;
     const id = parseInt(req.params.id as string);
-    const { status } = req.body; // APPROVED or REJECTED
+    const { status, approvedDate } = req.body; // APPROVED or REJECTED
 
     if (!['APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) {
       return res.status(400).json({ error: 'Status tidak valid.' });
@@ -2944,14 +2944,16 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
         }
 
         // Add to Expense (Hutang)
+        const finalApprovedDate = approvedDate ? new Date(approvedDate) : new Date();
+        const dueDate = new Date(finalApprovedDate.getTime() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
         await tx.expense.create({
           data: {
             companyId: tenantId,
             categoryId: category.id,
             supplierId: poData.supplierId,
             amount: poData.totalAmount,
-            date: new Date(),
-            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
+            date: finalApprovedDate,
+            dueDate: dueDate,
             description: `Hutang otomatis dari PO #${poData.orderNumber}`,
             status: 'PENDING',
             paidTo: poData.supplier_name
