@@ -10310,7 +10310,60 @@ app.get('/api/finance/expense-categories', tenantMiddleware, async (req: Request
     });
     res.json(categories);
   } catch (error: any) {
-    res.status(500).json({ error: 'Gagal mengambil kategori pengeluaran' });
+    res.status(500).json({ error: 'Gagal mengambil kategori pengeluaran: ' + error.message });
+  }
+});
+
+// F4_import. Import Expense Categories from another company
+app.post('/api/finance/expense-categories/import', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const targetCompanyId = Number((req as any).tenantId);
+    const { sourceCompanyId } = req.body;
+
+    if (!sourceCompanyId) return res.status(400).json({ error: 'Source company ID is required' });
+
+    // Ambil semua kategori dari perusahaan sumber
+    const sourceCategories = await prisma.expenseCategory.findMany({
+      where: { companyId: Number(sourceCompanyId) }
+    });
+
+    if (sourceCategories.length === 0) {
+      return res.status(404).json({ error: 'Tidak ada kategori pengeluaran di perusahaan sumber.' });
+    }
+
+    let importedCount = 0;
+    let skippedCount = 0;
+
+    for (const sourceCat of sourceCategories) {
+      // Cek apakah sudah ada kategori dengan nama yang sama di perusahaan target
+      const existingCat = await prisma.expenseCategory.findFirst({
+        where: { companyId: targetCompanyId, name: sourceCat.name }
+      });
+
+      if (existingCat) {
+        skippedCount++;
+        continue;
+      }
+
+      await prisma.expenseCategory.create({
+        data: {
+          companyId: targetCompanyId,
+          name: sourceCat.name,
+          type: sourceCat.type
+        }
+      });
+      importedCount++;
+    }
+
+    res.json({
+      message: `Berhasil mengimpor ${importedCount} kategori. Dilewati ${skippedCount} kategori yang sudah ada.`,
+      importedCount,
+      skippedCount
+    });
+
+  } catch (error: any) {
+    console.error('Error importing expense categories:', error);
+    res.status(500).json({ error: 'Gagal mengimpor kategori pengeluaran: ' + error.message });
   }
 });
 

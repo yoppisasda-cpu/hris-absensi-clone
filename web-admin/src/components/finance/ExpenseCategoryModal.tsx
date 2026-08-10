@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Tag, Plus, Trash2, Edit2, Check, AlertCircle } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
+import ImportExpenseCategoryModal from "./ImportExpenseCategoryModal";
 
 export default function ExpenseCategoryModal({ isOpen, onClose, onSuccess }: any) {
     const [categories, setCategories] = useState<any[]>([]);
@@ -11,6 +12,7 @@ export default function ExpenseCategoryModal({ isOpen, onClose, onSuccess }: any
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editingName, setEditingName] = useState("");
     const [loading, setLoading] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     const fetchCategories = async () => {
         try {
@@ -85,9 +87,17 @@ export default function ExpenseCategoryModal({ isOpen, onClose, onSuccess }: any
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 italic">Expense Classification Protocol</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
-                        <X className="h-5 w-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="h-10 px-4 rounded-2xl bg-indigo-500/10 hover:bg-indigo-500/20 flex items-center justify-center border border-indigo-500/20 text-indigo-400 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest italic gap-2"
+                        >
+                            Copy Cabang
+                        </button>
+                        <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/5 text-slate-500 hover:text-white transition-all">
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
@@ -172,6 +182,15 @@ export default function ExpenseCategoryModal({ isOpen, onClose, onSuccess }: any
                     </div>
                 </div>
             </div>
+            
+            <ImportExpenseCategoryModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={() => {
+                    fetchCategories();
+                    onSuccess();
+                }}
+            />
         </div>
     );
 }
