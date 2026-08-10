@@ -30,6 +30,7 @@ interface Product {
     categoryId?: number;
     category?: { name: string };
     unit: string;
+    trackStock?: boolean;
 }
 
 interface CartItem extends Product {
@@ -93,7 +94,7 @@ export default function POSPage() {
     }, [products, searchTerm, selectedCategory]);
 
     const addToCart = (product: Product) => {
-        if (product.stock <= 0) {
+        if (product.trackStock !== false && product.stock <= 0) {
             toast.error("Stok habis!");
             return;
         }
@@ -101,7 +102,7 @@ export default function POSPage() {
         setCart(prev => {
             const existing = prev.find(item => item.id === product.id);
             if (existing) {
-                if (existing.qty >= product.stock) {
+                if (product.trackStock !== false && existing.qty >= product.stock) {
                     toast.error("Stok tidak cukup");
                     return prev;
                 }
@@ -118,7 +119,7 @@ export default function POSPage() {
             if (item.id === id) {
                 const newQty = item.qty + delta;
                 if (newQty <= 0) return item;
-                if (newQty > item.stock) {
+                if (item.trackStock !== false && newQty > item.stock) {
                     toast.error("Stok tidak cukup");
                     return item;
                 }
