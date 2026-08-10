@@ -2912,14 +2912,19 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
 
       if (poData.status !== 'PENDING') throw new Error('PO sudah diproses sebelumnya.');
 
-      const updatedPo = await tx.purchaseOrder.update({
-        where: { id },
+      // Gunakan updateMany untuk menjamin operasi atomik (menghindari double-click race condition)
+      const updateResult = await tx.purchaseOrder.updateMany({
+        where: { id, status: 'PENDING' },
         data: {
           status,
           approvedById: userId,
           updatedAt: new Date()
         }
       });
+
+      if (updateResult.count === 0) {
+        throw new Error('PO sudah diproses sebelumnya (Terdeteksi klik ganda).');
+      }
 
       // If APPROVED, create a PENDING Expense (Hutang) AND update Inventory
       if (status === 'APPROVED') {
