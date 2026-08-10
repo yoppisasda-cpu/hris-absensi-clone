@@ -13199,7 +13199,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
 app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const productId = parseInt(req.params.id);
+    const productId = parseInt(req.params.id as string);
     const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, imageUrl, type, trackStock, purchaseUnit, purchaseFactor } = req.body;
 
     // Verify ownership
