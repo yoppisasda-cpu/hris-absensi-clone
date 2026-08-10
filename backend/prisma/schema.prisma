@@ -848,6 +848,7 @@ model Product {
   showInPos          Boolean                @default(true)
   type               ProductType            @default(FINISHED_GOOD)
   trackStock         Boolean                @default(true)
+  isAutoDeduct       Boolean                @default(false)
   priceGofood        Float                  @default(0)
   priceGrabfood      Float                  @default(0)
   priceShopeefood    Float                  @default(0)

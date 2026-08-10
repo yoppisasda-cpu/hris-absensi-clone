@@ -35,6 +35,7 @@ export default function ProductsPage() {
     const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("all");
     const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+    const [userRole, setUserRole] = useState<string | null>(null);
 
     const fetchProducts = async () => {
         setLoading(true);
@@ -85,6 +86,9 @@ export default function ProductsPage() {
     }, [selectedBranchId, selectedWarehouseId]);
 
     useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setUserRole(localStorage.getItem('userRole'));
+        }
         fetchCategories();
         fetchBranches();
         fetchWarehouses();
@@ -168,12 +172,14 @@ export default function ProductsPage() {
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-3 w-full md:w-auto">
-                    <button 
-                        onClick={() => setIsWarehouseModalOpen(true)}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-slate-400 hover:bg-slate-800 hover:text-white transition-all uppercase tracking-widest italic"
-                    >
-                        <MapPin className="h-4 w-4" /> Lokasi
-                    </button>
+                    {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
+                        <>
+                            <button 
+                                onClick={() => setIsWarehouseModalOpen(true)}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-slate-400 hover:bg-slate-800 hover:text-white transition-all uppercase tracking-widest italic"
+                            >
+                                <MapPin className="h-4 w-4" /> Lokasi
+                            </button>
                     <button 
                         onClick={() => setIsCategoryModalOpen(true)}
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-slate-400 hover:bg-slate-800 hover:text-white transition-all uppercase tracking-widest italic"
@@ -210,6 +216,8 @@ export default function ProductsPage() {
                     >
                         <Plus className="h-4 w-4 stroke-[3px]" /> Product Baru
                     </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -543,34 +551,38 @@ export default function ProductsPage() {
                                                         ></div>
                                                         <div className="absolute right-6 top-12 z-40 w-64 bg-[#050505] rounded-[24px] shadow-2xl border border-white/10 py-3 animate-in fade-in zoom-in duration-300 overflow-hidden backdrop-blur-3xl">
                                                             <p className="px-5 py-3 text-[9px] font-black uppercase text-slate-600 tracking-[0.3em] border-b border-white/5 mb-2 italic">Product Operations</p>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    handleEditProduct(product);
-                                                                    setOpenMenuId(null);
-                                                                }}
-                                                                className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
-                                                            >
-                                                                <Edit2 className="h-4 w-4 text-indigo-500" /> Profil Produk
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    handleAdjustStock(product);
-                                                                    setOpenMenuId(null);
-                                                                }}
-                                                                className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
-                                                            >
-                                                                <Edit3 className="h-4 w-4 text-amber-500" /> Koreksi Stok (Opname)
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    setSelectedProduct(product);
-                                                                    setIsTransferModalOpen(true);
-                                                                    setOpenMenuId(null);
-                                                                }}
-                                                                className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
-                                                            >
-                                                                <Truck className="h-4 w-4 text-indigo-400" /> Mutasi Stok
-                                                            </button>
+                                                            {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
+                                                                <>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            handleEditProduct(product);
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
+                                                                    >
+                                                                        <Edit2 className="h-4 w-4 text-indigo-500" /> Profil Produk
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            handleAdjustStock(product);
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
+                                                                    >
+                                                                        <Edit3 className="h-4 w-4 text-amber-500" /> Koreksi Stok (Opname)
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setSelectedProduct(product);
+                                                                            setIsTransferModalOpen(true);
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
+                                                                    >
+                                                                        <Truck className="h-4 w-4 text-indigo-400" /> Mutasi Stok
+                                                                    </button>
+                                                                </>
+                                                            )}
 
                                                             {(product.type === 'FINISHED_GOOD' || product.type === 'WIP') && (
                                                                 <button 
@@ -588,16 +600,20 @@ export default function ProductsPage() {
                                                                     <ChefHat className="h-4 w-4 text-emerald-500" /> Execute Batch
                                                                 </button>
                                                             )}
-                                                            <div className="h-px bg-white/5 my-2 mx-5"></div>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    handleDeleteProduct(product.id, product.name);
-                                                                    setOpenMenuId(null);
-                                                                }}
-                                                                className="w-full px-5 py-3 text-left text-[10px] font-black text-red-900 hover:bg-red-500/10 hover:text-red-500 flex items-center gap-3 transition-all uppercase tracking-widest italic"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" /> Terminate SKU
-                                                            </button>
+                                                            {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
+                                                                <>
+                                                                    <div className="h-px bg-white/5 my-2 mx-5"></div>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            handleDeleteProduct(product.id, product.name);
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className="w-full px-5 py-3 text-left text-[10px] font-black text-red-900 hover:bg-red-500/10 hover:text-red-500 flex items-center gap-3 transition-all uppercase tracking-widest italic"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" /> Terminate SKU
+                                                                    </button>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </>
                                                 )}

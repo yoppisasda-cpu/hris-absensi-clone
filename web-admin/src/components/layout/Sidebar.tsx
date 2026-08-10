@@ -98,7 +98,7 @@ export default function Sidebar() {
         setUserRole(role);
         
         const fetchAccessibleCompanies = async () => {
-            if (role === 'OWNER' || role === 'SUPERADMIN') {
+            if (role === 'OWNER' || role === 'SUPERADMIN' || role === 'MANAGER') {
                 try {
                     const res = await api.get('/companies/accessible');
                     setAccessibleCompanies(res.data);
@@ -547,12 +547,12 @@ export default function Sidebar() {
 
                         <div className="px-3 py-2 mt-4 text-[10px] font-bold text-orange-400 uppercase tracking-widest">Manajemen Inventori</div>
                         
+                        <Link href="/dashboard/inventory/products" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <Box className="h-5 w-5 text-orange-400" />
+                            Produk & Stok
+                        </Link>
                         {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
                             <>
-                                <Link href="/dashboard/inventory/products" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                                    <Box className="h-5 w-5 text-orange-400" />
-                                    Produk & Stok
-                                </Link>
                                 <Link href="/dashboard/inventory/adjustments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                                     <Clock className="h-5 w-5 text-slate-400" />
                                     Penyesuaian Stok (Stock Opname)

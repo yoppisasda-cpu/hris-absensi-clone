@@ -835,8 +835,8 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
             if (decoded.role === 'SUPERADMIN') {
                 (req as any).tenantId = requestedTenantId;
             } 
-            // 2. Owner can switch if they have access in UserAccess table
-            else if (decoded.role === 'OWNER' && requestedTenantId !== Number(decoded.companyId)) {
+            // 2. Owner or Manager can switch if they have access in UserAccess table
+            else if ((decoded.role === 'OWNER' || decoded.role === 'MANAGER') && requestedTenantId !== Number(decoded.companyId)) {
                 const access = await prisma.userAccess.findUnique({
                     where: {
                         userId_companyId: {
@@ -847,9 +847,9 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
                 });
                 if (access) {
                     (req as any).tenantId = requestedTenantId;
-                    console.log(`[AUTH] Owner ${decoded.userId} authorized Switch to Tenant ${requestedTenantId}`);
+                    console.log(`[AUTH] ${decoded.role} ${decoded.userId} authorized Switch to Tenant ${requestedTenantId}`);
                 } else {
-                    console.warn(`[AUTH] Unauthorized Tenant Switch attempt by Owner ${decoded.userId} to Tenant ${requestedTenantId}`);
+                    console.warn(`[AUTH] Unauthorized Tenant Switch attempt by ${decoded.role} ${decoded.userId} to Tenant ${requestedTenantId}`);
                     return res.status(403).json({ 
                       error: 'Akses Ditolak: Anda tidak memiliki izin akses untuk perusahaan ini. Hubungi pusat untuk menghubungkan akun.' 
                     });
@@ -964,8 +964,8 @@ app.post('/api/companies/link', tenantMiddleware, async (req: Request, res: Resp
     const userRole = (req as any).userRole;
     const { companyName, adminPassword } = req.body;
 
-    if (userRole !== 'OWNER' && userRole !== 'SUPERADMIN') {
-      return res.status(403).json({ error: 'Hanya Role Owner yang dapat menghubungkan perusahaan.' });
+    if (userRole !== 'OWNER' && userRole !== 'SUPERADMIN' && userRole !== 'MANAGER') {
+      return res.status(403).json({ error: 'Hanya Role Owner & Manager yang dapat menghubungkan perusahaan.' });
     }
 
     if (!companyName || !adminPassword) {
@@ -997,11 +997,11 @@ app.post('/api/companies/link', tenantMiddleware, async (req: Request, res: Resp
       return res.status(401).json({ error: 'Password Admin perusahaan salah. Verifikasi gagal.' });
     }
 
-    // 4. Create UserAccess Link
+    // 4. Create UserAccess Link with the user's current role
     await prisma.userAccess.upsert({
       where: { userId_companyId: { userId, companyId: targetCompany.id } },
-      update: { role: 'OWNER' },
-      create: { userId, companyId: targetCompany.id, role: 'OWNER' }
+      update: { role: userRole === 'MANAGER' ? 'MANAGER' : 'OWNER' },
+      create: { userId, companyId: targetCompany.id, role: userRole === 'MANAGER' ? 'MANAGER' : 'OWNER' }
     });
 
     res.json({ success: true, message: `Berhasil menghubungkan ke ${targetCompany.name}!` });
@@ -13074,7 +13074,7 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
+    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create Product
@@ -13090,6 +13090,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           minStock: Number(minStock) || 0,
           unit: String(unit || "Pcs"),
           showInPos: showInPos !== undefined ? showInPos : true,
+          isAutoDeduct: isAutoDeduct !== undefined ? isAutoDeduct : false,
           categoryId: categoryId && !isNaN(parseInt(String(categoryId))) ? parseInt(String(categoryId)) : null,
           type: req.body.type || 'FINISHED_GOOD',
           trackStock: req.body.trackStock !== undefined ? req.body.trackStock : true,
@@ -13198,12 +13199,12 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
 app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const id = parseInt(req.params.id as string);
-    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, purchaseUnit, purchaseFactor } = req.body;
+    const productId = parseInt(req.params.id);
+    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, imageUrl, type, trackStock, purchaseUnit, purchaseFactor } = req.body;
 
     // Verify ownership
     const existingProduct = await prisma.product.findFirst({
-      where: { id, companyId: tenantId }
+      where: { id: productId, companyId: tenantId }
     });
 
     if (!existingProduct) {
@@ -13211,7 +13212,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
     }
 
     await prisma.product.update({
-      where: { id },
+      where: { id: productId },
       data: {
         name: String(name),
         sku: sku && sku.trim() !== "" ? String(sku) : null,
@@ -13221,6 +13222,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
         minStock: Number(minStock) || 0,
         unit: String(unit || "Pcs"),
         showInPos: showInPos !== undefined ? showInPos : true,
+        isAutoDeduct: isAutoDeduct !== undefined ? isAutoDeduct : existingProduct.isAutoDeduct,
         categoryId: categoryId && !isNaN(parseInt(String(categoryId))) ? parseInt(String(categoryId)) : null,
         type: req.body.type || existingProduct.type,
         trackStock: req.body.trackStock !== undefined ? req.body.trackStock : existingProduct.trackStock,

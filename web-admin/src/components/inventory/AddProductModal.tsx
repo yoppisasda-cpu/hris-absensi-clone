@@ -21,6 +21,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         showInPos: true,
         type: "FINISHED_GOOD",
         trackStock: true,
+        isAutoDeduct: false,
         priceGofood: 0,
         priceGrabfood: 0,
         priceShopeefood: 0,
@@ -73,6 +74,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     showInPos: freshProduct.showInPos !== undefined ? freshProduct.showInPos : true,
                     type: freshProduct.type || "FINISHED_GOOD",
                     trackStock: freshProduct.trackStock !== undefined ? freshProduct.trackStock : true,
+                    isAutoDeduct: freshProduct.isAutoDeduct !== undefined ? freshProduct.isAutoDeduct : false,
                     priceGofood: freshProduct.priceGofood || 0,
                     priceGrabfood: freshProduct.priceGrabfood || 0,
                     priceShopeefood: freshProduct.priceShopeefood || 0,
@@ -117,6 +119,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     showInPos: product.showInPos !== undefined ? product.showInPos : true,
                     type: product.type || "FINISHED_GOOD",
                     trackStock: product.trackStock !== undefined ? product.trackStock : true,
+                    isAutoDeduct: product.isAutoDeduct !== undefined ? product.isAutoDeduct : false,
                     priceGofood: product.priceGofood || 0,
                     priceGrabfood: product.priceGrabfood || 0,
                     priceShopeefood: product.priceShopeefood || 0,
@@ -126,6 +129,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     purchaseUnit: product.purchaseUnit || product.unit || "Pcs",
                     purchaseFactor: product.purchaseFactor || 1
                 });
+                setHasRecipe(false);
+                setRecipeItems([]);
                 fetchRecipe(product.id);
                 if (product.customizations) {
                     setSelectedCustomizations(product.customizations.map((c: any) => c.groupId));
@@ -135,7 +140,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 setVendorPrice((product.costPrice || 0) * (product.purchaseFactor || 1));
             } else {
                 setFormData({
-                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, isAutoDeduct: false, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
@@ -311,6 +316,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         if (newType === 'RAW_MATERIAL') {
             updates.showInPos = false;
             updates.price = 0;
+            updates.isAutoDeduct = false;
+        }
+        if (newType !== 'WIP') {
+            updates.isAutoDeduct = false;
         }
 
         if (!product) {
@@ -408,7 +417,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
 
             setFormData({
-                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, isAutoDeduct: false, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
             });
             setHasRecipe(false);
             setRecipeItems([]);
@@ -667,6 +676,20 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     </div>
                                     <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic group-hover:text-indigo-400 transition-colors">REAL-TIME TRACKING</span>
                                 </label>
+                                {formData.type === 'WIP' && (
+                                    <label className="flex items-center gap-4 cursor-pointer group">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only peer"
+                                                checked={formData.isAutoDeduct}
+                                                onChange={(e) => setFormData({ ...formData, isAutoDeduct: e.target.checked })}
+                                            />
+                                            <div className="w-12 h-6 bg-slate-800 border border-white/5 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600 after:shadow-lg"></div>
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase text-amber-500/80 tracking-[0.2em] italic group-hover:text-amber-400 transition-colors">AUTO DEDUCT (POS)</span>
+                                    </label>
+                                )}
                             </div>
                             {formData.showInPos && formData.type !== 'RAW_MATERIAL' && (
                                 <div className="col-span-2 mt-2 bg-slate-950/50 p-6 rounded-[32px] border border-slate-800 shadow-inner">
