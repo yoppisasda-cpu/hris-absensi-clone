@@ -833,7 +833,7 @@ model Product {
   id                 Int                    @id @default(autoincrement())
   companyId          Int
   name               String
-  sku                String?                @unique
+  sku                String?
   description        String?
   price              Float                  @default(0)
   costPrice          Float                  @default(0)
@@ -867,6 +867,8 @@ model Product {
   salesOrderItems    SalesOrderItem[]
   StockTransaction   StockTransaction[]
   WarehouseStock     WarehouseStock[]
+
+  @@unique([companyId, sku])
 }
 
 model ProductRecipe {
