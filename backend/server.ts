@@ -12949,9 +12949,9 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
         let finalSku = sourceProduct.sku;
         // Check SKU uniqueness before creating
         if (finalSku) {
-          const existingSku = await prisma.product.findUnique({ where: { sku: finalSku } });
+          const existingSku = await prisma.product.findUnique({ where: { companyId_sku: { companyId: targetCompanyId, sku: finalSku } } });
           if (existingSku) {
-            // Because SKU is globally unique in the DB, append a suffix to avoid collision
+            // Because SKU is unique per company, append a suffix to avoid collision
             finalSku = `${finalSku}-COPY-${targetCompanyId}`;
           }
         }
