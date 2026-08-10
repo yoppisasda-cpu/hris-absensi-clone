@@ -12946,12 +12946,13 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
           targetCategoryId = targetCategory.id;
         }
 
+        let finalSku = sourceProduct.sku;
         // Check SKU uniqueness before creating
-        if (sourceProduct.sku) {
-          const existingSku = await prisma.product.findUnique({ where: { sku: sourceProduct.sku } });
+        if (finalSku) {
+          const existingSku = await prisma.product.findUnique({ where: { sku: finalSku } });
           if (existingSku) {
-            skippedCount++;
-            continue; // Skip if SKU exists globally
+            // Because SKU is globally unique in the DB, append a suffix to avoid collision
+            finalSku = `${finalSku}-COPY-${targetCompanyId}`;
           }
         }
 
@@ -12960,7 +12961,7 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
           data: {
             companyId: targetCompanyId,
             name: sourceProduct.name,
-            sku: sourceProduct.sku,
+            sku: finalSku,
             description: sourceProduct.description,
             price: sourceProduct.price,
             costPrice: sourceProduct.costPrice,
