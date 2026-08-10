@@ -3023,7 +3023,7 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
         }
       }
 
-      return updatedPo;
+      return updateResult;
     }, {
       timeout: 30000 // 30 seconds to handle large PO lists safely
     });
