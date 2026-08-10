@@ -16604,6 +16604,30 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
 
         // 3. Prepare all operations for parallel execution
+        
+        // Helper for recursive deduction of materials
+        async function getRecursiveDeductions(productId: number, qtyNeeded: number): Promise<{ id: number, qty: number }[]> {
+            const product = await tx.product.findUnique({ where: { id: productId } });
+            if (!product) return [];
+
+            // If it's a WIP and Auto Deduct is ON, we don't deduct it, we explode its recipe
+            if (product.type === 'WIP' && product.isAutoDeduct) {
+                const recipes = await tx.productRecipe.findMany({ where: { productId }, include: { Product: { select: { recipeYield: true } } } });
+                if (recipes.length > 0) {
+                    let deductions: { id: number, qty: number }[] = [];
+                    for (const r of recipes) {
+                        const yieldFactor = r.Product?.recipeYield || 1;
+                        const matQty = (Number(r.quantity) / yieldFactor) * qtyNeeded;
+                        const childDeductions = await getRecursiveDeductions(Number(r.materialId), matQty);
+                        deductions = deductions.concat(childDeductions);
+                    }
+                    return deductions;
+                }
+            }
+            // If it's not an Auto Deduct WIP (or has no recipe), we just deduct it directly
+            return [{ id: productId, qty: qtyNeeded }];
+        }
+
         const operations: Promise<any>[] = [];
 
         for (const item of items) {
@@ -16700,34 +16724,38 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                 });
             }
 
-            // If it has a recipe, ALSO decrement the MATERIALS
+            // If it has a recipe, ALSO decrement the MATERIALS (with recursive Auto Deduct support)
             const recipes = recipeMap[productId] || [];
             if (recipes.length > 0) {
                 for (const recipe of recipes) {
                     const materialId = Number(recipe.materialId);
                     const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
 
-                    operations.push(tx.product.update({
-                        where: { id: materialId },
-                        data: { stock: { decrement: materialQtyNeeded } }
-                    }));
-
-                    operations.push(tx.warehouseStock.upsert({
-                        where: { productId_warehouseId: { productId: materialId, warehouseId: warehouse.id } },
-                        update: { quantity: { decrement: materialQtyNeeded } },
-                        create: { productId: materialId, warehouseId: warehouse.id, quantity: -materialQtyNeeded }
-                    }));
-
-                    operations.push(tx.stockTransaction.create({
-                        data: {
-                            productId: materialId,
-                            warehouseId: warehouse.id,
-                            type: 'OUT',
-                            quantity: materialQtyNeeded,
-                            reference: `POS ${invoiceNumber} (BOM Result of ${sale.invoiceNumber})`,
-                            date: new Date()
-                        }
-                    }));
+                    const deductions = await getRecursiveDeductions(materialId, materialQtyNeeded);
+                    
+                    for (const ded of deductions) {
+                        operations.push(tx.product.update({
+                            where: { id: ded.id },
+                            data: { stock: { decrement: ded.qty } }
+                        }));
+    
+                        operations.push(tx.warehouseStock.upsert({
+                            where: { productId_warehouseId: { productId: ded.id, warehouseId: warehouse.id } },
+                            update: { quantity: { decrement: ded.qty } },
+                            create: { productId: ded.id, warehouseId: warehouse.id, quantity: -ded.qty }
+                        }));
+    
+                        operations.push(tx.stockTransaction.create({
+                            data: {
+                                productId: ded.id,
+                                warehouseId: warehouse.id,
+                                type: 'OUT',
+                                quantity: ded.qty,
+                                reference: `POS ${invoiceNumber} (BOM Result of ${sale.invoiceNumber})`,
+                                date: new Date()
+                            }
+                        }));
+                    }
                 }
             }
         }
