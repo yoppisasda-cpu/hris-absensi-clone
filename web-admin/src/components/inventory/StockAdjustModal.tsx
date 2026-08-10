@@ -148,7 +148,7 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                                     min="0"
                                     placeholder="0"
                                     className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-4 px-6 text-xs font-black text-white focus:border-amber-500/50 outline-none transition-all shadow-inner italic uppercase tracking-widest"
-                                    value={formData.quantity || ""}
+                                    value={formData.quantity !== undefined ? formData.quantity : ""}
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         setFormData({ ...formData, quantity: val === "" ? 0 : parseFloat(val) });
