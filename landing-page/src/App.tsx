@@ -871,9 +871,9 @@ const PrivacyPage = () => {
 
 const ClientsSection = () => {
   const clients = [
-    { name: 'Donat Enter', icon: '🍩' },
-    { name: '7B Coffee', icon: '☕' },
-    { name: 'Geprek Me Bengkulu', icon: '🍗' },
+    { name: 'Donat Enter', icon: '🍩', type: 'emoji' },
+    { name: '7B Coffee', src: '/7b_ho_acs.png', type: 'image' },
+    { name: 'Geprek Me Bengkulu', src: '/geprek_me_bengkulu.png', type: 'image' },
   ];
 
   return (
@@ -887,7 +887,11 @@ const ClientsSection = () => {
             onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.filter = 'grayscale(0%)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.filter = 'grayscale(100%)'; }}
           >
-            <span style={{ fontSize: '2rem' }}>{client.icon}</span>
+            {client.type === 'emoji' ? (
+              <span style={{ fontSize: '2rem' }}>{client.icon}</span>
+            ) : (
+              <img src={client.src} alt={client.name} style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />
+            )}
             <span style={{ color: 'white', fontSize: '1.2rem', fontWeight: 800 }}>{client.name}</span>
           </div>
         ))}
