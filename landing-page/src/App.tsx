@@ -869,6 +869,33 @@ const PrivacyPage = () => {
   );
 };
 
+const ClientsSection = () => {
+  const clients = [
+    { name: 'Donat Enter', icon: '🍩' },
+    { name: '7B Coffee', icon: '☕' },
+    { name: 'Geprek Me Bengkulu', icon: '🍗' },
+  ];
+
+  return (
+    <section className="clients-section" style={{ padding: '4rem 5%', background: '#050505', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <p style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '2rem' }}>Telah Dipercaya Oleh</p>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '3rem', flexWrap: 'wrap' }}>
+        {clients.map((client, i) => (
+          <div 
+            key={i} 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', opacity: 0.6, filter: 'grayscale(100%)', transition: 'all 0.3s', cursor: 'default' }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.filter = 'grayscale(0%)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.filter = 'grayscale(100%)'; }}
+          >
+            <span style={{ fontSize: '2rem' }}>{client.icon}</span>
+            <span style={{ color: 'white', fontSize: '1.2rem', fontWeight: 800 }}>{client.name}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 const AttendancePage = () => {
   const [showModal, setShowModal] = useState(false);
 
@@ -877,6 +904,7 @@ const AttendancePage = () => {
       <PromotionBanner />
       <Header />
       <Hero />
+      <ClientsSection />
       <AIShowcase />
       <FeaturesShowcase />
       <DemoSection onPlay={() => setShowModal(true)} />
