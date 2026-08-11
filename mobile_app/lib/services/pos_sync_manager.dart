@@ -57,8 +57,17 @@ class PosSyncManager {
       } catch (e) {
         print("PosSyncManager: Gagal mensinkronkan transaksi ${sale['localInvoiceNumber']}: $e");
         lastError = e.toString();
-        // Hentikan sinkronisasi jika ada kegagalan jaringan (karena transaksi berikutnya juga kemungkinan besar akan gagal)
-        break;
+        
+        // Hentikan sinkronisasi HANYA jika ada kegagalan jaringan sejati (karena transaksi berikutnya juga pasti gagal)
+        if (e.toString().contains('SocketException') || 
+            e.toString().contains('TimeoutException') || 
+            e.toString().contains('Failed host lookup') ||
+            e.toString().contains('Connection refused')) {
+          break;
+        }
+        // Jika error berasal dari server (misal 400 Bad Request, 500 Internal Server Error karena produk dihapus, dsb)
+        // Kita CONTINUE ke transaksi berikutnya agar tidak memblokir antrean.
+        continue;
       }
     }
 

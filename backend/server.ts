@@ -16500,6 +16500,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
 
       // 1. Create Sale
       const invoiceNumber = req.body.offlineInvoiceNumber || `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const saleDate = (req.body.offlineInvoiceNumber && req.body.date) ? new Date(req.body.date) : new Date();
 
       const existingSale = await tx.sale.findUnique({
         where: { invoiceNumber }
@@ -16513,6 +16514,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           companyId: tenantId,
           branchId: user?.branchId || null,
           cashierId: userId,
+          date: saleDate,
           customerId: finalCustomerId,
           customerName: customerName || null,
           customerPhone: customerPhone || null,
