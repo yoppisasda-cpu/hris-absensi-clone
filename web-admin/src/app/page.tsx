@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import api from '@/lib/api';
 import { Lock, Mail, ArrowRight, UserCircle, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
 
@@ -209,9 +210,9 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-slate-500">
             Belum punya akun?{' '}
-            <a href="http://localhost:3000/register" className="font-semibold text-blue-600 hover:text-blue-500">
+            <Link href="/register" className="font-semibold text-blue-600 hover:text-blue-500">
               Coba Gratis 6 Bulan
-            </a>
+            </Link>
           </p>
 
           {/* Customer Portal Entry Point */}
