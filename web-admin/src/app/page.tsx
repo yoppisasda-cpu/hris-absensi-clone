@@ -210,7 +210,7 @@ export default function LoginPage() {
           <p className="mt-6 text-center text-sm text-slate-500">
             Belum punya akun?{' '}
             <a href="http://localhost:3000/register" className="font-semibold text-blue-600 hover:text-blue-500">
-              Coba Gratis 14 Hari
+              Coba Gratis 6 Bulan
             </a>
           </p>
 

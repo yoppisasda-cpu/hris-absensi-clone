@@ -65,7 +65,7 @@ export default function RegisterPage() {
           </div>
           <h2 className="text-2xl font-bold text-slate-900">Registrasi Berhasil!</h2>
           <p className="mt-4 text-slate-600">
-            Akun trial 14 hari Anda telah aktif. Anda akan diarahkan ke halaman login dalam beberapa saat...
+            Akun trial 6 bulan Anda telah aktif. Anda akan diarahkan ke halaman login dalam beberapa saat...
           </p>
           <div className="mt-8">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
@@ -114,7 +114,7 @@ export default function RegisterPage() {
 
           <div className="mt-12 space-y-6">
             {[
-              'Uji coba gratis 14 hari penuh',
+              'Uji coba gratis 6 bulan penuh',
               'Tanpa kartu kredit diperlukan',
               'Akses semua fitur (KPI, Payroll, dll)',
               'Bantuan setup dari tim ahli kami'
@@ -154,7 +154,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-slate-900">Dapatkan 14 Hari Gratis</h2>
+            <h2 className="text-3xl font-bold text-slate-900">Dapatkan 6 Bulan Gratis</h2>
             <p className="mt-2 text-slate-500">Isi data di bawah untuk memulai akun trial Anda.</p>
           </div>
 

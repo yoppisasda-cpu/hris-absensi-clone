@@ -185,140 +185,158 @@ class PrinterService {
     }
   }
 
+  double _parseNum(dynamic val) {
+    if (val == null) return 0.0;
+    if (val is num) return val.toDouble();
+    return double.tryParse(val.toString()) ?? 0.0;
+  }
+
   Future<bool> printReceipt(Map<String, dynamic> saleData) async {
     if (!_isConnected) return false;
 
-    final store = await getStoreData();
-    List<int> bytes = [];
-    final profile = await CapabilityProfile.load();
-    final generator = Generator(PaperSize.mm58, profile);
+    try {
+      final store = await getStoreData();
+      List<int> bytes = [];
+      final profile = await CapabilityProfile.load();
+      final generator = Generator(PaperSize.mm58, profile);
 
-    // Header Logo
-    if (store['logoPath']!.isNotEmpty) {
-      final File file = File(store['logoPath']!);
-      if (await file.exists()) {
-        final img.Image? image = img.decodeImage(await file.readAsBytes());
-        if (image != null) {
-          final img.Image resized = img.copyResize(image, width: 200);
-          bytes += generator.imageRaster(resized, align: PosAlign.center);
+      // Header Logo
+      if (store['logoPath'] != null && store['logoPath']!.isNotEmpty) {
+        try {
+          final File file = File(store['logoPath']!);
+          if (await file.exists()) {
+            final img.Image? image = img.decodeImage(await file.readAsBytes());
+            if (image != null) {
+              final img.Image resized = img.copyResize(image, width: 200);
+              bytes += generator.imageRaster(resized, align: PosAlign.center);
+            }
+          }
+        } catch (e) {
+          print('Failed to print logo: $e');
         }
       }
-    }
 
-    // Header Text
-    bytes += generator.text(store['name']!, styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
-    bytes += generator.text(store['address']!, styles: PosStyles(align: PosAlign.center));
-    bytes += generator.text('Telp: ${store['phone']}', styles: PosStyles(align: PosAlign.center));
-    bytes += generator.hr();
+      // Header Text
+      bytes += generator.text(store['name'] ?? 'Toko', styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+      bytes += generator.text(store['address'] ?? '', styles: PosStyles(align: PosAlign.center));
+      bytes += generator.text('Telp: ${store['phone'] ?? ''}', styles: PosStyles(align: PosAlign.center));
+      bytes += generator.hr();
 
-    // Order Info
-    bytes += generator.text('Invoice: ${saleData['invoiceNumber'] ?? '-'}');
-    if (saleData['customerName'] != null && saleData['customerName'].toString().isNotEmpty) {
-      bytes += generator.text('Pelanggan: ${saleData['customerName']}');
-    }
-    bytes += generator.text('Tanggal: ${DateFormat('dd-MM-yyyy HH:mm').format(DateTime.now())}');
-    bytes += generator.text('Kasir  : ${saleData['cashierName'] ?? 'Admin'}');
-    bytes += generator.hr();
+      // Order Info
+      bytes += generator.text('Invoice: ${saleData['invoiceNumber'] ?? '-'}');
+      if (saleData['customerName'] != null && saleData['customerName'].toString().isNotEmpty) {
+        bytes += generator.text('Pelanggan: ${saleData['customerName']}');
+      }
+      bytes += generator.text('Tanggal: ${DateFormat('dd-MM-yyyy HH:mm').format(DateTime.now())}');
+      bytes += generator.text('Kasir  : ${saleData['cashierName'] ?? 'Admin'}');
+      bytes += generator.hr();
 
-    // Items
-    final List items = saleData['items'] ?? [];
-    for (var item in items) {
-       bytes += generator.text(item['name'], styles: PosStyles(bold: true));
-       bytes += generator.row([
-        PosColumn(text: '${item['quantity']} x ${item['price']}', width: 8),
-        PosColumn(text: (item['quantity'] * item['price']).toStringAsFixed(0), width: 4, styles: PosStyles(align: PosAlign.right)),
+      // Items
+      final List items = saleData['items'] ?? [];
+      for (var item in items) {
+        bytes += generator.text(item['name'] ?? 'Produk', styles: PosStyles(bold: true));
+        final double qty = _parseNum(item['quantity']);
+        final double price = _parseNum(item['price']);
+        bytes += generator.row([
+          PosColumn(text: '${qty.toStringAsFixed(0)} x ${price.toStringAsFixed(0)}', width: 8),
+          PosColumn(text: (qty * price).toStringAsFixed(0), width: 4, styles: PosStyles(align: PosAlign.right)),
+        ]);
+        
+        // Add Modifiers/Customizations
+        final List? modifiers = item['modifiers'];
+        if (modifiers != null && modifiers.isNotEmpty) {
+          for (var mod in modifiers) {
+            bytes += generator.text(' - ${mod['optionName'] ?? mod['name']}', styles: PosStyles(fontType: PosFontType.fontB));
+          }
+        }
+      }
+      bytes += generator.hr();
+
+      // Totals
+      final double memberDiscount = _parseNum(saleData['memberDiscountAmount']);
+      final double voucherDiscount = _parseNum(saleData['voucherDiscountAmount']);
+      final double taxAmount = _parseNum(saleData['taxAmount']);
+      final double taxRate = _parseNum(saleData['taxRate']);
+      final double pointsUsed = _parseNum(saleData['pointsUsed']);
+      final double totalAmount = _parseNum(saleData['totalAmount']);
+      
+      // Calculate true subtotal if not provided
+      final double subtotal = saleData['subtotal'] != null 
+          ? _parseNum(saleData['subtotal'])
+          : (totalAmount - taxAmount + memberDiscount + voucherDiscount + pointsUsed);
+
+      // Print Subtotal if there are taxes or discounts
+      if (memberDiscount > 0 || voucherDiscount > 0 || taxAmount > 0 || pointsUsed > 0) {
+        bytes += generator.row([
+          PosColumn(text: 'Subtotal', width: 6),
+          PosColumn(text: subtotal.toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right)),
+        ]);
+      }
+      
+      if (memberDiscount > 0) {
+        bytes += generator.row([
+          PosColumn(text: 'Diskon Member', width: 6),
+          PosColumn(text: '-${memberDiscount.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
+        ]);
+      }
+      
+      if (voucherDiscount > 0) {
+        bytes += generator.row([
+          PosColumn(text: 'Diskon Voucher', width: 6),
+          PosColumn(text: '-${voucherDiscount.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
+        ]);
+      }
+      
+      if (pointsUsed > 0) {
+        bytes += generator.row([
+          PosColumn(text: 'Tukar Poin', width: 6),
+          PosColumn(text: '-${pointsUsed.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
+        ]);
+      }
+      
+      if (taxAmount > 0) {
+        bytes += generator.row([
+          PosColumn(text: 'Pajak (${taxRate.toStringAsFixed(0)}%)', width: 6),
+          PosColumn(text: taxAmount.toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right)),
+        ]);
+      }
+
+      bytes += generator.hr();
+      bytes += generator.row([
+        PosColumn(text: 'TOTAL', width: 6, styles: PosStyles(bold: true)),
+        PosColumn(text: totalAmount.toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right, bold: true)),
       ]);
       
-      // Add Modifiers/Customizations
-      final List? modifiers = item['modifiers'];
-      if (modifiers != null && modifiers.isNotEmpty) {
-        for (var mod in modifiers) {
-          bytes += generator.text(' - ${mod['optionName'] ?? mod['name']}', styles: PosStyles(fontType: PosFontType.fontB));
+      if (saleData['paymentMethod'] != null) {
+        final double cashReceived = _parseNum(saleData['cashReceived']);
+        final double finalCash = cashReceived > 0 ? cashReceived : totalAmount;
+        bytes += generator.text('Bayar (${saleData['paymentMethod']}): ${finalCash.toStringAsFixed(0)}', styles: PosStyles(align: PosAlign.right));
+        final change = finalCash - totalAmount;
+        if (change > 0) {
+          bytes += generator.text('Kembali: ${change.toStringAsFixed(0)}', styles: PosStyles(align: PosAlign.right));
         }
       }
-    }
-    bytes += generator.hr();
 
-    // Totals
-    final double memberDiscount = (saleData['memberDiscountAmount'] ?? 0).toDouble();
-    final double voucherDiscount = (saleData['voucherDiscountAmount'] ?? 0).toDouble();
-    final double taxAmount = (saleData['taxAmount'] ?? 0).toDouble();
-    final double taxRate = (saleData['taxRate'] ?? 0).toDouble();
-    final double pointsUsed = (saleData['pointsUsed'] ?? 0).toDouble();
-    final double totalAmount = (saleData['totalAmount'] ?? 0).toDouble();
-    
-    // Calculate true subtotal if not provided
-    final double subtotal = saleData['subtotal'] != null 
-        ? saleData['subtotal'].toDouble() 
-        : (totalAmount - taxAmount + memberDiscount + voucherDiscount + pointsUsed);
+      bytes += generator.feed(1);
+      bytes += generator.text(store['footer'] ?? '', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
+      bytes += generator.feed(3);
+      bytes += generator.cut();
 
-    // Print Subtotal if there are taxes or discounts
-    if (memberDiscount > 0 || voucherDiscount > 0 || taxAmount > 0 || pointsUsed > 0) {
-      bytes += generator.row([
-        PosColumn(text: 'Subtotal', width: 6),
-        PosColumn(text: subtotal.toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right)),
-      ]);
-    }
-    
-    if (memberDiscount > 0) {
-      bytes += generator.row([
-        PosColumn(text: 'Diskon Member', width: 6),
-        PosColumn(text: '-${memberDiscount.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
-      ]);
-    }
-    
-    if (voucherDiscount > 0) {
-      bytes += generator.row([
-        PosColumn(text: 'Diskon Voucher', width: 6),
-        PosColumn(text: '-${voucherDiscount.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
-      ]);
-    }
-    
-    if (pointsUsed > 0) {
-      bytes += generator.row([
-        PosColumn(text: 'Tukar Poin', width: 6),
-        PosColumn(text: '-${pointsUsed.toStringAsFixed(0)}', width: 6, styles: PosStyles(align: PosAlign.right)),
-      ]);
-    }
-    
-    if (taxAmount > 0) {
-      bytes += generator.row([
-        PosColumn(text: 'Pajak (${taxRate.toStringAsFixed(0)}%)', width: 6),
-        PosColumn(text: taxAmount.toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right)),
-      ]);
-    }
-
-    bytes += generator.hr();
-    bytes += generator.row([
-      PosColumn(text: 'TOTAL', width: 6, styles: PosStyles(bold: true)),
-      PosColumn(text: (saleData['totalAmount'] ?? 0).toStringAsFixed(0), width: 6, styles: PosStyles(align: PosAlign.right, bold: true)),
-    ]);
-    
-    if (saleData['paymentMethod'] != null) {
-      bytes += generator.text('Bayar (${saleData['paymentMethod']}): ${(saleData['cashReceived'] ?? saleData['totalAmount']).toStringAsFixed(0)}', styles: PosStyles(align: PosAlign.right));
-      final change = (saleData['cashReceived'] ?? 0) - (saleData['totalAmount'] ?? 0);
-      if (change > 0) {
-        bytes += generator.text('Kembali: ${change.toStringAsFixed(0)}', styles: PosStyles(align: PosAlign.right));
+      final prefs = await SharedPreferences.getInstance();
+      final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
+      final address = prefs.getString(_prefReceiptPrinterAddress);
+      
+      if (type == 'wifi' && address != null && address.isNotEmpty) {
+        await _sendToWifiPrinter(address, bytes);
+        return true;
+      } else {
+        if (Platform.isIOS) return true;
+        return await PrintBluetoothThermal.writeBytes(bytes);
       }
+    } catch (e) {
+      print('Exception in printReceipt: $e');
+      return false;
     }
-
-    bytes += generator.feed(1);
-    bytes += generator.text(store['footer']!, styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
-    bytes += generator.feed(3);
-    bytes += generator.cut();
-
-    final prefs = await SharedPreferences.getInstance();
-    final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
-    final address = prefs.getString(_prefReceiptPrinterAddress);
-    
-    if (type == 'wifi' && address != null) {
-      await _sendToWifiPrinter(address, bytes);
-      return true;
-    }
-
-    if (Platform.isIOS) return true; // Bypass on iOS
-
-    return await PrintBluetoothThermal.writeBytes(bytes);
   }
 
   Future<bool> printKitchenReceipt(Map<String, dynamic> saleData) async {
