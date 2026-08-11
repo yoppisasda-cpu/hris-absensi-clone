@@ -150,11 +150,57 @@ const FeaturesShowcase = () => {
       ],
       linkText: 'Lihat semua fitur Attendance →'
     },
-    { id: 'payroll', name: 'Payroll & Benefit', icon: '💰', features: [] },
-    { id: 'admin', name: 'HR Administration', icon: '📋', features: [] },
-    { id: 'talent', name: 'Talent & KPI', icon: '🚀', features: [] },
-    { id: 'ai', name: 'AI & Analytics', icon: '📊', features: [] },
-    { id: 'assets', name: 'Asset Management', icon: '💻', features: [] },
+    { 
+      id: 'payroll', 
+      name: 'Payroll & Benefit', 
+      icon: '💰', 
+      features: [
+        { title: 'Otomatisasi Gaji', desc: 'Hitung gaji, lembur, dan potongan secara otomatis dan akurat.' },
+        { title: 'BPJS & PPh 21', desc: 'Kalkulasi pajak penghasilan dan iuran BPJS sesuai regulasi terbaru.' },
+        { title: 'Reimbursement', desc: 'Proses klaim pengeluaran karyawan dengan persetujuan bertingkat.' },
+        { title: 'Slip Gaji Digital', desc: 'Karyawan dapat mengakses slip gaji langsung dari aplikasi mobile.' },
+      ] 
+    },
+    { 
+      id: 'admin', 
+      name: 'HR Administration', 
+      icon: '📋', 
+      features: [
+        { title: 'Database Karyawan', desc: 'Simpan dan kelola data personalia secara aman di cloud.' },
+        { title: 'Manajemen Cuti & Izin', desc: 'Sistem pengajuan dan persetujuan cuti yang terstruktur.' },
+        { title: 'Kontrak & Dokumen', desc: 'Pengingat masa berlaku kontrak dan penyimpanan dokumen digital.' },
+        { title: 'Struktur Organisasi', desc: 'Visualisasi hirarki dan struktur pelaporan perusahaan.' },
+      ] 
+    },
+    { 
+      id: 'talent', 
+      name: 'Talent & KPI', 
+      icon: '🚀', 
+      features: [
+        { title: 'Penilaian Kinerja', desc: 'Evaluasi performa karyawan dengan indikator yang terukur (KPI).' },
+        { title: 'Manajemen Target', desc: 'Tetapkan dan pantau pencapaian target individu maupun tim.' },
+        { title: 'Jenjang Karir', desc: 'Rencanakan pengembangan kompetensi dan promosi karyawan.' },
+      ] 
+    },
+    { 
+      id: 'ai', 
+      name: 'AI & Analytics', 
+      icon: '📊', 
+      features: [
+        { title: 'Dashboard Cerdas', desc: 'Visualisasi data absensi dan produktivitas secara real-time.' },
+        { title: 'Prediksi Turnover', desc: 'Teknologi AI untuk mendeteksi risiko karyawan resign lebih awal.' },
+        { title: 'Rekomendasi Kebijakan', desc: 'Saran strategis dari AI berdasarkan pola kerja dan efisiensi.' },
+      ] 
+    },
+    { 
+      id: 'assets', 
+      name: 'Asset Management', 
+      icon: '💻', 
+      features: [
+        { title: 'Inventaris Aset', desc: 'Lacak laptop, HP, dan aset perusahaan yang dipinjamkan ke karyawan.' },
+        { title: 'Digital Handover', desc: 'Berita acara serah terima aset secara digital dan sah.' },
+      ] 
+    },
   ];
 
   const [activeTab, setActiveTab] = useState('attendance');
