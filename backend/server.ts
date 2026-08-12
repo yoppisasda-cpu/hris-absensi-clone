@@ -16792,7 +16792,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       }
 
       return sale;
-    }, { timeout: 30000 });
+    }, { timeout: 120000 });
 
     res.json(result);
   } catch (error: any) {
