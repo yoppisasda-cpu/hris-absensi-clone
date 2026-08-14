@@ -191,7 +191,7 @@ export default function PerformancePage() {
                                             required
                                             value={newIndicator.name}
                                             onChange={e => setNewIndicator({ ...newIndicator, name: e.target.value })}
-                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                             placeholder="Contoh: Produktivitas Harian"
                                         />
                                     </div>
@@ -200,7 +200,7 @@ export default function PerformancePage() {
                                         <select
                                             value={newIndicator.systemType}
                                             onChange={e => setNewIndicator({ ...newIndicator, systemType: e.target.value })}
-                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                         >
                                             <option value="">Manual (Input Sendiri)</option>
                                             <option value="ATTENDANCE">Kehadiran (Sistem)</option>
@@ -215,7 +215,7 @@ export default function PerformancePage() {
                                             required
                                             value={newIndicator.target}
                                             onChange={e => setNewIndicator({ ...newIndicator, target: parseFloat(e.target.value) })}
-                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                         />
                                     </div>
                                     <div>
@@ -226,7 +226,7 @@ export default function PerformancePage() {
                                             required
                                             value={newIndicator.weight}
                                             onChange={e => setNewIndicator({ ...newIndicator, weight: parseFloat(e.target.value) })}
-                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                         />
                                     </div>
                                     <div className="md:col-span-2">
@@ -234,7 +234,7 @@ export default function PerformancePage() {
                                         <textarea
                                             value={newIndicator.description}
                                             onChange={e => setNewIndicator({ ...newIndicator, description: e.target.value })}
-                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                             rows={2}
                                         />
                                     </div>
@@ -256,7 +256,7 @@ export default function PerformancePage() {
                                             <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Indikator</label>
                                             <input 
                                                 type="text" 
-                                                className="w-full text-sm font-bold border-b border-slate-200 focus:border-blue-500 outline-none pb-1"
+                                                className="w-full text-sm font-bold text-slate-900 border-b border-slate-200 focus:border-blue-500 outline-none pb-1"
                                                 value={editIndicator.name}
                                                 onChange={e => setEditIndicator({...editIndicator, name: e.target.value})}
                                             />
@@ -264,7 +264,7 @@ export default function PerformancePage() {
                                         <div>
                                             <label className="text-[10px] font-bold text-slate-400 uppercase">Sumber Data</label>
                                             <select 
-                                                className="w-full text-[10px] font-bold border border-slate-100 rounded px-2 py-1 focus:border-blue-500 outline-none"
+                                                className="w-full text-[10px] font-bold text-slate-900 border border-slate-100 rounded px-2 py-1 focus:border-blue-500 outline-none"
                                                 value={editIndicator.systemType || ''}
                                                 onChange={e => setEditIndicator({...editIndicator, systemType: e.target.value})}
                                             >
@@ -277,7 +277,7 @@ export default function PerformancePage() {
                                         <div>
                                             <label className="text-[10px] font-bold text-slate-400 uppercase">Deskripsi</label>
                                             <textarea 
-                                                className="w-full text-xs text-slate-500 border border-slate-100 rounded p-2 focus:border-blue-500 outline-none"
+                                                className="w-full text-xs text-slate-900 border border-slate-100 rounded p-2 focus:border-blue-500 outline-none"
                                                 rows={2}
                                                 value={editIndicator.description || ''}
                                                 onChange={e => setEditIndicator({...editIndicator, description: e.target.value})}
@@ -288,7 +288,7 @@ export default function PerformancePage() {
                                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Target</label>
                                                 <input 
                                                     type="number" 
-                                                    className="w-full text-sm font-bold border-b border-slate-200 focus:border-blue-500 outline-none"
+                                                    className="w-full text-sm font-bold text-slate-900 border-b border-slate-200 focus:border-blue-500 outline-none"
                                                     value={editIndicator.target}
                                                     onChange={e => setEditIndicator({...editIndicator, target: parseFloat(e.target.value)})}
                                                 />
@@ -298,7 +298,7 @@ export default function PerformancePage() {
                                                 <input 
                                                     type="number" 
                                                     step="0.1"
-                                                    className="w-full text-sm font-bold border-b border-slate-200 focus:border-blue-500 outline-none"
+                                                    className="w-full text-sm font-bold text-slate-900 border-b border-slate-200 focus:border-blue-500 outline-none"
                                                     value={editIndicator.weight}
                                                     onChange={e => setEditIndicator({...editIndicator, weight: parseFloat(e.target.value)})}
                                                 />
@@ -361,12 +361,12 @@ export default function PerformancePage() {
                                     placeholder="Cari karyawan..."
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                             </div>
                             <div className="flex gap-2">
                                 <select
-                                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none"
                                     value={selectedMonth}
                                     onChange={e => setSelectedMonth(parseInt(e.target.value))}
                                 >
@@ -375,7 +375,7 @@ export default function PerformancePage() {
                                     ))}
                                 </select>
                                 <select
-                                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none"
                                     value={selectedYear}
                                     onChange={e => setSelectedYear(parseInt(e.target.value))}
                                 >
