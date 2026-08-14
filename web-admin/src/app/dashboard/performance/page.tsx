@@ -315,7 +315,7 @@ export default function PerformancePage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {indicators.map(ind => (
-                            <div key={ind.id} className={`bg-white p-6 rounded-xl border shadow-sm flex flex-col justify-between transition-all ${editingId === ind.id ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-200'}`}>
+                            <div key={ind.id} className={`bg-white dark:bg-slate-800 p-6 rounded-xl border shadow-sm flex flex-col justify-between transition-all ${editingId === ind.id ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-200 dark:border-slate-700'}`}>
                                 {editingId === ind.id ? (
                                     <div className="space-y-4">
                                         <div>
@@ -424,40 +424,40 @@ export default function PerformancePage() {
                                     <div>
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex flex-col">
-                                                <h3 className="font-bold text-slate-900 leading-tight">{ind.name}</h3>
+                                                <h3 className="font-bold text-slate-900 dark:text-white leading-tight">{ind.name}</h3>
                                                 <div className="flex flex-wrap gap-1 mt-1">
                                                     {ind.systemType && (
-                                                        <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-1 py-0.5 rounded">
+                                                        <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 dark:bg-blue-900/30 px-1 py-0.5 rounded">
                                                             {ind.systemType === 'ATTENDANCE' ? 'Otomatis Kehadiran' : 
                                                             ind.systemType === 'PUNCTUALITY' ? 'Otomatis Ketepatan Waktu' : 
                                                             ind.systemType === 'LEARNING' ? 'Target Belajar' : 'Otomatis Sistem'}
                                                         </span>
                                                     )}
-                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-1 py-0.5 rounded ${ind.isGlobal !== false ? 'text-emerald-600 bg-emerald-50' : 'text-purple-600 bg-purple-50'}`}>
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-1 py-0.5 rounded ${ind.isGlobal !== false ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400' : 'text-purple-600 bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400'}`}>
                                                         {ind.isGlobal !== false ? 'Global' : `${ind.users?.length || 0} Karyawan`}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button onClick={() => handleStartEdit(ind)} className="text-slate-300 hover:text-blue-500 transition-colors">
-                                                    <Plus className="h-4 w-4 rotate-45" /> {/* Use Plus rotated for "Edit" or just a text button */}
+                                                <button onClick={() => handleStartEdit(ind)} className="text-slate-400 hover:text-blue-500 dark:text-slate-500 dark:hover:text-blue-400 transition-colors">
+                                                    <Plus className="h-4 w-4 rotate-45" />
                                                 </button>
                                                 {!ind.isSystem && (
-                                                    <button onClick={() => handleDeleteIndicator(ind.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                                                    <button onClick={() => handleDeleteIndicator(ind.id)} className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 transition-colors">
                                                         <Trash2 className="h-4 w-4" />
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
-                                        <p className="text-xs text-slate-500 mb-4 h-10 overflow-hidden line-clamp-2">{ind.description || 'Tidak ada deskripsi'}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 h-10 overflow-hidden line-clamp-2">{ind.description || 'Tidak ada deskripsi'}</p>
                                         <div className="flex gap-4">
-                                            <div className="bg-slate-50 px-3 py-2 rounded-lg text-center flex-1">
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold">Target</p>
-                                                <p className="text-lg font-bold text-blue-600">{ind.target}</p>
+                                            <div className="bg-slate-50 dark:bg-slate-700/50 px-3 py-2 rounded-lg text-center flex-1">
+                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold">Target</p>
+                                                <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{ind.target}</p>
                                             </div>
-                                            <div className="bg-slate-50 px-3 py-2 rounded-lg text-center flex-1">
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold">Weight</p>
-                                                <p className="text-lg font-bold text-slate-700">{ind.weight}x</p>
+                                            <div className="bg-slate-50 dark:bg-slate-700/50 px-3 py-2 rounded-lg text-center flex-1">
+                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold">Weight</p>
+                                                <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{ind.weight}x</p>
                                             </div>
                                         </div>
                                     </div>
