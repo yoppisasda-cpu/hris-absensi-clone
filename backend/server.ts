@@ -5701,8 +5701,24 @@ app.delete('/api/holidays/:id', tenantMiddleware, async (req: Request, res: Resp
 app.get('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
+    const userId = req.query.userId;
+    
+    let whereClause: any = { companyId: tenantId };
+    if (userId) {
+      whereClause = {
+        companyId: tenantId,
+        OR: [
+          { isGlobal: true },
+          { users: { some: { id: parseInt(userId as string) } } }
+        ]
+      };
+    }
+    
     const indicators = await prisma.kPIIndicator.findMany({
-      where: { companyId: tenantId },
+      where: whereClause,
+      include: {
+        users: { select: { id: true, name: true } }
+      },
       orderBy: { name: 'asc' }
     });
     res.json(indicators);
@@ -5715,10 +5731,17 @@ app.get('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Respo
 app.post('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const { name, description, target, weight, isSystem, systemType } = req.body;
+    const { name, description, target, weight, isSystem, systemType, isGlobal, userIds } = req.body;
     console.log(`[KPI] Create Indicator: Tenant=${tenantId}, Body=`, req.body);
 
     if (!name) return res.status(400).json({ error: 'Nama indikator wajib diisi' });
+
+    let usersConnect: any = undefined;
+    const isGloballyApplied = isGlobal !== false;
+    
+    if (!isGloballyApplied && Array.isArray(userIds)) {
+      usersConnect = { connect: userIds.map(id => ({ id: parseInt(id) })) };
+    }
 
     const newIndicator = await prisma.kPIIndicator.create({
       data: {
@@ -5728,7 +5751,9 @@ app.post('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Resp
         target: target ? parseFloat(target) : 100,
         weight: weight ? parseFloat(weight) : 1,
         isSystem: isSystem || false,
-        systemType: systemType || null
+        systemType: systemType || null,
+        isGlobal: isGloballyApplied,
+        users: usersConnect
       }
     });
 
@@ -5744,9 +5769,18 @@ app.put('/api/kpi/indicators/:id', tenantMiddleware, async (req: Request, res: R
   try {
     const tenantId = (req as any).tenantId;
     const id = req.params.id;
-    const { name, description, target, weight, isSystem, systemType } = req.body;
+    const { name, description, target, weight, isSystem, systemType, isGlobal, userIds } = req.body;
 
     if (typeof id !== 'string') return res.status(400).json({ error: 'ID tidak valid' });
+
+    let usersConnect: any = undefined;
+    const isGloballyApplied = isGlobal !== false;
+    
+    if (!isGloballyApplied && Array.isArray(userIds)) {
+      usersConnect = { set: userIds.map(id => ({ id: parseInt(id) })) };
+    } else if (isGloballyApplied) {
+      usersConnect = { set: [] }; // Remove specific users if it's back to global
+    }
 
     const updatedIndicator = await prisma.kPIIndicator.update({
       where: {
@@ -5759,7 +5793,9 @@ app.put('/api/kpi/indicators/:id', tenantMiddleware, async (req: Request, res: R
         target: target ? parseFloat(target) : undefined,
         weight: weight ? parseFloat(weight) : undefined,
         isSystem: isSystem === true,
-        systemType: systemType || null
+        systemType: systemType || null,
+        isGlobal: isGloballyApplied,
+        users: usersConnect
       }
     });
 

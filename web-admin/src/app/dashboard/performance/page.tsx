@@ -14,6 +14,8 @@ interface Indicator {
     weight: number;
     isSystem?: boolean;
     systemType?: string | null;
+    isGlobal?: boolean;
+    users?: { id: number, name: string }[];
 }
 
 interface Employee {
@@ -35,12 +37,22 @@ export default function PerformancePage() {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editIndicator, setEditIndicator] = useState<Partial<Indicator>>({});
 
-    const [newIndicator, setNewIndicator] = useState({
+    const [newIndicator, setNewIndicator] = useState<{
+        name: string;
+        description: string;
+        target: number;
+        weight: number;
+        systemType: string;
+        isGlobal: boolean;
+        userIds: number[];
+    }>({
         name: '',
         description: '',
         target: 100,
         weight: 1,
-        systemType: ''
+        systemType: '',
+        isGlobal: true,
+        userIds: []
     });
 
     useEffect(() => {
@@ -72,7 +84,7 @@ export default function PerformancePage() {
                 systemType: newIndicator.systemType || null
             };
             await api.post('/kpi/indicators', payload);
-            setNewIndicator({ name: '', description: '', target: 100, weight: 1, systemType: '' });
+            setNewIndicator({ name: '', description: '', target: 100, weight: 1, systemType: '', isGlobal: true, userIds: [] });
             setIsFormOpen(false);
             fetchData();
         } catch (err) {
@@ -97,7 +109,9 @@ export default function PerformancePage() {
             description: ind.description || '',
             target: ind.target,
             weight: ind.weight,
-            systemType: ind.systemType || ''
+            systemType: ind.systemType || '',
+            isGlobal: ind.isGlobal !== false,
+            users: ind.users || []
         });
     };
 
@@ -106,7 +120,8 @@ export default function PerformancePage() {
             const payload = {
                 ...editIndicator,
                 isSystem: editIndicator.systemType === 'ATTENDANCE' || editIndicator.systemType === 'PUNCTUALITY',
-                systemType: editIndicator.systemType || null
+                systemType: editIndicator.systemType || null,
+                userIds: editIndicator.users?.map(u => u.id)
             };
             await api.put(`/kpi/indicators/${id}`, payload);
             setEditingId(null);
@@ -230,6 +245,57 @@ export default function PerformancePage() {
                                         />
                                     </div>
                                     <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">Berlaku Untuk</label>
+                                        <div className="flex gap-4 mb-3">
+                                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                                <input 
+                                                    type="radio" 
+                                                    checked={newIndicator.isGlobal} 
+                                                    onChange={() => setNewIndicator({ ...newIndicator, isGlobal: true, userIds: [] })}
+                                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                Semua Karyawan
+                                            </label>
+                                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                                <input 
+                                                    type="radio" 
+                                                    checked={!newIndicator.isGlobal} 
+                                                    onChange={() => setNewIndicator({ ...newIndicator, isGlobal: false })}
+                                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                Karyawan Tertentu
+                                            </label>
+                                        </div>
+                                        
+                                        {!newIndicator.isGlobal && (
+                                            <div className="border border-slate-200 rounded-lg p-4 max-h-48 overflow-y-auto bg-slate-50">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                                    {employees.map(emp => (
+                                                        <label key={emp.id} className="flex items-center gap-2 text-xs text-slate-700 p-1 hover:bg-slate-100 rounded cursor-pointer">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={newIndicator.userIds.includes(emp.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setNewIndicator({ ...newIndicator, userIds: [...newIndicator.userIds, emp.id] });
+                                                                    } else {
+                                                                        setNewIndicator({ ...newIndicator, userIds: newIndicator.userIds.filter(id => id !== emp.id) });
+                                                                    }
+                                                                }}
+                                                                className="rounded text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold">{emp.name}</span>
+                                                                <span className="text-[9px] text-slate-500">{emp.division || 'Umum'}</span>
+                                                            </div>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                                {employees.length === 0 && <p className="text-xs text-slate-500 text-center py-2">Tidak ada data karyawan</p>}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="md:col-span-2">
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Deskripsi</label>
                                         <textarea
                                             value={newIndicator.description}
@@ -283,6 +349,51 @@ export default function PerformancePage() {
                                                 onChange={e => setEditIndicator({...editIndicator, description: e.target.value})}
                                             />
                                         </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Berlaku Untuk</label>
+                                            <div className="flex gap-4 mb-2 mt-1">
+                                                <label className="flex items-center gap-1 text-[10px] text-slate-700 cursor-pointer">
+                                                    <input 
+                                                        type="radio" 
+                                                        checked={editIndicator.isGlobal} 
+                                                        onChange={() => setEditIndicator({ ...editIndicator, isGlobal: true, users: [] })}
+                                                        className="w-3 h-3 text-blue-600"
+                                                    />
+                                                    Semua Karyawan
+                                                </label>
+                                                <label className="flex items-center gap-1 text-[10px] text-slate-700 cursor-pointer">
+                                                    <input 
+                                                        type="radio" 
+                                                        checked={!editIndicator.isGlobal} 
+                                                        onChange={() => setEditIndicator({ ...editIndicator, isGlobal: false })}
+                                                        className="w-3 h-3 text-blue-600"
+                                                    />
+                                                    Tertentu
+                                                </label>
+                                            </div>
+                                            {!editIndicator.isGlobal && (
+                                                <div className="border border-slate-100 rounded p-2 max-h-32 overflow-y-auto bg-slate-50">
+                                                    {employees.map(emp => (
+                                                        <label key={emp.id} className="flex items-center gap-2 text-[10px] text-slate-700 p-1 hover:bg-slate-100 rounded cursor-pointer">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={editIndicator.users?.some(u => u.id === emp.id)}
+                                                                onChange={(e) => {
+                                                                    const currentUsers = editIndicator.users || [];
+                                                                    if (e.target.checked) {
+                                                                        setEditIndicator({ ...editIndicator, users: [...currentUsers, { id: emp.id, name: emp.name }] });
+                                                                    } else {
+                                                                        setEditIndicator({ ...editIndicator, users: currentUsers.filter(u => u.id !== emp.id) });
+                                                                    }
+                                                                }}
+                                                                className="rounded text-blue-600 w-3 h-3"
+                                                            />
+                                                            <span>{emp.name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="flex gap-4">
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Target</label>
@@ -314,13 +425,18 @@ export default function PerformancePage() {
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex flex-col">
                                                 <h3 className="font-bold text-slate-900 leading-tight">{ind.name}</h3>
-                                                {ind.systemType && (
-                                                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-0.5">
-                                                        {ind.systemType === 'ATTENDANCE' ? 'Otomatis Kehadiran' : 
-                                                         ind.systemType === 'PUNCTUALITY' ? 'Otomatis Ketepatan Waktu' : 
-                                                         ind.systemType === 'LEARNING' ? 'Target Belajar' : 'Otomatis Sistem'}
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {ind.systemType && (
+                                                        <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-1 py-0.5 rounded">
+                                                            {ind.systemType === 'ATTENDANCE' ? 'Otomatis Kehadiran' : 
+                                                            ind.systemType === 'PUNCTUALITY' ? 'Otomatis Ketepatan Waktu' : 
+                                                            ind.systemType === 'LEARNING' ? 'Target Belajar' : 'Otomatis Sistem'}
+                                                        </span>
+                                                    )}
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-1 py-0.5 rounded ${ind.isGlobal !== false ? 'text-emerald-600 bg-emerald-50' : 'text-purple-600 bg-purple-50'}`}>
+                                                        {ind.isGlobal !== false ? 'Global' : `${ind.users?.length || 0} Karyawan`}
                                                     </span>
-                                                )}
+                                                </div>
                                             </div>
                                             <div className="flex gap-2">
                                                 <button onClick={() => handleStartEdit(ind)} className="text-slate-300 hover:text-blue-500 transition-colors">

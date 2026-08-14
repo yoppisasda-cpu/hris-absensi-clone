@@ -60,7 +60,7 @@ function ScoreContent() {
         setIsLoading(true);
         try {
             const [indRes, scoreRes, empRes, autoRes] = await Promise.all([
-                api.get('/kpi/indicators'),
+                api.get(`/kpi/indicators?userId=${userId}`),
                 api.get(`/kpi/scores/${userId}?month=${month}&year=${year}`),
                 api.get(`/users`),
                 api.get(`/kpi/auto-score/${userId}?month=${month}&year=${year}`)

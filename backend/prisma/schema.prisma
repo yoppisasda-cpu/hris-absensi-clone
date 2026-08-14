@@ -317,6 +317,7 @@ model User {
   subordinates            User[]              @relation("ReportingLine")
   shift                   Shift?              @relation(fields: [shiftId], references: [id])
   accessibleCompanies     UserAccess[]
+  kpiIndicators           KPIIndicator[]
 }
 
 model UserAccess {
@@ -589,8 +590,10 @@ model KPIIndicator {
   updatedAt   DateTime   @updatedAt
   isSystem    Boolean    @default(false)
   systemType  String?
+  isGlobal    Boolean    @default(true)
   company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   scores      KPIScore[]
+  users       User[]
 }
 
 model KPIScore {
