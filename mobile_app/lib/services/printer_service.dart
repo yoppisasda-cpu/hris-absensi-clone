@@ -70,8 +70,9 @@ class PrinterService {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final rAddress = prefs.getString(_prefReceiptPrinterAddress);
+    final rType = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
     if (rAddress != null) {
-      await connectReceipt(prefs.getString(_prefReceiptPrinterName) ?? 'Printer', rAddress);
+      await connectReceipt(prefs.getString(_prefReceiptPrinterName) ?? 'Printer', rAddress, type: rType);
     }
   }
 
