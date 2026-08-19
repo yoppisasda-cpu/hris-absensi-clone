@@ -12953,13 +12953,18 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
 
     if (!sourceCompanyId) return res.status(400).json({ error: 'Source company ID is required' });
 
-    // 1. Fetch source products
+    // 1. Fetch source products WITH recipes and materials
     const sourceProducts = await prisma.product.findMany({
       where: {
         companyId: Number(sourceCompanyId),
         id: productIds ? { in: productIds.map(Number) } : undefined
       },
-      include: { category: true }
+      include: { 
+        category: true,
+        Recipes: {
+          include: { Material: { include: { category: true } } }
+        }
+      }
     });
 
     if (sourceProducts.length === 0) return res.status(404).json({ error: 'No products found to import' });
@@ -12967,51 +12972,99 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
     let importedCount = 0;
     let skippedCount = 0;
 
-    // 2. Process each product
+    // Mapping from source product ID to target product ID to avoid recreating and for linking recipes
+    const idMap = new Map<number, number>();
+
+    // Helper function to import or find a product
+    const importOrFindProduct = async (sourceProd: any) => {
+      if (idMap.has(sourceProd.id)) return idMap.get(sourceProd.id)!;
+
+      // Check if it already exists in target company by name and type
+      let existingTarget = await prisma.product.findFirst({
+        where: { companyId: targetCompanyId, name: sourceProd.name, type: sourceProd.type }
+      });
+
+      if (existingTarget) {
+        idMap.set(sourceProd.id, existingTarget.id);
+        return existingTarget.id;
+      }
+
+      // Handle Category
+      let targetCategoryId = null;
+      if (sourceProd.category) {
+        let targetCategory = await prisma.productCategory.findFirst({
+          where: { companyId: targetCompanyId, name: sourceProd.category.name }
+        });
+
+        if (!targetCategory) {
+          targetCategory = await prisma.productCategory.create({
+            data: { companyId: targetCompanyId, name: sourceProd.category.name }
+          });
+        }
+        targetCategoryId = targetCategory.id;
+      }
+
+      let finalSku = sourceProd.sku;
+      // Check SKU uniqueness before creating
+      if (finalSku) {
+        const existingSku = await prisma.product.findUnique({ where: { companyId_sku: { companyId: targetCompanyId, sku: finalSku } } });
+        if (existingSku) {
+          finalSku = `${finalSku}-COPY-${targetCompanyId}-${Date.now()}`;
+        }
+      }
+
+      // Create new product
+      const newProd = await prisma.product.create({
+        data: {
+          companyId: targetCompanyId,
+          name: sourceProd.name,
+          sku: finalSku,
+          description: sourceProd.description,
+          price: sourceProd.price,
+          costPrice: sourceProd.costPrice,
+          unit: sourceProd.unit,
+          type: sourceProd.type,
+          imageUrl: sourceProd.imageUrl,
+          categoryId: targetCategoryId,
+          updatedAt: new Date()
+        }
+      });
+
+      idMap.set(sourceProd.id, newProd.id);
+      return newProd.id;
+    };
+
+    // 2. Process each main product
     for (const sourceProduct of sourceProducts) {
       try {
-        // Handle Category
-        let targetCategoryId = null;
-        if (sourceProduct.category) {
-          let targetCategory = await prisma.productCategory.findFirst({
-            where: { companyId: targetCompanyId, name: sourceProduct.category.name }
-          });
-
-          if (!targetCategory) {
-            targetCategory = await prisma.productCategory.create({
-              data: { companyId: targetCompanyId, name: sourceProduct.category.name }
-            });
-          }
-          targetCategoryId = targetCategory.id;
-        }
-
-        let finalSku = sourceProduct.sku;
-        // Check SKU uniqueness before creating
-        if (finalSku) {
-          const existingSku = await prisma.product.findUnique({ where: { companyId_sku: { companyId: targetCompanyId, sku: finalSku } } });
-          if (existingSku) {
-            // Because SKU is unique per company, append a suffix to avoid collision
-            finalSku = `${finalSku}-COPY-${targetCompanyId}`;
-          }
-        }
-
-        // Create new product
-        await prisma.product.create({
-          data: {
-            companyId: targetCompanyId,
-            name: sourceProduct.name,
-            sku: finalSku,
-            description: sourceProduct.description,
-            price: sourceProduct.price,
-            costPrice: sourceProduct.costPrice,
-            unit: sourceProduct.unit,
-            type: sourceProduct.type,
-            imageUrl: sourceProduct.imageUrl,
-            categoryId: targetCategoryId,
-            updatedAt: new Date()
-          }
-        });
+        const targetProdId = await importOrFindProduct(sourceProduct);
         importedCount++;
+
+        // Process Recipes if any
+        if (sourceProduct.Recipes && sourceProduct.Recipes.length > 0) {
+          for (const recipe of sourceProduct.Recipes) {
+            if (recipe.Material) {
+              // Ensure material exists in target company
+              const targetMaterialId = await importOrFindProduct(recipe.Material);
+
+              // Check if recipe link already exists to prevent duplicate
+              const existingRecipe = await prisma.productRecipe.findFirst({
+                where: { productId: targetProdId, materialId: targetMaterialId }
+              });
+
+              if (!existingRecipe) {
+                await prisma.productRecipe.create({
+                  data: {
+                    productId: targetProdId,
+                    materialId: targetMaterialId,
+                    quantity: recipe.quantity,
+                    updatedAt: new Date()
+                  }
+                });
+              }
+            }
+          }
+        }
       } catch (err) {
         console.error(`Failed to import product ${sourceProduct.name}:`, err);
         skippedCount++;
@@ -13022,9 +13075,9 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
       message: `Successfully imported ${importedCount} products.`,
       skipped: skippedCount
     });
-
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to import products: ' + error.message });
+  } catch (error) {
+    console.error('Import Error:', error);
+    res.status(500).json({ error: 'Failed to import products' });
   }
 });
 
