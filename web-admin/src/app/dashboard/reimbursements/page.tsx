@@ -299,6 +299,7 @@ export default function ReimbursementsPage() {
                                             <div className="flex flex-col">
                                                 <span className="text-slate-700 font-medium">{claim.title}</span>
                                                 <span className="text-xs text-slate-400">{claim.description || '-'}</span>
+                                                <span className="text-[10px] text-slate-400 mt-1">Diajukan: {formatDate(claim.createdAt)}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
