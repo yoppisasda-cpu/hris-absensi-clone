@@ -35,8 +35,8 @@ export async function uploadToSupabase(localPath: string, destinationFolder: str
   try {
     const fileContent = fs.readFileSync(localPath);
     const fileName = path.basename(localPath);
-    const bucketName = destinationFolder; // Now use destinationFolder as the bucket name (face_references or attendance)
-    const filePath = fileName; // No more folder prefix inside bucket
+    const bucketName = SUPABASE_BUCKET_NAME || 'uploads';
+    const filePath = `${destinationFolder}/${fileName}`; // Use folder prefix inside bucket
 
     const { data, error } = await supabase.storage
       .from(bucketName)

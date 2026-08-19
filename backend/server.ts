@@ -7118,7 +7118,10 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
     console.log(`[REIMBURSE] Saved OK, id=${reimbursement.id}`);
 
     // Cleanup local file after Supabase upload and AI processing
-    cleanupLocalFile(fullPath);
+    // Only delete if it's uploaded to a remote storage (starts with http)
+    if (receiptUrl && receiptUrl.startsWith('http')) {
+      cleanupLocalFile(fullPath);
+    }
 
     // TRIGGER NOTIFIKASI KE ADMIN
     try {
