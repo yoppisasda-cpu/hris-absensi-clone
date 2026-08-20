@@ -36,6 +36,19 @@ export default function ReimbursementsPage() {
     const [error, setError] = useState('');
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('ALL');
+    const [paymentFilter, setPaymentFilter] = useState('ALL');
+
+    const filteredClaims = claims.filter(c => {
+        const matchesSearch = c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              c.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              c.title.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
+        const matchesPayment = paymentFilter === 'ALL' || 
+                               (paymentFilter === 'PAID' && c.isPaid) || 
+                               (paymentFilter === 'UNPAID' && !c.isPaid);
+        return matchesSearch && matchesStatus && matchesPayment;
+    });
 
     // Finance Integration States
     const [accounts, setAccounts] = useState<any[]>([]);
@@ -188,11 +201,7 @@ export default function ReimbursementsPage() {
     };
 
     const handleExportExcel = () => {
-        const filtered = claims.filter(c =>
-            c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.title.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const filtered = filteredClaims;
 
         if (filtered.length === 0) {
             alert('Tidak ada data reimbursement yang dapat diexport.');
@@ -237,6 +246,25 @@ export default function ReimbursementsPage() {
                             className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-500"
                         />
                     </div>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-full sm:w-auto px-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+                    >
+                        <option value="ALL">Semua Status</option>
+                        <option value="PENDING">Menunggu</option>
+                        <option value="APPROVED">Disetujui</option>
+                        <option value="REJECTED">Ditolak</option>
+                    </select>
+                    <select
+                        value={paymentFilter}
+                        onChange={(e) => setPaymentFilter(e.target.value)}
+                        className="w-full sm:w-auto px-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+                    >
+                        <option value="ALL">Semua Pembayaran</option>
+                        <option value="UNPAID">Belum Dibayar</option>
+                        <option value="PAID">Lunas</option>
+                    </select>
                     <button
                         onClick={handleExportExcel}
                         className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm active:scale-95 whitespace-nowrap"
@@ -254,11 +282,7 @@ export default function ReimbursementsPage() {
                     </div>
                 ) : error ? (
                     <div className="p-12 text-center text-red-500">{error}</div>
-                ) : claims.filter(c =>
-                    c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    c.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    c.title.toLowerCase().includes(searchQuery.toLowerCase())
-                ).length === 0 ? (
+                ) : filteredClaims.length === 0 ? (
                     <div className="flex h-64 flex-col items-center justify-center p-6 text-center text-slate-500">
                         <Search className="h-12 w-12 text-slate-200 mb-4" />
                         <p className="font-medium text-lg mb-1">Tidak ada hasil ditemukan</p>
@@ -278,11 +302,7 @@ export default function ReimbursementsPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {claims.filter(c =>
-                                    c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                    c.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                    c.title.toLowerCase().includes(searchQuery.toLowerCase())
-                                ).map((claim) => (
+                                {filteredClaims.map((claim) => (
                                     <tr key={claim.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
