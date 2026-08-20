@@ -38,6 +38,7 @@ export default function ReimbursementsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [paymentFilter, setPaymentFilter] = useState('ALL');
+    const [timeFilter, setTimeFilter] = useState('ALL');
 
     const filteredClaims = claims.filter(c => {
         const matchesSearch = c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -47,7 +48,25 @@ export default function ReimbursementsPage() {
         const matchesPayment = paymentFilter === 'ALL' || 
                                (paymentFilter === 'PAID' && c.isPaid) || 
                                (paymentFilter === 'UNPAID' && !c.isPaid);
-        return matchesSearch && matchesStatus && matchesPayment;
+        
+        const matchesTime = (() => {
+            if (timeFilter === 'ALL') return true;
+            const claimDate = new Date(c.createdAt);
+            const now = new Date();
+            if (timeFilter === 'THIS_MONTH') {
+                return claimDate.getMonth() === now.getMonth() && claimDate.getFullYear() === now.getFullYear();
+            }
+            if (timeFilter === 'LAST_MONTH') {
+                const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                return claimDate.getMonth() === lastMonth.getMonth() && claimDate.getFullYear() === lastMonth.getFullYear();
+            }
+            if (timeFilter === 'THIS_YEAR') {
+                return claimDate.getFullYear() === now.getFullYear();
+            }
+            return true;
+        })();
+
+        return matchesSearch && matchesStatus && matchesPayment && matchesTime;
     });
 
     // Finance Integration States
@@ -264,6 +283,16 @@ export default function ReimbursementsPage() {
                         <option value="ALL">Semua Pembayaran</option>
                         <option value="UNPAID">Belum Dibayar</option>
                         <option value="PAID">Lunas</option>
+                    </select>
+                    <select
+                        value={timeFilter}
+                        onChange={(e) => setTimeFilter(e.target.value)}
+                        className="w-full sm:w-auto px-4 py-2 text-sm bg-slate-900/50 border border-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+                    >
+                        <option value="ALL">Semua Waktu</option>
+                        <option value="THIS_MONTH">Bulan Ini</option>
+                        <option value="LAST_MONTH">Bulan Lalu</option>
+                        <option value="THIS_YEAR">Tahun Ini</option>
                     </select>
                     <button
                         onClick={handleExportExcel}
