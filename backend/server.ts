@@ -6780,7 +6780,7 @@ app.patch('/api/reimbursements/:id/pay', tenantMiddleware, async (req: Request, 
     const tenantId = Number((req as any).tenantId);
     const userRole = (req as any).userRole;
     const { id } = req.params;
-    const { accountId, categoryId } = req.body;
+    const { accountId, categoryId, paymentDate } = req.body;
 
     const reimbursement = await prisma.reimbursement.findUnique({
         where: { id: parseInt(id as string) }
@@ -6803,12 +6803,14 @@ app.patch('/api/reimbursements/:id/pay', tenantMiddleware, async (req: Request, 
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+        const paymentDateValue = paymentDate ? new Date(paymentDate) : new Date();
+
         // 1. Mark status as Paid
         const r = await tx.reimbursement.update({
             where: { id: parseInt(id as string) },
             data: {
                 isPaid: true,
-                paidAt: new Date()
+                paidAt: paymentDateValue
             }
         });
 
@@ -6825,13 +6827,14 @@ app.patch('/api/reimbursements/:id/pay', tenantMiddleware, async (req: Request, 
             // Using $queryRaw for reliability with enums across various Prisma versions
             await tx.$executeRawUnsafe(
               `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "amount", "date", "status", "description", "paidTo", "updatedAt")
-               VALUES ($1, $2, $3, $4, NOW(), 'PAID', $5, $6, NOW())`,
+               VALUES ($1, $2, $3, $4, $7, 'PAID', $5, $6, NOW())`,
               tenantId,
               accIdNum,
               catIdNum,
               reimbursement.amount,
               `Pembayaran Reimbursement: ${reimbursement.title}`,
-              `User ID: ${reimbursement.userId}`
+              `User ID: ${reimbursement.userId}`,
+              paymentDateValue
             );
 
             // Update Account Balance

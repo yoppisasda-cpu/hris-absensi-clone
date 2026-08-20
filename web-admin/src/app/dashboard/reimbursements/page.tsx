@@ -73,7 +73,7 @@ export default function ReimbursementsPage() {
     const [accounts, setAccounts] = useState<any[]>([]);
     const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
     const [showPayModal, setShowPayModal] = useState(false);
-    const [payData, setPayData] = useState<{ claimId: number, accountId: string, categoryId: string, amount: number, title: string } | null>(null);
+    const [payData, setPayData] = useState<{ claimId: number, accountId: string, categoryId: string, amount: number, title: string, paymentDate: string } | null>(null);
     const [isSubmittingPay, setIsSubmittingPay] = useState(false);
 
     const fetchClaims = async () => {
@@ -120,7 +120,8 @@ export default function ReimbursementsPage() {
             accountId: accounts.length > 0 ? accounts[0].id.toString() : '',
             categoryId: expenseCategories.length > 0 ? expenseCategories[0].id.toString() : '',
             amount: claim.amount,
-            title: claim.title
+            title: claim.title,
+            paymentDate: new Date().toISOString().split('T')[0]
         });
         setShowPayModal(true);
     };
@@ -135,10 +136,11 @@ export default function ReimbursementsPage() {
         try {
             await api.patch(`/reimbursements/${payData.claimId}/pay`, {
                 accountId: payData.accountId,
-                categoryId: payData.categoryId
+                categoryId: payData.categoryId,
+                paymentDate: payData.paymentDate
             });
             
-            setClaims(prev => prev.map(item => item.id === payData.claimId ? { ...item, isPaid: true, paidAt: new Date().toISOString() } : item));
+            setClaims(prev => prev.map(item => item.id === payData.claimId ? { ...item, isPaid: true, paidAt: new Date(payData.paymentDate).toISOString() } : item));
             setShowPayModal(false);
             setPayData(null);
             alert('Pembayaran berhasil diproses dan tercatat di Modul Keuangan.');
@@ -452,6 +454,17 @@ export default function ReimbursementsPage() {
                             </div>
 
                             <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                                        Tanggal Pembayaran
+                                    </label>
+                                    <input 
+                                        type="date"
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                                        value={payData.paymentDate}
+                                        onChange={(e) => setPayData({...payData, paymentDate: e.target.value})}
+                                    />
+                                </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">
                                         Bayar Menggunakan (Kas/Bank)
