@@ -13007,12 +13007,13 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
         targetCategoryId = targetCategory.id;
       }
 
-      let finalSku = sourceProd.sku;
+      let finalSku = (sourceProd.sku && sourceProd.sku.trim() !== '') ? sourceProd.sku.trim() : null;
       // Check SKU uniqueness before creating
       if (finalSku) {
         const existingSku = await prisma.product.findUnique({ where: { companyId_sku: { companyId: targetCompanyId, sku: finalSku } } });
         if (existingSku) {
-          finalSku = `${finalSku}-COPY-${targetCompanyId}-${Date.now()}`;
+          const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+          finalSku = `${finalSku}-COPY-${targetCompanyId}-${randomSuffix}`;
         }
       }
 
