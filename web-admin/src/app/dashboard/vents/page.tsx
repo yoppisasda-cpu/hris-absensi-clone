@@ -68,7 +68,7 @@ export default function VentsPage() {
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                         <Heart className="h-6 w-6 text-pink-600" /> Pulse of Company
                     </h1>
                     <p className="text-sm text-slate-500 mt-1">Dengarkan suara hati karyawan dan pahami kondisi tim melalui analisis AI.</p>
@@ -128,7 +128,7 @@ export default function VentsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-4">
-                    <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <Clock className="h-5 w-5 text-slate-400" /> Curhatan Terbaru
                     </h2>
                     
