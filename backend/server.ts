@@ -13023,21 +13023,21 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
           name: sourceProd.name,
           sku: finalSku,
           description: sourceProd.description,
-          price: sourceProd.price,
-          costPrice: sourceProd.costPrice,
-          unit: sourceProd.unit,
-          purchaseUnit: sourceProd.purchaseUnit,
-          purchaseFactor: sourceProd.purchaseFactor,
-          minStock: sourceProd.minStock,
-          showInPos: sourceProd.showInPos,
-          trackStock: sourceProd.trackStock,
-          isAutoDeduct: sourceProd.isAutoDeduct,
-          priceGofood: sourceProd.priceGofood,
-          priceGrabfood: sourceProd.priceGrabfood,
-          priceShopeefood: sourceProd.priceShopeefood,
-          priceQpoon: sourceProd.priceQpoon,
-          recipeYield: sourceProd.recipeYield,
-          type: sourceProd.type,
+          price: Number(sourceProd.price) || 0,
+          costPrice: Number(sourceProd.costPrice) || 0,
+          unit: sourceProd.unit || 'Pcs',
+          purchaseUnit: sourceProd.purchaseUnit || sourceProd.unit || 'Pcs',
+          purchaseFactor: Number(sourceProd.purchaseFactor) || 1,
+          minStock: Number(sourceProd.minStock) || 0,
+          showInPos: sourceProd.showInPos !== undefined ? sourceProd.showInPos : true,
+          trackStock: sourceProd.trackStock !== undefined ? sourceProd.trackStock : true,
+          isAutoDeduct: sourceProd.isAutoDeduct !== undefined ? sourceProd.isAutoDeduct : false,
+          priceGofood: Number(sourceProd.priceGofood) || 0,
+          priceGrabfood: Number(sourceProd.priceGrabfood) || 0,
+          priceShopeefood: Number(sourceProd.priceShopeefood) || 0,
+          priceQpoon: Number(sourceProd.priceQpoon) || 0,
+          recipeYield: Number(sourceProd.recipeYield) || 1,
+          type: sourceProd.type || 'FINISHED_GOOD',
           imageUrl: sourceProd.imageUrl,
           categoryId: targetCategoryId,
           updatedAt: new Date()
@@ -13080,7 +13080,7 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
           }
         }
       } catch (err) {
-        console.error(`Failed to import product ${sourceProduct.name}:`, err);
+        console.error(`Failed to import product ${sourceProduct.name}:`, err); require("fs").appendFileSync("debug_error.txt", "\nImport Error " + sourceProduct.name + ": " + err.message + "\n");
         skippedCount++;
       }
     }
