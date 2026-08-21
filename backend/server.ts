@@ -13080,7 +13080,7 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
           }
         }
       } catch (err) {
-        console.error(`Failed to import product ${sourceProduct.name}:`, err); require("fs").appendFileSync("debug_error.txt", "\nImport Error " + sourceProduct.name + ": " + err.message + "\n");
+        console.error(`Failed to import product ${sourceProduct.name}:`, err);
         skippedCount++;
       }
     }
