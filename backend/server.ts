@@ -13095,21 +13095,22 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
   }
 });
 
-// I1. List Products
 // I1. List Products (Updated with Warehouse Stock)
 app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
     const userRole = (req as any).userRole;
-    const { branchId, warehouseId } = req.query;
+    const { branchId, warehouseId, companyId } = req.query;
+
+    const queryCompanyId = companyId ? Number(companyId) : tenantId;
 
     // DIAGNOSTIC LOGGING
     const fs = require('fs');
-    const logMsg = `[${new Date().toISOString()}] GET /api/inventory/products | tenantId: ${tenantId} | role: ${userRole} | branch: ${branchId} | warehouse: ${warehouseId}\n`;
+    const logMsg = `[${new Date().toISOString()}] GET /api/inventory/products | tenantId: ${tenantId} | role: ${userRole} | branch: ${branchId} | warehouse: ${warehouseId} | queryCompanyId: ${queryCompanyId}\n`;
     fs.appendFileSync('debug_error.txt', logMsg);
 
     const products = await prisma.product.findMany({
-      where: { companyId: tenantId },
+      where: { companyId: queryCompanyId },
       include: {
         WarehouseStock: {
           include: { warehouse: true }
