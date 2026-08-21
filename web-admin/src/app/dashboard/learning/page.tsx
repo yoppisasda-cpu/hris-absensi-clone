@@ -303,7 +303,7 @@ export default function LearningDashboard() {
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                         <School className="h-6 w-6 text-indigo-600" /> Learning & Development
                     </h1>
                     <p className="text-sm text-slate-500 mt-1">Pantau perkembangan skill dan verifikasi pemahaman SOP seluruh tim.</p>

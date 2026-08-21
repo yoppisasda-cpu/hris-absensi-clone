@@ -145,7 +145,7 @@ export default function PerformancePage() {
         <DashboardLayout>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                         <TrendingUp className="h-6 w-6 text-blue-600" /> Manajemen Performa KPI
                     </h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Kelola indikator kinerja dan berikan penilaian berkala bagi karyawan.</p>
