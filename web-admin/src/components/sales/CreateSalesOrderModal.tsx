@@ -99,7 +99,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
         fetchData();
       } else {
         fetchData();
-        setOrderNumber(`PO-${Date.now().toString().slice(-6)}`);
+        setOrderNumber(`PO-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`);
         setCustomerId("");
         setNotes("");
         setItems([]);
