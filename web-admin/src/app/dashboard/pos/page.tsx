@@ -255,7 +255,7 @@ export default function POSPage() {
                         </div>
 
                         {/* Category Pills */}
-                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide py-1">
+                        <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar py-1">
                             <button 
                                 onClick={() => setSelectedCategory(null)}
                                 className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border italic ${

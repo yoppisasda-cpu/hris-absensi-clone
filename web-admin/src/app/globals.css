@@ -185,6 +185,7 @@ body {
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: rgba(15, 23, 42, 0.1);

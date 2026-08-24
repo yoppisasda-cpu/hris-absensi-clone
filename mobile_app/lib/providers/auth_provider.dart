@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../main.dart'; // import navigatorKey
 
 class AuthProvider with ChangeNotifier {
   bool _isAuthenticated = false;
@@ -100,5 +101,6 @@ class AuthProvider with ChangeNotifier {
     _userName = null;
     _userRole = null;
     notifyListeners();
+    navigatorKey.currentState?.popUntil((route) => route.isFirst);
   }
 }
