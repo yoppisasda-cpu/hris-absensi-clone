@@ -14,7 +14,8 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
         accountId: "",
         expenseType: "COGS", // Default to Bahan Baku
         supplierId: "",
-        warehouseId: ""
+        warehouseId: "",
+        date: new Date().toISOString().split("T")[0]
     });
     const [accounts, setAccounts] = useState<any[]>([]);
     const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -138,7 +139,17 @@ export default function StockAdjustModal({ product, isOpen, onClose, onSuccess }
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Tanggal</label>
+                            <input
+                                required
+                                type="date"
+                                className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-4 px-6 text-xs font-black text-white focus:border-amber-500/50 outline-none transition-all shadow-inner italic uppercase tracking-widest"
+                                value={formData.date}
+                                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                            />
+                        </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Jumlah Perubahan</label>
                             <div className="relative">

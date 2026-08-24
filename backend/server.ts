@@ -13468,7 +13468,8 @@ app.post('/api/inventory/products/upload', tenantMiddleware, uploadProduct.singl
 app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { productId, type, quantity, reference, recordExpense, accountId, expenseType, supplierId, warehouseId } = req.body;
+    const { productId, type, quantity, reference, recordExpense, accountId, expenseType, supplierId, warehouseId, date } = req.body;
+    const transactionDate = date ? new Date(date) : new Date();
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Get current product data
@@ -13510,8 +13511,8 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
       
       await tx.$executeRawUnsafe(`
         INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "supplierId", "warehouseId")
-        VALUES ($1, $2, $3, $4, NOW(), $5, $6)`,
-        productId, type, Number(quantity || 0), reference, safeSupplierId, safeWarehouseId
+        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        productId, type, Number(quantity || 0), reference, transactionDate, safeSupplierId, safeWarehouseId
       );
 
       // 5. Optional Expense Sync (Only for IN)
@@ -13550,7 +13551,7 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
             accountId: parseInt(accountId),
             categoryId: category.id,
             amount: totalCost,
-            date: new Date(),
+            date: transactionDate,
             description: `Belanja stok: ${product.name} (${quantity} unit)`,
             paidTo: paidTo
           }
