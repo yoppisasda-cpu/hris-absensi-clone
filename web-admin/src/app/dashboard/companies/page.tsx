@@ -81,7 +81,7 @@ export default function CompaniesPage() {
     const [plan, setPlan] = useState<'STARTER' | 'PRO' | 'ENTERPRISE'>('STARTER');
     const [addonKpi, setAddonKpi] = useState(false);
     const [addonLearning, setAddonLearning] = useState(false);
-    const [addonInventory, setAddonInventory] = useState(false);
+    const [inventoryTier, setInventoryTier] = useState<'NONE' | 'INVENTORY_BASIC' | 'INVENTORY_PRO' | 'INVENTORY_ENTERPRISE'>('NONE');
     const [addonAi, setAddonAi] = useState(false);
     const [addonFraud, setAddonFraud] = useState(false);
     const [addonExpansion, setAddonExpansion] = useState(false);
@@ -176,7 +176,7 @@ export default function CompaniesPage() {
         setPlan('STARTER');
         setAddonKpi(false);
         setAddonLearning(false);
-        setAddonInventory(false);
+        setInventoryTier('NONE');
         setAddonAi(false);
         setAddonFraud(false);
         setAddonExpansion(false);
@@ -229,7 +229,7 @@ export default function CompaniesPage() {
                 purchasedInsights: buildInsights(),
                 plan,
                 addons: [
-                    ...(addonInventory ? ['INVENTORY'] : []),
+                    ...(inventoryTier !== 'NONE' ? [inventoryTier] : []),
                     ...(addonAi ? ['AI_ADVISOR'] : []),
                     ...(addonFraud ? ['FRAUD_DETECTION'] : []),
                     ...(addonExpansion ? ['STAFF_EXPANSION'] : []),
@@ -261,7 +261,7 @@ export default function CompaniesPage() {
                 if (editingCompanyId && loggedInCompanyId === editingCompanyId.toString()) {
                     localStorage.setItem('userPlan', plan);
                     localStorage.setItem('userAddons', JSON.stringify([
-                        ...(addonInventory ? ['INVENTORY'] : []),
+                        ...(inventoryTier !== 'NONE' ? [inventoryTier] : []),
                         ...(addonAi ? ['AI_ADVISOR'] : []),
                         ...(addonFraud ? ['FRAUD_DETECTION'] : []),
                         ...(addonExpansion ? ['STAFF_EXPANSION'] : []),
@@ -315,7 +315,11 @@ export default function CompaniesPage() {
         setAddonLearning(insights.includes('LEARNING') || insights.includes('KPI_LEARNING'));
         
         const addons = company.addons || [];
-        setAddonInventory(addons.includes('INVENTORY'));
+        setInventoryTier(
+            addons.includes('INVENTORY_ENTERPRISE') ? 'INVENTORY_ENTERPRISE' :
+            addons.includes('INVENTORY_PRO') ? 'INVENTORY_PRO' :
+            addons.includes('INVENTORY_BASIC') ? 'INVENTORY_BASIC' : 'NONE'
+        );
         setAddonAi(addons.includes('AI_ADVISOR'));
         setAddonFraud(addons.includes('FRAUD_DETECTION'));
         setAddonExpansion(addons.includes('STAFF_EXPANSION'));
@@ -364,7 +368,9 @@ export default function CompaniesPage() {
                 KPI: 1500,
                 LEARNING: 2000,
                 BUNDLE_KPI_LRN: 3000,
-                INVENTORY: 20000,
+                INVENTORY_BASIC: 99000,
+                INVENTORY_PRO: 200000,
+                INVENTORY_ENTERPRISE: 500000,
                 AI: 20000,
                 FRAUD: 10000,
                 EXPANSION: 7000,
@@ -456,12 +462,15 @@ export default function CompaniesPage() {
             }
         }
 
-        if (addons.includes('INVENTORY')) {
+        if (addons.includes('INVENTORY_BASIC') || addons.includes('INVENTORY_PRO') || addons.includes('INVENTORY_ENTERPRISE')) {
+            const tier = addons.includes('INVENTORY_ENTERPRISE') ? 'INVENTORY_ENTERPRISE' : 
+                         addons.includes('INVENTORY_PRO') ? 'INVENTORY_PRO' : 'INVENTORY_BASIC';
+            const tierName = tier === 'INVENTORY_ENTERPRISE' ? 'Enterprise' : tier === 'INVENTORY_PRO' ? 'Pro' : 'Basic';
             const disc = company.discountInventory || 0;
-            const unitPrice = applyDiscount(pricing.addons.INVENTORY, disc);
+            const unitPrice = applyDiscount(pricing.addons[tier as keyof typeof pricing.addons], disc);
             const cost = unitPrice * multiplier;
             addonTotal += cost;
-            detailItems.push({ name: `Add-on: Inventory Management ${disc > 0 ? `(Disc ${disc}%)` : ''}`, price: unitPrice, qty: periodUnit, total: cost });
+            detailItems.push({ name: `Add-on: Inventory ${tierName} ${disc > 0 ? `(Disc ${disc}%)` : ''}`, price: unitPrice, qty: periodUnit, total: cost });
         }
         if (addons.includes('AI_ADVISOR')) {
             const disc = company.discountAi || 0;
@@ -809,31 +818,96 @@ export default function CompaniesPage() {
                             <div className="pt-2">
                                 <h4 className="text-[10px] font-bold uppercase text-slate-500 mb-2 mt-2">Add-On Finance & AI Management</h4>
                                 <div className="grid grid-cols-1 gap-2">
-                                    <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition-all">
+                                    <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${inventoryTier === 'INVENTORY_BASIC' ? 'bg-emerald-50 border-emerald-400 shadow-sm' : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'}`}>
                                         <input
-                                            type="checkbox"
-                                            checked={addonInventory}
-                                            onChange={(e) => setAddonInventory(e.target.checked)}
-                                            className="mt-0.5 h-4 w-4 rounded accent-emerald-600"
+                                            type="radio"
+                                            checked={inventoryTier === 'INVENTORY_BASIC'}
+                                            onClick={() => setInventoryTier(inventoryTier === 'INVENTORY_BASIC' ? 'NONE' : 'INVENTORY_BASIC')}
+                                            onChange={() => {}}
+                                            className="mt-0.5 h-4 w-4 rounded-full accent-emerald-600"
                                         />
-                                        <div>
-                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
-                                                📦 Inventory & Stock
-                                                <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Rp 20.000/bln</span>
+                                        <div className="flex-1">
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">📦 Inventory Basic</div>
+                                                <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Rp 99.000/bln</span>
                                             </div>
-                                            <div className="text-[10px] text-slate-400 mt-0.5">Manajemen stok barang, multi-gudang, dan integrasi POS.</div>
-                                            {addonInventory && (
-                                                <div className="mt-2 flex items-center gap-2 bg-emerald-50/50 p-1.5 rounded border border-emerald-100">
-                                                    <span className="text-[10px] text-emerald-700 font-bold">Diskon:</span>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Manajemen stok barang (Maksimal 100 SKU) & POS.</div>
+                                            {inventoryTier === 'INVENTORY_BASIC' && (
+                                                <div className="mt-2 flex items-center gap-2 bg-emerald-100/50 p-1.5 rounded border border-emerald-200">
+                                                    <span className="text-[10px] text-emerald-800 font-bold">Diskon:</span>
                                                     <div className="relative">
                                                         <input 
                                                             type="number" 
                                                             value={discountInventory} 
                                                             onChange={(e) => setDiscountInventory(e.target.value)} 
-                                                            className="w-20 h-7 text-xs border border-emerald-200 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none text-slate-900" 
+                                                            className="w-20 h-7 text-xs border border-emerald-300 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none text-slate-900 bg-white" 
                                                             placeholder="0"
                                                         />
-                                                        <span className="absolute right-2 top-1.5 text-[10px] text-emerald-400 font-bold">%</span>
+                                                        <span className="absolute right-2 top-1.5 text-[10px] text-emerald-500 font-bold">%</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </label>
+
+                                    <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${inventoryTier === 'INVENTORY_PRO' ? 'bg-emerald-50 border-emerald-400 shadow-sm' : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'}`}>
+                                        <input
+                                            type="radio"
+                                            checked={inventoryTier === 'INVENTORY_PRO'}
+                                            onClick={() => setInventoryTier(inventoryTier === 'INVENTORY_PRO' ? 'NONE' : 'INVENTORY_PRO')}
+                                            onChange={() => {}}
+                                            className="mt-0.5 h-4 w-4 rounded-full accent-emerald-600"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">📦 Inventory Pro</div>
+                                                <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Rp 200.000/bln</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Manajemen stok lanjutan (Maksimal 1.000 SKU) & POS.</div>
+                                            {inventoryTier === 'INVENTORY_PRO' && (
+                                                <div className="mt-2 flex items-center gap-2 bg-emerald-100/50 p-1.5 rounded border border-emerald-200">
+                                                    <span className="text-[10px] text-emerald-800 font-bold">Diskon:</span>
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            value={discountInventory} 
+                                                            onChange={(e) => setDiscountInventory(e.target.value)} 
+                                                            className="w-20 h-7 text-xs border border-emerald-300 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none text-slate-900 bg-white" 
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute right-2 top-1.5 text-[10px] text-emerald-500 font-bold">%</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </label>
+
+                                    <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${inventoryTier === 'INVENTORY_ENTERPRISE' ? 'bg-emerald-50 border-emerald-400 shadow-sm' : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'}`}>
+                                        <input
+                                            type="radio"
+                                            checked={inventoryTier === 'INVENTORY_ENTERPRISE'}
+                                            onClick={() => setInventoryTier(inventoryTier === 'INVENTORY_ENTERPRISE' ? 'NONE' : 'INVENTORY_ENTERPRISE')}
+                                            onChange={() => {}}
+                                            className="mt-0.5 h-4 w-4 rounded-full accent-emerald-600"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">🏢 Inventory Enterprise</div>
+                                                <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Rp 500.000/bln</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">Manajemen inventaris skala besar (SKU Tidak Terbatas) & POS.</div>
+                                            {inventoryTier === 'INVENTORY_ENTERPRISE' && (
+                                                <div className="mt-2 flex items-center gap-2 bg-emerald-100/50 p-1.5 rounded border border-emerald-200">
+                                                    <span className="text-[10px] text-emerald-800 font-bold">Diskon:</span>
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            value={discountInventory} 
+                                                            onChange={(e) => setDiscountInventory(e.target.value)} 
+                                                            className="w-20 h-7 text-xs border border-emerald-300 rounded pl-2 pr-5 focus:ring-1 focus:ring-emerald-500 outline-none text-slate-900 bg-white" 
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute right-2 top-1.5 text-[10px] text-emerald-500 font-bold">%</span>
                                                     </div>
                                                 </div>
                                             )}

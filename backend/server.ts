@@ -12972,6 +12972,37 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
 
     if (sourceProducts.length === 0) return res.status(404).json({ error: 'No products found to import' });
 
+    // --- SKU LIMIT CHECK ---
+    const targetCompanyInfo = await prisma.company.findUnique({
+      where: { id: targetCompanyId },
+      select: { addons: true }
+    });
+    
+    const addons = targetCompanyInfo?.addons || [];
+    let skuLimit = 10; // Default Free Tier
+    
+    if (addons.includes('INVENTORY_ENTERPRISE')) {
+      skuLimit = Infinity;
+    } else if (addons.includes('INVENTORY_PRO')) {
+      skuLimit = 1000;
+    } else if (addons.includes('INVENTORY_BASIC')) {
+      skuLimit = 100;
+    }
+
+    if (skuLimit !== Infinity) {
+      const currentSkuCount = await prisma.product.count({
+        where: { companyId: targetCompanyId }
+      });
+      
+      // Calculate how many products are being added. This is an estimate based on the main items imported.
+      if (currentSkuCount + sourceProducts.length > skuLimit) {
+        return res.status(403).json({ 
+          error: `Batas SKU tercapai. Anda mencoba mengimpor ${sourceProducts.length} produk, namun limit Add-on Inventory Anda adalah ${skuLimit} SKU (Saat ini: ${currentSkuCount} SKU). Silakan upgrade Add-on Inventory Anda.` 
+        });
+      }
+    }
+    // --- END SKU LIMIT CHECK ---
+
     let importedCount = 0;
     let skippedCount = 0;
 
@@ -13183,6 +13214,36 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
   try {
     const tenantId = Number((req as any).tenantId);
     const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
+
+    // --- SKU LIMIT CHECK ---
+    const company = await prisma.company.findUnique({
+      where: { id: tenantId },
+      select: { addons: true }
+    });
+    
+    const addons = company?.addons || [];
+    let skuLimit = 10; // Default Free Tier
+    
+    if (addons.includes('INVENTORY_ENTERPRISE')) {
+      skuLimit = Infinity;
+    } else if (addons.includes('INVENTORY_PRO')) {
+      skuLimit = 1000;
+    } else if (addons.includes('INVENTORY_BASIC')) {
+      skuLimit = 100;
+    }
+
+    if (skuLimit !== Infinity) {
+      const currentSkuCount = await prisma.product.count({
+        where: { companyId: tenantId }
+      });
+      
+      if (currentSkuCount >= skuLimit) {
+        return res.status(403).json({ 
+          error: `Batas SKU tercapai (${skuLimit} produk). Silakan upgrade Add-on Inventory Anda.` 
+        });
+      }
+    }
+    // -----------------------
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create Product
