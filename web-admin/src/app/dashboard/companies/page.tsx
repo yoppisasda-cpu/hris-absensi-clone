@@ -535,8 +535,8 @@ export default function CompaniesPage() {
     return (
         <DashboardLayout>
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-black">Manajemen Klien (Tenant)</h1>
-                <p className="text-sm text-slate-500">Daftarkan perusahaan baru lengkap dengan titik lokasi kantor absensinya.</p>
+                <h1 className="text-2xl font-bold text-white">Manajemen Klien (Tenant)</h1>
+                <p className="text-sm text-slate-400">Daftarkan perusahaan baru lengkap dengan titik lokasi kantor absensinya.</p>
             </div>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
