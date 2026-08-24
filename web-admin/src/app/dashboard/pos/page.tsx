@@ -31,11 +31,13 @@ interface Product {
     category?: { name: string };
     unit: string;
     trackStock?: boolean;
+    customizations?: any[];
 }
 
 interface CartItem extends Product {
     qty: number;
     modifiers?: any;
+    cartId: string;
 }
 
 export default function POSPage() {
@@ -52,6 +54,11 @@ export default function POSPage() {
     const [lastSale, setLastSale] = useState<any>(null);
     const [lastCart, setLastCart] = useState<CartItem[]>([]);
     const [taxRate, setTaxRate] = useState<number>(0);
+
+    // MODIFIER MODAL
+    const [modifierProduct, setModifierProduct] = useState<Product | null>(null);
+    const [modifierSelections, setModifierSelections] = useState<Record<number, any[]>>({});
+
 
     // NEW CHECKOUT FIELDS
     const [saleType, setSaleType] = useState<string>('WALK_IN');
@@ -93,30 +100,39 @@ export default function POSPage() {
         });
     }, [products, searchTerm, selectedCategory]);
 
-    const addToCart = (product: Product) => {
+    const addToCart = (product: Product, withModifiers: any = null) => {
         if (product.trackStock !== false && product.stock <= 0) {
             toast.error("Stok habis!");
             return;
         }
 
+        if (!withModifiers && product.customizations && product.customizations.length > 0) {
+            setModifierProduct(product);
+            setModifierSelections({});
+            return;
+        }
+
         setCart(prev => {
-            const existing = prev.find(item => item.id === product.id);
+            const existing = prev.find(item => 
+                item.id === product.id && 
+                JSON.stringify(item.modifiers || null) === JSON.stringify(withModifiers || null)
+            );
             if (existing) {
                 if (product.trackStock !== false && existing.qty >= product.stock) {
                     toast.error("Stok tidak cukup");
                     return prev;
                 }
                 return prev.map(item => 
-                    item.id === product.id ? { ...item, qty: item.qty + 1 } : item
+                    item.cartId === existing.cartId ? { ...item, qty: item.qty + 1 } : item
                 );
             }
-            return [...prev, { ...product, qty: 1 }];
+            return [...prev, { ...product, qty: 1, modifiers: withModifiers, cartId: Date.now().toString() + Math.random().toString() }];
         });
     };
 
-    const updateQty = (id: number, delta: number) => {
+    const updateQty = (cartId: string, delta: number) => {
         setCart(prev => prev.map(item => {
-            if (item.id === id) {
+            if (item.cartId === cartId) {
                 const newQty = item.qty + delta;
                 if (newQty <= 0) return item;
                 if (item.trackStock !== false && newQty > item.stock) {
@@ -129,8 +145,8 @@ export default function POSPage() {
         }));
     };
 
-    const removeFromCart = (id: number) => {
-        setCart(prev => prev.filter(item => item.id !== id));
+    const removeFromCart = (cartId: string) => {
+        setCart(prev => prev.filter(item => item.cartId !== cartId));
     };
 
     const subtotal = useMemo(() => {
@@ -370,7 +386,7 @@ export default function POSPage() {
                                 {/* CART ITEMS */}
                                 <div className="space-y-4">
                                     {cart.map(item => (
-                                        <div key={item.id} className="flex items-center gap-4 group animate-in slide-in-from-right-8 duration-500">
+                                        <div key={item.cartId} className="flex items-center gap-4 group animate-in slide-in-from-right-8 duration-500 bg-slate-900/50 p-3 rounded-2xl border border-white/5">
                                             <div className="h-12 w-12 rounded-xl bg-slate-950 border border-white/5 flex items-center justify-center text-blue-500 font-black text-xs group-hover:bg-blue-600 group-hover:text-white transition-all shadow-inner relative overflow-hidden shrink-0">
                                                 {item.image ? (
                                                     <img src={item.image} className="w-full h-full object-cover opacity-60" />
@@ -380,27 +396,36 @@ export default function POSPage() {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="font-black text-[11px] tracking-tight text-white uppercase truncate">{item.name}</h4>
+                                                {item.modifiers && Object.keys(item.modifiers).length > 0 && (
+                                                    <div className="text-[8px] text-slate-400 font-black uppercase tracking-wider mt-1 flex flex-wrap gap-1">
+                                                        {Object.values(item.modifiers).map((mod: any, idx) => (
+                                                            <span key={idx} className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
+                                                                {mod.name} {mod.price > 0 && `(+${mod.price})`}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                                 <p className="text-[10px] text-blue-400 font-black uppercase mt-1">
                                                     Rp {item.price.toLocaleString()}
                                                 </p>
                                             </div>
                                             <div className="flex items-center bg-slate-900 rounded-xl p-1 gap-1 border border-white/10 shrink-0">
                                                 <button 
-                                                    onClick={() => updateQty(item.id, -1)}
+                                                    onClick={() => updateQty(item.cartId, -1)}
                                                     className="h-6 w-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
                                                 >
                                                     <Minus className="h-3 w-3" />
                                                 </button>
                                                 <span className="w-6 text-center text-[10px] font-black text-white">{item.qty}</span>
                                                 <button 
-                                                    onClick={() => updateQty(item.id, 1)}
+                                                    onClick={() => updateQty(item.cartId, 1)}
                                                     className="h-6 w-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
                                                 >
                                                     <Plus className="h-3 w-3" />
                                                 </button>
                                             </div>
                                             <button 
-                                                onClick={() => removeFromCart(item.id)}
+                                                onClick={() => removeFromCart(item.cartId)}
                                                 className="h-8 w-8 flex items-center justify-center text-slate-600 hover:text-red-500 transition-all hover:bg-red-500/10 rounded-lg shrink-0"
                                             >
                                                 <X className="h-4 w-4" />
@@ -563,7 +588,131 @@ export default function POSPage() {
                 </div>
             </div>
 
+            
+            {/* MODIFIER MODAL */}
+            {modifierProduct && (
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-[#050505]/95 backdrop-blur-2xl sm:p-4 animate-in fade-in duration-500">
+                    <div className="bg-slate-900 w-full sm:max-w-xl rounded-t-[48px] sm:rounded-[48px] shadow-[0_0_100px_rgba(59,130,246,0.1)] overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-500 border border-white/5 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="p-8 border-b border-white/5 bg-slate-950/30 flex justify-between items-center shrink-0">
+                            <div>
+                                <h3 className="text-xl font-black italic tracking-tighter text-white uppercase text-glow-sm">
+                                    Customization
+                                </h3>
+                                <p className="text-[10px] font-black text-blue-400 tracking-[0.2em] uppercase mt-1 italic">{modifierProduct.name}</p>
+                            </div>
+                            <button 
+                                onClick={() => { setModifierProduct(null); setModifierSelections({}); }}
+                                className="h-10 w-10 bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shrink-0"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        
+                        {/* Body */}
+                        <div className="p-8 overflow-y-auto space-y-8 flex-1 scrollbar-hide">
+                            {modifierProduct.customizations?.map((customization: any) => {
+                                const group = customization.Group;
+                                if (!group) return null;
+                                const isRequired = group.isRequired;
+                                const maxSel = group.maxSelections;
+                                const selectedInGroup = modifierSelections[group.id] || [];
+                                
+                                return (
+                                    <div key={group.id} className="space-y-4">
+                                        <div className="flex justify-between items-end">
+                                            <div>
+                                                <h4 className="text-sm font-black uppercase text-white tracking-widest">{group.name}</h4>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 italic mt-1">
+                                                    {isRequired ? 'Wajib Pilih' : 'Opsional'} &bull; Max: {maxSel}
+                                                </p>
+                                            </div>
+                                            <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-1 rounded italic">{selectedInGroup.length}/{maxSel}</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {group.options?.map((opt: any) => {
+                                                const isSelected = selectedInGroup.some(s => s.id === opt.id);
+                                                return (
+                                                    <div 
+                                                        key={opt.id}
+                                                        onClick={() => {
+                                                            setModifierSelections(prev => {
+                                                                const current = prev[group.id] || [];
+                                                                if (isSelected) {
+                                                                    return { ...prev, [group.id]: current.filter(c => c.id !== opt.id) };
+                                                                } else {
+                                                                    if (current.length >= maxSel) {
+                                                                        if (maxSel === 1) {
+                                                                            return { ...prev, [group.id]: [opt] }; // Replace if max 1
+                                                                        }
+                                                                        toast.error(`Maksimal ${maxSel} pilihan`);
+                                                                        return prev;
+                                                                    }
+                                                                    return { ...prev, [group.id]: [...current, opt] };
+                                                                }
+                                                            });
+                                                        }}
+                                                        className={`p-4 rounded-2xl border cursor-pointer transition-all flex justify-between items-center ${
+                                                            isSelected 
+                                                            ? 'bg-blue-600/10 border-blue-500/50 text-blue-400 shadow-[inset_0_0_20px_rgba(59,130,246,0.1)]' 
+                                                            : 'bg-slate-950/50 border-white/5 text-slate-400 hover:border-white/10'
+                                                        }`}
+                                                    >
+                                                        <span className="text-[11px] font-black uppercase tracking-wider">{opt.name}</span>
+                                                        {opt.price > 0 && <span className="text-[10px] font-bold">+Rp{opt.price.toLocaleString()}</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        
+                        {/* Footer */}
+                        <div className="p-6 border-t border-white/5 bg-slate-950/80 shrink-0">
+                            <button 
+                                onClick={() => {
+                                    // Validate Required Groups
+                                    for (const customization of modifierProduct.customizations || []) {
+                                        const group = customization.Group;
+                                        if (group && group.isRequired) {
+                                            const selected = modifierSelections[group.id] || [];
+                                            if (selected.length < group.minSelections) {
+                                                toast.error(`${group.name} minimal ${group.minSelections} pilihan!`);
+                                                return;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Format modifiers for cart
+                                    const finalModifiers: Record<string, any> = {};
+                                    let extraPrice = 0;
+                                    Object.entries(modifierSelections).forEach(([groupId, opts]) => {
+                                        opts.forEach(opt => {
+                                            finalModifiers[`${groupId}_${opt.id}`] = { id: opt.id, name: opt.name, price: opt.price };
+                                            extraPrice += opt.price;
+                                        });
+                                    });
+                                    
+                                    // Create a customized product with accumulated price
+                                    const customizedProduct = { ...modifierProduct, price: modifierProduct.price + extraPrice };
+                                    
+                                    addToCart(customizedProduct, finalModifiers);
+                                    setModifierProduct(null);
+                                    setModifierSelections({});
+                                }}
+                                className="w-full py-5 rounded-[24px] bg-blue-600 hover:bg-blue-500 text-white font-black text-[11px] uppercase tracking-[0.3em] transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                            >
+                                SELESAI & MASUKKAN KERANJANG
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             {/* RECEIPT MODAL */}
+
             {showReceipt && lastSale && (
                 <>
                     {/* CSS khusus untuk print struk Thermal */}
