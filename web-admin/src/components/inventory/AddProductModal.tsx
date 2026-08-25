@@ -318,7 +318,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             updates.price = 0;
             updates.isAutoDeduct = false;
         }
-        if (newType !== 'WIP') {
+        if (newType === 'RAW_MATERIAL') {
             updates.isAutoDeduct = false;
         }
 
@@ -676,7 +676,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     </div>
                                     <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic group-hover:text-indigo-400 transition-colors">REAL-TIME TRACKING</span>
                                 </label>
-                                {formData.type === 'WIP' && (
+                                {formData.type !== 'RAW_MATERIAL' && (
                                     <label className="flex items-center gap-4 cursor-pointer group">
                                         <div className="relative">
                                             <input 
