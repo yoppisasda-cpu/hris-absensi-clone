@@ -16267,6 +16267,8 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
         imageUrl: true,
         categoryId: true,
         trackStock: true,
+        isAutoDeduct: true,
+        type: true,
         recipeYield: true,
         WarehouseStock: {
           where: { warehouseId: warehouse?.id },
@@ -16782,8 +16784,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             const product = await tx.product.findUnique({ where: { id: productId } });
             if (!product) return [];
 
-            // If it's a WIP and Auto Deduct is ON, we don't deduct it, we explode its recipe
-            if (product.type === 'WIP' && product.isAutoDeduct) {
+            // If Auto Deduct is ON, we don't deduct the parent directly, we explode its recipe
+            if (product.isAutoDeduct) {
                 const recipes = await tx.productRecipe.findMany({ where: { productId }, include: { Product: { select: { recipeYield: true } } } });
                 if (recipes.length > 0) {
                     let deductions: { id: number, qty: number }[] = [];
