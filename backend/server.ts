@@ -16765,13 +16765,13 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         // 1.7 Validate Stock before proceeding (Skip validation for offline synchronized sales since they have already been finalized)
         const productsInCart = await tx.product.findMany({
             where: { id: { in: productIds } },
-            select: { id: true, name: true, stock: true, trackStock: true }
+            select: { id: true, name: true, stock: true, trackStock: true, isAutoDeduct: true }
         });
 
         if (!req.body.offlineInvoiceNumber) {
             for (const item of items) {
                 const product = productsInCart.find(p => p.id === Number(item.productId));
-                if (product && product.trackStock && product.stock < Number(item.quantity)) {
+                if (product && product.trackStock && !product.isAutoDeduct && product.stock < Number(item.quantity)) {
                     throw new Error(`Stok tidak mencukupi untuk produk: ${product.name}. Stok tersedia: ${product.stock}`);
                 }
             }
