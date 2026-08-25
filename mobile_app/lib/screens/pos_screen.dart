@@ -260,8 +260,9 @@ class _POSScreenState extends State<POSScreen> {
 
   void _addToCart(dynamic product, {List<Map<String, dynamic>>? modifiers}) {
     bool trackStock = product['trackStock'] ?? true;
+    bool isAutoDeduct = product['isAutoDeduct'] == true;
     
-    if (trackStock && (product['stock'] ?? 0) <= 0) {
+    if (trackStock && !isAutoDeduct && (product['stock'] ?? 0) <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Stok habis!'), backgroundColor: Colors.orange),
       );
@@ -277,7 +278,7 @@ class _POSScreenState extends State<POSScreen> {
       });
 
       if (index >= 0) {
-        if (trackStock && _cart[index]['quantity'] >= product['stock']) {
+        if (trackStock && !isAutoDeduct && _cart[index]['quantity'] >= product['stock']) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Stok tidak cukup')),
           );
@@ -296,6 +297,7 @@ class _POSScreenState extends State<POSScreen> {
           'quantity': 1,
           'maxStock': product['stock'],
           'trackStock': product['trackStock'] ?? true,
+          'isAutoDeduct': product['isAutoDeduct'] == true,
           'modifiers': modifiers,
         });
       }
@@ -345,9 +347,10 @@ class _POSScreenState extends State<POSScreen> {
           _cart.removeAt(index);
         } else {
           bool trackStock = _cart[index]['trackStock'] ?? true;
-          int maxStock = (_cart[index]['maxStock'] ?? 0).toInt();
+          bool isAutoDeduct = _cart[index]['isAutoDeduct'] == true;
+          int maxStock = int.tryParse(_cart[index]['maxStock']?.toString() ?? '0') ?? 0;
 
-          if (!trackStock || newQty <= maxStock) {
+          if (!trackStock || isAutoDeduct || newQty <= maxStock) {
             _cart[index]['quantity'] = newQty;
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1712,8 +1715,9 @@ class _POSScreenState extends State<POSScreen> {
                             final p = _filteredProducts[i];
                             final int cartQty = _cart.where((item) => item['productId'] == p['id']).fold(0, (sum, item) => sum + (item['quantity'] as int));
                             final bool trackStock = p['trackStock'] == true;
+                            final bool isAutoDeduct = p['isAutoDeduct'] == true;
                             final double currentStock = double.tryParse(p['stock']?.toString() ?? '0') ?? 0;
-                            final bool isOutOfStock = trackStock && currentStock <= 0;
+                            final bool isOutOfStock = trackStock && !isAutoDeduct && currentStock <= 0;
 
                             return GestureDetector(
                               onTap: isOutOfStock 
