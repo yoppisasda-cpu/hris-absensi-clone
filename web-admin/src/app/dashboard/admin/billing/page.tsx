@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { FileText, CheckCircle2, Search, Calendar, Zap, Download } from "lucide-react";
+import { FileText, Plus, CheckCircle2, Search, Filter, Calendar, Zap, AlertCircle, Download } from "lucide-react";
 import api from "@/lib/api";
 import SubscriptionInvoiceModal from "@/components/billing/SubscriptionInvoiceModal";
 
