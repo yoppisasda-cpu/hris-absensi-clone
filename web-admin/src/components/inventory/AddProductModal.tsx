@@ -22,6 +22,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         type: "FINISHED_GOOD",
         trackStock: true,
         isAutoDeduct: false,
+        isDiscountable: true,
         priceGofood: 0,
         priceGrabfood: 0,
         priceShopeefood: 0,
@@ -74,6 +75,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     showInPos: freshProduct.showInPos !== undefined ? freshProduct.showInPos : true,
                     type: freshProduct.type || "FINISHED_GOOD",
                     trackStock: freshProduct.trackStock !== undefined ? freshProduct.trackStock : true,
+                    isDiscountable: freshProduct.isDiscountable !== undefined ? freshProduct.isDiscountable : true,
                     isAutoDeduct: freshProduct.isAutoDeduct !== undefined ? freshProduct.isAutoDeduct : false,
                     priceGofood: freshProduct.priceGofood || 0,
                     priceGrabfood: freshProduct.priceGrabfood || 0,
@@ -119,6 +121,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     showInPos: product.showInPos !== undefined ? product.showInPos : true,
                     type: product.type || "FINISHED_GOOD",
                     trackStock: product.trackStock !== undefined ? product.trackStock : true,
+                    isDiscountable: product.isDiscountable !== undefined ? product.isDiscountable : true,
                     isAutoDeduct: product.isAutoDeduct !== undefined ? product.isAutoDeduct : false,
                     priceGofood: product.priceGofood || 0,
                     priceGrabfood: product.priceGrabfood || 0,
@@ -140,7 +143,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 setVendorPrice((product.costPrice || 0) * (product.purchaseFactor || 1));
             } else {
                 setFormData({
-                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, isAutoDeduct: false, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
@@ -417,7 +420,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
 
             setFormData({
-                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, isAutoDeduct: false, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
             });
             setHasRecipe(false);
             setRecipeItems([]);
@@ -688,6 +691,20 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                             <div className="w-12 h-6 bg-slate-800 border border-white/5 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600 after:shadow-lg"></div>
                                         </div>
                                         <span className="text-[10px] font-black uppercase text-amber-500/80 tracking-[0.2em] italic group-hover:text-amber-400 transition-colors">AUTO DEDUCT (POS)</span>
+                                    </label>
+                                )}
+                                {formData.type === 'FINISHED_GOOD' && (
+                                    <label className="flex items-center gap-4 cursor-pointer group ml-6">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only peer"
+                                                checked={formData.isDiscountable}
+                                                onChange={(e) => setFormData({ ...formData, isDiscountable: e.target.checked })}
+                                            />
+                                            <div className="w-12 h-6 bg-slate-800 border border-white/5 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 after:shadow-lg"></div>
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase text-indigo-400/80 tracking-[0.2em] italic group-hover:text-indigo-300 transition-colors">BERLAKU DISKON</span>
                                     </label>
                                 )}
                             </div>

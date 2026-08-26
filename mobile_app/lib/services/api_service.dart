@@ -10,6 +10,8 @@ class ApiService {
   // URL API akan otomatis berubah tergantung mode (Debug vs Release/Google Play)
   // PENTING: Jika menggunakan HP asli (Debug), ganti IP di bawah jika tidak menggunakan emulator
   static const String baseUrl = 'https://api.aivola.id/api'; // POINT TO PRODUCTION BACKEND
+  // static const String baseUrl = 'http://127.0.0.1:5005/api'; // LOCAL BACKEND FOR IOS EMULATOR
+  // static const String baseUrl = 'http://192.168.1.166:5005/api'; // LOCAL BACKEND FOR PHYSICAL DEVICE (SAME WIFI)
   final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
     connectTimeout: Duration(milliseconds: 60000),
@@ -64,6 +66,36 @@ class ApiService {
       throw Exception('Gagal menghubungi server otentikasi (Cek koneksi internet Anda). Endpoint: $baseUrl');
     } catch (e) {
       throw Exception('Gagal login: $e');
+    }
+  }
+
+  // Fetch Employee Dynamic QR Token
+  Future<Map<String, dynamic>> getEmployeeQrToken() async {
+    try {
+      final response = await _dio.get('/employee/qr');
+      return response.data;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data['error'] != null) {
+        throw Exception(e.response?.data['error']);
+      }
+      throw Exception('Gagal menghubungi server untuk QR Token.');
+    } catch (e) {
+      throw Exception('Gagal mendapatkan QR Token: $e');
+    }
+  }
+
+  // Scan Employee Dynamic QR Token
+  Future<Map<String, dynamic>> scanEmployeeQr(String token) async {
+    try {
+      final response = await _dio.post('/pos/scan-employee-qr', data: {'token': token});
+      return response.data;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data['error'] != null) {
+        throw Exception(e.response?.data['error']);
+      }
+      throw Exception('Gagal memvalidasi QR Token.');
+    } catch (e) {
+      throw Exception('Gagal memvalidasi QR Token: $e');
     }
   }
 
@@ -649,6 +681,7 @@ class ApiService {
   // Kalkulasi total POS (Diskon Member, Voucher, Poin)
   Future<Map<String, dynamic>> calculatePosTotal({
     required double subtotal,
+    required double discountableSubtotal,
     int? customerId,
     String? voucherCode,
     double pointsToUse = 0,
@@ -657,6 +690,7 @@ class ApiService {
     try {
       final response = await _dio.post('/pos/calculate', data: {
         'subtotal': subtotal,
+        'discountableSubtotal': discountableSubtotal,
         'customerId': customerId,
         'voucherCode': voucherCode,
         'pointsToUse': pointsToUse,

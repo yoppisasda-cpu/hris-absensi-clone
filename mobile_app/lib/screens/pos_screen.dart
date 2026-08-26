@@ -11,6 +11,7 @@ import '../services/socket_service.dart';
 import 'package:provider/provider.dart';
 import '../services/pos_local_db_service.dart';
 import '../services/pos_sync_manager.dart';
+import 'qr_scanner_screen.dart';
 
 class POSScreen extends StatefulWidget {
   @override
@@ -37,6 +38,7 @@ class _POSScreenState extends State<POSScreen> {
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerPhoneController = TextEditingController();
   final TextEditingController _cashReceivedController = TextEditingController();
+  final TextEditingController _aivolaIdController = TextEditingController();
   double _cashReceived = 0;
 
   // Loyalty variables
@@ -46,6 +48,7 @@ class _POSScreenState extends State<POSScreen> {
   double _availablePoints = 0;
   
   double _memberDiscountAmount = 0;
+  double _employeeDiscountAmount = 0;
   double _voucherDiscountAmount = 0;
   double _pointsUsed = 0;
   double _pointsEarned = 0;
@@ -242,9 +245,19 @@ class _POSScreenState extends State<POSScreen> {
     return _cart.fold(0, (sum, item) => sum + (_getItemPrice(item) * item['quantity']));
   }
 
+  double get _discountableSubtotalAmount {
+    return _cart.fold(0, (sum, item) {
+      bool isDisc = item['isDiscountable'] ?? true;
+      if (isDisc) {
+        return sum + (_getItemPrice(item) * item['quantity']);
+      }
+      return sum;
+    });
+  }
+
   double get _taxAmount {
     if (_globalTaxRate <= 0) return 0;
-    double base = _subtotalAmount - _memberDiscountAmount - _voucherDiscountAmount - _pointValueUsed;
+    double base = _subtotalAmount - _memberDiscountAmount - _employeeDiscountAmount - _voucherDiscountAmount - _pointValueUsed;
     if (base < 0) base = 0;
     return base * (_globalTaxRate / 100);
   }
@@ -252,6 +265,7 @@ class _POSScreenState extends State<POSScreen> {
   double get _grandTotal {
     double total = _subtotalAmount;
     total -= _memberDiscountAmount;
+    total -= _employeeDiscountAmount;
     total -= _voucherDiscountAmount;
     total -= _pointValueUsed;
     if (total < 0) total = 0;
@@ -298,6 +312,7 @@ class _POSScreenState extends State<POSScreen> {
           'maxStock': product['stock'],
           'trackStock': product['trackStock'] ?? true,
           'isAutoDeduct': product['isAutoDeduct'] == true,
+          'isDiscountable': product['isDiscountable'] ?? true,
           'modifiers': modifiers,
         });
       }
@@ -309,6 +324,7 @@ class _POSScreenState extends State<POSScreen> {
       double totalQty = _cart.fold(0, (sum, item) => sum + (item['quantity'] as num));
       final res = await _apiService.calculatePosTotal(
         subtotal: _subtotalAmount,
+        discountableSubtotal: _discountableSubtotalAmount,
         customerId: _activeCustomerId,
         voucherCode: _voucherController.text.trim(),
         pointsToUse: _usePoints ? _availablePoints : 0,
@@ -326,6 +342,32 @@ class _POSScreenState extends State<POSScreen> {
       setState(() {});
     } catch (e) {
       print("Calc Error: $e");
+    }
+  }
+
+  Future<void> _scanAivolaId(StateSetter setPanelState) async {
+    final token = _aivolaIdController.text.trim();
+    if (token.isEmpty) return;
+    try {
+      final res = await _apiService.scanEmployeeQr(token);
+      setPanelState(() {
+        _customerNameController.text = res['customer']['name'];
+        _customerPhoneController.text = res['customer']['phone'] ?? '';
+        _activeCustomerId = res['customer']['id'];
+        
+        final discType = res['discount']['type'];
+        final discValue = (res['discount']['value'] as num).toDouble();
+        
+        if (discType == 'NOMINAL') {
+          _employeeDiscountAmount = discValue > _discountableSubtotalAmount ? _discountableSubtotalAmount : discValue;
+        } else {
+          _employeeDiscountAmount = _discountableSubtotalAmount * (discValue / 100);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Diskon Karyawan Diterapkan!'), backgroundColor: Colors.green));
+      setState(() {});
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
     }
   }
 
@@ -687,6 +729,53 @@ class _POSScreenState extends State<POSScreen> {
                 SizedBox(height: 24),
 
                 // Loyalty Section
+                Text('Scan / Input Aivola ID (Karyawan)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
+                SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _aivolaIdController,
+                        decoration: InputDecoration(
+                          hintText: 'Paste token Aivola ID',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                          suffixIcon: IconButton(
+                            icon: Icon(Icons.qr_code_scanner, color: Colors.blueGrey),
+                            onPressed: () async {
+                              final scannedToken = await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => QRScannerScreen()),
+                              );
+                              if (scannedToken != null && scannedToken is String) {
+                                _aivolaIdController.text = scannedToken;
+                                _scanAivolaId(setPanelState); // Auto apply!
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => _scanAivolaId(setPanelState),
+                      child: Text('Terapkan'),
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_employeeDiscountAmount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text('Diskon Karyawan Aktif: - Rp ${_employeeDiscountAmount.toStringAsFixed(0)}', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                SizedBox(height: 24),
+
                 Text('Kode Voucher', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
                 SizedBox(height: 10),
                 Row(
@@ -1138,7 +1227,7 @@ class _POSScreenState extends State<POSScreen> {
         'customerName': _customerNameController.text.trim(),
         'taxRate': _globalTaxRate,
         'taxAmount': _taxAmount,
-        'memberDiscountAmount': _memberDiscountAmount,
+        'memberDiscountAmount': _memberDiscountAmount + _employeeDiscountAmount,
         'voucherDiscountAmount': _voucherDiscountAmount,
         'pointsUsed': _pointsUsed,
         'subtotal': _subtotalAmount,

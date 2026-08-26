@@ -17,7 +17,8 @@ import {
     Printer,
     Monitor,
     Scan,
-    X
+    X,
+    ShieldCheck
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -41,6 +42,8 @@ interface CartItem extends Product {
     modifiers?: any;
     cartId: string;
 }
+
+import QrScanner from "@/components/pos/QrScanner";
 
 export default function POSPage() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -67,6 +70,12 @@ export default function POSPage() {
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [voucherCode, setVoucherCode] = useState("");
+
+    // NEW EMPLOYEE DISCOUNT FIELDS
+    const [employeeDiscount, setEmployeeDiscount] = useState<{value: number, label: string} | null>(null);
+    const [scannedQRToken, setScannedQRToken] = useState("");
+    const [showScanModal, setShowScanModal] = useState(false);
+    const [scanLoading, setScanLoading] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
@@ -155,13 +164,41 @@ export default function POSPage() {
         return cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     }, [cart]);
 
+    const discountAmount = useMemo(() => {
+        if (!employeeDiscount) return 0;
+        return Math.round(subtotal * (employeeDiscount.value / 100));
+    }, [subtotal, employeeDiscount]);
+
+    const subtotalAfterDiscount = useMemo(() => {
+        return Math.max(0, subtotal - discountAmount);
+    }, [subtotal, discountAmount]);
+
     const taxAmount = useMemo(() => {
-        return Math.round(subtotal * taxRate / 100);
-    }, [subtotal, taxRate]);
+        return Math.round(subtotalAfterDiscount * taxRate / 100);
+    }, [subtotalAfterDiscount, taxRate]);
 
     const finalTotalAmount = useMemo(() => {
-        return subtotal + taxAmount;
-    }, [subtotal, taxAmount]);
+        return subtotalAfterDiscount + taxAmount;
+    }, [subtotalAfterDiscount, taxAmount]);
+
+    const handleScanQR = async (tokenOverride?: string) => {
+        const finalToken = tokenOverride || scannedQRToken;
+        if (!finalToken.trim()) return;
+        setScanLoading(true);
+        try {
+            const res = await api.post('/pos/scan-employee-qr', { token: finalToken });
+            setEmployeeDiscount(res.data.discount);
+            setCustomerName(res.data.customer.name);
+            setCustomerPhone(res.data.customer.phone);
+            toast.success("ID Karyawan Valid! Diskon diterapkan.");
+            setShowScanModal(false);
+            setScannedQRToken("");
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Gagal memvalidasi QR");
+        } finally {
+            setScanLoading(false);
+        }
+    };
 
     const handleCheckout = async () => {
         if (cart.length === 0) return;
@@ -186,7 +223,8 @@ export default function POSPage() {
                 saleType,
                 customerName,
                 customerPhone,
-                voucherCode
+                voucherCode,
+                memberDiscountAmount: discountAmount
             };
 
             const res = await api.post('/pos/checkout', payload);
@@ -200,6 +238,9 @@ export default function POSPage() {
                 return qtySold ? { ...p, stock: p.stock - qtySold } : p;
             }));
 
+            setCustomerPhone("");
+            setVoucherCode("");
+            setEmployeeDiscount(null);
             setLastCart([...cart]);
             setCart([]);
             setShowReceipt(true);
@@ -549,6 +590,17 @@ export default function POSPage() {
                                 <span>Subtotal Items</span>
                                 <span>Rp {subtotal.toLocaleString()}</span>
                             </div>
+                            
+                            {employeeDiscount && (
+                                <div className="flex justify-between items-center text-sm font-medium text-emerald-400">
+                                    <span className="flex items-center gap-2">
+                                        <ShieldCheck className="w-4 h-4" />
+                                        {employeeDiscount.label} ({employeeDiscount.value}%)
+                                    </span>
+                                    <span>- Rp {discountAmount.toLocaleString()}</span>
+                                </div>
+                            )}
+
                             <div className="flex justify-between items-center text-sm font-medium text-slate-400">
                                 <span className="flex items-center gap-2">
                                     Pajak (11%)
@@ -585,6 +637,14 @@ export default function POSPage() {
                                     Commit Sale
                                 </>
                             )}
+                        </button>
+
+                        <button 
+                            onClick={() => setShowScanModal(true)}
+                            className="w-full py-4 rounded-[24px] font-black text-[10px] uppercase tracking-widest text-emerald-400 border-2 border-emerald-900/30 bg-emerald-900/10 hover:bg-emerald-900/30 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Scan className="w-4 h-4" />
+                            Scan ID Karyawan (Aivola ID)
                         </button>
                     </div>
                 </div>
@@ -857,6 +917,64 @@ export default function POSPage() {
                 </div>
                 </>
             )}
+            {/* SCAN QR MODAL */}
+            {showScanModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl transform scale-100 animate-in zoom-in-95 duration-200">
+                        <div className="p-8">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 className="text-xl font-black text-white tracking-tighter mb-1">Scan Aivola ID</h3>
+                                    <p className="text-xs text-slate-400 font-medium leading-relaxed">Arahkan scanner ke QR Code di HP karyawan, atau paste token di sini.</p>
+                                </div>
+                                <button onClick={() => setShowScanModal(false)} className="text-slate-500 hover:text-white transition-colors bg-slate-800/50 p-2 rounded-full">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            
+                            <div className="space-y-6">
+                                <div className="bg-slate-950 p-2 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center flex-col min-h-[250px]">
+                                    <QrScanner 
+                                        onScanSuccess={(decodedText) => {
+                                            setScannedQRToken(decodedText);
+                                            setTimeout(() => {
+                                                handleScanQR(decodedText);
+                                            }, 500);
+                                        }}
+                                        onScanFailure={(error) => {
+                                            // Optional: handle failure if needed
+                                        }}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Manual Token Input</label>
+                                    <input 
+                                        type="text"
+                                        value={scannedQRToken}
+                                        onChange={(e) => setScannedQRToken(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleScanQR();
+                                        }}
+                                        autoFocus
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all font-mono placeholder:text-slate-700"
+                                        placeholder="Paste JWT Token here"
+                                    />
+                                </div>
+
+                                <button 
+                                    onClick={handleScanQR}
+                                    disabled={scanLoading || !scannedQRToken}
+                                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                                >
+                                    {scanLoading ? 'Memvalidasi...' : 'Terapkan Diskon'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </DashboardLayout>
     );
 }

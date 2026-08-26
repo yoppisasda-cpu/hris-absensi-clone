@@ -851,6 +851,7 @@ model Product {
   purchaseUnit       String?                @default("Pcs")
   purchaseFactor     Float                  @default(1)
   showInPos          Boolean                @default(true)
+  isDiscountable     Boolean                @default(true)
   type               ProductType            @default(FINISHED_GOOD)
   trackStock         Boolean                @default(true)
   isAutoDeduct       Boolean                @default(false)

@@ -16455,13 +16455,14 @@ app.get('/api/pos/customers', tenantMiddleware, async (req: Request, res: Respon
   }
 });
 
-// 1.5 Calculate POS Totals (Discounts, Vouchers, Points)
+// POS 2. Calculate Discounts & Total
 app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { customerId, voucherCode, pointsToUse = 0, subtotal = 0, totalQuantity = 0 } = req.body;
+    const { customerId, voucherCode, pointsToUse = 0, subtotal = 0, totalQuantity = 0, discountableSubtotal } = req.body;
 
     let finalTotal = Number(subtotal);
+    let baseDiscountAmount = discountableSubtotal !== undefined ? Number(discountableSubtotal) : Number(subtotal);
     let memberDiscountAmount = 0;
     let voucherDiscountAmount = 0;
     let pointsUsed = Number(pointsToUse);
@@ -16478,11 +16479,12 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
       if (customer && customer.isMember) {
         if (company.memberDiscountValue > 0) {
           if (company.memberDiscountType === 'PERCENTAGE') {
-            memberDiscountAmount = finalTotal * (company.memberDiscountValue / 100);
+            memberDiscountAmount = baseDiscountAmount * (company.memberDiscountValue / 100);
           } else {
-            memberDiscountAmount = company.memberDiscountValue;
+            memberDiscountAmount = Math.min(company.memberDiscountValue, baseDiscountAmount);
           }
           finalTotal -= memberDiscountAmount;
+          baseDiscountAmount = Math.max(0, baseDiscountAmount - memberDiscountAmount);
         }
       }
 
@@ -16522,14 +16524,15 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
       }
 
       if (voucher.discountType === 'PERCENTAGE') {
-        voucherDiscountAmount = finalTotal * (voucher.discountValue / 100);
+        voucherDiscountAmount = baseDiscountAmount * (voucher.discountValue / 100);
         if (voucher.maxDiscount && voucherDiscountAmount > voucher.maxDiscount) {
           voucherDiscountAmount = voucher.maxDiscount;
         }
       } else {
-        voucherDiscountAmount = voucher.discountValue;
+        voucherDiscountAmount = Math.min(voucher.discountValue, baseDiscountAmount);
       }
       finalTotal -= voucherDiscountAmount;
+      baseDiscountAmount = Math.max(0, baseDiscountAmount - voucherDiscountAmount);
     }
 
     // Ensure total is not negative
@@ -16551,6 +16554,110 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
     });
   } catch (error: any) {
     console.error("CALCULATION ERROR:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// DYNAMIC QR EMPLOYEE DISCOUNT ENDPOINTS
+// ==========================================
+
+// 1. Generate QR Token (For Employee App/Dashboard)
+app.get('/api/employee/qr', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId, companyId: tenantId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const secret = process.env.JWT_SECRET || 'supersecretkey';
+    const token = jwt.sign(
+      { 
+        userId: user.id, 
+        companyId: tenantId, 
+        type: 'EMPLOYEE_DISCOUNT',
+        name: user.name,
+        phone: user.phone || ''
+      }, 
+      secret, 
+      { expiresIn: '60s' }
+    );
+
+    res.json({ token, expiresAt: new Date(Date.now() + 60000) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Scan QR Token (For POS Cashier)
+app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: "QR Token is required" });
+    }
+
+    const secret = process.env.JWT_SECRET || 'supersecretkey';
+    let decoded: any;
+    
+    try {
+      decoded = jwt.verify(token, secret);
+    } catch (err: any) {
+      return res.status(400).json({ error: "QR Code kadaluarsa atau tidak valid" });
+    }
+
+    if (decoded.companyId !== tenantId || decoded.type !== 'EMPLOYEE_DISCOUNT') {
+      return res.status(400).json({ error: "QR Code tidak valid untuk perusahaan ini" });
+    }
+
+    // Ensure customer profile exists for this employee
+    let customer = await prisma.customer.findFirst({
+      where: { 
+        companyId: tenantId, 
+        phone: decoded.phone || `EMP-${decoded.userId}`
+      }
+    });
+
+    if (!customer) {
+      customer = await prisma.customer.create({
+        data: {
+          companyId: tenantId,
+          name: decoded.name + ' (Karyawan)',
+          phone: decoded.phone || `EMP-${decoded.userId}`,
+          isMember: true
+        }
+      });
+    }
+
+    // Ambil setting diskon dari voucher "EMPLOYEE"
+    const internalVoucher = await prisma.voucher.findFirst({
+      where: {
+        companyId: tenantId,
+        targetAudience: 'EMPLOYEE',
+        isActive: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      customer,
+      discount: {
+        type: internalVoucher ? internalVoucher.discountType : 'PERCENTAGE',
+        value: internalVoucher ? internalVoucher.discountValue : 0, // Fallback ke 0 jika tidak ada voucher
+        label: internalVoucher ? internalVoucher.code : 'Aivola ID (Tanpa Diskon Aktif)'
+      }
+    });
+
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
@@ -16687,6 +16794,18 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         return existingSale;
       }
 
+      let finalPointsEarned = Number(pointsEarned) || 0;
+      if (finalCustomerId && !req.body.offlineInvoiceNumber) {
+        const company = await tx.company.findUnique({ where: { id: tenantId }, select: { pointsEarnRatio: true } });
+        const customer = await tx.customer.findUnique({ where: { id: finalCustomerId }, select: { isMember: true } });
+        if (company && company.pointsEarnRatio > 0 && customer && customer.isMember) {
+          const finalTotalAmountNumber = Number(totalAmount);
+          if (finalTotalAmountNumber >= company.pointsEarnRatio) {
+            finalPointsEarned = Math.floor(finalTotalAmountNumber / company.pointsEarnRatio);
+          }
+        }
+      }
+
       const sale = await tx.sale.create({
         data: {
           companyId: tenantId,
@@ -16709,7 +16828,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           voucherCode: voucherCode || null,
           voucherDiscountAmount: Number(voucherDiscountAmount),
           pointsUsed: Number(pointsUsed),
-          pointsEarned: Number(pointsEarned),
+          pointsEarned: finalPointsEarned,
           taxRate: Number(taxRate) || 0,
           taxAmount: Number(taxAmount) || 0,
           kitchenStatus: 'PREPARING',
@@ -16718,12 +16837,12 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       });
 
       // 1.5 Process Points and Vouchers
-      if (finalCustomerId && (Number(pointsUsed) > 0 || Number(pointsEarned) > 0)) {
+      if (finalCustomerId && (Number(pointsUsed) > 0 || finalPointsEarned > 0)) {
         await tx.customer.update({
           where: { id: finalCustomerId },
           data: {
             points: {
-              increment: Number(pointsEarned) - Number(pointsUsed)
+              increment: finalPointsEarned - Number(pointsUsed)
             }
           }
         });

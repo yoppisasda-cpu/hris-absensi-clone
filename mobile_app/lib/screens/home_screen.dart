@@ -18,6 +18,7 @@ import 'profile_screen.dart';
 import 'calendar_screen.dart';
 import 'kpi_screen.dart';
 import 'vent_screen.dart';
+import 'employee_id_screen.dart';
 import 'learning_center_screen.dart';
 import 'pos_screen.dart';
 import 'assignment_list_screen.dart';
@@ -530,6 +531,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         MaterialPageRoute(builder: (_) => POSScreen()),
                       ),
                     ),
+                  _buildMenuCard(
+                    context,
+                    title: 'Aivola ID',
+                    icon: Icons.qr_code_scanner,
+                    color: Colors.blueAccent,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => EmployeeIdScreen()),
+                    ),
+                  ),
                   _buildMenuCard(
                     context,
                     title: 'Slip Gaji',
