@@ -963,7 +963,7 @@ export default function POSPage() {
                                 </div>
 
                                 <button 
-                                    onClick={handleScanQR}
+                                    onClick={() => handleScanQR()}
                                     disabled={scanLoading || !scannedQRToken}
                                     className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
                                 >

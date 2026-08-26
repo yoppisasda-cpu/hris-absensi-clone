@@ -117,7 +117,7 @@ export default function EmployeeIdPage() {
                                 <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                     <div 
                                         className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 10 ? 'bg-red-500' : 'bg-blue-500'}`}
-                                        style={{ width: \`\${(timeLeft / 60) * 100}%\` }}
+                                        style={{ width: `${(timeLeft / 60) * 100}%` }}
                                     ></div>
                                 </div>
                                 <p className="text-[10px] text-center text-slate-400 mt-3">
