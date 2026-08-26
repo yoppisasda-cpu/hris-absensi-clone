@@ -193,12 +193,12 @@ export default function SubscriptionInvoiceModal({ isOpen, onClose, invoice }: S
                             
                             {/* Bank Transfer Instructions */}
                             <div className="flex flex-col gap-2 mt-4 sm:mt-0">
-                                <div className="p-3 px-4 bg-white rounded-xl border border-slate-200 flex flex-col shadow-sm print:border-black print:bg-white print:border w-[250px]">
+                                <div className="p-3 px-4 bg-white rounded-xl border border-slate-200 flex flex-col shadow-sm print:border-black print:bg-white print:border w-[280px]">
                                     <div>
                                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.1em] print:text-black">BANK BCA</span>
-                                        <p className="text-[14px] font-extrabold text-slate-950 tracking-widest print:text-black mt-1 leading-none">1234567890</p>
+                                        <p className="text-[14px] font-extrabold text-slate-950 tracking-widest print:text-black mt-1 leading-none">661-125-0000</p>
                                     </div>
-                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider mt-2.5 print:text-black">a.n. PT Aivola AI Nusantara</p>
+                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider mt-2.5 print:text-black">a.n. PT PERMATA GEMPITA SEJAHTERA</p>
                                 </div>
                             </div>
 

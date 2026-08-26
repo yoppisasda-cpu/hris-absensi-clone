@@ -1454,9 +1454,9 @@ export default function CompaniesPage() {
                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col shadow-sm w-fit min-w-[280px]">
                                     <div>
                                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.1em]">BANK BCA</span>
-                                        <p className="text-lg font-extrabold text-slate-950 tracking-widest mt-1 leading-none">1234567890</p>
+                                        <p className="text-lg font-extrabold text-slate-950 tracking-widest mt-1 leading-none">661-125-0000</p>
                                     </div>
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-3">a.n. PT Aivola AI Nusantara</p>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-3">a.n. PT PERMATA GEMPITA SEJAHTERA</p>
                                 </div>
                             </div>
                             

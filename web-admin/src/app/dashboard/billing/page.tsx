@@ -187,7 +187,7 @@ export default function BillingPage() {
                     <h4 className="font-bold text-blue-800">Catatan Pembayaran</h4>
                     <p className="text-sm text-blue-700 mt-1">
                         Sistem aivola saat ini baru mendukung transfer bank manual. Silakan transfer ke rekening: 
-                        <span className="font-bold"> Bank BCA 1234.567.890 a/n PT Aivola AI Nusantara</span>. 
+                        <span className="font-bold"> Bank BCA 661-125-0000 a/n PT PERMATA GEMPITA SEJAHTERA</span>. 
                         Setelah transfer, silakan lampirkan bukti pembayaran via WhatsApp PIC Admin kami untuk verifikasi.
                     </p>
                 </div>
