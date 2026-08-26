@@ -1448,8 +1448,20 @@ export default function CompaniesPage() {
                                 );
                             })()}
                             
+                            {/* Bank Transfer Instructions */}
+                            <div className="mt-8 flex flex-col gap-2 relative z-10 text-left">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">PEMBAYARAN DITRANSFER KE:</h3>
+                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col shadow-sm w-fit min-w-[280px]">
+                                    <div>
+                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.1em]">BANK BCA</span>
+                                        <p className="text-lg font-extrabold text-slate-950 tracking-widest mt-1 leading-none">1234567890</p>
+                                    </div>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-3">a.n. PT Aivola AI Nusantara</p>
+                                </div>
+                            </div>
+                            
                             {/* Footer */}
-                            <div className="mt-16 text-center border-t border-slate-100 pt-8">
+                            <div className="mt-12 text-center border-t border-slate-100 pt-8">
                                 <p className="text-[10px] text-slate-400 italic">Harap membayar sebelum masa kontrak berakhir untuk menghindari pembekuan akun.</p>
                                 <p className="text-[10px] font-bold text-slate-300 mt-4 uppercase tracking-widest">© {new Date().getFullYear()} Aivola Cloud System</p>
                             </div>
