@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { FileText, Download, CreditCard, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import api from "@/lib/api";
+import SubscriptionInvoiceModal from "@/components/billing/SubscriptionInvoiceModal";
 
 export default function BillingPage() {
     const [invoices, setInvoices] = useState<any[]>([]);
+    const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     const router = useRouter();
@@ -162,6 +164,7 @@ export default function BillingPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <button 
+                                                onClick={() => setSelectedInvoice(inv)}
                                                 className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
                                                 title="Cetak Invoice"
                                             >
@@ -189,6 +192,12 @@ export default function BillingPage() {
                     </p>
                 </div>
             </div>
+
+            <SubscriptionInvoiceModal 
+                isOpen={!!selectedInvoice}
+                invoice={selectedInvoice}
+                onClose={() => setSelectedInvoice(null)}
+            />
         </DashboardLayout>
     );
 }

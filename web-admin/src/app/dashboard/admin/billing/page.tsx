@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { FileText, Plus, CheckCircle2, Search, Filter, Calendar, Zap, AlertCircle } from "lucide-react";
+import { FileText, CheckCircle2, Search, Calendar, Zap, Download } from "lucide-react";
 import api from "@/lib/api";
+import SubscriptionInvoiceModal from "@/components/billing/SubscriptionInvoiceModal";
 
 export default function AdminBillingPage() {
     const [invoices, setInvoices] = useState<any[]>([]);
+    const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     
@@ -184,11 +186,18 @@ export default function AdminBillingPage() {
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                                            <button 
+                                                onClick={() => setSelectedInvoice(inv)}
+                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                                                title="Cetak Invoice"
+                                            >
+                                                <Download className="h-4 w-4" />
+                                            </button>
                                             {inv.status === 'UNPAID' && (
                                                 <button 
                                                     onClick={() => handleMarkAsPaid(inv.id)}
-                                                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-1 ml-auto"
+                                                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-1"
                                                 >
                                                     <CheckCircle2 className="h-3.5 w-3.5" /> Set PAID
                                                 </button>
@@ -218,6 +227,12 @@ export default function AdminBillingPage() {
                     </p>
                 </div>
             </div>
+
+            <SubscriptionInvoiceModal 
+                isOpen={!!selectedInvoice}
+                invoice={selectedInvoice}
+                onClose={() => setSelectedInvoice(null)}
+            />
         </DashboardLayout>
     );
 }
