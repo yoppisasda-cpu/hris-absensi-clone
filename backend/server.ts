@@ -16569,7 +16569,8 @@ app.get('/api/employee/qr', tenantMiddleware, async (req: Request, res: Response
     const userId = Number((req as any).userId);
 
     const user = await prisma.user.findUnique({
-      where: { id: userId, companyId: tenantId }
+      where: { id: userId, companyId: tenantId },
+      select: { id: true, name: true }
     });
 
     if (!user) {
@@ -16583,7 +16584,7 @@ app.get('/api/employee/qr', tenantMiddleware, async (req: Request, res: Response
         companyId: tenantId, 
         type: 'EMPLOYEE_DISCOUNT',
         name: user.name,
-        phone: user.phone || ''
+        phone: ''
       }, 
       secret, 
       { expiresIn: '60s' }
