@@ -15,6 +15,7 @@ interface Company {
     picName: string | null;
     picPhone: string | null;
     contractType: 'BULANAN' | 'TAHUNAN';
+    contractDuration?: number;
     contractValue: number;
     contractStart: string | null;
     contractEnd: string | null;
