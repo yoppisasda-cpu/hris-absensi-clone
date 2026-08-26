@@ -70,7 +70,7 @@ const ADDONS = [
   { id: 'KPI', name: 'KPI & Penilaian Kinerja', icon: '🎯', pricePerUser: 1000, desc: 'Fitur pembuatan KPI, penilaian, dan laporan performa tim.', highlight: false, group: 'HR & Talent Management' },
   { id: 'LEARNING', name: 'Learning & Development', icon: '📚', pricePerUser: 2000, desc: 'Modul pelatihan online, ujian, dan tracking kompetensi.', highlight: false, group: 'HR & Talent Management' },
   // Finance & AI Management
-  { id: 'INVENTORY_ADDON', name: 'Inventory & Stock', icon: '📦', priceFlat: 20000, desc: 'Manajemen stok bahan. Gratis di paket PRO.', highlight: false, group: 'Finance & AI Management' },
+  { id: 'INVENTORY_ADDON', name: 'Inventory & Stock', icon: '📦', priceText: 'Gratis (Tiered)', desc: 'Manajemen stok bahan. Kuota SKU menyesuaikan paket (Basic: 100, Pro: 1rb, Enterprise: Unlimited).', highlight: false, group: 'Finance & AI Management' },
   { id: 'AIVOLA_MIND', name: 'Aivola Mind (AI Advisor)', icon: '🧠', priceFlat: 20000, desc: 'AI Business Advisor strategis untuk seluruh level paket Anda.', highlight: true, group: 'Finance & AI Management' },
   { id: 'ANTI_FRAUD', name: 'Anti-Fraud Face Check', icon: '🔒', priceFlat: 10000, desc: 'Verifikasi wajah ketat saat absensi & transaksi sensitif.', highlight: false, group: 'Finance & AI Management' },
   // Sistem Ekspansi
@@ -316,9 +316,11 @@ export default function StorePage() {
                       <p className={`text-xs font-bold uppercase tracking-widest ${groupColor === 'blue' ? 'text-blue-500' : 'text-violet-500'} mb-1`}>{group}</p>
                       {groupAddons.map((addon) => {
                         const isActive = purchasedInsights.includes(addon.id);
-                        const priceLabel = (addon as any).priceFlat
-                          ? `${formatRupiah((addon as any).priceFlat)}/bln`
-                          : `${formatRupiah((addon as any).pricePerUser)}/kar`;
+                        const priceLabel = (addon as any).priceText
+                          ? (addon as any).priceText
+                          : (addon as any).priceFlat
+                            ? `${formatRupiah((addon as any).priceFlat)}/bln`
+                            : `${formatRupiah((addon as any).pricePerUser)}/kar`;
                         return (
                           <div key={addon.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all hover:shadow-md ${
                             addon.highlight ? 'border-violet-300 bg-violet-50 dark:bg-violet-900/10' : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'
