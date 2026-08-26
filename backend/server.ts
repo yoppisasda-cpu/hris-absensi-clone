@@ -13496,9 +13496,16 @@ app.post('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Req
       // 1. Delete existing recipe
       await tx.$executeRawUnsafe(`DELETE FROM "ProductRecipe" WHERE "productId" = $1`, productId);
       
-      // 2. Insert new recipe items
+      // 2. Insert new recipe items (deduplicate by materialId to prevent double entries)
       if (items && Array.isArray(items)) {
-        for (const item of items) {
+        // Keep only the last occurrence of each materialId
+        const dedupedItems = Object.values(
+          items.reduce((acc: any, item: any) => {
+            acc[item.materialId] = item;
+            return acc;
+          }, {})
+        );
+        for (const item of dedupedItems as any[]) {
           // Diagnostic Logging
           console.log(`[RECIPE SAVE] Product: ${productId} | Material: ${item.materialId} | Qty: ${item.quantity}`);
           
