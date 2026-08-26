@@ -69,6 +69,7 @@ export default function CompaniesPage() {
     const [picName, setPicName] = useState('');
     const [picPhone, setPicPhone] = useState('');
     const [contractType, setContractType] = useState('BULANAN');
+    const [contractDuration, setContractDuration] = useState(1);
     const [contractValue, setContractValue] = useState('0');
     const [contractStart, setContractStart] = useState('');
     const [contractEnd, setContractEnd] = useState('');
@@ -166,6 +167,7 @@ export default function CompaniesPage() {
         setPicName('');
         setPicPhone('');
         setContractType('BULANAN');
+        setContractDuration(1);
         setContractValue('0');
         setContractStart('');
         setContractEnd('');
@@ -219,7 +221,8 @@ export default function CompaniesPage() {
                 picName,
                 picPhone,
                 contractType,
-                contractValue: parseFloat(contractValue) || 0,
+                contractDuration,
+                contractValue: parseFloat(contractValue.replace(/\D/g, '') || '0'),
                 contractStart: contractStart || null,
                 contractEnd: contractEnd || null,
                 employeeLimit: parseInt(employeeLimit) || 0,
@@ -300,6 +303,7 @@ export default function CompaniesPage() {
         setPicName(company.picName || '');
         setPicPhone(company.picPhone || '');
         setContractType(company.contractType);
+        setContractDuration(company.contractDuration || 1);
         setContractValue(company.contractValue?.toString() || '0');
         setContractStart(company.contractStart ? new Date(company.contractStart).toISOString().split('T')[0] : '');
         setContractEnd(company.contractEnd ? new Date(company.contractEnd).toISOString().split('T')[0] : '');
@@ -385,9 +389,10 @@ export default function CompaniesPage() {
 
         const plan = company.plan || 'STARTER';
         const isAnnual = company.contractType === 'TAHUNAN';
+        const duration = company.contractDuration || 1;
         const multiplier = isAnnual ? 10 : 1; // Sync with landing page: 10x monthly = 1 Year
         const periodUnit = isAnnual ? '12 Bln' : '1 Bln';
-        const periodLabel = isAnnual ? '1 Thn' : '1 Bln';
+        const periodLabel = `${duration} ${isAnnual ? 'Thn' : 'Bln'}`;
 
         // USE MANUAL CONTRACT VALUE IF SET, otherwise use plan default
         let basePrice = (company.contractValue && Number(company.contractValue) > 0) 
@@ -528,7 +533,8 @@ export default function CompaniesPage() {
             extraPos,
             addonTotal,
             detailItems,
-            total: Math.max(0, total - (parseInt(invoiceDiscount) || 0))
+            contractDuration: duration,
+            total: Math.max(0, (total * duration) - (parseInt(invoiceDiscount) || 0))
         };
     };
 
@@ -628,26 +634,31 @@ export default function CompaniesPage() {
                             <h3 className="text-slate-800 uppercase tracking-widest mb-2 font-bold">Detail Kontrak</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="mb-1 block text-slate-800 font-bold">Jenis Kontrak</label>
+                                    <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Tipe Tagihan</label>
                                     <select
                                         value={contractType}
                                         onChange={(e) => setContractType(e.target.value)}
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium text-slate-800"
                                     >
                                         <option value="BULANAN">Bulanan</option>
                                         <option value="TAHUNAN">Tahunan</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="mb-1 block text-slate-800 font-bold">Nilai Kontrak (Rp)</label>
+                                    <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                                        Durasi ({contractType === 'TAHUNAN' ? 'Tahun' : 'Bulan'})
+                                    </label>
                                     <input
                                         type="number"
-                                        value={contractValue}
-                                        onChange={(e) => setContractValue(e.target.value)}
-                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        min="1"
+                                        value={contractDuration}
+                                        onChange={(e) => setContractDuration(parseInt(e.target.value) || 1)}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-bold text-slate-800"
+                                        placeholder="1"
                                     />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="mb-1 block text-slate-800 font-bold text-xs">Mulai</label>
@@ -669,6 +680,16 @@ export default function CompaniesPage() {
                                 </div>
                             </div>
                             
+                            <div>
+                                <label className="mb-1 block text-slate-800 font-bold">Nilai Kontrak (Rp)</label>
+                                <input
+                                    type="number"
+                                    value={contractValue}
+                                    onChange={(e) => setContractValue(e.target.value)}
+                                    className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-950 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="mb-1 block text-slate-800 font-bold">Limit Karyawan</label>
@@ -1365,7 +1386,7 @@ export default function CompaniesPage() {
                                 <div className="text-right">
                                     <h5 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Detail Pembayaran:</h5>
                                     <p className="text-sm text-slate-700 font-bold">Tanggal Cetak: <span className="font-normal text-slate-500">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span></p>
-                                    <p className="text-sm text-slate-700 font-bold">Periode: <span className="font-normal text-slate-500">{selectedInvoiceCompany.contractType}</span></p>
+                                    <p className="text-sm text-slate-700 font-bold">Periode: <span className="font-normal text-slate-500">{selectedInvoiceCompany.contractDuration || 1} {selectedInvoiceCompany.contractType === 'TAHUNAN' ? 'Tahun' : 'Bulan'} ({selectedInvoiceCompany.contractType})</span></p>
                                     <p className="text-sm text-slate-700 font-bold">Mata Uang: <span className="font-normal text-slate-500">IDR (Rupiah)</span></p>
                                 </div>
                             </div>
@@ -1392,31 +1413,33 @@ export default function CompaniesPage() {
                                                     </td>
                                                     <td className="py-4 text-right">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
                                                     <td className="py-4 text-right">{inv.periodLabel}</td>
-                                                    <td className="py-4 text-right font-semibold">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
+                                                    <td className="py-4 text-right font-semibold">Rp {(inv.basePrice * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                 </tr>
                                                 {(inv.extraAdmin > 0 || inv.extraPos > 0) && (
                                                     <tr className="border-b border-slate-50">
                                                         <td className="py-4">
                                                             <div className="font-bold text-slate-800 tracking-tight">👤 KURSI / SLOT TAMBAHAN</div>
-                                                            <div className="text-[10px] text-slate-400 italic">
-                                                                {inv.extraAdmin > 0 && `${inv.extraAdmin} Admin `}
-                                                                {inv.extraPos > 0 && `${inv.extraPos} POS`}
+                                                            <div className="text-[10px] text-slate-400">
+                                                                {[
+                                                                    inv.extraAdmin > 0 ? `${inv.extraAdmin} Admin` : null,
+                                                                    inv.extraPos > 0 ? `${inv.extraPos} POS` : null
+                                                                ].filter(Boolean).join(' & ')}
                                                             </div>
                                                         </td>
                                                         <td className="py-4 text-right">Rp 10.000</td>
-                                                        <td className="py-4 text-right">{inv.extraAdmin + inv.extraPos} Unit</td>
-                                                        <td className="py-4 text-right font-semibold">Rp {inv.seatCost.toLocaleString('id-ID')}</td>
+                                                        <td className="py-4 text-right">{inv.extraAdmin + inv.extraPos} Unit <span className="text-[10px] text-slate-400">x {inv.periodLabel}</span></td>
+                                                        <td className="py-4 text-right font-semibold">Rp {(inv.seatCost * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                     </tr>
                                                 )}
                                                 {inv.detailItems.map((item, idx) => (
                                                     <tr key={idx} className="border-b border-slate-50">
                                                         <td className="py-4">
-                                                            <div className="font-bold text-slate-800 tracking-tight uppercase">💎 {item.name}</div>
+                                                            <div className="font-bold text-slate-800 tracking-tight">💎 {item.name}</div>
                                                             <div className="text-[10px] text-slate-400">Fitur Ekstra Aktif</div>
                                                         </td>
                                                         <td className="py-4 text-right">Rp {item.price.toLocaleString('id-ID')}</td>
-                                                        <td className="py-4 text-right">{item.qty}</td>
-                                                        <td className="py-4 text-right font-semibold">Rp {item.total.toLocaleString('id-ID')}</td>
+                                                        <td className="py-4 text-right">{item.qty} <span className="text-[10px] text-slate-400">x {inv.contractDuration}</span></td>
+                                                        <td className="py-4 text-right font-semibold">Rp {(item.total * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>

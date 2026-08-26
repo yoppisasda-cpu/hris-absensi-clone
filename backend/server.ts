@@ -2455,7 +2455,7 @@ app.post('/api/companies', async (req: Request, res: Response) => {
   try {
     const { 
       name, latitude, longitude, radius,
-      picName, picPhone, contractType, contractValue, contractStart, contractEnd,
+      picName, picPhone, contractType, contractDuration, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons,
       discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion, discountProspecting,
@@ -2475,6 +2475,7 @@ app.post('/api/companies', async (req: Request, res: Response) => {
           picName,
           picPhone,
           contractType: contractType || 'BULANAN',
+          contractDuration: contractDuration ? parseInt(contractDuration) : 1,
           contractValue: contractValue ? parseFloat(contractValue) : 0,
           contractStart: contractStart ? new Date(contractStart) : null,
           contractEnd: contractEnd ? new Date(contractEnd) : null,
@@ -3268,7 +3269,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
     }
     const { 
       name, latitude, longitude, radius,
-      picName, picPhone, contractType, contractValue, contractStart, contractEnd,
+      picName, picPhone, contractType, contractDuration, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons, purchasedInsights,
       discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion, discountProspecting,
@@ -3296,6 +3297,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         picName,
         picPhone,
         contractType,
+        contractDuration: safeParseInt(contractDuration),
         contractValue: (contractValue !== undefined && contractValue !== null) ? parseFloat(contractValue.toString()) : undefined,
         contractStart: contractStart ? new Date(contractStart) : (contractStart === null ? null : undefined),
         contractEnd: contractEnd ? new Date(contractEnd) : (contractEnd === null ? null : undefined),
@@ -9715,6 +9717,9 @@ app.post('/api/admin/billing/generate', tenantMiddleware, async (req: Request, r
           // TAHUNAN: contractValue * kuota (employeeLimit)
           amount = company.contractValue * company.employeeLimit;
         }
+        
+        // Kalikan dengan durasi kontrak (misal: bayar untuk 2 tahun)
+        amount = amount * (company.contractDuration || 1);
 
         // Generate Nomor Invoice: INV/2026/03/ID1-ABCD
         const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -9728,6 +9733,7 @@ app.post('/api/admin/billing/generate', tenantMiddleware, async (req: Request, r
             year: y,
             amount,
             contractType: company.contractType,
+            contractDuration: company.contractDuration || 1,
             contractValue: company.contractValue,
             employeeLimit: company.employeeLimit,
             photoRetentionDays: company.photoRetentionDays,

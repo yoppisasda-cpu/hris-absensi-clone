@@ -24,6 +24,7 @@ model Company {
   contractEnd            DateTime?
   contractStart          DateTime?
   contractType           ContractType         @default(BULANAN)
+  contractDuration       Int                  @default(1)
   contractValue          Float                @default(0)
   picName                String?
   picPhone               String?
@@ -728,6 +729,7 @@ model Invoice {
   amount             Float
   status             InvoiceStatus @default(UNPAID)
   contractType       ContractType
+  contractDuration   Int           @default(1)
   contractValue      Float
   employeeLimit      Int           @default(10)
   adminLimit         Int           @default(2)

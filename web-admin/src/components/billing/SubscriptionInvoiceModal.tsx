@@ -130,12 +130,16 @@ export default function SubscriptionInvoiceModal({ isOpen, onClose, invoice }: S
                                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">BILL TO</h3>
                                     <p className="font-bold text-slate-950 text-base">{invoice.company?.name || 'Client'}</p>
                                 </div>
+                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                    <div>
+                                        <h4 className="text-[10px] font-bold text-slate-400 mb-1">PERIODE TAGIHAN</h4>
+                                        <div className="text-sm font-semibold text-slate-800">
+                                            {invoice.contractDuration || 1} {invoice.contractType === 'TAHUNAN' ? 'Tahun' : 'Bulan'} ({invoice.contractType})
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div className="space-y-4 text-right">
-                                <div>
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">PERIODE</h3>
-                                    <p className="font-bold text-slate-950">{invoice.month} / {invoice.year}</p>
-                                </div>
                                 <div>
                                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">JATUH TEMPO</h3>
                                     <p className="font-bold text-slate-950">{new Date(invoice.dueDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -148,7 +152,7 @@ export default function SubscriptionInvoiceModal({ isOpen, onClose, invoice }: S
                                 <thead>
                                     <tr className="border-b-2 border-slate-950">
                                         <th className="py-3 text-[10px] font-black text-slate-950 uppercase tracking-widest">DESKRIPSI</th>
-                                        <th className="py-3 text-[10px] font-black text-slate-950 uppercase tracking-widest text-center">TIPE</th>
+                                        <th className="py-3 text-[10px] font-black text-slate-950 uppercase tracking-widest text-center">QTY (DURASI)</th>
                                         <th className="py-3 text-[10px] font-black text-slate-950 uppercase tracking-widest text-right">HARGA</th>
                                         <th className="py-3 text-[10px] font-black text-slate-950 uppercase tracking-widest text-right">TOTAL</th>
                                     </tr>
@@ -163,7 +167,7 @@ export default function SubscriptionInvoiceModal({ isOpen, onClose, invoice }: S
                                             </div>
                                         </td>
                                         <td className="py-4 border-b border-slate-100 last:border-0 text-slate-600 text-center">
-                                            {invoice.contractType}
+                                            {invoice.contractDuration || 1} {invoice.contractType === 'TAHUNAN' ? 'Thn' : 'Bln'}
                                         </td>
                                         <td className="py-4 border-b border-slate-100 last:border-0 text-slate-600 font-mono text-right">
                                             {formatCurrency(invoice.contractValue)}
