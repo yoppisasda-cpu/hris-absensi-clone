@@ -1363,9 +1363,9 @@ export default function CompaniesPage() {
                         </div>
 
                         {/* Konten Invoice */}
-                        <div className="max-h-[70vh] overflow-y-auto p-8 bg-white" id="invoice-content">
+                        <div className="max-h-[70vh] overflow-y-auto p-6 bg-white" id="invoice-content">
                             {/* Brand Header */}
-                            <div className="flex justify-between items-start mb-10">
+                            <div className="flex justify-between items-start mb-6">
                                 <div>
                                     <div className="text-2xl font-black tracking-tighter text-blue-600">AIVOLA <span className="text-slate-400">CLOUD</span></div>
                                     <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Saas Management Platform</p>
@@ -1377,7 +1377,7 @@ export default function CompaniesPage() {
                             </div>
 
                             {/* Client & Info Section */}
-                            <div className="grid grid-cols-2 gap-8 mb-10 border-y border-slate-50 py-6">
+                            <div className="grid grid-cols-2 gap-8 mb-6 border-y border-slate-50 py-4">
                                 <div>
                                     <h5 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ditujukan Untuk:</h5>
                                     <div className="font-bold text-slate-900 text-lg uppercase">{selectedInvoiceCompany.name}</div>
@@ -1397,28 +1397,28 @@ export default function CompaniesPage() {
                                 const inv = calculateInvoice(selectedInvoiceCompany);
                                 return (
                                     <>
-                                        <table className="w-full text-sm mb-10">
+                                        <table className="w-full text-sm mb-6">
                                             <thead>
                                                 <tr className="border-b-2 border-slate-100 text-slate-400 text-left">
-                                                    <th className="py-3 font-bold uppercase text-[10px]">Deskripsi Layanan</th>
-                                                    <th className="py-3 text-right font-bold uppercase text-[10px]">Harga Satuan</th>
-                                                    <th className="py-3 text-right font-bold uppercase text-[10px]">Qty</th>
-                                                    <th className="py-3 text-right font-bold uppercase text-[10px]">Subtotal</th>
+                                                    <th className="py-2 font-bold uppercase text-[10px]">Deskripsi Layanan</th>
+                                                    <th className="py-2 text-right font-bold uppercase text-[10px]">Harga Satuan</th>
+                                                    <th className="py-2 text-right font-bold uppercase text-[10px]">Qty</th>
+                                                    <th className="py-2 text-right font-bold uppercase text-[10px]">Subtotal</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="text-slate-700">
                                                 <tr className="border-b border-slate-50">
-                                                    <td className="py-4">
+                                                    <td className="py-2.5">
                                                         <div className="font-bold text-slate-800 tracking-tight text-blue-700">🚀 PAKET {inv.planName}</div>
                                                         <div className="text-[10px] text-slate-400">Layanan Inti Platform Aivola</div>
                                                     </td>
-                                                    <td className="py-4 text-right">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
-                                                    <td className="py-4 text-right">{inv.periodLabel}</td>
-                                                    <td className="py-4 text-right font-semibold">Rp {(inv.basePrice * inv.contractDuration).toLocaleString('id-ID')}</td>
+                                                    <td className="py-2.5 text-right">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
+                                                    <td className="py-2.5 text-right">{inv.periodLabel}</td>
+                                                    <td className="py-2.5 text-right font-semibold">Rp {(inv.basePrice * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                 </tr>
                                                 {(inv.extraAdmin > 0 || inv.extraPos > 0) && (
                                                     <tr className="border-b border-slate-50">
-                                                        <td className="py-4">
+                                                        <td className="py-2.5">
                                                             <div className="font-bold text-slate-800 tracking-tight">👤 KURSI / SLOT TAMBAHAN</div>
                                                             <div className="text-[10px] text-slate-400">
                                                                 {[
@@ -1427,20 +1427,20 @@ export default function CompaniesPage() {
                                                                 ].filter(Boolean).join(' & ')}
                                                             </div>
                                                         </td>
-                                                        <td className="py-4 text-right">Rp 10.000</td>
-                                                        <td className="py-4 text-right">{inv.extraAdmin + inv.extraPos} Unit <span className="text-[10px] text-slate-400">x {inv.periodLabel}</span></td>
-                                                        <td className="py-4 text-right font-semibold">Rp {(inv.seatCost * inv.contractDuration).toLocaleString('id-ID')}</td>
+                                                        <td className="py-2.5 text-right">Rp 10.000</td>
+                                                        <td className="py-2.5 text-right">{inv.extraAdmin + inv.extraPos} Unit <span className="text-[10px] text-slate-400">x {inv.periodLabel}</span></td>
+                                                        <td className="py-2.5 text-right font-semibold">Rp {(inv.seatCost * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                     </tr>
                                                 )}
                                                 {inv.detailItems.map((item, idx) => (
                                                     <tr key={idx} className="border-b border-slate-50">
-                                                        <td className="py-4">
+                                                        <td className="py-2.5">
                                                             <div className="font-bold text-slate-800 tracking-tight">💎 {item.name}</div>
                                                             <div className="text-[10px] text-slate-400">Fitur Ekstra Aktif</div>
                                                         </td>
-                                                        <td className="py-4 text-right">Rp {item.price.toLocaleString('id-ID')}</td>
-                                                        <td className="py-4 text-right">{item.qty} <span className="text-[10px] text-slate-400">x {inv.contractDuration}</span></td>
-                                                        <td className="py-4 text-right font-semibold">Rp {(item.total * inv.contractDuration).toLocaleString('id-ID')}</td>
+                                                        <td className="py-2.5 text-right">Rp {item.price.toLocaleString('id-ID')}</td>
+                                                        <td className="py-2.5 text-right">{item.qty} <span className="text-[10px] text-slate-400">x {inv.contractDuration}</span></td>
+                                                        <td className="py-2.5 text-right font-semibold">Rp {(item.total * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -1473,7 +1473,7 @@ export default function CompaniesPage() {
                             })()}
                             
                             {/* Bank Transfer Instructions */}
-                            <div className="mt-8 flex flex-col gap-2 relative z-10 text-left">
+                            <div className="mt-4 flex flex-col gap-2 relative z-10 text-left">
                                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">PEMBAYARAN DITRANSFER KE:</h3>
                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col shadow-sm w-fit min-w-[280px]">
                                     <div>
