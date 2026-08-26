@@ -1365,9 +1365,9 @@ export default function CompaniesPage() {
                         {/* Konten Invoice */}
                         <div className="max-h-[70vh] overflow-y-auto p-6 bg-white" id="invoice-content">
                             {/* Brand Header */}
-                            <div className="flex justify-between items-start mb-6">
+                            <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <div className="text-2xl font-black tracking-tighter text-blue-600">AIVOLA <span className="text-slate-400">CLOUD</span></div>
+                                    <div className="text-xl font-black tracking-tighter text-blue-600">AIVOLA <span className="text-slate-400">CLOUD</span></div>
                                     <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Saas Management Platform</p>
                                 </div>
                                 <div className="text-right">
@@ -1377,7 +1377,7 @@ export default function CompaniesPage() {
                             </div>
 
                             {/* Client & Info Section */}
-                            <div className="grid grid-cols-2 gap-8 mb-6 border-y border-slate-50 py-4">
+                            <div className="grid grid-cols-2 gap-8 mb-4 border-y border-slate-50 py-3">
                                 <div>
                                     <h5 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ditujukan Untuk:</h5>
                                     <div className="font-bold text-slate-900 text-lg uppercase">{selectedInvoiceCompany.name}</div>
@@ -1397,29 +1397,29 @@ export default function CompaniesPage() {
                                 const inv = calculateInvoice(selectedInvoiceCompany);
                                 return (
                                     <>
-                                        <table className="w-full text-sm mb-6">
+                                        <table className="w-full text-sm mb-4">
                                             <thead>
                                                 <tr className="border-b-2 border-slate-100 text-slate-400 text-left">
-                                                    <th className="py-2 font-bold uppercase text-[10px]">Deskripsi Layanan</th>
-                                                    <th className="py-2 text-right font-bold uppercase text-[10px]">Harga Satuan</th>
-                                                    <th className="py-2 text-right font-bold uppercase text-[10px]">Qty</th>
-                                                    <th className="py-2 text-right font-bold uppercase text-[10px]">Subtotal</th>
+                                                    <th className="py-1.5 font-bold uppercase text-[10px]">Deskripsi Layanan</th>
+                                                    <th className="py-1.5 text-right font-bold uppercase text-[10px]">Harga Satuan</th>
+                                                    <th className="py-1.5 text-right font-bold uppercase text-[10px]">Qty</th>
+                                                    <th className="py-1.5 text-right font-bold uppercase text-[10px]">Subtotal</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="text-slate-700">
                                                 <tr className="border-b border-slate-50">
-                                                    <td className="py-2.5">
-                                                        <div className="font-bold text-slate-800 tracking-tight text-blue-700">🚀 PAKET {inv.planName}</div>
+                                                    <td className="py-2">
+                                                        <div className="font-bold text-slate-800 tracking-tight text-blue-700 text-xs">🚀 PAKET {inv.planName}</div>
                                                         <div className="text-[10px] text-slate-400">Layanan Inti Platform Aivola</div>
                                                     </td>
-                                                    <td className="py-2.5 text-right">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
-                                                    <td className="py-2.5 text-right">{inv.periodLabel}</td>
-                                                    <td className="py-2.5 text-right font-semibold">Rp {(inv.basePrice * inv.contractDuration).toLocaleString('id-ID')}</td>
+                                                    <td className="py-2 text-right text-xs">Rp {inv.basePrice.toLocaleString('id-ID')}</td>
+                                                    <td className="py-2 text-right text-xs">{inv.periodLabel}</td>
+                                                    <td className="py-2 text-right font-semibold text-xs">Rp {(inv.basePrice * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                 </tr>
                                                 {(inv.extraAdmin > 0 || inv.extraPos > 0) && (
                                                     <tr className="border-b border-slate-50">
-                                                        <td className="py-2.5">
-                                                            <div className="font-bold text-slate-800 tracking-tight">👤 KURSI / SLOT TAMBAHAN</div>
+                                                        <td className="py-2">
+                                                            <div className="font-bold text-slate-800 tracking-tight text-xs">👤 KURSI / SLOT TAMBAHAN</div>
                                                             <div className="text-[10px] text-slate-400">
                                                                 {[
                                                                     inv.extraAdmin > 0 ? `${inv.extraAdmin} Admin` : null,
@@ -1427,20 +1427,20 @@ export default function CompaniesPage() {
                                                                 ].filter(Boolean).join(' & ')}
                                                             </div>
                                                         </td>
-                                                        <td className="py-2.5 text-right">Rp 10.000</td>
-                                                        <td className="py-2.5 text-right">{inv.extraAdmin + inv.extraPos} Unit <span className="text-[10px] text-slate-400">x {inv.periodLabel}</span></td>
-                                                        <td className="py-2.5 text-right font-semibold">Rp {(inv.seatCost * inv.contractDuration).toLocaleString('id-ID')}</td>
+                                                        <td className="py-2 text-right text-xs">Rp 10.000</td>
+                                                        <td className="py-2 text-right text-xs">{inv.extraAdmin + inv.extraPos} Unit <span className="text-[10px] text-slate-400">x {inv.periodLabel}</span></td>
+                                                        <td className="py-2 text-right font-semibold text-xs">Rp {(inv.seatCost * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                     </tr>
                                                 )}
                                                 {inv.detailItems.map((item, idx) => (
                                                     <tr key={idx} className="border-b border-slate-50">
-                                                        <td className="py-2.5">
-                                                            <div className="font-bold text-slate-800 tracking-tight">💎 {item.name}</div>
+                                                        <td className="py-2">
+                                                            <div className="font-bold text-slate-800 tracking-tight text-xs">💎 {item.name}</div>
                                                             <div className="text-[10px] text-slate-400">Fitur Ekstra Aktif</div>
                                                         </td>
-                                                        <td className="py-2.5 text-right">Rp {item.price.toLocaleString('id-ID')}</td>
-                                                        <td className="py-2.5 text-right">{item.qty} <span className="text-[10px] text-slate-400">x {inv.contractDuration}</span></td>
-                                                        <td className="py-2.5 text-right font-semibold">Rp {(item.total * inv.contractDuration).toLocaleString('id-ID')}</td>
+                                                        <td className="py-2 text-right text-xs">Rp {item.price.toLocaleString('id-ID')}</td>
+                                                        <td className="py-2 text-right text-xs">{item.qty} <span className="text-[10px] text-slate-400">x {inv.contractDuration}</span></td>
+                                                        <td className="py-2 text-right font-semibold text-xs">Rp {(item.total * inv.contractDuration).toLocaleString('id-ID')}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -1473,21 +1473,21 @@ export default function CompaniesPage() {
                             })()}
                             
                             {/* Bank Transfer Instructions */}
-                            <div className="mt-4 flex flex-col gap-2 relative z-10 text-left">
-                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">PEMBAYARAN DITRANSFER KE:</h3>
-                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col shadow-sm w-fit min-w-[280px]">
+                            <div className="mt-2 flex flex-col gap-1 relative z-10 text-left">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">PEMBAYARAN DITRANSFER KE:</h3>
+                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex flex-col shadow-sm w-fit min-w-[280px]">
                                     <div>
                                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.1em]">BANK BCA</span>
-                                        <p className="text-lg font-extrabold text-slate-950 tracking-widest mt-1 leading-none">661-125-0000</p>
+                                        <p className="text-sm font-extrabold text-slate-950 tracking-widest mt-0.5 leading-none">661-125-0000</p>
                                     </div>
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-3">a.n. PT PERMATA GEMPITA SEJAHTERA</p>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-2">a.n. PT PERMATA GEMPITA SEJAHTERA</p>
                                 </div>
                             </div>
                             
                             {/* Footer */}
-                            <div className="mt-12 text-center border-t border-slate-100 pt-8">
+                            <div className="mt-6 text-center border-t border-slate-100 pt-4">
                                 <p className="text-[10px] text-slate-400 italic">Harap membayar sebelum masa kontrak berakhir untuk menghindari pembekuan akun.</p>
-                                <p className="text-[10px] font-bold text-slate-300 mt-4 uppercase tracking-widest">© {new Date().getFullYear()} Aivola Cloud System</p>
+                                <p className="text-[10px] font-bold text-slate-300 mt-2 uppercase tracking-widest">© {new Date().getFullYear()} Aivola Cloud System</p>
                             </div>
                         </div>
 
@@ -1516,7 +1516,7 @@ export default function CompaniesPage() {
                                                         <script src="https://cdn.tailwindcss.com"></script>
                                                     </head>
                                                     <body>
-                                                        <div class="p-8">
+                                                        <div class="p-2 sm:p-4">
                                                             ${printContent?.innerHTML}
                                                         </div>
                                                         <script>
