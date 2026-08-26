@@ -391,9 +391,9 @@ const PricingSection = () => {
             <div style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <span style={{ color: 'white', fontWeight: 700 }}>📦 Inventory & Stock</span>
-                <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Rp 20.000/bln</span>
+                <span style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>Gratis (Tiered)</span>
               </div>
-              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Manajemen stok bahan. <b style={{color: '#4ade80'}}>Gratis di paket PRO</b>.</p>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Manajemen stok bahan. Kuota SKU menyesuaikan paket (Basic 100, Pro 1rb, Enterprise Unlimited).</p>
             </div>
             <div style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
