@@ -16974,28 +16974,34 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             }));
 
             // --- OPTIMIZED STOCK LOGIC ---
-            // Always decrement the main product's stock if tracked
-            operations.push(tx.product.update({
-                where: { id: productId },
-                data: { stock: { decrement: quantity } }
-            }));
+            const mainProduct = productsInCart.find(p => p.id === productId);
+            const isAutoDeduct = mainProduct?.isAutoDeduct || false;
 
-            operations.push(tx.warehouseStock.upsert({
-                where: { productId_warehouseId: { productId: productId, warehouseId: warehouse.id } },
-                update: { quantity: { decrement: quantity } },
-                create: { productId: productId, warehouseId: warehouse.id, quantity: -quantity }
-            }));
+            // Mode Pabrikasi (isAutoDeduct = false): HANYA potong stok produk jadi.
+            // Mode Made-to-Order (isAutoDeduct = true): JANGAN potong stok produk jadi.
+            if (!isAutoDeduct) {
+                operations.push(tx.product.update({
+                    where: { id: productId },
+                    data: { stock: { decrement: quantity } }
+                }));
 
-            operations.push(tx.stockTransaction.create({
-                data: {
-                    productId: productId,
-                    warehouseId: warehouse.id,
-                    type: 'OUT',
-                    quantity: quantity,
-                    reference: `POS ${invoiceNumber}`,
-                    date: new Date()
-                }
-            }));
+                operations.push(tx.warehouseStock.upsert({
+                    where: { productId_warehouseId: { productId: productId, warehouseId: warehouse.id } },
+                    update: { quantity: { decrement: quantity } },
+                    create: { productId: productId, warehouseId: warehouse.id, quantity: -quantity }
+                }));
+
+                operations.push(tx.stockTransaction.create({
+                    data: {
+                        productId: productId,
+                        warehouseId: warehouse.id,
+                        type: 'OUT',
+                        quantity: quantity,
+                        reference: `POS ${invoiceNumber}`,
+                        date: new Date()
+                    }
+                }));
+            }
 
             // --- MODIFIER STOCK DEDUCTION ---
             if (item.modifiers) {
@@ -17031,9 +17037,10 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                 });
             }
 
-            // If it has a recipe, ALSO decrement the MATERIALS (with recursive Auto Deduct support)
+            // If it has a recipe AND is Made-to-Order, decrement the MATERIALS
+            // (If it's Pabrikasi/isAutoDeduct=false, we DO NOT deduct materials here, because they were deducted during Production)
             const recipes = recipeMap[productId] || [];
-            if (recipes.length > 0) {
+            if (isAutoDeduct && recipes.length > 0) {
                 for (const recipe of recipes) {
                     const materialId = Number(recipe.materialId);
                     const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
