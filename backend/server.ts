@@ -2741,9 +2741,6 @@ app.get('/api/inventory/ai-po-recommendations', tenantMiddleware, async (req: Re
     const days = Math.max(1, Math.min(daysParam, 90));
     const bufferDays = Math.max(1, Math.min(bufferDaysParam, 30));
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
     // 1. Fetch all products and their recipe relationships
     const products = await prisma.product.findMany({
       where: { companyId: tenantId },
