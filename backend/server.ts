@@ -15309,17 +15309,17 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
       }
     }
 
-    // Date Filter
+    // Date Filter (Timezone-aware WIB +07:00)
     if (startDate) {
       const sDate = (startDate as string).split('T')[0];
-      whereConditions.push(`s."date" >= '${sDate} 00:00:00'`);
+      whereConditions.push(`s."date" >= '${sDate} 00:00:00+07:00'`);
     }
     if (endDate) {
       const eDate = (endDate as string).split('T')[0];
-      const d = new Date(eDate);
-      d.setDate(d.getDate() + 1);
-      const nextDayStr = d.toISOString().split('T')[0];
-      whereConditions.push(`s."date" < '${nextDayStr} 00:00:00'`);
+      const [y, m, d] = eDate.split('-').map(Number);
+      const nextD = new Date(Date.UTC(y, m - 1, d + 1));
+      const nextDayStr = nextD.toISOString().split('T')[0];
+      whereConditions.push(`s."date" < '${nextDayStr} 00:00:00+07:00'`);
     }
 
     // Payment Method Filter (Smart Categorization)
@@ -15410,14 +15410,17 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
     }
 
     if (startDate) {
+      const sDateStr = (startDate as string).split('T')[0];
       whereConditions.push(`s."date" >= $${paramIndex++}`);
-      queryParams.push(new Date(startDate as string));
+      queryParams.push(new Date(`${sDateStr}T00:00:00+07:00`));
     }
     if (endDate) {
-      const d = new Date(endDate as string);
-      d.setDate(d.getDate() + 1);
+      const eDateStr = (endDate as string).split('T')[0];
+      const [y, m, d] = eDateStr.split('-').map(Number);
+      const nextD = new Date(Date.UTC(y, m - 1, d + 1));
+      const nextDayStr = nextD.toISOString().split('T')[0];
       whereConditions.push(`s."date" < $${paramIndex++}`);
-      queryParams.push(d);
+      queryParams.push(new Date(`${nextDayStr}T00:00:00+07:00`));
     }
 
     if (paymentMethod && paymentMethod !== 'all') {
@@ -15532,8 +15535,24 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     const tenantId = Number((req as any).tenantId);
     const { branchId, startDate, endDate } = req.query;
 
-    const currentStart = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const currentEnd = endDate ? new Date(endDate as string) : new Date();
+    const companyTz = await getCompanyTimezone(tenantId);
+    let currentStart: Date;
+    let currentEnd: Date;
+
+    if (startDate) {
+      const sDateStr = (startDate as string).split('T')[0];
+      currentStart = new Date(`${sDateStr}T00:00:00+07:00`);
+    } else {
+      const { dayStart } = getDayRange(companyTz);
+      currentStart = dayStart;
+    }
+
+    if (endDate) {
+      const eDateStr = (endDate as string).split('T')[0];
+      currentEnd = new Date(`${eDateStr}T23:59:59.999+07:00`);
+    } else {
+      currentEnd = new Date();
+    }
     
     // Calculate duration of current period to get previous period
     const duration = currentEnd.getTime() - currentStart.getTime();
@@ -15783,14 +15802,17 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
       }
     }
 
-    // Date Filter
+    // Date Filter (Timezone-aware WIB +07:00)
     if (startDate) {
-      whereConditions.push(`s."date" >= '${startDate}'`);
+      const sDate = (startDate as string).split('T')[0];
+      whereConditions.push(`s."date" >= '${sDate} 00:00:00+07:00'`);
     }
     if (endDate) {
-      const d = new Date(endDate as string);
-      d.setDate(d.getDate() + 1);
-      whereConditions.push(`s."date" < '${d.toISOString().split('T')[0]}'`);
+      const eDate = (endDate as string).split('T')[0];
+      const [y, m, d] = eDate.split('-').map(Number);
+      const nextD = new Date(Date.UTC(y, m - 1, d + 1));
+      const nextDayStr = nextD.toISOString().split('T')[0];
+      whereConditions.push(`s."date" < '${nextDayStr} 00:00:00+07:00'`);
     }
 
     // Payment Filter (Smart Categorization)
@@ -17408,10 +17430,10 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       orderBy: { endTime: 'desc' }
     });
 
-    // Default to start of current day if no closing exists, to avoid pulling years of history
-    const defaultStartTime = new Date();
-    defaultStartTime.setHours(0, 0, 0, 0);
-    const startTime = lastClosing ? lastClosing.endTime : defaultStartTime;
+    // Default to start of current day in company timezone if no closing exists
+    const companyTimezone = await getCompanyTimezone(tenantId);
+    const { dayStart } = getDayRange(companyTimezone);
+    const startTime = lastClosing ? lastClosing.endTime : dayStart;
 
     // 2. Find all sales since last closing in this branch (filtered by branchId directly)
     // We also include null branchId if the user is associated with the first branch (Head Office fallback)
