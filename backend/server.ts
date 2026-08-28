@@ -2761,7 +2761,7 @@ app.get('/api/inventory/ai-po-recommendations', tenantMiddleware, async (req: Re
 
     // 2. Build date range and POS filter conditions (WIB Timezone)
     const now = new Date();
-    const startD = new Date(now.getTime() + 7 * 3600 * 1000 - days * 86400 * 1000);
+    const startD = new Date(now.getTime() + 7 * 3600 * 1000 - (days - 1) * 86400 * 1000);
     const startStr = startD.toISOString().split('T')[0];
     const endStr = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().split('T')[0];
 

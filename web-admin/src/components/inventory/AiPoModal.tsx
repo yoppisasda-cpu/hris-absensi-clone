@@ -130,6 +130,8 @@ export default function AiPoModal({ isOpen, onClose, onGeneratePo }: AiPoModalPr
                 onChange={(e) => setDays(Number(e.target.value))}
                 className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-[10px] font-black text-indigo-400 outline-none uppercase italic tracking-wider cursor-pointer"
               >
+                <option value={1}>1 Hari (Hari Ini)</option>
+                <option value={3}>3 Hari Terakhir</option>
                 <option value={7}>7 Hari Terakhir</option>
                 <option value={14}>14 Hari Terakhir</option>
                 <option value={30}>30 Hari Terakhir</option>
