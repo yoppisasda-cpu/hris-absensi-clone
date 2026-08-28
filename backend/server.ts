@@ -17538,7 +17538,7 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
 
     let user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
     
-    // Robustness for ALL roles: fallback to first branch if branchId is null
+    // Robustness: fallback to first branch if user has no branchId
     if (!user?.branchId) {
       const firstBranch = await prisma.branch.findFirst({ where: { companyId: tenantId } });
       if (firstBranch) {
@@ -17547,11 +17547,16 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       }
     }
 
-    if (!user?.branchId) return res.status(400).json({ error: 'User tidak terikat ke cabang manapun. Hubungi admin untuk mengatur cabang.' });
+    // If still no branch (company has no branches configured), use null = all company sales
+    const effectiveBranchId: number | null = user?.branchId ?? null;
 
-    // 1. Get last closing for this branch
+    // 1. Get last closing (branch-specific or company-wide)
     const lastClosing = await prisma.posClosing.findFirst({
-      where: { companyId: tenantId, branchId: user.branchId, status: 'COMPLETED' },
+      where: {
+        companyId: tenantId,
+        ...(effectiveBranchId !== null ? { branchId: effectiveBranchId } : {}),
+        status: 'COMPLETED'
+      },
       orderBy: { endTime: 'desc' }
     });
 
@@ -17560,15 +17565,13 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
     const { dayStart } = getDayRange(companyTimezone);
     const startTime = lastClosing ? lastClosing.endTime : dayStart;
 
-    // 2. Find all sales since last closing in this branch (filtered by branchId directly)
-    // We also include null branchId if the user is associated with the first branch (Head Office fallback)
+    // 2. Find all sales since last closing
     const sales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
-        OR: [
-          { branchId: user.branchId },
-          { branchId: null } // Include transactions that don't have a branch assigned
-        ],
+        ...(effectiveBranchId !== null
+          ? { OR: [{ branchId: effectiveBranchId }, { branchId: null }] }
+          : {}),  // No branch filter = all company sales
         date: { gt: startTime, lte: new Date() },
         status: { notIn: ['CANCELLED', 'VOID'] }
       }
@@ -17732,20 +17735,21 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
 
     let user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
     
-    // Fallback for Admins/Owners who aren't tied to a specific branch
-    if (!user?.branchId && (user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'OWNER')) {
+    // Fallback to first branch if user has no branchId
+    if (!user?.branchId) {
       const firstBranch = await prisma.branch.findFirst({ where: { companyId: tenantId } });
       if (firstBranch) {
         user = { ...user!, branchId: firstBranch.id };
       }
     }
 
-    if (!user?.branchId) return res.status(400).json({ error: 'User tidak terikat ke cabang.' });
+    // If company has no branches at all, proceed with undefined branchId
+    const effectiveBranchId: number | undefined = user?.branchId ?? undefined;
 
     const closing = await prisma.posClosing.create({
       data: {
         companyId: tenantId,
-        branchId: user.branchId,
+        ...(effectiveBranchId !== undefined ? { branchId: effectiveBranchId } : {}),
         cashierId: userId,
         startTime: new Date(startTime),
         endTime: new Date(endTime),
@@ -17759,7 +17763,7 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
         notes,
         status: 'COMPLETED'
       }
-    });
+    } as any);
 
     res.json(closing);
   } catch (error: any) {
