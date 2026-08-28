@@ -424,11 +424,10 @@ class PrinterService {
         
         bytes += generator.text('($i/$qty) - $time', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
         bytes += generator.text('--------------------------------', styles: PosStyles(align: PosAlign.center));
-        bytes += generator.feed(2);
+        bytes += generator.feed(3);
+        bytes += generator.cut();
       }
     }
-    
-    bytes += generator.cut();
 
     if (type == 'wifi') {
       await _sendToWifiPrinter(address, bytes);
