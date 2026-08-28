@@ -405,6 +405,7 @@ class PrinterService {
 
     final List items = saleData['items'] ?? [];
     final String invoice = saleData['invoiceNumber'] ?? '-';
+    final String customerName = saleData['customerName']?.toString().trim() ?? '';
     final String time = DateFormat('HH:mm').format(DateTime.now());
 
     for (var item in items) {
@@ -413,6 +414,9 @@ class PrinterService {
       for (int i = 1; i <= qty; i++) {
         bytes += generator.text('--------------------------------', styles: PosStyles(align: PosAlign.center));
         bytes += generator.text('Order: $invoice', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
+        if (customerName.isNotEmpty) {
+          bytes += generator.text('Nama: $customerName', styles: PosStyles(align: PosAlign.center, bold: true, fontType: PosFontType.fontB));
+        }
         bytes += generator.text(item['name'], styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
         
         final List? modifiers = item['modifiers'];
