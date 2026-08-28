@@ -9594,10 +9594,10 @@ app.get('/api/stats/visual-inventory', tenantMiddleware, async (req: Request, re
   try {
     const tenantId = (req as any).tenantId;
 
-    // 1. Stock Health Stats
-    const totalOut = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock <= 0`, tenantId) as any;
-    const totalLow = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock > 0 AND stock <= "minStock"`, tenantId) as any;
-    const totalHealthy = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock > "minStock"`, tenantId) as any;
+    // 1. Stock Health Stats (Exclude Made-to-Order & Non-Tracked Products)
+    const totalOut = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock <= 0 AND "isAutoDeduct" = false AND "trackStock" = true`, tenantId) as any;
+    const totalLow = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock > 0 AND stock <= "minStock" AND "isAutoDeduct" = false AND "trackStock" = true`, tenantId) as any;
+    const totalHealthy = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "Product" WHERE "companyId" = $1 AND stock > "minStock" AND "isAutoDeduct" = false AND "trackStock" = true`, tenantId) as any;
 
     // 2. Top 5 Products
     const topProducts = await prisma.$queryRawUnsafe(`
