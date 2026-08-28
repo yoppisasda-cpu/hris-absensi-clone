@@ -66,7 +66,7 @@ export default function CashflowSankey() {
         const nodeValue = payload.value || 0;
 
         let textX = x + width + 10;
-        let textAnchor = 'start';
+        let textAnchor: 'start' | 'middle' | 'end' = 'start';
 
         if (isLeft) {
             textX = x + width + 10;
