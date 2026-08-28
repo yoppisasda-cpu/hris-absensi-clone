@@ -139,25 +139,34 @@ export async function getFinancialFlow(tenantIdInput: any): Promise<any> {
         }) : [];
 
         // Agregasi sumber dana (Left Nodes)
-        const leftItems: { name: string; value: number }[] = [];
+        const leftItemsMap: Record<string, number> = {};
         let totalIncome = 0;
         let totalExpense = 0;
 
-        // 1. POS Sales
+        // 1. POS Sales — masuk sebagai 'Penjualan POS'
         if (posSalesTotal > 0) {
             totalIncome += posSalesTotal;
-            leftItems.push({ name: 'Penjualan POS', value: posSalesTotal });
+            leftItemsMap['Penjualan POS'] = (leftItemsMap['Penjualan POS'] || 0) + posSalesTotal;
         }
 
-        // 2. Manual Incomes
+        // 2. Manual Incomes — jika nama kategori mengandung "Penjualan" atau "POS",
+        //    digabungkan ke node 'Penjualan POS' agar tidak duplikat
         Object.entries(incomesMap).forEach(([catIdStr, amount]) => {
             const catId = Number(catIdStr);
             if (amount > 0) {
                 totalIncome += amount;
-                const catName = incomeCats.find(c => c.id === catId)?.name || `Pemasukan #${catId}`;
-                leftItems.push({ name: catName, value: amount });
+                const rawName = incomeCats.find(c => c.id === catId)?.name || `Pemasukan #${catId}`;
+                // Merge POS-related income into single node
+                const isPosRelated = rawName.toLowerCase().includes('penjualan') || rawName.toLowerCase().includes('pos') || rawName.toLowerCase().includes('kasir');
+                const nodeName = isPosRelated ? 'Penjualan POS' : rawName;
+                leftItemsMap[nodeName] = (leftItemsMap[nodeName] || 0) + amount;
             }
         });
+
+        // Convert map to array
+        const leftItems: { name: string; value: number }[] = Object.entries(leftItemsMap)
+            .filter(([, v]) => v > 0)
+            .map(([name, value]) => ({ name, value }));
 
         // Agregasi pengeluaran (Right Nodes)
         const rightItems: { name: string; value: number }[] = [];
