@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
     ShoppingBag, Search, Filter, MoreVertical, CheckCircle2, XCircle, 
-    Clock, FileText, Plus, ArrowUpRight, ArrowDownRight, Package, Truck, User, Download, MessageCircle, Mail, Printer, Edit3 
+    Clock, FileText, Plus, ArrowUpRight, ArrowDownRight, Package, Truck, User, Download, MessageCircle, Mail, Printer, Edit3, Sparkles 
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import PurchaseOrderModal from "@/components/inventory/PurchaseOrderModal";
 import EditPurchaseOrderModal from "@/components/inventory/EditPurchaseOrderModal";
 import PODetailModal from "@/components/inventory/PODetailModal";
+import AiPoModal from "@/components/inventory/AiPoModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -26,6 +27,8 @@ export default function PurchaseOrdersPage() {
     const [role, setRole] = useState<string>("");
     const [selectedStatus, setSelectedStatus] = useState<string>("all");
     const [company, setCompany] = useState<any>(null);
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+    const [prefilledPoItems, setPrefilledPoItems] = useState<any[]>([]);
 
     const fetchPos = async () => {
         setLoading(true);
@@ -264,12 +267,23 @@ export default function PurchaseOrdersPage() {
                     </p>
                 </div>
                 {canCreatePO && (
-                    <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="group flex items-center gap-4 rounded-2xl bg-indigo-600 px-8 py-4 text-[11px] font-black text-white shadow-2xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-[0.2em] italic border border-white/10"
-                    >
-                        <Plus className="h-4 w-4 stroke-[3px] group-hover:rotate-90 transition-transform duration-300" /> Initiate Requisition
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={() => setIsAiModalOpen(true)}
+                            className="group flex items-center gap-3 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-6 py-4 text-[11px] font-black text-white shadow-2xl shadow-indigo-500/30 hover:brightness-110 transition-all active:scale-95 uppercase tracking-[0.2em] italic border border-indigo-400/30"
+                        >
+                            <Sparkles className="h-4 w-4 text-indigo-200 animate-pulse" /> Rekomendasi PO (AI)
+                        </button>
+                        <button 
+                            onClick={() => {
+                                setPrefilledPoItems([]);
+                                setIsModalOpen(true);
+                            }}
+                            className="group flex items-center gap-4 rounded-2xl bg-indigo-600 px-8 py-4 text-[11px] font-black text-white shadow-2xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-[0.2em] italic border border-white/10"
+                        >
+                            <Plus className="h-4 w-4 stroke-[3px] group-hover:rotate-90 transition-transform duration-300" /> Initiate Requisition
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -558,10 +572,22 @@ export default function PurchaseOrdersPage() {
             </div>
 
             {/* Modal */}
+            <AiPoModal 
+                isOpen={isAiModalOpen}
+                onClose={() => setIsAiModalOpen(false)}
+                onGeneratePo={(items) => {
+                    setPrefilledPoItems(items);
+                    setIsModalOpen(true);
+                }}
+            />
             <PurchaseOrderModal 
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setPrefilledPoItems([]);
+                }}
                 onSuccess={fetchPos}
+                initialItems={prefilledPoItems}
             />
             <PODetailModal 
                 isOpen={isDetailModalOpen}

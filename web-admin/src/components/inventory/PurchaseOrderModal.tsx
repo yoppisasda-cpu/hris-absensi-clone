@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import SearchableSelect from "../common/SearchableSelect";
 
-export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) {
+export default function PurchaseOrderModal({ isOpen, onClose, onSuccess, initialItems }: any) {
     const [suppliers, setSuppliers] = useState<any[]>([]);
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -26,8 +26,14 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess }: any) 
             fetchSuppliers();
             fetchProducts();
             fetchWarehouses();
+            if (initialItems && Array.isArray(initialItems) && initialItems.length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    items: initialItems
+                }));
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, initialItems]);
 
     const fetchWarehouses = async () => {
         try {

@@ -2731,6 +2731,169 @@ app.get('/api/companies/my', tenantMiddleware, async (req: Request, res: Respons
 
 // --- MODUL PURCHASE ORDER (PO) ---
 
+// PO0. AI Purchase Order Recommendations (Smart Reorder Point)
+app.get('/api/inventory/ai-po-recommendations', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const daysParam = parseInt(req.query.days as string) || 7;
+    const bufferDaysParam = parseInt(req.query.bufferDays as string) || 3;
+
+    const days = Math.max(1, Math.min(daysParam, 90));
+    const bufferDays = Math.max(1, Math.min(bufferDaysParam, 30));
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // 1. Fetch all products and their recipe relationships
+    const products = await prisma.product.findMany({
+      where: { companyId: tenantId },
+      include: {
+        category: true,
+        Recipes: { include: { Material: true } }
+      }
+    });
+
+    if (products.length === 0) {
+      return res.json({ periodDays: days, bufferDays, recommendations: [], aiSummary: "Belum ada data produk di inventori." });
+    }
+
+    const productMap = new Map<number, any>(products.map(p => [p.id, p]));
+
+    // 2. Fetch completed sales in the period
+    const sales = await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        date: { gte: startDate },
+        status: { notIn: ['CANCELLED', 'VOID', 'RETURNED'] }
+      },
+      include: {
+        SaleItem: true
+      }
+    });
+
+    // 3. Track consumption per item (Direct Sales & Raw Material BOM breakdown)
+    const consumptionMap: Record<number, number> = {};
+
+    for (const sale of sales) {
+      for (const item of sale.SaleItem) {
+        if (!item.productId) continue;
+        const qty = Number(item.quantity) || 0;
+        const prod = productMap.get(item.productId);
+
+        if (!prod) continue;
+
+        // Direct sales consumption
+        consumptionMap[prod.id] = (consumptionMap[prod.id] || 0) + qty;
+
+        // Recipe / Raw Material BOM breakdown
+        if (prod.Recipes && prod.Recipes.length > 0) {
+          const yieldFactor = prod.recipeYield || 1;
+          for (const recipeItem of prod.Recipes) {
+            const materialQty = (qty * Number(recipeItem.quantity)) / yieldFactor;
+            consumptionMap[recipeItem.materialId] = (consumptionMap[recipeItem.materialId] || 0) + materialQty;
+          }
+        }
+      }
+    }
+
+    // 4. Calculate PO recommendations
+    const recommendations: any[] = [];
+
+    for (const prod of products) {
+      const totalConsumed = consumptionMap[prod.id] || 0;
+      const avgDailySales = Math.round((totalConsumed / days) * 100) / 100;
+      const currentStock = Number(prod.stock) || 0;
+      const minStock = Number(prod.minStock) || 0;
+
+      const targetStock = (avgDailySales * bufferDays) + minStock;
+      const deficit = targetStock - currentStock;
+      const rawSuggestedQty = Math.max(0, deficit);
+      const suggestedQty = Math.ceil(rawSuggestedQty * 10) / 10;
+
+      let urgency: 'CRITICAL' | 'WARNING' | 'LOW' | 'SAFE' = 'SAFE';
+      if (currentStock <= 0 || (minStock > 0 && currentStock <= minStock * 0.5)) {
+        urgency = 'CRITICAL';
+      } else if (minStock > 0 && currentStock <= minStock) {
+        urgency = 'WARNING';
+      } else if (suggestedQty > 0) {
+        urgency = 'LOW';
+      }
+
+      // Include in recommendation if suggested PO qty > 0 or stock is in warning/critical status
+      if (suggestedQty > 0 || urgency === 'CRITICAL' || urgency === 'WARNING') {
+        const costPrice = Number(prod.costPrice) || 0;
+        recommendations.push({
+          productId: prod.id,
+          productName: prod.name,
+          sku: prod.sku || '-',
+          categoryName: prod.category?.name || 'Tanpa Kategori',
+          unit: prod.unit || 'Pcs',
+          currentStock,
+          minStock,
+          costPrice,
+          totalSalesPeriod: totalConsumed,
+          avgDailySales,
+          suggestedQty: Math.max(1, suggestedQty),
+          estimatedTotalCost: Math.round(Math.max(1, suggestedQty) * costPrice),
+          urgency
+        });
+      }
+    }
+
+    // Sort by urgency priority: CRITICAL -> WARNING -> LOW -> SAFE, then by daily sales
+    const urgencyOrder: Record<string, number> = { CRITICAL: 1, WARNING: 2, LOW: 3, SAFE: 4 };
+    recommendations.sort((a, b) => {
+      const uDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+      if (uDiff !== 0) return uDiff;
+      return b.avgDailySales - a.avgDailySales;
+    });
+
+    // 5. Generate AI insights using Gemini AI if recommendations exist
+    let aiSummary = "Stok dalam keadaan aman.";
+    if (recommendations.length > 0) {
+      try {
+        const top5Urgent = recommendations.slice(0, 5);
+        const genAI = new GeminiAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+        const prompt = `
+          Anda adalah manajer inventori dan purchasing ahli.
+          Berikan 2-3 poin rekomendasi pembelian barang (Purchase Order) singkat dan aksi spesifik (maksimal 2 kalimat per poin) berdasarkan analisis stok & penjualan toko berikut dalam Bahasa Indonesia yang santun & profesional:
+
+          Data Toko:
+          - Periode Analisis Penjualan: ${days} hari terakhir
+          - Target Buffer Stok: ${bufferDays} hari
+          - Jumlah Item Membutuhkan Reorder: ${recommendations.length} barang
+          - Produk Paling Kritis/Dibutuhkan:
+          ${top5Urgent.map(item => `- ${item.productName} (${item.categoryName}): Stok saat ini ${item.currentStock} ${item.unit}, Min Stok ${item.minStock}, Rata-rata Penjualan ${item.avgDailySales}/hari. Disarankan PO: ${item.suggestedQty} ${item.unit}`).join('\n')}
+
+          Format Output: JSON dengan field "summary" (string markdown singkat dengan bullet points).
+        `;
+
+        const aiResult = await model.generateContent(prompt);
+        const text = aiResult.response.text();
+        const cleanedText = text.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(cleanedText);
+        aiSummary = parsed.summary || text;
+      } catch (aiErr) {
+        console.warn("[AI PO Recommendation] Gemini error, using fallback summary:", aiErr);
+        const criticalCount = recommendations.filter(r => r.urgency === 'CRITICAL').length;
+        aiSummary = `Terdapat ${recommendations.length} barang yang disarankan untuk dipesan (PO). ${criticalCount > 0 ? `${criticalCount} barang dalam kondisi kritis!` : 'Stok hampir mencapai batas minimum.'}`;
+      }
+    }
+
+    res.json({
+      periodDays: days,
+      bufferDays,
+      recommendations,
+      aiSummary
+    });
+  } catch (error: any) {
+    console.error("AI PO RECOMMENDATION ERROR:", error);
+    res.status(500).json({ error: "Gagal menghitung rekomendasi PO: " + error.message });
+  }
+});
+
 // PO1. List Purchase Orders
 app.get('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request, res: Response) => {
   try {
