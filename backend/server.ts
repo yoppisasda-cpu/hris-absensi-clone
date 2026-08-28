@@ -15448,103 +15448,88 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
   }
 });
 
+const buildPosWhereClause = async (req: Request, tenantId: number, query: any) => {
+  const userId = Number((req as any).userId);
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
+  const isPosViewer = (user?.role as string) === 'POS_VIEWER';
+  const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '');
+
+  let { branchId, startDate, endDate, paymentMethod, saleType } = query;
+
+  let whereConditions = [`s."companyId" = $1`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')` ];
+  let queryParams: any[] = [tenantId];
+  let paramIndex = 2;
+
+  if (isPosViewer) {
+    whereConditions.push(`(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`);
+  }
+
+  // Branch Filter
+  let effectiveBranchId = branchId;
+  if (isPosViewer && user?.branchId) {
+    effectiveBranchId = user.branchId.toString();
+  } else if (!isAdmin && !isPosViewer && user?.branchId) {
+    effectiveBranchId = user.branchId.toString();
+  }
+
+  if (effectiveBranchId && effectiveBranchId !== 'all') {
+    if (effectiveBranchId === 'null') {
+      whereConditions.push(`s."branchId" IS NULL`);
+    } else {
+      whereConditions.push(`s."branchId" = $${paramIndex++}`);
+      queryParams.push(parseInt(effectiveBranchId as string));
+    }
+  }
+
+  // Date Filter (WIB +07:00)
+  if (startDate) {
+    const sDateStr = (startDate as string).split('T')[0];
+    whereConditions.push(`s."date" >= $${paramIndex++}`);
+    queryParams.push(new Date(`${sDateStr}T00:00:00+07:00`));
+  }
+  if (endDate) {
+    const eDateStr = (endDate as string).split('T')[0];
+    const [y, m, d] = eDateStr.split('-').map(Number);
+    const nextD = new Date(Date.UTC(y, m - 1, d + 1));
+    const nextDayStr = nextD.toISOString().split('T')[0];
+    whereConditions.push(`s."date" < $${paramIndex++}`);
+    queryParams.push(new Date(`${nextDayStr}T00:00:00+07:00`));
+  }
+
+  // Payment Method Filter
+  if (paymentMethod && paymentMethod !== 'all') {
+    if (paymentMethod === 'TUNAI') {
+      whereConditions.push(`(s."notes" ILIKE '%TUNAI%' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%' OR fa."type" = 'CASH')`);
+    } else if (paymentMethod === 'TRANSFER') {
+      whereConditions.push(`(s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')`);
+    } else if (paymentMethod === 'QRIS') {
+      whereConditions.push(`(s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
+    } else if (paymentMethod === 'DEBIT') {
+      whereConditions.push(`(s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR fa."name" ILIKE '%MANDIRI%' OR fa."name" ILIKE '%BCA%')`);
+    } else {
+      whereConditions.push(`(s."notes" ILIKE $${paramIndex++} OR fa."name" ILIKE $${paramIndex++})`);
+      queryParams.push(`%${paymentMethod}%`);
+      queryParams.push(`%${paymentMethod}%`);
+    }
+  }
+
+  // Sale Type Filter
+  if (saleType && saleType !== 'all') {
+    whereConditions.push(`s."saleType" = $${paramIndex++}`);
+    queryParams.push(saleType as string);
+  }
+
+  return {
+    whereClause: whereConditions.join(' AND '),
+    queryParams
+  };
+};
+
 app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const userId = Number((req as any).userId);
+    const filterRes = await buildPosWhereClause(req, tenantId, req.query);
 
-    // 1. Get user branch
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
-    let { branchId, startDate, endDate, paymentMethod, saleType, month, year } = req.query;
-
-    if (month && year && !startDate && !endDate) {
-      const m = parseInt(month as string);
-      const y = parseInt(year as string);
-      const startD = new Date(y, m - 1, 1);
-      const endD = new Date(y, m, 0, 23, 59, 59);
-      startDate = startD.toISOString();
-      endDate = endD.toISOString();
-    }
-
-    // 2. Build query based on branch and role
-    const isPosViewer = (user?.role as string) === 'POS_VIEWER';
-    
-    let whereConditions = [`s."companyId" = ${tenantId}`];
-    if (isPosViewer) {
-      whereConditions.push(`(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`);
-    }
-
-    // Branch Filter
-    let effectiveBranchId = branchId;
-    if (isPosViewer && user?.branchId) {
-      effectiveBranchId = user.branchId.toString();
-    }
-
-    if (effectiveBranchId && effectiveBranchId !== 'all') {
-      if (effectiveBranchId === 'null') {
-        whereConditions.push(`s."branchId" IS NULL`);
-      } else {
-        whereConditions.push(`s."branchId" = ${parseInt(effectiveBranchId as string)}`);
-      }
-    }
-
-    // Date Filter (Timezone-aware WIB +07:00)
-    if (startDate) {
-      const sDate = (startDate as string).split('T')[0];
-      whereConditions.push(`s."date" >= '${sDate} 00:00:00+07:00'`);
-    }
-    if (endDate) {
-      const eDate = (endDate as string).split('T')[0];
-      const [y, m, d] = eDate.split('-').map(Number);
-      const nextD = new Date(Date.UTC(y, m - 1, d + 1));
-      const nextDayStr = nextD.toISOString().split('T')[0];
-      whereConditions.push(`s."date" < '${nextDayStr} 00:00:00+07:00'`);
-    }
-
-    // Payment Method Filter (Smart Categorization)
-    if (paymentMethod && paymentMethod !== 'all') {
-      if (paymentMethod === 'TUNAI') {
-        whereConditions.push(`(s."notes" ILIKE '%TUNAI%' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%' OR fa."type" = 'CASH')`);
-      } else if (paymentMethod === 'TRANSFER') {
-        whereConditions.push(`(s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')`);
-      } else if (paymentMethod === 'QRIS') {
-        whereConditions.push(`(s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
-      } else if (paymentMethod === 'DEBIT') {
-        whereConditions.push(`(s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR fa."name" ILIKE '%MANDIRI%' OR fa."name" ILIKE '%BCA%')`);
-      } else {
-        whereConditions.push(`(s."notes" ILIKE '%${paymentMethod}%' OR fa."name" ILIKE '%${paymentMethod}%')`);
-      }
-    }
-
-    // Sale Type Filter
-    if (saleType && saleType !== 'all') {
-      whereConditions.push(`s."saleType" = '${saleType}'`);
-    }
-
-    // Status Filter
-    if (req.query.status && req.query.status !== 'all') {
-      const statusValue = req.query.status as string;
-      if (statusValue.includes(',')) {
-        const statuses = statusValue.split(',').map(s => `'${s.trim()}'`).join(',');
-        whereConditions.push(`s."status" IN (${statuses})`);
-      } else {
-        whereConditions.push(`s."status" = '${statusValue}'`);
-      }
-    }
-
-    // Role-based Access (Non-Admin Restricted to their own branch)
-    const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '');
-    if (!isAdmin && !isPosViewer) {
-      if (!user?.branchId) {
-        whereConditions.push(`s."branchId" IS NULL`);
-      } else {
-        whereConditions.push(`s."branchId" = ${Number(user.branchId)}`);
-      }
-    }
-
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-    
-    // Use explicit column selection to avoid property name issues
     const sales = await prisma.$queryRawUnsafe(`
       SELECT s.*, 
              c.name as "customerName", 
@@ -15558,9 +15543,9 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
         FROM "SaleReturn"
         GROUP BY "saleId"
       ) sr ON sr."saleId" = s.id
-      ${whereClause}
+      WHERE ${filterRes.whereClause}
       ORDER BY s."date" DESC
-    `);
+    `, ...filterRes.queryParams);
     
     res.json(sales);
   } catch (error: any) {
@@ -15573,57 +15558,7 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
     const tenantId = Number((req as any).tenantId);
     if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
 
-    const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
-
-    let whereConditions = [`s."companyId" = $1`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')`];
-    let queryParams: any[] = [tenantId];
-    let paramIndex = 2;
-    
-    if (branchId && branchId !== 'all') {
-      if (branchId === 'null') {
-        whereConditions.push(`s."branchId" IS NULL`);
-      } else {
-        whereConditions.push(`s."branchId" = $${paramIndex++}`);
-        queryParams.push(parseInt(branchId as string));
-      }
-    }
-
-    if (startDate) {
-      const sDateStr = (startDate as string).split('T')[0];
-      whereConditions.push(`s."date" >= $${paramIndex++}`);
-      queryParams.push(new Date(`${sDateStr}T00:00:00+07:00`));
-    }
-    if (endDate) {
-      const eDateStr = (endDate as string).split('T')[0];
-      const [y, m, d] = eDateStr.split('-').map(Number);
-      const nextD = new Date(Date.UTC(y, m - 1, d + 1));
-      const nextDayStr = nextD.toISOString().split('T')[0];
-      whereConditions.push(`s."date" < $${paramIndex++}`);
-      queryParams.push(new Date(`${nextDayStr}T00:00:00+07:00`));
-    }
-
-    if (paymentMethod && paymentMethod !== 'all') {
-      if (paymentMethod === 'TUNAI') {
-        whereConditions.push(`(s."notes" ILIKE '%TUNAI%' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%' OR fa."type" = 'CASH')`);
-      } else if (paymentMethod === 'TRANSFER') {
-        whereConditions.push(`(s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')`);
-      } else if (paymentMethod === 'QRIS') {
-        whereConditions.push(`(s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
-      } else if (paymentMethod === 'DEBIT') {
-        whereConditions.push(`(s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%')`);
-      } else {
-        whereConditions.push(`(s."notes" ILIKE $${paramIndex++} OR fa."name" ILIKE $${paramIndex++})`);
-        queryParams.push(`%${paymentMethod}%`);
-        queryParams.push(`%${paymentMethod}%`);
-      }
-    }
-
-    if (saleType && saleType !== 'all') {
-      whereConditions.push(`s."saleType" = $${paramIndex++}`);
-      queryParams.push(saleType as string);
-    }
-
-    const whereClause = whereConditions.join(' AND ');
+    const filterRes = await buildPosWhereClause(req, tenantId, req.query);
 
     // 1. Top Products
     const topProducts = await prisma.$queryRawUnsafe(`
@@ -15640,11 +15575,11 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
         JOIN "SaleReturn" sr ON sri."returnId" = sr.id
         GROUP BY sri."productId", sr."saleId"
       ) ret ON ret."productId" = si."productId" AND ret."saleId" = si."saleId"
-      WHERE ${whereClause}
+      WHERE ${filterRes.whereClause}
       GROUP BY p.name
       ORDER BY "totalSold" DESC
       LIMIT 5
-    `, ...queryParams);
+    `, ...filterRes.queryParams);
 
     // 2. Sales Trend (Daily)
     const salesTrend = await prisma.$queryRawUnsafe(`
@@ -15658,10 +15593,10 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
         FROM "SaleReturn"
         GROUP BY "saleId"
       ) sr ON sr."saleId" = s.id
-      WHERE ${whereClause}
+      WHERE ${filterRes.whereClause}
       GROUP BY DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')
       ORDER BY "date" ASC
-    `, ...queryParams);
+    `, ...filterRes.queryParams);
 
     // 3. Payment Method Distribution
     const paymentMethods = await prisma.$queryRawUnsafe(`
@@ -15685,13 +15620,12 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
           FROM "SaleReturn"
           GROUP BY "saleId"
         ) sr ON sr."saleId" = s.id
-        WHERE ${whereClause}
+        WHERE ${filterRes.whereClause}
       ) sub
       GROUP BY method
       ORDER BY total DESC
-    `, ...queryParams);
+    `, ...filterRes.queryParams);
 
-    // Helper to handle BigInt serialization
     const serialize = (data: any) => {
       return JSON.parse(JSON.stringify(data, (key, value) =>
         typeof value === 'bigint' ? Number(value) : value
@@ -15712,56 +15646,27 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
 app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { branchId, startDate, endDate } = req.query;
+    if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
 
-    const companyTz = await getCompanyTimezone(tenantId);
-    let currentStart: Date;
-    let currentEnd: Date;
+    const filterRes = await buildPosWhereClause(req, tenantId, req.query);
 
-    if (startDate) {
-      const sDateStr = (startDate as string).split('T')[0];
-      currentStart = new Date(`${sDateStr}T00:00:00+07:00`);
-    } else {
-      const { dayStart } = getDayRange(companyTz);
-      currentStart = dayStart;
-    }
+    // 1. Core Summary Metrics
+    const summaryResult: any[] = await prisma.$queryRawUnsafe(`
+      SELECT 
+        SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "revenue", 
+        COUNT(s.id) as "orders",
+        AVG(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "aov"
+      FROM "Sale" s
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+      LEFT JOIN (
+        SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
+        FROM "SaleReturn"
+        GROUP BY "saleId"
+      ) sr ON sr."saleId" = s.id
+      WHERE ${filterRes.whereClause}
+    `, ...filterRes.queryParams);
 
-    if (endDate) {
-      const eDateStr = (endDate as string).split('T')[0];
-      currentEnd = new Date(`${eDateStr}T23:59:59.999+07:00`);
-    } else {
-      currentEnd = new Date();
-    }
-    
-    // Calculate duration of current period to get previous period
-    const duration = currentEnd.getTime() - currentStart.getTime();
-    const prevStart = new Date(currentStart.getTime() - duration);
-    const prevEnd = new Date(currentStart.getTime());
-
-    const buildWhere = (start: Date, end: Date) => {
-      let conditions = [`s."companyId" = $1`, `s."date" >= $2`, `s."date" <= $3`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')` ];
-      if (branchId && branchId !== 'all') {
-        if (branchId === 'null') conditions.push(`s."branchId" IS NULL`);
-        else conditions.push(`s."branchId" = ${parseInt(branchId as string)}`);
-      }
-      return conditions.join(' AND ');
-    };
-
-    // 1. Core Summary Metrics (Current vs Previous)
-    const getSummary = async (start: Date, end: Date) => {
-      const result: any[] = await prisma.$queryRawUnsafe(`
-        SELECT 
-          SUM(s."totalAmount" - COALESCE((SELECT SUM("totalRefundAmount") FROM "SaleReturn" sr WHERE sr."saleId" = s.id), 0)) as "revenue", 
-          COUNT(s.id) as "orders",
-          AVG(s."totalAmount" - COALESCE((SELECT SUM("totalRefundAmount") FROM "SaleReturn" sr WHERE sr."saleId" = s.id), 0)) as "aov"
-        FROM "Sale" s
-        WHERE ${buildWhere(start, end)}
-      `, tenantId, start, end);
-      return result[0] || { revenue: 0, orders: 0, aov: 0 };
-    };
-
-    const currentSummary = await getSummary(currentStart, currentEnd);
-    const prevSummary = await getSummary(prevStart, prevEnd);
+    const currentSummary = summaryResult[0] || { revenue: 0, orders: 0, aov: 0 };
 
     // 2. Hourly Distribution (Peak Hours)
     const hourlyData = await prisma.$queryRawUnsafe(`
@@ -15770,15 +15675,16 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
         SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "revenue",
         COUNT(s.id) as "orders"
       FROM "Sale" s
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       LEFT JOIN (
         SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
         FROM "SaleReturn"
         GROUP BY "saleId"
       ) sr ON sr."saleId" = s.id
-      WHERE ${buildWhere(currentStart, currentEnd)}
+      WHERE ${filterRes.whereClause}
       GROUP BY 1
       ORDER BY 1 ASC
-    `, tenantId, currentStart, currentEnd);
+    `, ...filterRes.queryParams);
 
     // 3. Category Distribution
     const categoryData = await prisma.$queryRawUnsafe(`
@@ -15789,33 +15695,34 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
       JOIN "Sale" s ON si."saleId" = s.id
       JOIN "Product" p ON si."productId" = p.id
       LEFT JOIN "ProductCategory" c ON p."categoryId" = c.id
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       LEFT JOIN (
         SELECT sri."productId", sr."saleId", SUM(sri.total) as returnedTotal
         FROM "SaleReturnItem" sri
         JOIN "SaleReturn" sr ON sri."returnId" = sr.id
         GROUP BY sri."productId", sr."saleId"
       ) ret ON ret."productId" = si."productId" AND ret."saleId" = si."saleId"
-      WHERE ${buildWhere(currentStart, currentEnd)}
+      WHERE ${filterRes.whereClause}
       GROUP BY c.name
       ORDER BY "revenue" DESC
-    `, tenantId, currentStart, currentEnd);
+    `, ...filterRes.queryParams);
 
-    // 4. Daily Trend (to compare with previous if needed)
+    // 4. Daily Trend
     const dailyTrend = await prisma.$queryRawUnsafe(`
       SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "date", 
              SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "total"
       FROM "Sale" s
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       LEFT JOIN (
         SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
         FROM "SaleReturn"
         GROUP BY "saleId"
       ) sr ON sr."saleId" = s.id
-      WHERE ${buildWhere(currentStart, currentEnd)}
+      WHERE ${filterRes.whereClause}
       GROUP BY DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')
       ORDER BY "date" ASC
-    `, tenantId, currentStart, currentEnd);
+    `, ...filterRes.queryParams);
 
-    // Helper to handle BigInt serialization
     const serialize = (data: any) => {
       return JSON.parse(JSON.stringify(data, (key, value) =>
         typeof value === 'bigint' ? Number(value) : value
@@ -15824,8 +15731,12 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
 
     res.json(serialize({
       summary: {
-        current: { ...currentSummary, revenue: Number(currentSummary.revenue) || 0, aov: Number(currentSummary.aov) || 0, orders: Number(currentSummary.orders) || 0 },
-        previous: { ...prevSummary, revenue: Number(prevSummary.revenue) || 0, aov: Number(prevSummary.aov) || 0, orders: Number(prevSummary.orders) || 0 }
+        current: {
+          revenue: Number(currentSummary.revenue) || 0,
+          aov: Number(currentSummary.aov) || 0,
+          orders: Number(currentSummary.orders) || 0
+        },
+        previous: { revenue: 0, aov: 0, orders: 0 }
       },
       hourly: (hourlyData as any[]).map((h: any) => ({ ...h, revenue: Number(h.revenue) || 0, orders: Number(h.orders) || 0 })),
       categories: (categoryData as any[]).map((c: any) => ({ ...c, revenue: Number(c.revenue) || 0 })),

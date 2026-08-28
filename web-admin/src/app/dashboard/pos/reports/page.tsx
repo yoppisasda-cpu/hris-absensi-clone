@@ -100,7 +100,9 @@ export default function POSReportsPage() {
                 params: { 
                     branchId: selectedBranchId,
                     startDate,
-                    endDate
+                    endDate,
+                    paymentMethod: paymentFilter,
+                    saleType: saleTypeFilter
                 }
             });
             setComprehensive(compRes.data);
