@@ -2771,35 +2771,51 @@ app.get('/api/inventory/ai-po-recommendations', tenantMiddleware, async (req: Re
       }
     });
 
-    // 3. Track consumption per item (Direct Sales & Raw Material BOM breakdown)
+    // Helper function to resolve consumption down the BOM tree recursively
+    const resolveConsumption = (
+      productId: number,
+      qty: number,
+      visited = new Set<number>()
+    ) => {
+      if (visited.has(productId)) return; // Prevent infinite loop in circular recipes
+      visited.add(productId);
+
+      const prod = productMap.get(productId);
+      if (!prod) return;
+
+      if (prod.Recipes && prod.Recipes.length > 0) {
+        // Product has a recipe -> produced in-house, pass demand to ingredients
+        const yieldFactor = prod.recipeYield || 1;
+        for (const recipeItem of prod.Recipes) {
+          const ingredientQty = (qty * Number(recipeItem.quantity)) / yieldFactor;
+          resolveConsumption(recipeItem.materialId, ingredientQty, new Set(visited));
+        }
+      } else {
+        // Product has no recipe -> it is a purchased item from vendor
+        consumptionMap[prod.id] = (consumptionMap[prod.id] || 0) + qty;
+      }
+    };
+
+    // 3. Track consumption per item via BOM resolution
     const consumptionMap: Record<number, number> = {};
 
     for (const sale of sales) {
       for (const item of sale.SaleItem) {
         if (!item.productId) continue;
         const qty = Number(item.quantity) || 0;
-        const prod = productMap.get(item.productId);
-
-        if (!prod) continue;
-
-        // Direct sales consumption
-        consumptionMap[prod.id] = (consumptionMap[prod.id] || 0) + qty;
-
-        // Recipe / Raw Material BOM breakdown
-        if (prod.Recipes && prod.Recipes.length > 0) {
-          const yieldFactor = prod.recipeYield || 1;
-          for (const recipeItem of prod.Recipes) {
-            const materialQty = (qty * Number(recipeItem.quantity)) / yieldFactor;
-            consumptionMap[recipeItem.materialId] = (consumptionMap[recipeItem.materialId] || 0) + materialQty;
-          }
-        }
+        resolveConsumption(item.productId, qty);
       }
     }
 
-    // 4. Calculate PO recommendations
+    // 4. Calculate PO recommendations (Only for vendor-purchased items, i.e. items without recipe)
     const recommendations: any[] = [];
 
     for (const prod of products) {
+      // Products manufactured in-house (having recipes) are excluded from vendor PO
+      if (prod.Recipes && prod.Recipes.length > 0) {
+        continue;
+      }
+
       const totalConsumed = consumptionMap[prod.id] || 0;
       const avgDailySales = Math.round((totalConsumed / days) * 100) / 100;
       const currentStock = Number(prod.stock) || 0;
@@ -2827,7 +2843,7 @@ app.get('/api/inventory/ai-po-recommendations', tenantMiddleware, async (req: Re
           productName: prod.name,
           sku: prod.sku || '-',
           categoryName: prod.category?.name || 'Tanpa Kategori',
-          unit: prod.unit || 'Pcs',
+          unit: prod.purchaseUnit || prod.unit || 'Pcs',
           currentStock,
           minStock,
           costPrice,
