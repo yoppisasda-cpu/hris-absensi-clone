@@ -86,8 +86,11 @@ export async function getFinancialForecast(tenantId: number): Promise<any> {
 /**
  * Menyusun data arus kas untuk visualisasi Sankey (Alur Keuangan)
  */
-export async function getFinancialFlow(tenantId: number): Promise<any> {
+export async function getFinancialFlow(tenantIdInput: any): Promise<any> {
     try {
+        const tenantId = Number(tenantIdInput);
+        if (isNaN(tenantId)) throw new Error('Invalid Tenant ID');
+
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -167,7 +170,7 @@ export async function getFinancialFlow(tenantId: number): Promise<any> {
             }
         });
 
-        // 2. Wallet -> Expenses
+        // 3. Wallet -> Expenses
         Object.entries(expensesMap).forEach(([catIdStr, amount]) => {
             const catId = Number(catIdStr);
             if (amount > 0) {
@@ -182,9 +185,18 @@ export async function getFinancialFlow(tenantId: number): Promise<any> {
             }
         });
 
-        // 3. Wallet -> Profit (If any)
-        const profit = totalIncome - totalExpense;
-        if (profit > 0) {
+        // 4. Balancing node if Income < Expense (e.g. funded from initial balance / company cash)
+        if (totalIncome < totalExpense) {
+            const neededCapital = totalExpense - totalIncome;
+            nodes.push({ name: 'Kas/Modal Usaha' });
+            links.push({
+                source: nodes.length - 1,
+                target: 0,
+                value: neededCapital
+            });
+        } else if (totalIncome > totalExpense) {
+            // Wallet -> Profit
+            const profit = totalIncome - totalExpense;
             nodes.push({ name: 'Laba Bersih' });
             links.push({
                 source: 0,

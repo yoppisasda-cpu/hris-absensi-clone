@@ -48,12 +48,12 @@ export default function CashflowSankey() {
         const { x, y, width, height, index, payload, containerWidth } = props;
         if (!payload) return null;
 
-        const isLeft = payload.depth === 0;
+        const isLeft = payload.depth === 0 || (payload.sourceNodes && payload.sourceNodes.length === 0);
         const isCenter = payload.name === 'Kas Aivola';
         const isProfit = payload.name === 'Laba Bersih';
 
         let color = '#f43f5e'; // red for expenses
-        if (isLeft || payload.name.includes('Penjualan') || payload.name.includes('Pemasukan')) {
+        if (isLeft || payload.name.includes('Penjualan') || payload.name.includes('Pemasukan') || payload.name.includes('Modal')) {
             color = '#10b981'; // emerald green
         }
         if (isCenter) {
@@ -65,8 +65,8 @@ export default function CashflowSankey() {
 
         const nodeValue = payload.value || 0;
 
-        let textX = x + width + 10;
-        let textAnchor: 'start' | 'middle' | 'end' = 'start';
+        let textX = x - 10;
+        let textAnchor: 'start' | 'middle' | 'end' = 'end';
 
         if (isLeft) {
             textX = x + width + 10;
@@ -79,7 +79,7 @@ export default function CashflowSankey() {
             textAnchor = 'end';
         }
 
-        const rectHeight = Math.max(height, 12);
+        const rectHeight = Math.max(height, 14);
 
         return (
             <Layer key={`sankey-node-${index}`}>
@@ -140,13 +140,13 @@ export default function CashflowSankey() {
                     </div>
                 </div>
 
-                <div className="h-[420px] w-full">
+                <div className="h-[440px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <Sankey
                             data={data}
                             node={renderNode}
-                            nodePadding={60}
-                            margin={{ top: 20, left: 120, right: 120, bottom: 20 }}
+                            nodePadding={50}
+                            margin={{ top: 25, left: 160, right: 180, bottom: 25 }}
                             link={{ stroke: 'rgba(99, 102, 241, 0.3)', strokeOpacity: 0.4 }}
                         >
                             <Tooltip 
