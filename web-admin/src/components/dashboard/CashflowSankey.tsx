@@ -2,13 +2,22 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Sankey, Tooltip, ResponsiveContainer, Layer, Rectangle } from 'recharts';
-import { ArrowRightLeft, Info, PieChart } from 'lucide-react';
+import { ArrowRightLeft, PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import api from '@/lib/api';
 
 interface FlowData {
     nodes: { name: string }[];
     links: { source: number; target: number; value: number }[];
+}
+
+function formatCurrency(val: number) {
+    if (val >= 1_000_000) return `Rp ${(val / 1_000_000).toFixed(1)}Jt`;
+    if (val >= 1_000) return `Rp ${(val / 1_000).toFixed(0)}K`;
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+}
+
+function formatFull(val: number) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 }
 
 export default function CashflowSankey() {
@@ -29,10 +38,6 @@ export default function CashflowSankey() {
         fetchFlow();
     }, []);
 
-    const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
-    };
-
     if (loading) return (
         <div className="w-full h-96 bg-[#050505]/40 border border-white/10 rounded-[2.5rem] flex items-center justify-center animate-pulse">
             <div className="text-center">
@@ -44,85 +49,143 @@ export default function CashflowSankey() {
 
     if (!data || data.links.length === 0) return null;
 
-    const renderNode = (props: any) => {
-        const { x, y, width, height, index, payload, containerWidth } = props;
-        if (!payload) return null;
+    const nodes = data.nodes;
+    const links = data.links;
 
-        const isLeft = payload.depth === 0 || (payload.sourceNodes && payload.sourceNodes.length === 0);
-        const isCenter = payload.name === 'Kas Aivola';
-        const isProfit = payload.name === 'Laba Bersih';
+    // Find center index (Kas Aivola) — it's the node that both receives and sends links
+    const receiverSet = new Set(links.map(l => l.target));
+    const senderSet   = new Set(links.map(l => l.source));
+    const centerIndex = nodes.findIndex((_, i) => receiverSet.has(i) && senderSet.has(i));
 
-        let color = '#f43f5e'; // red for expenses
-        if (isLeft || payload.name.includes('Penjualan') || payload.name.includes('Pemasukan') || payload.name.includes('Modal')) {
-            color = '#10b981'; // emerald green
-        }
-        if (isCenter) {
-            color = '#6366f1'; // indigo
-        }
-        if (isProfit) {
-            color = '#06b6d4'; // cyan
-        }
+    // Left nodes: those that only send (sources)
+    const leftIndexes = nodes
+        .map((_, i) => i)
+        .filter(i => i !== centerIndex && senderSet.has(i) && !receiverSet.has(i));
 
-        const nodeValue = payload.value || 0;
+    // Right nodes: those that only receive (sinks)
+    const rightIndexes = nodes
+        .map((_, i) => i)
+        .filter(i => i !== centerIndex && receiverSet.has(i) && !senderSet.has(i));
 
-        let textX = x - 10;
-        let textAnchor: 'start' | 'middle' | 'end' = 'end';
+    // Calculate totals
+    const totalIn  = links.filter(l => l.target === centerIndex).reduce((s, l) => s + l.value, 0);
+    const totalOut = links.filter(l => l.source === centerIndex).reduce((s, l) => s + l.value, 0);
 
-        if (isLeft) {
-            textX = x + width + 10;
-            textAnchor = 'start';
-        } else if (isCenter) {
-            textX = x + width / 2;
-            textAnchor = 'middle';
-        } else {
-            textX = x - 10;
-            textAnchor = 'end';
-        }
+    // ---- SVG Layout Constants ----
+    const SVG_W = 900;
+    const SVG_H = 480;
+    const COL_LEFT_X  = 20;
+    const COL_RIGHT_X = 680;
+    const COL_CTR_X   = 380;
+    const COL_CTR_W   = 140;
+    const NODE_W      = 14;
+    const CHART_H     = SVG_H - 60;
+    const TOP_OFFSET  = 30;
 
-        const rectHeight = Math.max(height, 14);
+    // Build left bar positions
+    type BarItem = { nodeIdx: number; label: string; value: number; y: number; barH: number; color: string };
 
-        return (
-            <Layer key={`sankey-node-${index}`}>
-                <Rectangle
-                    x={x}
-                    y={y}
-                    width={width}
-                    height={rectHeight}
-                    fill={color}
-                    fillOpacity={0.9}
-                    rx={4}
-                    ry={4}
-                />
-                <text
-                    x={textX}
-                    y={y + rectHeight / 2 - 6}
-                    textAnchor={textAnchor}
-                    fontSize="11"
-                    fontWeight="900"
-                    fill="#f8fafc"
-                    className="select-none font-sans tracking-tight"
-                >
-                    {payload.name}
-                </text>
-                <text
-                    x={textX}
-                    y={y + rectHeight / 2 + 10}
-                    textAnchor={textAnchor}
-                    fontSize="10"
-                    fontWeight="700"
-                    fill="#94a3b8"
-                    className="select-none font-mono"
-                >
-                    {formatCurrency(nodeValue)}
-                </text>
-            </Layer>
-        );
-    };
+    function buildBars(indexes: number[], totalRef: number, colX: number, side: 'left'|'right'): BarItem[] {
+        const items = indexes.map(i => ({
+            nodeIdx: i,
+            label: nodes[i].name,
+            value: links.find(l => side === 'left' ? l.source === i : l.target === i)?.value || 0,
+        }));
+
+        const PADDING = 10;
+        const availableH = CHART_H - PADDING * (items.length - 1);
+        let usedH = 0;
+        const bars: BarItem[] = items.map((item, idx) => {
+            const frac = totalRef > 0 ? item.value / totalRef : 1 / items.length;
+            const barH = Math.max(Math.round(frac * availableH), 20);
+            usedH += barH + (idx > 0 ? PADDING : 0);
+            return { ...item, y: 0, barH, color: '' };
+        });
+
+        // Distribute Y positions
+        let curY = TOP_OFFSET;
+        bars.forEach(b => {
+            b.y = curY;
+            curY += b.barH + PADDING;
+        });
+
+        // Assign colors
+        bars.forEach(b => {
+            const isProfit = b.label === 'Laba Bersih';
+            const isModal  = b.label.includes('Modal');
+            b.color = side === 'left'
+                ? (isModal ? '#a78bfa' : '#10b981')
+                : (isProfit ? '#06b6d4' : '#f43f5e');
+        });
+
+        return bars;
+    }
+
+    const leftBars  = buildBars(leftIndexes, totalIn, COL_LEFT_X, 'left');
+    const rightBars = buildBars(rightIndexes, totalOut, COL_RIGHT_X, 'right');
+
+    // Center bar (full height)
+    const ctrH = Math.min(CHART_H, 380);
+    const ctrY = TOP_OFFSET + (CHART_H - ctrH) / 2;
+
+    // Draw flow ribbons
+    function ribbons() {
+        const elems: React.ReactNode[] = [];
+
+        leftBars.forEach((lb, idx) => {
+            const srcMidY = lb.y + lb.barH / 2;
+            const tgtMidY = ctrY + ctrH / 2;
+            const frac    = totalIn > 0 ? lb.value / totalIn : 0;
+            const tgtH    = frac * ctrH;
+            const tgtY    = ctrY + rightBars.slice(0, 0).reduce((s, _) => s, 0) +
+                leftBars.slice(0, idx).reduce((s, b) => s + (b.value / totalIn) * ctrH, 0);
+
+            const x1 = COL_LEFT_X + NODE_W;
+            const x2 = COL_CTR_X;
+            const mx = (x1 + x2) / 2;
+
+            const halfH = Math.max(lb.barH / 2, 6);
+            const tgtHalf = Math.max(tgtH / 2, 6);
+
+            const d = `M${x1},${lb.y} C${mx},${lb.y} ${mx},${tgtY} ${x2},${tgtY}
+                       L${x2},${tgtY + tgtH} C${mx},${tgtY + tgtH} ${mx},${lb.y + lb.barH} ${x1},${lb.y + lb.barH} Z`;
+
+            elems.push(
+                <path key={`l-ribbon-${idx}`} d={d}
+                    fill={lb.color} fillOpacity={0.25}
+                    stroke={lb.color} strokeOpacity={0.5} strokeWidth={0.5} />
+            );
+        });
+
+        let ctrRightOffset = 0;
+        rightBars.forEach((rb, idx) => {
+            const frac  = totalOut > 0 ? rb.value / totalOut : 0;
+            const srcH  = frac * ctrH;
+            const srcY  = ctrY + ctrRightOffset;
+            ctrRightOffset += srcH;
+
+            const x1 = COL_CTR_X + COL_CTR_W;
+            const x2 = COL_RIGHT_X;
+            const mx = (x1 + x2) / 2;
+
+            const d = `M${x1},${srcY} C${mx},${srcY} ${mx},${rb.y} ${x2},${rb.y}
+                       L${x2},${rb.y + rb.barH} C${mx},${rb.y + rb.barH} ${mx},${srcY + srcH} ${x1},${srcY + srcH} Z`;
+
+            elems.push(
+                <path key={`r-ribbon-${idx}`} d={d}
+                    fill={rb.color} fillOpacity={0.2}
+                    stroke={rb.color} strokeOpacity={0.4} strokeWidth={0.5} />
+            );
+        });
+
+        return elems;
+    }
 
     return (
         <div className="w-full mb-12 animate-in fade-in zoom-in-95 duration-700">
             <div className="rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl">
-                <div className="flex items-center justify-between mb-10">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
                     <div>
                         <div className="flex items-center gap-2 mb-2">
                             <span className="p-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
@@ -140,31 +203,100 @@ export default function CashflowSankey() {
                     </div>
                 </div>
 
-                <div className="h-[440px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <Sankey
-                            data={data}
-                            node={renderNode}
-                            nodePadding={50}
-                            margin={{ top: 25, left: 160, right: 180, bottom: 25 }}
-                            link={{ stroke: 'rgba(99, 102, 241, 0.3)', strokeOpacity: 0.4 }}
-                        >
-                            <Tooltip 
-                                contentStyle={{ 
-                                    backgroundColor: '#0f172a', 
-                                    border: '1px solid rgba(255,255,255,0.1)', 
-                                    borderRadius: '16px',
-                                    fontSize: '12px',
-                                    fontWeight: '900',
-                                    color: '#fff'
-                                }}
-                                formatter={(value: any) => formatCurrency(Number(value || 0))}
-                            />
-                        </Sankey>
-                    </ResponsiveContainer>
+                {/* Summary KPI row */}
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                    <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 flex items-center gap-3">
+                        <TrendingUp className="h-5 w-5 text-emerald-400 flex-shrink-0" />
+                        <div>
+                            <p className="text-[9px] font-black text-emerald-400/70 uppercase tracking-widest">Total Pemasukan</p>
+                            <p className="text-sm font-black text-emerald-300">{formatFull(totalIn)}</p>
+                        </div>
+                    </div>
+                    <div className="rounded-2xl bg-indigo-500/10 border border-indigo-500/20 p-4 flex items-center gap-3">
+                        <Wallet className="h-5 w-5 text-indigo-400 flex-shrink-0" />
+                        <div>
+                            <p className="text-[9px] font-black text-indigo-400/70 uppercase tracking-widest">Kas Aivola</p>
+                            <p className="text-sm font-black text-indigo-300">{formatFull(totalIn)}</p>
+                        </div>
+                    </div>
+                    <div className="rounded-2xl bg-rose-500/10 border border-rose-500/20 p-4 flex items-center gap-3">
+                        <TrendingDown className="h-5 w-5 text-rose-400 flex-shrink-0" />
+                        <div>
+                            <p className="text-[9px] font-black text-rose-400/70 uppercase tracking-widest">Total Pengeluaran</p>
+                            <p className="text-sm font-black text-rose-300">{formatFull(totalOut)}</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-white/5 flex flex-wrap gap-8 items-center justify-center">
+                {/* Custom SVG Sankey */}
+                <div className="w-full overflow-x-auto">
+                    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{ minHeight: 420 }}>
+                        {/* Ribbons (drawn behind nodes) */}
+                        {ribbons()}
+
+                        {/* Left Nodes */}
+                        {leftBars.map((lb) => (
+                            <g key={`left-${lb.nodeIdx}`}>
+                                <rect x={COL_LEFT_X} y={lb.y} width={NODE_W} height={lb.barH}
+                                    fill={lb.color} rx={3} opacity={0.9} />
+                                {/* Label */}
+                                <text x={COL_LEFT_X + NODE_W + 8} y={lb.y + lb.barH / 2 - 5}
+                                    fontSize={10} fontWeight={800} fill="#f8fafc" textAnchor="start">
+                                    {lb.label.toUpperCase()}
+                                </text>
+                                <text x={COL_LEFT_X + NODE_W + 8} y={lb.y + lb.barH / 2 + 9}
+                                    fontSize={9} fontWeight={600} fill="#94a3b8" textAnchor="start">
+                                    {formatCurrency(lb.value)}
+                                </text>
+                            </g>
+                        ))}
+
+                        {/* Center Node — Kas Aivola */}
+                        <g>
+                            <rect x={COL_CTR_X} y={ctrY} width={COL_CTR_W} height={ctrH}
+                                fill="url(#walletGrad)" rx={6} opacity={0.95} />
+                            {/* Glow border */}
+                            <rect x={COL_CTR_X} y={ctrY} width={COL_CTR_W} height={ctrH}
+                                fill="none" stroke="#818cf8" strokeWidth={1.5} rx={6} opacity={0.6} />
+                            <text x={COL_CTR_X + COL_CTR_W / 2} y={ctrY + ctrH / 2 - 12}
+                                fontSize={11} fontWeight={900} fill="#e0e7ff" textAnchor="middle">
+                                🏦 KAS AIVOLA
+                            </text>
+                            <text x={COL_CTR_X + COL_CTR_W / 2} y={ctrY + ctrH / 2 + 6}
+                                fontSize={9} fontWeight={700} fill="#a5b4fc" textAnchor="middle">
+                                {formatCurrency(totalIn)}
+                            </text>
+                        </g>
+
+                        {/* Right Nodes */}
+                        {rightBars.map((rb) => (
+                            <g key={`right-${rb.nodeIdx}`}>
+                                <rect x={COL_RIGHT_X} y={rb.y} width={NODE_W} height={rb.barH}
+                                    fill={rb.color} rx={3} opacity={0.9} />
+                                {/* Label to the left of the bar */}
+                                <text x={COL_RIGHT_X - 8} y={rb.y + rb.barH / 2 - 5}
+                                    fontSize={10} fontWeight={800} fill="#f8fafc" textAnchor="end">
+                                    {rb.label.toUpperCase()}
+                                </text>
+                                <text x={COL_RIGHT_X - 8} y={rb.y + rb.barH / 2 + 9}
+                                    fontSize={9} fontWeight={600} fill="#94a3b8" textAnchor="end">
+                                    {formatCurrency(rb.value)}
+                                </text>
+                            </g>
+                        ))}
+
+                        {/* Gradient definitions */}
+                        <defs>
+                            <linearGradient id="walletGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.9} />
+                                <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.9} />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+
+                {/* Legend */}
+                <div className="mt-6 pt-5 border-t border-white/5 flex flex-wrap gap-8 items-center justify-center">
                     <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
                         <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Sumber Pendapatan</span>
@@ -177,9 +309,16 @@ export default function CashflowSankey() {
                         <div className="h-2 w-2 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
                         <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Pos Pengeluaran</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.5)]" />
+                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Modal Usaha</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Laba Bersih</span>
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
-
