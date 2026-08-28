@@ -91,7 +91,17 @@ export async function getFinancialFlow(tenantId: number): Promise<any> {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        // Ambil semua data pemasukan dan pengeluaran 30 hari terakhir
+        // Ambil data POS Sales, Pemasukan manual, dan Pengeluaran 30 hari terakhir
+        const posSalesAgg = await prisma.sale.aggregate({
+            where: {
+                companyId: tenantId,
+                date: { gte: thirtyDaysAgo },
+                status: { notIn: ['CANCELLED', 'VOID', 'RETURNED'] }
+            },
+            _sum: { totalAmount: true }
+        });
+        const posSalesTotal = Number(posSalesAgg._sum.totalAmount) || 0;
+
         const rawIncomes = await prisma.income.findMany({
             where: { companyId: tenantId, date: { gte: thirtyDaysAgo } },
             select: { categoryId: true, amount: true }
@@ -131,12 +141,23 @@ export async function getFinancialFlow(tenantId: number): Promise<any> {
         let totalIncome = 0;
         let totalExpense = 0;
 
-        // 1. Incomes -> Wallet
+        // 1. POS Sales -> Wallet
+        if (posSalesTotal > 0) {
+            totalIncome += posSalesTotal;
+            nodes.push({ name: 'Penjualan POS' });
+            links.push({
+                source: nodes.length - 1,
+                target: 0,
+                value: posSalesTotal
+            });
+        }
+
+        // 2. Incomes -> Wallet
         Object.entries(incomesMap).forEach(([catIdStr, amount]) => {
             const catId = Number(catIdStr);
             if (amount > 0) {
                 totalIncome += amount;
-                const catName = incomeCats.find(c => c.id === catId)?.name || `Income #${catId}`;
+                const catName = incomeCats.find(c => c.id === catId)?.name || `Pemasukan #${catId}`;
                 nodes.push({ name: catName });
                 links.push({
                     source: nodes.length - 1,

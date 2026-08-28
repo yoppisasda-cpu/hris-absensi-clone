@@ -44,6 +44,81 @@ export default function CashflowSankey() {
 
     if (!data || data.links.length === 0) return null;
 
+    const renderNode = (props: any) => {
+        const { x, y, width, height, index, payload, containerWidth } = props;
+        if (!payload) return null;
+
+        const isLeft = payload.depth === 0;
+        const isCenter = payload.name === 'Kas Aivola';
+        const isProfit = payload.name === 'Laba Bersih';
+
+        let color = '#f43f5e'; // red for expenses
+        if (isLeft || payload.name.includes('Penjualan') || payload.name.includes('Pemasukan')) {
+            color = '#10b981'; // emerald green
+        }
+        if (isCenter) {
+            color = '#6366f1'; // indigo
+        }
+        if (isProfit) {
+            color = '#06b6d4'; // cyan
+        }
+
+        const nodeValue = payload.value || 0;
+
+        let textX = x + width + 10;
+        let textAnchor = 'start';
+
+        if (isLeft) {
+            textX = x + width + 10;
+            textAnchor = 'start';
+        } else if (isCenter) {
+            textX = x + width / 2;
+            textAnchor = 'middle';
+        } else {
+            textX = x - 10;
+            textAnchor = 'end';
+        }
+
+        const rectHeight = Math.max(height, 12);
+
+        return (
+            <Layer key={`sankey-node-${index}`}>
+                <Rectangle
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={rectHeight}
+                    fill={color}
+                    fillOpacity={0.9}
+                    rx={4}
+                    ry={4}
+                />
+                <text
+                    x={textX}
+                    y={y + rectHeight / 2 - 6}
+                    textAnchor={textAnchor}
+                    fontSize="11"
+                    fontWeight="900"
+                    fill="#f8fafc"
+                    className="select-none font-sans tracking-tight"
+                >
+                    {payload.name}
+                </text>
+                <text
+                    x={textX}
+                    y={y + rectHeight / 2 + 10}
+                    textAnchor={textAnchor}
+                    fontSize="10"
+                    fontWeight="700"
+                    fill="#94a3b8"
+                    className="select-none font-mono"
+                >
+                    {formatCurrency(nodeValue)}
+                </text>
+            </Layer>
+        );
+    };
+
     return (
         <div className="w-full mb-12 animate-in fade-in zoom-in-95 duration-700">
             <div className="rounded-[2.5rem] border border-white/10 bg-[#050505]/40 backdrop-blur-xl p-8 shadow-2xl">
@@ -65,14 +140,14 @@ export default function CashflowSankey() {
                     </div>
                 </div>
 
-                <div className="h-[400px] w-full">
+                <div className="h-[420px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <Sankey
                             data={data}
-                            node={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }}
-                            nodePadding={50}
-                            margin={{ top: 20, left: 20, right: 20, bottom: 20 }}
-                            link={{ stroke: 'rgba(99, 102, 241, 0.2)' }}
+                            node={renderNode}
+                            nodePadding={60}
+                            margin={{ top: 20, left: 120, right: 120, bottom: 20 }}
+                            link={{ stroke: 'rgba(99, 102, 241, 0.3)', strokeOpacity: 0.4 }}
                         >
                             <Tooltip 
                                 contentStyle={{ 
