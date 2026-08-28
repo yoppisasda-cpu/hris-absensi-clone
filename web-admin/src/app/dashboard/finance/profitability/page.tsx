@@ -46,16 +46,43 @@ export default function ProfitabilityPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+  const [branches, setBranches] = useState<any[]>([]);
+  const [isRestricted, setIsRestricted] = useState(false);
   const [dateRange, setDateRange] = useState({
-    startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
+    startDate: format(new Date(), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd')
   });
+
+  useEffect(() => {
+    const role = localStorage.getItem('userRole');
+    const branchId = localStorage.getItem('userBranchId');
+    if (role === 'POS_VIEWER' && branchId && branchId !== '') {
+      setSelectedBranchId(branchId);
+      setIsRestricted(true);
+    }
+    fetchBranches();
+  }, []);
+
+  const fetchBranches = async () => {
+    try {
+      const res = await api.get('/branches');
+      setBranches(res.data);
+    } catch (error) {
+      console.error("Gagal mengambil data cabang", error);
+    }
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [reportRes, catRes] = await Promise.all([
-        api.get('/reports/profitability', { params: dateRange }),
+        api.get('/reports/profitability', { 
+          params: { 
+            ...dateRange, 
+            branchId: selectedBranchId 
+          } 
+        }),
         api.get('/pos/categories')
       ]);
       setData(reportRes.data);
@@ -71,7 +98,7 @@ export default function ProfitabilityPage() {
 
   useEffect(() => {
     fetchData();
-  }, [dateRange]);
+  }, [dateRange, selectedBranchId]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -108,7 +135,20 @@ export default function ProfitabilityPage() {
             <p className="text-slate-400 text-sm">Pantau performa keuntungan per item dan efisiensi HPP</p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {!isRestricted && (
+              <select 
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer font-medium"
+              >
+                <option value="all">Semua Cabang</option>
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            )}
+
             <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-sm">
               <Calendar className="h-4 w-4 text-slate-400" />
               <input 

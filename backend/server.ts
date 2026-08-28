@@ -12764,14 +12764,12 @@ app.get('/api/finance/journal/export', tenantMiddleware, async (req: Request, re
 app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+    if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
 
-    // Set end of day for endDate
-    endDate.setHours(23, 59, 59, 999);
+    const filterRes = await buildPosWhereClause(req, tenantId, req.query);
 
-    // 1. Get SaleItems joining with Sale to filter by date and company
-    const saleItems: any[] = await prisma.$queryRaw`
+    // 1. Get SaleItems joining with Sale to filter by date, company, branch, role, etc.
+    const saleItems: any[] = await prisma.$queryRawUnsafe(`
       SELECT 
         si.id, 
         si."productId", 
@@ -12788,17 +12786,15 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
       JOIN "Sale" s ON si."saleId" = s.id
       JOIN "Product" p ON si."productId" = p.id
       LEFT JOIN "ProductCategory" pc ON p."categoryId" = pc.id
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       LEFT JOIN (
         SELECT sri."productId", sr."saleId", SUM(sri.quantity) as "returnedQty", SUM(sri.total) as "returnedTotal"
         FROM "SaleReturnItem" sri
         JOIN "SaleReturn" sr ON sri."returnId" = sr.id
         GROUP BY sri."productId", sr."saleId"
       ) sri ON sri."productId" = si."productId" AND sri."saleId" = si."saleId"
-      WHERE s."companyId" = ${tenantId} 
-        AND s.date >= ${startDate} 
-        AND s.date <= ${endDate}
-        AND s.status NOT IN ('CANCELLED', 'VOID')
-    `;
+      WHERE ${filterRes.whereClause}
+    `, ...filterRes.queryParams);
 
     // 2. Fetch all products and recipes to support recursive HPP calculation
     const allProducts = await prisma.product.findMany({
@@ -12860,7 +12856,7 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
       const product = allProducts.find(p => p.id === pid);
       const calculatedUnitCost = product ? getProductCost(product) : (item.currentCostPrice || 0);
 
-      let itemCogs = item.quantity * calculatedUnitCost;
+      let itemCogs = Number(item.quantity) * calculatedUnitCost;
       
       // Calculate Modifiers COGS
       if (item.modifiers) {
@@ -12871,15 +12867,15 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
                const linkedQty = Number(val.linkedQuantity) || 1;
                const modProduct = allProducts.find(p => p.id === linkedProdId);
                const modUnitCogs = modProduct ? getProductCost(modProduct) : 0;
-               itemCogs += (item.quantity * linkedQty * modUnitCogs);
+               itemCogs += (Number(item.quantity) * linkedQty * modUnitCogs);
             }
          });
       }
 
-      const itemRevenue = item.total;
+      const itemRevenue = Number(item.total) || 0;
       const itemProfit = itemRevenue - itemCogs;
       
-      productStats[pid].qtySold += item.quantity;
+      productStats[pid].qtySold += Number(item.quantity) || 0;
       productStats[pid].revenue += itemRevenue;
       productStats[pid].cogs += itemCogs;
       productStats[pid].profit += itemProfit;
@@ -12904,7 +12900,13 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
     const totalRevenue = productArray.reduce((sum, p) => sum + p.revenue, 0);
     const totalProfit = productArray.reduce((sum, p) => sum + p.profit, 0);
 
-    res.json({
+    const serialize = (data: any) => {
+      return JSON.parse(JSON.stringify(data, (key, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+      ));
+    };
+
+    res.json(serialize({
       products: productArray,
       trend: trendArray,
       summary: {
@@ -12913,10 +12915,10 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
         // Weighted Average Margin: (Total Profit / Total Revenue)
         avgMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
       }
-    });
+    }));
   } catch (error: any) {
-    console.error("PROFITABILITY REPORT ERROR:", error);
-    res.status(500).json({ error: 'Gagal menghasilkan analisis margin: ' + error.message });
+    console.error("Profitability report error:", error);
+    res.status(500).json({ error: "Gagal mengambil data laporan profitabilitas: " + error.message });
   }
 });
 // F16.1. Get Payables Report (Hutang)
