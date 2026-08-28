@@ -23,7 +23,9 @@ export default function AiPoModal({ isOpen, onClose, onGeneratePo }: AiPoModalPr
   const fetchRecommendations = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/inventory/ai-po-recommendations?days=${days}&bufferDays=${bufferDays}`);
+      const branchId = localStorage.getItem('userBranchId') || '';
+      const branchParam = branchId ? `&branchId=${branchId}` : '';
+      const res = await api.get(`/inventory/ai-po-recommendations?days=${days}&bufferDays=${bufferDays}${branchParam}`);
       const list = res.data.recommendations || [];
       setRecommendations(list);
       setAiSummary(res.data.aiSummary || "");

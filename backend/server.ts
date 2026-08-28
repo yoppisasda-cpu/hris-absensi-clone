@@ -2759,17 +2759,35 @@ app.get('/api/inventory/ai-po-recommendations', tenantMiddleware, async (req: Re
 
     const productMap = new Map<number, any>(products.map(p => [p.id, p]));
 
-    // 2. Fetch completed sales in the period
-    const sales = await prisma.sale.findMany({
-      where: {
-        companyId: tenantId,
-        date: { gte: startDate },
-        status: { notIn: ['CANCELLED', 'VOID', 'RETURNED'] }
-      },
-      include: {
-        SaleItem: true
-      }
-    });
+    // 2. Build date range and POS filter conditions (WIB Timezone)
+    const now = new Date();
+    const startD = new Date(now.getTime() + 7 * 3600 * 1000 - days * 86400 * 1000);
+    const startStr = startD.toISOString().split('T')[0];
+    const endStr = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().split('T')[0];
+
+    const queryParamsObj = { ...req.query };
+    if (!queryParamsObj.startDate) queryParamsObj.startDate = `${startStr}T00:00:00+07:00`;
+    if (!queryParamsObj.endDate) queryParamsObj.endDate = `${endStr}T23:59:59+07:00`;
+
+    const filterRes = await buildPosWhereClause(req, tenantId, queryParamsObj);
+
+    // 3. Fetch Net Sales per item using unified POS filter conditions
+    const saleItems: any[] = await prisma.$queryRawUnsafe(`
+      SELECT 
+        si."productId", 
+        SUM(GREATEST(0, si.quantity - COALESCE(ret."returnedQty", 0))) as "netQtySold"
+      FROM "SaleItem" si
+      JOIN "Sale" s ON si."saleId" = s.id
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+      LEFT JOIN (
+        SELECT sri."productId", sr."saleId", SUM(sri.quantity) as "returnedQty"
+        FROM "SaleReturnItem" sri
+        JOIN "SaleReturn" sr ON sri."returnId" = sr.id
+        GROUP BY sri."productId", sr."saleId"
+      ) ret ON ret."productId" = si."productId" AND ret."saleId" = si."saleId"
+      WHERE ${filterRes.whereClause}
+      GROUP BY si."productId"
+    `, ...filterRes.queryParams);
 
     // Helper function to resolve consumption down the BOM tree recursively
     const resolveConsumption = (
@@ -2796,15 +2814,13 @@ app.get('/api/inventory/ai-po-recommendations', tenantMiddleware, async (req: Re
       }
     };
 
-    // 3. Track consumption per item via BOM resolution
+    // 4. Track consumption per item via BOM resolution
     const consumptionMap: Record<number, number> = {};
 
-    for (const sale of sales) {
-      for (const item of sale.SaleItem) {
-        if (!item.productId) continue;
-        const qty = Number(item.quantity) || 0;
-        resolveConsumption(item.productId, qty);
-      }
+    for (const item of saleItems) {
+      if (!item.productId) continue;
+      const qty = Number(item.netQtySold) || 0;
+      resolveConsumption(Number(item.productId), qty);
     }
 
     // 4. Calculate PO recommendations (Only for vendor-purchased items, i.e. items without recipe)
