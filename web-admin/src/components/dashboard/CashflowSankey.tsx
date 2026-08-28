@@ -71,33 +71,34 @@ export default function CashflowSankey() {
     const totalIn  = links.filter(l => l.target === centerIndex).reduce((s, l) => s + l.value, 0);
     const totalOut = links.filter(l => l.source === centerIndex).reduce((s, l) => s + l.value, 0);
 
-    // ---- SVG Layout Constants ----
+    // ---- SVG Layout Constants (Dynamic Height) ----
     const SVG_W = 900;
-    const SVG_H = 480;
     const COL_LEFT_X  = 20;
     const COL_RIGHT_X = 680;
     const COL_CTR_X   = 380;
     const COL_CTR_W   = 140;
     const NODE_W      = 14;
-    const CHART_H     = SVG_H - 60;
     const TOP_OFFSET  = 30;
+    const BOTTOM_PAD  = 40;
 
     // Build left bar positions
     type BarItem = { nodeIdx: number; label: string; value: number; y: number; barH: number; color: string };
 
-    function buildBars(indexes: number[], totalRef: number, colX: number, side: 'left'|'right'): BarItem[] {
+    function buildBars(indexes: number[], totalRef: number, colX: number, side: 'left'|'right', chartH: number): BarItem[] {
         const items = indexes.map(i => ({
             nodeIdx: i,
             label: nodes[i].name,
             value: links.find(l => side === 'left' ? l.source === i : l.target === i)?.value || 0,
         }));
 
-        const PADDING = 10;
-        const availableH = CHART_H - PADDING * (items.length - 1);
+        // Reduce padding when many items to avoid overflow
+        const PADDING = items.length > 8 ? 6 : 10;
+        const MIN_BAR_H = items.length > 10 ? 16 : 20;
+        const availableH = chartH - PADDING * (items.length - 1);
         let usedH = 0;
         const bars: BarItem[] = items.map((item, idx) => {
             const frac = totalRef > 0 ? item.value / totalRef : 1 / items.length;
-            const barH = Math.max(Math.round(frac * availableH), 20);
+            const barH = Math.max(Math.round(frac * availableH), MIN_BAR_H);
             usedH += barH + (idx > 0 ? PADDING : 0);
             return { ...item, y: 0, barH, color: '' };
         });
@@ -121,31 +122,43 @@ export default function CashflowSankey() {
         return bars;
     }
 
-    const leftBars  = buildBars(leftIndexes, totalIn, COL_LEFT_X, 'left');
-    const rightBars = buildBars(rightIndexes, totalOut, COL_RIGHT_X, 'right');
+
+    const leftBars  = buildBars(leftIndexes, totalIn, COL_LEFT_X, 'left', 0); // placeholder, recalc below
+    const rightBars = buildBars(rightIndexes, totalOut, COL_RIGHT_X, 'right', 0);
+
+    // Dynamically compute required height: each right node needs at least 36px (bar + padding + label)
+    const MIN_NODE_SLOT = 36;
+    const rightNodeCount = rightIndexes.length;
+    const leftNodeCount  = leftIndexes.length;
+    const minChartH = Math.max(
+        rightNodeCount * MIN_NODE_SLOT,
+        leftNodeCount  * MIN_NODE_SLOT,
+        300
+    );
+    const CHART_H = minChartH;
+    const SVG_H   = CHART_H + TOP_OFFSET + BOTTOM_PAD;
+
+    // Rebuild bars with correct chartH
+    const leftBarsFinal  = buildBars(leftIndexes, totalIn, COL_LEFT_X, 'left', CHART_H);
+    const rightBarsFinal = buildBars(rightIndexes, totalOut, COL_RIGHT_X, 'right', CHART_H);
 
     // Center bar (full height)
-    const ctrH = Math.min(CHART_H, 380);
-    const ctrY = TOP_OFFSET + (CHART_H - ctrH) / 2;
+    const ctrH = Math.min(CHART_H, CHART_H - 20);
+    const ctrY = TOP_OFFSET;
 
     // Draw flow ribbons
     function ribbons() {
         const elems: React.ReactNode[] = [];
 
-        leftBars.forEach((lb, idx) => {
-            const srcMidY = lb.y + lb.barH / 2;
-            const tgtMidY = ctrY + ctrH / 2;
+        leftBarsFinal.forEach((lb, idx) => {
             const frac    = totalIn > 0 ? lb.value / totalIn : 0;
             const tgtH    = frac * ctrH;
-            const tgtY    = ctrY + rightBars.slice(0, 0).reduce((s, _) => s, 0) +
-                leftBars.slice(0, idx).reduce((s, b) => s + (b.value / totalIn) * ctrH, 0);
+            const tgtY    = ctrY +
+                leftBarsFinal.slice(0, idx).reduce((s, b) => s + (b.value / totalIn) * ctrH, 0);
 
             const x1 = COL_LEFT_X + NODE_W;
             const x2 = COL_CTR_X;
             const mx = (x1 + x2) / 2;
-
-            const halfH = Math.max(lb.barH / 2, 6);
-            const tgtHalf = Math.max(tgtH / 2, 6);
 
             const d = `M${x1},${lb.y} C${mx},${lb.y} ${mx},${tgtY} ${x2},${tgtY}
                        L${x2},${tgtY + tgtH} C${mx},${tgtY + tgtH} ${mx},${lb.y + lb.barH} ${x1},${lb.y + lb.barH} Z`;
@@ -158,7 +171,7 @@ export default function CashflowSankey() {
         });
 
         let ctrRightOffset = 0;
-        rightBars.forEach((rb, idx) => {
+        rightBarsFinal.forEach((rb, idx) => {
             const frac  = totalOut > 0 ? rb.value / totalOut : 0;
             const srcH  = frac * ctrH;
             const srcY  = ctrY + ctrRightOffset;
@@ -230,12 +243,12 @@ export default function CashflowSankey() {
 
                 {/* Custom SVG Sankey */}
                 <div className="w-full overflow-x-auto">
-                    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{ minHeight: 420 }}>
+                    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{ minHeight: Math.min(SVG_H, 600) }}>
                         {/* Ribbons (drawn behind nodes) */}
                         {ribbons()}
 
                         {/* Left Nodes */}
-                        {leftBars.map((lb) => (
+                        {leftBarsFinal.map((lb) => (
                             <g key={`left-${lb.nodeIdx}`}>
                                 <rect x={COL_LEFT_X} y={lb.y} width={NODE_W} height={lb.barH}
                                     fill={lb.color} rx={3} opacity={0.9} />
@@ -269,7 +282,7 @@ export default function CashflowSankey() {
                         </g>
 
                         {/* Right Nodes */}
-                        {rightBars.map((rb) => (
+                        {rightBarsFinal.map((rb) => (
                             <g key={`right-${rb.nodeIdx}`}>
                                 <rect x={COL_RIGHT_X} y={rb.y} width={NODE_W} height={rb.barH}
                                     fill={rb.color} rx={3} opacity={0.9} />
