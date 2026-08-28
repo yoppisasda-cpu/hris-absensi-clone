@@ -839,6 +839,8 @@ class _POSScreenState extends State<POSScreen> {
                   child: Column(
                     children: [
                       _buildSummaryRow('Subtotal Items', 'Rp ${_subtotalAmount.toStringAsFixed(0)}'),
+                      if (_employeeDiscountAmount > 0)
+                        _buildSummaryRow('Diskon Karyawan', '- Rp ${_employeeDiscountAmount.toStringAsFixed(0)}', isPositive: true),
                       if (_memberDiscountAmount > 0)
                         _buildSummaryRow('Diskon Member', '- Rp ${_memberDiscountAmount.toStringAsFixed(0)}', isPositive: true),
                       if (_voucherDiscountAmount > 0)

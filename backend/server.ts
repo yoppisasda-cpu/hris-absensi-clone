@@ -9436,11 +9436,8 @@ app.get('/api/stats/visual-finance', tenantMiddleware, async (req: Request, res:
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-    // 1. Get Revenue (Sales + Incomes) Aggregated by Date
     const revenueData: any[] = await prisma.$queryRawUnsafe(`
       SELECT day, SUM(total) as total FROM (
-        SELECT DATE_TRUNC('day', "date") as day, "totalAmount" as total FROM "Sale" WHERE "companyId" = $1 AND "date" >= $2
-        UNION ALL
         SELECT DATE_TRUNC('day', "date") as day, "amount" as total FROM "Income" WHERE "companyId" = $1 AND "date" >= $2
       ) combined
       GROUP BY day
