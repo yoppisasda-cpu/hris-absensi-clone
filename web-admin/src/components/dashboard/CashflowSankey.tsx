@@ -79,7 +79,7 @@ export default function CashflowSankey() {
     const COL_CTR_W   = 140;
     const NODE_W      = 14;
     const TOP_OFFSET  = 30;
-    const BOTTOM_PAD  = 40;
+    const BOTTOM_PAD  = 80;
 
     // Build left bar positions
     type BarItem = { nodeIdx: number; label: string; value: number; y: number; barH: number; color: string };
@@ -126,8 +126,8 @@ export default function CashflowSankey() {
     const leftBars  = buildBars(leftIndexes, totalIn, COL_LEFT_X, 'left', 0); // placeholder, recalc below
     const rightBars = buildBars(rightIndexes, totalOut, COL_RIGHT_X, 'right', 0);
 
-    // Dynamically compute required height: each right node needs at least 36px (bar + padding + label)
-    const MIN_NODE_SLOT = 36;
+    // Dynamically compute required height: each right node needs at least 46px (bar + padding + label)
+    const MIN_NODE_SLOT = 46;
     const rightNodeCount = rightIndexes.length;
     const leftNodeCount  = leftIndexes.length;
     const minChartH = Math.max(
