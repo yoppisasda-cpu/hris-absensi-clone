@@ -12880,8 +12880,8 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
       productStats[pid].cogs += itemCogs;
       productStats[pid].profit += itemProfit;
 
-      // Trend data
-      const dateKey = new Date(item.date).toISOString().split('T')[0];
+      // Trend data (formatted in WIB Asia/Jakarta)
+      const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(item.date));
       if (!trendStats[dateKey]) {
         trendStats[dateKey] = { date: dateKey, profit: 0, revenue: 0 };
       }

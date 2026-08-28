@@ -233,7 +233,14 @@ export default function ProfitabilityPage() {
                     axisLine={false} 
                     tickLine={false} 
                     tick={{fill: '#64748b', fontSize: 10, fontWeight: 600}}
-                    tickFormatter={(val) => format(new Date(val), 'dd MMM', {locale: localeId})} 
+                    tickFormatter={(val) => {
+                      if (!val) return '';
+                      const parts = val.split('-');
+                      if (parts.length === 3) {
+                        return format(new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])), 'dd MMM', {locale: localeId});
+                      }
+                      return val;
+                    }}
                   />
                   <YAxis 
                     axisLine={false} 
@@ -244,6 +251,14 @@ export default function ProfitabilityPage() {
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                     formatter={(val: any) => formatCurrency(val)}
+                    labelFormatter={(label) => {
+                      if (!label) return '';
+                      const parts = label.split('-');
+                      if (parts.length === 3) {
+                        return format(new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])), 'dd MMMM yyyy', {locale: localeId});
+                      }
+                      return label;
+                    }}
                   />
                   <Area type="monotone" dataKey="revenue" name="Omzet" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={3} />
                   <Area type="monotone" dataKey="profit" name="Profit" stroke="#10b981" fillOpacity={1} fill="url(#colorProfit)" strokeWidth={3} />
