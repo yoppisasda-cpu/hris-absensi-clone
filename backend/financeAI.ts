@@ -138,72 +138,91 @@ export async function getFinancialFlow(tenantIdInput: any): Promise<any> {
             where: { id: { in: expenseCategoryIds } }
         }) : [];
 
-        const nodes: any[] = [{ name: 'Kas Aivola' }];
-        const links: any[] = [];
-
+        // Agregasi sumber dana (Left Nodes)
+        const leftItems: { name: string; value: number }[] = [];
         let totalIncome = 0;
         let totalExpense = 0;
 
-        // 1. POS Sales -> Wallet
+        // 1. POS Sales
         if (posSalesTotal > 0) {
             totalIncome += posSalesTotal;
-            nodes.push({ name: 'Penjualan POS' });
-            links.push({
-                source: nodes.length - 1,
-                target: 0,
-                value: posSalesTotal
-            });
+            leftItems.push({ name: 'Penjualan POS', value: posSalesTotal });
         }
 
-        // 2. Incomes -> Wallet
+        // 2. Manual Incomes
         Object.entries(incomesMap).forEach(([catIdStr, amount]) => {
             const catId = Number(catIdStr);
             if (amount > 0) {
                 totalIncome += amount;
                 const catName = incomeCats.find(c => c.id === catId)?.name || `Pemasukan #${catId}`;
-                nodes.push({ name: catName });
-                links.push({
-                    source: nodes.length - 1,
-                    target: 0,
-                    value: amount
-                });
+                leftItems.push({ name: catName, value: amount });
             }
         });
 
-        // 3. Wallet -> Expenses
+        // Agregasi pengeluaran (Right Nodes)
+        const rightItems: { name: string; value: number }[] = [];
+
         Object.entries(expensesMap).forEach(([catIdStr, amount]) => {
             const catId = Number(catIdStr);
             if (amount > 0) {
                 totalExpense += amount;
                 const catName = expenseCats.find(c => c.id === catId)?.name || `Expense #${catId}`;
-                nodes.push({ name: catName });
-                links.push({
-                    source: 0,
-                    target: nodes.length - 1,
-                    value: amount
-                });
+                rightItems.push({ name: catName, value: amount });
             }
         });
 
-        // 4. Balancing node if Income < Expense (e.g. funded from initial balance / company cash)
+        // Penyeimbang Aliran Kas (Balancing Node)
         if (totalIncome < totalExpense) {
             const neededCapital = totalExpense - totalIncome;
-            nodes.push({ name: 'Kas/Modal Usaha' });
-            links.push({
-                source: nodes.length - 1,
-                target: 0,
-                value: neededCapital
-            });
+            leftItems.push({ name: 'Modal Usaha', value: neededCapital });
+            totalIncome += neededCapital;
         } else if (totalIncome > totalExpense) {
-            // Wallet -> Profit
             const profit = totalIncome - totalExpense;
-            nodes.push({ name: 'Laba Bersih' });
-            links.push({
-                source: 0,
-                target: nodes.length - 1,
-                value: profit
-            });
+            rightItems.push({ name: 'Laba Bersih', value: profit });
+            totalExpense += profit;
         }
+
+        // Jika tidak ada data sama sekali, beri fallback agar chart tidak blank
+        if (leftItems.length === 0) {
+            leftItems.push({ name: 'Kasir POS', value: 0 });
+        }
+
+        // SUSUN TOPOLOGICAL NODES: [ ...LeftNodes, Kas Aivola (Center), ...RightNodes ]
+        const nodes: any[] = [];
+        const links: any[] = [];
+
+        // 1. Masukkan Left Nodes (Index 0 s/d leftItems.length - 1)
+        leftItems.forEach(item => {
+            nodes.push({ name: item.name });
+        });
+
+        // 2. Masukkan Center Node (Kas Aivola)
+        const centerIndex = nodes.length;
+        nodes.push({ name: 'Kas Aivola' });
+
+        // 3. Masukkan Right Nodes
+        rightItems.forEach(item => {
+            nodes.push({ name: item.name });
+        });
+
+        // BUILD LINKS
+        // Left Nodes -> Center (Kas Aivola)
+        leftItems.forEach((item, idx) => {
+            links.push({
+                source: idx,
+                target: centerIndex,
+                value: item.value
+            });
+        });
+
+        // Center (Kas Aivola) -> Right Nodes
+        rightItems.forEach((item, idx) => {
+            links.push({
+                source: centerIndex,
+                target: centerIndex + 1 + idx,
+                value: item.value
+            });
+        });
 
         return { nodes, links };
     } catch (error) {
