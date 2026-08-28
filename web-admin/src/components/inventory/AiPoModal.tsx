@@ -14,17 +14,31 @@ interface AiPoModalProps {
 export default function AiPoModal({ isOpen, onClose, onGeneratePo }: AiPoModalProps) {
   const [days, setDays] = useState(7);
   const [bufferDays, setBufferDays] = useState(3);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+  const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [aiSummary, setAiSummary] = useState<string>("");
   const [selectedItems, setSelectedItems] = useState<Record<number, boolean>>({});
   const [customQuantities, setCustomQuantities] = useState<Record<number, number>>({});
 
+  useEffect(() => {
+    fetchBranches();
+  }, []);
+
+  const fetchBranches = async () => {
+    try {
+      const res = await api.get('/branches');
+      setBranches(res.data || []);
+    } catch (err) {
+      console.error("Gagal mengambil data cabang di AiPoModal", err);
+    }
+  };
+
   const fetchRecommendations = async () => {
     setLoading(true);
     try {
-      const branchId = localStorage.getItem('userBranchId') || '';
-      const branchParam = branchId ? `&branchId=${branchId}` : '';
+      const branchParam = selectedBranchId ? `&branchId=${selectedBranchId}` : '';
       const res = await api.get(`/inventory/ai-po-recommendations?days=${days}&bufferDays=${bufferDays}${branchParam}`);
       const list = res.data.recommendations || [];
       setRecommendations(list);
@@ -51,7 +65,7 @@ export default function AiPoModal({ isOpen, onClose, onGeneratePo }: AiPoModalPr
     if (isOpen) {
       fetchRecommendations();
     }
-  }, [isOpen, days, bufferDays]);
+  }, [isOpen, days, bufferDays, selectedBranchId]);
 
   if (!isOpen) return null;
 
@@ -123,6 +137,22 @@ export default function AiPoModal({ isOpen, onClose, onGeneratePo }: AiPoModalPr
         {/* Filter Controls Bar */}
         <div className="bg-slate-900/60 px-10 py-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-6">
+            {branches.length > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider italic">Cabang:</span>
+                <select
+                  value={selectedBranchId}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-[10px] font-black text-indigo-400 outline-none uppercase italic tracking-wider cursor-pointer"
+                >
+                  <option value="all">Semua Cabang</option>
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider italic">Periode Penjualan:</span>
               <select

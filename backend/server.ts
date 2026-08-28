@@ -2765,29 +2765,49 @@ app.get('/api/inventory/ai-po-recommendations', tenantMiddleware, async (req: Re
     const startStr = startD.toISOString().split('T')[0];
     const endStr = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().split('T')[0];
 
-    const queryParamsObj = { ...req.query };
-    if (!queryParamsObj.startDate) queryParamsObj.startDate = `${startStr}T00:00:00+07:00`;
-    if (!queryParamsObj.endDate) queryParamsObj.endDate = `${endStr}T23:59:59+07:00`;
+    const startDate = new Date(`${startStr}T00:00:00+07:00`);
+    const [y, m, d] = endStr.split('-').map(Number);
+    const nextD = new Date(Date.UTC(y, m - 1, d + 1));
+    const nextDayStr = nextD.toISOString().split('T')[0];
+    const endDate = new Date(`${nextDayStr}T00:00:00+07:00`);
 
-    const filterRes = await buildPosWhereClause(req, tenantId, queryParamsObj);
+    let whereConditions = [
+      `s."companyId" = $1`,
+      `s."status" NOT IN ('CANCELLED', 'VOID', 'RETURNED')`,
+      `s."date" >= $2`,
+      `s."date" < $3`
+    ];
+    let queryParams: any[] = [tenantId, startDate, endDate];
 
-    // 3. Fetch Net Sales per item using unified POS filter conditions
+    // Optional Branch Filter
+    const reqBranchId = req.query.branchId as string;
+    if (reqBranchId && reqBranchId !== 'all') {
+      if (reqBranchId === 'null') {
+        whereConditions.push(`s."branchId" IS NULL`);
+      } else {
+        whereConditions.push(`s."branchId" = $4`);
+        queryParams.push(parseInt(reqBranchId));
+      }
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // 3. Fetch Net Sales per item using clean POS sales conditions
     const saleItems: any[] = await prisma.$queryRawUnsafe(`
       SELECT 
         si."productId", 
         SUM(GREATEST(0, si.quantity - COALESCE(ret."returnedQty", 0))) as "netQtySold"
       FROM "SaleItem" si
       JOIN "Sale" s ON si."saleId" = s.id
-      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       LEFT JOIN (
         SELECT sri."productId", sr."saleId", SUM(sri.quantity) as "returnedQty"
         FROM "SaleReturnItem" sri
         JOIN "SaleReturn" sr ON sri."returnId" = sr.id
         GROUP BY sri."productId", sr."saleId"
       ) ret ON ret."productId" = si."productId" AND ret."saleId" = si."saleId"
-      WHERE ${filterRes.whereClause}
+      WHERE ${whereClause}
       GROUP BY si."productId"
-    `, ...filterRes.queryParams);
+    `, ...queryParams);
 
     // Helper function to resolve consumption down the BOM tree recursively
     const resolveConsumption = (
