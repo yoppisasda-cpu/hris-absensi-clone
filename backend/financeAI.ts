@@ -143,23 +143,28 @@ export async function getFinancialFlow(tenantIdInput: any): Promise<any> {
         let totalIncome = 0;
         let totalExpense = 0;
 
-        // 1. POS Sales — masuk sebagai 'Penjualan POS'
+        // 1. POS Sales dari tabel Sale (sumber resmi, sudah exclude CANCELLED/VOID/RETURNED)
         if (posSalesTotal > 0) {
             totalIncome += posSalesTotal;
-            leftItemsMap['Penjualan POS'] = (leftItemsMap['Penjualan POS'] || 0) + posSalesTotal;
+            leftItemsMap['Penjualan POS'] = posSalesTotal;
         }
 
-        // 2. Manual Incomes — jika nama kategori mengandung "Penjualan" atau "POS",
-        //    digabungkan ke node 'Penjualan POS' agar tidak duplikat
+        // 2. Manual Incomes — SKIP kategori yang berkaitan dengan POS/Penjualan
+        //    karena sudah dihitung dari tabel Sale di atas (hindari double-count)
         Object.entries(incomesMap).forEach(([catIdStr, amount]) => {
             const catId = Number(catIdStr);
             if (amount > 0) {
-                totalIncome += amount;
                 const rawName = incomeCats.find(c => c.id === catId)?.name || `Pemasukan #${catId}`;
-                // Merge POS-related income into single node
-                const isPosRelated = rawName.toLowerCase().includes('penjualan') || rawName.toLowerCase().includes('pos') || rawName.toLowerCase().includes('kasir');
-                const nodeName = isPosRelated ? 'Penjualan POS' : rawName;
-                leftItemsMap[nodeName] = (leftItemsMap[nodeName] || 0) + amount;
+                // Lewati kategori income yang berkaitan dengan POS (sudah dihitung dari sale table)
+                const isPosRelated = rawName.toLowerCase().includes('penjualan')
+                    || rawName.toLowerCase().includes('pos')
+                    || rawName.toLowerCase().includes('kasir')
+                    || rawName.toLowerCase().includes('pendapatan penjualan')
+                    || rawName.toLowerCase().includes('omzet');
+                if (isPosRelated) return; // skip — sudah tercakup di posSalesTotal
+
+                totalIncome += amount;
+                leftItemsMap[rawName] = (leftItemsMap[rawName] || 0) + amount;
             }
         });
 
