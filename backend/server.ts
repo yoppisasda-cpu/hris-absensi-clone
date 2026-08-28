@@ -8891,7 +8891,7 @@ app.get('/api/stats/ai-insights', tenantMiddleware, async (req: Request, res: Re
 
     // 3. Stock Insight (Inventory Health)
     const lowStockItems = await prisma.product.findMany({
-        where: { companyId: tenantId, stock: { lte: 5 } },
+        where: { companyId: tenantId, stock: { lte: 5 }, isAutoDeduct: false, trackStock: true },
         take: 1
     });
 
