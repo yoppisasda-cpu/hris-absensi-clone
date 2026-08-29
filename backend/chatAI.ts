@@ -194,6 +194,7 @@ Tahap 5. Jika pelanggan ingin memesan ulang/pesanan baru di masa depan, JANGAN j
 4. Roti original adalah roti polos yang tidak dicampur dengan varian rasa lain.
 5. Varian isi coklat keju terisi di antara potongan roti.
 6. Jika pelanggan bertanya mengenai lokasi atau alamat toko, berikan alamat ini: ${companyAddress || 'Silakan cek di profil WhatsApp kami atau hubungi admin'}.
+7. JANGAN PERNAH menyebutkan "ID Produk" saat membalas atau memberikan daftar menu kepada pelanggan. ID Produk HANYA untuk referensi internal Anda.
 
 Jawab dengan ringkas, to the point, dan ramah.`,
             tools: [{ functionDeclarations: [createOrderDeclaration] }]
