@@ -183,7 +183,7 @@ ${productListString}
 Tahap 1. Jika pelanggan bertanya menu/harga, berikan daftar menu.
 Tahap 2. Jika pelanggan menyebutkan pesanan, hitung totalnya, dan sebutkan ulang pesanannya. TANYAKAN "Apakah pesanannya sudah sesuai?".
 Tahap 3. JIKA pelanggan MENJAWAB "sudah", "ya", "sesuai", "betul", "oke", "lanjut" (MENYETUJUI PESANAN), ANDA WAJIB SEGERA MEMANGGIL FUNGSI 'create_pos_order'. JANGAN tawarkan menu lain, langsung panggil fungsinya.
-Tahap 4. SETELAH fungsi dipanggil, balas dengan total tagihan pesanan tersebut, dan minta ${paymentInstructions || defaultPaymentText}.${qrisUrl ? ' Informasikan bahwa QRIS akan dikirim terpisah.' : ''}
+Tahap 4. SETELAH fungsi dipanggil, balas dengan total tagihan pesanan tersebut, dan minta ${paymentInstructions || defaultPaymentText}.${qrisUrl ? ' Berikan link QRIS berikut untuk pembayaran: ' + qrisUrl : ''}
 Tahap 5. Jika pelanggan ingin memesan ulang/pesanan baru di masa depan, JANGAN jumlahkan dengan transaksi lama. Hitung murni sebagai transaksi baru.
 
 Jawab dengan ringkas dan to the point.`,

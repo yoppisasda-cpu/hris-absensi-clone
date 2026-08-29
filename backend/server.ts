@@ -417,7 +417,6 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
 
         // D. Dapatkan Balasan dari AI
         let aiResponse = '';
-        let qrisUrlForImage: string | null = null; // Deklarasi di outer scope agar bisa diakses di G2
         if (targetCompanyId !== 1) {
             const company = await prisma.company.findUnique({ 
                 where: { id: targetCompanyId }, 
@@ -458,10 +457,6 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
             );
             
             aiResponse = aiResult.text;
-            // Tentukan apakah perlu kirim QRIS gambar: cek apakah AI sedang meminta pembayaran
-            const lowerResp = aiResponse.toLowerCase();
-            const isPaymentMessage = lowerResp.includes('tagihan') || lowerResp.includes('transfer') || lowerResp.includes('qris') || lowerResp.includes('bayar');
-            qrisUrlForImage = (company?.qrisUrl && isPaymentMessage) ? company.qrisUrl : null;
 
             if (aiResult.orderPayload) {
                 // Buat Order di Kasir!
@@ -532,14 +527,8 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         // await sendWhatsAppMessage(senderPhone, aiResponse);
         console.log(`✅ [WA AI] Balasan otomatis tersimpan di CRM (dikirim via webhook auto-reply) ke ${from}`);
 
-        // G2. Jika ada QRIS dan ini adalah pesan konfirmasi order, kirim QRIS sebagai gambar terpisah
-        // G2. Jika ada QRIS dan AI sedang meminta pembayaran, kirim QRIS sebagai gambar terpisah
-        if (qrisUrlForImage) {
-            setTimeout(async () => {
-                await sendWhatsAppImage(senderPhone, qrisUrlForImage, '🔳 Scan QRIS ini untuk membayar pesanan Anda.');
-                console.log(`🖼️ [WA AI] QRIS gambar terkirim ke ${senderPhone}`);
-            }, 1500); // Delay 1.5 detik agar tidak bersamaan
-        }
+        // Catatan: Karena tier Wablas pengguna (Rp 22k) tidak mendukung pengiriman media (gambar),
+        // QRIS disertakan sebagai link langsung di dalam teks balasan AI.
 
         // Return direct JSON response for Wablas "Get Auto Reply From Webhook"
         return res.status(200).json({
