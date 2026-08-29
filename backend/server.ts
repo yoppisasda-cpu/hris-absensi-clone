@@ -3868,26 +3868,32 @@ app.patch('/api/companies/my/qris', tenantMiddleware, uploadLogo.single('qris'),
       return res.status(400).json({ error: 'Tidak ada file yang diupload' });
     }
 
-    // 1. Baca file dan ubah ke Base64 (Data URI)
-    const mimeType = req.file.mimetype;
-    const base64Image = fs.readFileSync(req.file.path, { encoding: 'base64' });
-    const qrisUrl = `data:${mimeType};base64,${base64Image}`;
+    // 1. Upload ke Supabase Storage (agar mendapatkan URL publik yang valid untuk WhatsApp preview)
+    const fullLocalPath = req.file.path;
+    let finalQrisUrl = '';
     
-    console.log(`[QRIS UPLOAD] File converted to Base64, length: ${qrisUrl.length}`);
+    try {
+      finalQrisUrl = await uploadToSupabase(fullLocalPath, 'logos'); // menggunakan bucket logos yang sudah ada
+      
+      // Cleanup local file
+      cleanupLocalFile(fullLocalPath);
+    } catch (uploadError) {
+      console.error('Failed to upload QRIS image to Supabase:', uploadError);
+      return res.status(500).json({ error: 'Gagal mengupload gambar QRIS ke Cloud Storage' });
+    }
+    
+    console.log(`[QRIS UPLOAD] File uploaded to Supabase: ${finalQrisUrl}`);
 
     // 2. Update URL di Database
     await prisma.company.update({
       where: { id: tenantId },
-      data: { qrisUrl }
+      data: { qrisUrl: finalQrisUrl }
     });
-
-    // 3. Cleanup local file karena sudah masuk database
-    cleanupLocalFile(req.file.path);
 
     res.json({ 
       success: true,
       message: 'QRIS berhasil diperbarui', 
-      qrisUrl: qrisUrl 
+      qrisUrl: finalQrisUrl 
     });
   } catch (error: any) {
     console.error('!!! QRIS UPLOAD CRITICAL ERROR !!!', error);
