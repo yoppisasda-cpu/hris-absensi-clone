@@ -393,11 +393,12 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                 where: { companyId: targetCompanyId, showInPos: true },
                 select: { id: true, name: true, price: true }
             });
-            const chatHistory = await prisma.chatMessage.findMany({
+            const recentHistory = await prisma.chatMessage.findMany({
                 where: { sessionId: session.id },
-                orderBy: { createdAt: 'asc' },
+                orderBy: { createdAt: 'desc' },
                 take: 10
             });
+            const chatHistory = recentHistory.reverse();
             
             const aiResult = await processWhatsAppOrder(
                 text, 
