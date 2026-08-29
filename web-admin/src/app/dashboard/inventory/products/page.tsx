@@ -241,7 +241,7 @@ export default function ProductsPage() {
                         <div>
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Low Stock Warning</p>
                             <p className="text-3xl font-black italic tracking-tighter text-red-500">
-                                {products.filter(p => p.trackStock && p.stock <= p.minStock).length} <span className="text-slate-700 text-xl uppercase">Critical</span>
+                                {products.filter(p => p.trackStock && !p.isAutoDeduct && p.stock <= p.minStock).length} <span className="text-slate-700 text-xl uppercase">Critical</span>
                             </p>
                         </div>
                     </div>
@@ -438,7 +438,7 @@ export default function ProductsPage() {
                                         <td className="px-4 py-6 text-center">
                                             {product.trackStock ? (
                                                 <div className="flex flex-col items-center group/tooltip relative text-center">
-                                                     <span className={`text-lg font-black italic tracking-tighter ${product.stock <= 0 ? 'text-red-500' : product.stock <= product.minStock ? 'text-amber-500' : 'text-white'}`}>
+                                                     <span className={`text-lg font-black italic tracking-tighter ${!product.isAutoDeduct && product.stock <= 0 ? 'text-red-500' : !product.isAutoDeduct && product.stock <= product.minStock ? 'text-amber-500' : 'text-white'}`}>
                                                         {(() => {
                                                             const qty = product.stock;
                                                             const unit = product.unit;
@@ -463,12 +463,12 @@ export default function ProductsPage() {
                                                             );
                                                         })()}
                                                      </span>
-                                                    {product.stock < 0 && (
+                                                    {!product.isAutoDeduct && product.stock < 0 && (
                                                         <span className="text-[7px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-lg font-black uppercase mt-2 tracking-widest border border-red-500/20 animate-pulse">
                                                             SYNC ERR
                                                         </span>
                                                     )}
-                                                    {product.stock === 0 && (
+                                                    {!product.isAutoDeduct && product.stock === 0 && (
                                                         <span className="text-[7px] bg-white/5 text-slate-600 px-2 py-0.5 rounded-lg font-black uppercase mt-2 tracking-widest border border-white/5 italic">
                                                             DEPLETED
                                                         </span>
