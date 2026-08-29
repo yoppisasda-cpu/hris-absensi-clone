@@ -131,13 +131,14 @@ function fallbackMockResponse(msg: string): string {
 export async function processWhatsAppOrder(
     userMessage: string, 
     companyName: string, 
-    availableProducts: any[], 
-    history: {role: ChatRole, content: string}[],
+    products: {id: number, name: string, price: number}[],
+    history: {role: 'USER' | 'AI', content: string}[],
     qrisUrl: string | null = null,
-    paymentInstructions: string | null = null
+    paymentInstructions: string | null = null,
+    companyAddress: string | null = null
 ): Promise<{ text: string, orderPayload?: any }> {
     try {
-        const productListString = availableProducts.map(p => `- ${p.name} (Harga: Rp ${p.price.toLocaleString('id-ID')}) [ID Produk: ${p.id}]`).join('\n');
+        const productListString = products.map(p => `- ${p.name} (Harga: Rp ${p.price.toLocaleString('id-ID')}) [ID Produk: ${p.id}]`).join('\n');
         const defaultPaymentText = "transfer ke rekening BCA 12345678 a.n Perusahaan dengan mengirimkan bukti transfer ke chat ini";
         
         let paymentRule = `5. SETELAH fungsi dipanggil, balas pelanggan dengan total tagihan pesanan TERBARU saja, dan minta ${paymentInstructions || defaultPaymentText}.`;
@@ -192,6 +193,7 @@ Tahap 5. Jika pelanggan ingin memesan ulang/pesanan baru di masa depan, JANGAN j
 3. Waktu pengambilan PO WhatsApp dimulai dari jam 05:00 pagi sampai dengan jam 08:00 pagi.
 4. Roti original adalah roti polos yang tidak dicampur dengan varian rasa lain.
 5. Varian isi coklat keju terisi di antara potongan roti.
+6. Jika pelanggan bertanya mengenai lokasi atau alamat toko, berikan alamat ini: ${companyAddress || 'Silakan cek di profil WhatsApp kami atau hubungi admin'}.
 
 Jawab dengan ringkas, to the point, dan ramah.`,
             tools: [{ functionDeclarations: [createOrderDeclaration] }]

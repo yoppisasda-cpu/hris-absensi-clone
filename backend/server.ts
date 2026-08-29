@@ -420,7 +420,7 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         if (targetCompanyId !== 1) {
             const company = await prisma.company.findUnique({ 
                 where: { id: targetCompanyId }, 
-                select: { name: true, qrisUrl: true, paymentInstructions: true } 
+                select: { name: true, address: true, qrisUrl: true, paymentInstructions: true } 
             });
             // Ambil rekening bank dari modul Kas & Bank (FinancialAccount type BANK)
             const bankAccounts = await prisma.financialAccount.findMany({
@@ -453,7 +453,8 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                 products, 
                 chatHistory.map((h: any) => ({ role: h.sender as 'USER' | 'AI', content: h.content })),
                 company?.qrisUrl || null,
-                paymentInstructions
+                paymentInstructions,
+                company?.address || null
             );
             
             aiResponse = aiResult.text;
