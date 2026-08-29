@@ -250,6 +250,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Endpoint untuk cek IP outbound Railway (untuk whitelist di Wablas)
+app.get('/api/my-ip', async (req, res) => {
+  try {
+    const axios = require('axios');
+    const r = await axios.get('https://api.ipify.org?format=json');
+    res.json({ outboundIp: r.data.ip, message: 'Whitelist IP ini di panel Wablas' });
+  } catch (e: any) {
+    res.json({ error: e.message });
+  }
+});
+
 // --- ONE-TIME SEQUENCE FIX ENDPOINT ---
 // Visit http://localhost:5000/api/fix-sequences in your browser to fix auto-increment issues
 app.get('/api/fix-sequences', async (req: Request, res: Response) => {
