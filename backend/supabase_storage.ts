@@ -23,7 +23,7 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
  * @param destinationFolder Folder name in the bucket (e.g., 'attendance')
  * @returns Public URL of the uploaded file
  */
-export async function uploadToSupabase(localPath: string, destinationFolder: string): Promise<string> {
+export async function uploadToSupabase(localPath: string, destinationFolder: string, mimeType?: string): Promise<string> {
   const relativePath = path.relative(process.cwd(), localPath).replace(/\\/g, '/');
   const webPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
 
@@ -36,14 +36,24 @@ export async function uploadToSupabase(localPath: string, destinationFolder: str
     const fileContent = fs.readFileSync(localPath);
     const fileName = path.basename(localPath);
     const bucketName = SUPABASE_BUCKET_NAME || 'uploads';
-    const filePath = `${destinationFolder}/${fileName}`; // Use folder prefix inside bucket
+    
+    // Fallback to extension based detection if mimeType is not provided
+    const finalMimeType = mimeType || getContentType(fileName);
+    
+    // Try to guess extension if missing, to ensure URL has proper extension for some picky clients
+    let ext = path.extname(fileName);
+    if (!ext && mimeType) {
+        if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = '.jpg';
+        else if (mimeType.includes('png')) ext = '.png';
+    }
+    const filePath = `${destinationFolder}/${fileName}${ext}`;
 
     const { data, error } = await supabase.storage
       .from(bucketName)
       .upload(filePath, fileContent, {
         cacheControl: '3600',
         upsert: true,
-        contentType: getContentType(fileName)
+        contentType: finalMimeType
       });
 
     if (error) throw error;

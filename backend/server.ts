@@ -3873,7 +3873,7 @@ app.patch('/api/companies/my/qris', tenantMiddleware, uploadLogo.single('qris'),
     let finalQrisUrl = '';
     
     try {
-      finalQrisUrl = await uploadToSupabase(fullLocalPath, 'logos'); // menggunakan bucket logos yang sudah ada
+      finalQrisUrl = await uploadToSupabase(fullLocalPath, 'logos', req.file.mimetype); // menggunakan bucket logos yang sudah ada
       
       // Cleanup local file
       cleanupLocalFile(fullLocalPath);
