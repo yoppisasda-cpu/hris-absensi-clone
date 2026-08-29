@@ -417,10 +417,12 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                         const qty = Number(item.quantity) || 1;
                         totalAmount += price * qty;
                         return {
+                            productId: item.productId,
                             id: item.productId,
                             name: item.name || 'Produk AI',
                             price: price,
                             qty: qty,
+                            quantity: qty,
                             subtotal: price * qty
                         };
                     });
