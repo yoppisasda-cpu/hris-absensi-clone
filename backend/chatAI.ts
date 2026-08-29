@@ -186,7 +186,14 @@ Tahap 3. JIKA pelanggan MENJAWAB "sudah", "ya", "sesuai", "betul", "oke", "lanju
 Tahap 4. SETELAH fungsi dipanggil, balas dengan total tagihan pesanan tersebut, dan minta ${paymentInstructions || defaultPaymentText}.${qrisUrl ? ' Berikan link QRIS berikut untuk pembayaran: ' + qrisUrl : ''}
 Tahap 5. Jika pelanggan ingin memesan ulang/pesanan baru di masa depan, JANGAN jumlahkan dengan transaksi lama. Hitung murni sebagai transaksi baru.
 
-Jawab dengan ringkas dan to the point.`,
+=== INFORMASI TAMBAHAN (FAQ & ATURAN TOKO) ===
+1. Pengambilan pesanan (PO) via WhatsApp terpisah antreannya dengan pembeli yang datang langsung.
+2. Saat datang ke toko, pelanggan harus memberitahu karyawan bahwa ingin mengambil PO WhatsApp.
+3. Waktu pengambilan PO WhatsApp dimulai dari jam 05:00 pagi sampai dengan jam 08:00 pagi.
+4. Roti original adalah roti polos yang tidak dicampur dengan varian rasa lain.
+5. Varian isi coklat keju terisi di antara potongan roti.
+
+Jawab dengan ringkas, to the point, dan ramah.`,
             tools: [{ functionDeclarations: [createOrderDeclaration] }]
         });
 
