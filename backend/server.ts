@@ -530,13 +530,9 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         // Catatan: Karena tier Wablas pengguna (Rp 22k) tidak mendukung pengiriman media (gambar),
         // QRIS disertakan sebagai link langsung di dalam teks balasan AI.
 
-        // Return direct JSON response for Wablas "Get Auto Reply From Webhook"
-        return res.status(200).json({
-            status: true,
-            data: {
-                message: aiResponse
-            }
-        });
+        // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send(aiResponse);
     }
 
     res.status(200).send('EVENT_RECEIVED');
