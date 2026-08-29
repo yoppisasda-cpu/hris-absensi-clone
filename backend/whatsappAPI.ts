@@ -26,15 +26,32 @@ export async function sendWhatsAppMessage(to: string, message: string, customDom
     }
 
     try {
-        const url = `${DOMAIN}/api/send-message`;
+        // Deteksi apakah pesan mengandung URL gambar (misalnya QRIS dari Supabase)
+        const imageUrlMatch = message.match(/(https?:\/\/[^\s]+?\.(?:jpg|jpeg|png))/i);
         
-        console.log(`📡 [WA API] Mengirim ke: ${formattedTo} | URL: ${url}`);
-
-        const response = await axios.post(url, {
+        let url = `${DOMAIN}/api/send-message`;
+        let payload: any = {
             phone: formattedTo,
             message: message,
             isGroup: "0", 
-        }, {
+        };
+
+        if (imageUrlMatch && imageUrlMatch[1]) {
+            const imageUrl = imageUrlMatch[1];
+            // Ubah endpoint ke send-image dan sesuaikan payload untuk Wablas
+            url = `${DOMAIN}/api/send-image`;
+            payload = {
+                phone: formattedTo,
+                image: imageUrl,
+                caption: message.replace(imageUrl, '').trim(), // Hilangkan URL dari teks, sisanya jadikan caption
+                isGroup: "0"
+            };
+            console.log(`🖼️ [WA API] Mendeteksi URL Gambar! Menggunakan endpoint send-image: ${imageUrl}`);
+        }
+
+        console.log(`📡 [WA API] Mengirim ke: ${formattedTo} | URL: ${url}`);
+
+        const response = await axios.post(url, payload, {
             headers: {
                 'Authorization': TOKEN,
                 'Content-Type': 'application/json'
