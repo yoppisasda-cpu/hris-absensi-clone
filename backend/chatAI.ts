@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, FunctionDeclaration, Schema, Type } from "@google/generative-ai";
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -121,4 +121,103 @@ function fallbackMockResponse(msg: string): string {
     if (lowerMsg.includes('absensi')) return "Aivola menggunakan AI Face Recognition dan Liveness Detection untuk mencegah titip absen.";
     
     return "Maaf, sistem AI cerdas kami sedang mengalami kendala teknis (Limit API). Mohon coba beberapa saat lagi atau hubungi support kami.";
+}
+
+/**
+ * processWhatsAppOrder
+ * Asisten AI Kasir Virtual untuk Tenant (contoh: Roti Subuh).
+ * Mampu membaca menu dan memanggil fungsi create_pos_order jika pelanggan memesan.
+ */
+export async function processWhatsAppOrder(
+    userMessage: string, 
+    companyName: string, 
+    availableProducts: any[], 
+    history: {role: ChatRole, content: string}[]
+): Promise<{ text: string, orderPayload?: any }> {
+    try {
+        const productListString = availableProducts.map(p => `- ${p.name} (Harga: Rp ${p.price.toLocaleString('id-ID')}) [ID Produk: ${p.id}]`).join('\n');
+
+        const createOrderDeclaration: FunctionDeclaration = {
+            name: "create_pos_order",
+            description: "Membuat pesanan baru di sistem kasir ketika pelanggan mengonfirmasi pesanan mereka secara jelas. Gunakan HANYA ID Produk yang ada di daftar menu.",
+            parameters: {
+                type: Type.OBJECT,
+                properties: {
+                    items: {
+                        type: Type.ARRAY,
+                        description: "Daftar produk yang dipesan",
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                productId: { type: Type.NUMBER, description: "ID Produk dari daftar menu" },
+                                quantity: { type: Type.NUMBER, description: "Jumlah pesanan" },
+                                price: { type: Type.NUMBER, description: "Harga satuan produk" }
+                            },
+                            required: ["productId", "quantity", "price"]
+                        }
+                    },
+                    customerName: { type: Type.STRING, description: "Nama pelanggan (jika disebutkan)" },
+                    notes: { type: Type.STRING, description: "Catatan khusus pesanan" }
+                },
+                required: ["items"]
+            }
+        };
+
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.5-flash",
+            systemInstruction: `Anda adalah 'Virtual Sales Assistant' dari ${companyName}.
+Tugas Anda: Melayani pelanggan yang memesan via WhatsApp dengan ramah, luwes, dan responsif.
+
+=== DAFTAR MENU ===
+${productListString}
+
+=== ATURAN MENJAWAB ===
+1. Selalu bersikap ramah, sopan, dan hangat.
+2. Jika pelanggan bertanya menu, berikan menu yang tersedia beserta harganya dengan rapi.
+3. Jika pelanggan memesan, HITUNG TOTALNYA, konfirmasi pesanannya, dan TANYAKAN apakah sudah sesuai.
+4. JIKA pelanggan MENGONFIRMASI pesanan (misal: "Iya pesan", "Bungkus", "Oke"), SEGERA PANGGIL FUNGSI 'create_pos_order'. Jangan memanggil fungsi jika pelanggan baru sekadar bertanya harga atau belum fix.
+5. Jawab dengan ringkas, to the point. Jangan terlalu kaku.`,
+            tools: [{ functionDeclarations: [createOrderDeclaration] }]
+        });
+
+        const formattedHistory = history.map(h => ({
+            role: h.role === 'USER' ? 'user' : 'model',
+            parts: [{ text: h.content }]
+        }));
+
+        const chat = model.startChat({
+            history: formattedHistory,
+            generationConfig: { maxOutputTokens: 1000 },
+        });
+
+        const result = await chat.sendMessage(userMessage);
+        
+        // Cek apakah model melakukan panggilan fungsi
+        const functionCalls = result.response.functionCalls();
+        if (functionCalls && functionCalls.length > 0) {
+            const call = functionCalls[0];
+            if (call.name === "create_pos_order") {
+                const args = call.args as any;
+                
+                // Balas ke Gemini bahwa fungsi berhasil dijalankan agar ia memberi text respon akhir
+                const functionResponseResult = await chat.sendMessage([{
+                    functionResponse: {
+                        name: "create_pos_order",
+                        response: { status: "success", message: "Order processed" }
+                    }
+                }]);
+                
+                return {
+                    text: functionResponseResult.response.text(),
+                    orderPayload: args
+                };
+            }
+        }
+
+        return { text: result.response.text() };
+
+    } catch (error: any) {
+        console.error("❌ [AI Order Error]:", error.message);
+        return { text: "Maaf, sistem pemesanan sedang sibuk. Mohon ulangi kembali." };
+    }
 }

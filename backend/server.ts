@@ -19,7 +19,7 @@ import { spawn } from 'child_process';
 import zlib from 'zlib';
 import { initCleanupCron, runCleanup } from './cron_jobs';
 import { compareFaces } from './faceAI';
-import { getAIChatResponse, generateSubscriptionResponse } from './chatAI';
+import { getAIChatResponse, generateSubscriptionResponse, processWhatsAppOrder } from './chatAI';
 import { sendWhatsAppMessage } from './whatsappAPI';
 import aiRoutes from './src/routes/ai.routes';
 import prospectRoutes from './src/routes/prospect.routes';
@@ -382,7 +382,69 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         });
 
         // D. Dapatkan Balasan dari AI
-        const aiResponse = await getAIChatResponse(text, []);
+        let aiResponse = '';
+        if (targetCompanyId !== 1) {
+            const company = await prisma.company.findUnique({ where: { id: targetCompanyId }, select: { name: true } });
+            const products = await prisma.product.findMany({ 
+                where: { companyId: targetCompanyId, showInPos: true },
+                select: { id: true, name: true, price: true }
+            });
+            const chatHistory = await prisma.chatMessage.findMany({
+                where: { sessionId: session.id },
+                orderBy: { createdAt: 'asc' },
+                take: 10
+            });
+            
+            const aiResult = await processWhatsAppOrder(
+                text, 
+                company?.name || 'Perusahaan', 
+                products, 
+                chatHistory.map((h: any) => ({ role: h.sender as 'USER' | 'AI', content: h.content }))
+            );
+            
+            aiResponse = aiResult.text;
+
+            if (aiResult.orderPayload) {
+                // Buat Order di Kasir!
+                try {
+                    const items = aiResult.orderPayload.items;
+                    let totalAmount = 0;
+                    const saleItemsData = items.map((item: any) => {
+                        const price = Number(item.price) || 0;
+                        const qty = Number(item.quantity) || 1;
+                        totalAmount += price * qty;
+                        return {
+                            productId: item.productId,
+                            quantity: qty,
+                            price: price,
+                            originalPrice: price,
+                            subtotal: price * qty
+                        };
+                    });
+
+                    const invoiceNumber = `WA-PO-${Date.now()}`;
+                    await prisma.sale.create({
+                        data: {
+                            companyId: targetCompanyId,
+                            invoiceNumber,
+                            totalAmount,
+                            customerPhone: senderPhone,
+                            customerName: aiResult.orderPayload.customerName || targetName,
+                            saleType: 'PRE_ORDER',
+                            status: 'OPEN',
+                            paymentMethod: 'Belum Bayar',
+                            notes: aiResult.orderPayload.notes || 'Pesanan dari AI WhatsApp',
+                            SaleItem: { create: saleItemsData }
+                        }
+                    });
+                    console.log(`✅ [WA AI] Pesanan berhasil dibuat: ${invoiceNumber}`);
+                } catch (err: any) {
+                    console.error("Gagal membuat order dari AI:", err.message);
+                }
+            }
+        } else {
+            aiResponse = await getAIChatResponse(text, []);
+        }
 
         // E. Simpan Pesan AI ke Database
         await prisma.chatMessage.create({
