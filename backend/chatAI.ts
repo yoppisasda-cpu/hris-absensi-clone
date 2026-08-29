@@ -190,10 +190,20 @@ Jawab dengan ringkas dan to the point.`,
             tools: [{ functionDeclarations: [createOrderDeclaration] }]
         });
 
-        const formattedHistory = history.map(h => ({
-            role: h.role === 'USER' ? 'user' : 'model',
-            parts: [{ text: h.content }]
-        }));
+        const validHistory: { role: string, parts: { text: string }[] }[] = [];
+        for (const h of history) {
+            const mappedRole = h.role === 'USER' ? 'user' : 'model';
+            if (validHistory.length > 0 && validHistory[validHistory.length - 1].role === mappedRole) {
+                validHistory[validHistory.length - 1].parts[0].text += '\n' + h.content;
+            } else {
+                validHistory.push({ role: mappedRole, parts: [{ text: h.content }] });
+            }
+        }
+        // Gemini expects history to end with 'model' before a new 'user' message is sent via sendMessage
+        if (validHistory.length > 0 && validHistory[validHistory.length - 1].role === 'user') {
+            validHistory.pop();
+        }
+        const formattedHistory = validHistory;
 
         const chat = model.startChat({
             history: formattedHistory,
