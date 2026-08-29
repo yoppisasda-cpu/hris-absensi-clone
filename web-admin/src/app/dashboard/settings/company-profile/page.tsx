@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
-import { Building2, Save, MapPin, Navigation, Loader2, Shield } from 'lucide-react';
+import { Building2, Save, MapPin, Navigation, Loader2, Shield, QrCode } from 'lucide-react';
 
 interface Company {
     id: number;
     name: string;
     address: string | null;
     logoUrl: string | null;
+    qrisUrl?: string | null;
+    paymentInstructions?: string | null;
     picName: string | null;
     picPhone: string | null;
     longitude: number | null;
@@ -266,6 +268,31 @@ export default function CompanyProfilePage() {
         }
     };
 
+    const handleQrisUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('Format file tidak didukung! Harap upload file gambar (JPG, PNG, dll).');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('qris', file);
+
+        try {
+            setIsSaving(true);
+            const res = await api.patch('/companies/my/qris', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setCompany(prev => prev ? { ...prev, qrisUrl: res.data.qrisUrl } : null);
+            alert("QRIS berhasil diperbarui!");
+        } catch (error) {
+            console.error(error);
+            alert("Gagal mengupload QRIS.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="mb-8 flex items-center justify-between">
@@ -308,6 +335,29 @@ export default function CompanyProfilePage() {
                                 </div>
                                 <h3 className="font-bold text-slate-900 text-lg">{formData.name || 'Nama Perusahaan'}</h3>
                                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-widest leading-none">ID Perusahaan: #{company?.id}</p>
+                                
+                                <div className="w-full h-px bg-slate-100 my-6"></div>
+
+                                <div className="w-full flex flex-col items-center">
+                                    <p className="text-sm font-bold text-slate-700 mb-3">QRIS Pembayaran Statis</p>
+                                    <div className="relative group cursor-pointer w-48 h-48 mb-2">
+                                        <div className="w-full h-full rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden bg-slate-50 group-hover:border-blue-400 transition-colors">
+                                            {company?.qrisUrl ? (
+                                                <img src={company.qrisUrl} alt="QRIS" className="w-full h-full object-contain p-2" />
+                                            ) : (
+                                                <div className="text-center text-slate-400 p-4">
+                                                    <QrCode className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                                                    <span className="text-xs font-medium">Belum ada QRIS</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl cursor-pointer">
+                                            <span className="text-white text-xs font-bold uppercase tracking-wider">Ubah QRIS</span>
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleQrisUpload} />
+                                        </label>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 text-center px-4 leading-tight">Digunakan oleh AI Kasir WhatsApp saat menagih pesanan.</p>
+                                </div>
                                 
                                 <div className="w-full h-px bg-slate-100 my-6"></div>
                                 
@@ -449,6 +499,23 @@ export default function CompanyProfilePage() {
                                             </div>
                                             <p className="mt-1.5 text-[10px] text-slate-400 font-medium italic">* Digunakan untuk warna background aplikasi mobile.</p>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="h-6 w-1 bg-green-500 rounded-full"></div>
+                                        <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Informasi Pembayaran</h3>
+                                    </div>
+                                    <div className="w-full">
+                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Instruksi Pembayaran (Untuk AI Kasir)</label>
+                                        <textarea
+                                            value={formData.paymentInstructions || ''}
+                                            onChange={e => setFormData({ ...formData, paymentInstructions: e.target.value })}
+                                            className="w-full rounded-xl border border-slate-200 py-3 px-4 text-sm text-slate-700 transition-all focus:ring-4 focus:ring-green-500/10 focus:border-green-500 outline-none hover:border-slate-300 min-h-[80px]"
+                                            placeholder="Contoh: transfer ke rekening BCA 12345678 a.n Perusahaan dan kirim bukti transfer..."
+                                        ></textarea>
+                                        <p className="mt-1.5 text-[10px] text-slate-400 font-medium italic">* Akan disertakan oleh AI saat menagih pesanan pelanggan di WhatsApp.</p>
                                     </div>
                                 </div>
 

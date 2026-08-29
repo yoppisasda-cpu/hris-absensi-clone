@@ -385,7 +385,10 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         // D. Dapatkan Balasan dari AI
         let aiResponse = '';
         if (targetCompanyId !== 1) {
-            const company = await prisma.company.findUnique({ where: { id: targetCompanyId }, select: { name: true } });
+            const company = await prisma.company.findUnique({ 
+                where: { id: targetCompanyId }, 
+                select: { name: true, qrisUrl: true, paymentInstructions: true } 
+            });
             const products = await prisma.product.findMany({ 
                 where: { companyId: targetCompanyId, showInPos: true },
                 select: { id: true, name: true, price: true }
@@ -400,7 +403,9 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                 text, 
                 company?.name || 'Perusahaan', 
                 products, 
-                chatHistory.map((h: any) => ({ role: h.sender as 'USER' | 'AI', content: h.content }))
+                chatHistory.map((h: any) => ({ role: h.sender as 'USER' | 'AI', content: h.content })),
+                company?.qrisUrl || null,
+                company?.paymentInstructions || null
             );
             
             aiResponse = aiResult.text;
@@ -3477,7 +3482,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       addons,
       posBlindClosing,
       globalTaxRate,
-      deliveryNoteTerms
+      deliveryNoteTerms,
+      paymentInstructions
     } = req.body;
 
     console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
@@ -3526,6 +3532,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         timezone: timezone || undefined,
         addons: Array.isArray(addons) ? addons : undefined,
         deliveryNoteTerms: deliveryNoteTerms !== undefined ? deliveryNoteTerms : undefined,
+        paymentInstructions: paymentInstructions !== undefined ? paymentInstructions : undefined,
         openTime: req.body.openTime !== undefined ? req.body.openTime : undefined,
         closeTime: req.body.closeTime !== undefined ? req.body.closeTime : undefined,
         isOpenManual: req.body.isOpenManual !== undefined ? !!req.body.isOpenManual : undefined
@@ -3844,7 +3851,52 @@ app.patch('/api/companies/my/logo', tenantMiddleware, uploadLogo.single('logo'),
   }
 });
 
+// A3.3. Endpoint Upload QRIS Perusahaan
+app.patch('/api/companies/my/qris', tenantMiddleware, uploadLogo.single('qris'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userRole = (req as any).userRole;
 
+    console.log(`[QRIS UPLOAD] Starting for tenant: ${tenantId}, file: ${req.file?.originalname}`);
+
+    if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN' && userRole !== 'OWNER' && userRole !== 'FINANCE') {
+      return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki akses' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Tidak ada file yang diupload' });
+    }
+
+    // 1. Baca file dan ubah ke Base64 (Data URI)
+    const mimeType = req.file.mimetype;
+    const base64Image = fs.readFileSync(req.file.path, { encoding: 'base64' });
+    const qrisUrl = `data:${mimeType};base64,${base64Image}`;
+    
+    console.log(`[QRIS UPLOAD] File converted to Base64, length: ${qrisUrl.length}`);
+
+    // 2. Update URL di Database
+    await prisma.company.update({
+      where: { id: tenantId },
+      data: { qrisUrl }
+    });
+
+    // 3. Cleanup local file karena sudah masuk database
+    cleanupLocalFile(req.file.path);
+
+    res.json({ 
+      success: true,
+      message: 'QRIS berhasil diperbarui', 
+      qrisUrl: qrisUrl 
+    });
+  } catch (error: any) {
+    console.error('!!! QRIS UPLOAD CRITICAL ERROR !!!', error);
+    res.status(500).json({ 
+      error: 'Gagal mengupload QRIS', 
+      details: error.message,
+      code: error.code
+    });
+  }
+});
 
 // A4.1. Endpoint Update Aturan Gaji (Payroll Settings) Phase 20
 app.patch('/api/companies/my/payroll-settings', tenantMiddleware, async (req: Request, res: Response) => {

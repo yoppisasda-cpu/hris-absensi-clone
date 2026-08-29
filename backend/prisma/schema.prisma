@@ -35,6 +35,8 @@ model Company {
   modules                AppModule            @default(ABSENSI)
   address                String?
   logoUrl                String?
+  qrisUrl                String?
+  paymentInstructions    String?              @db.Text
   deliveryNoteTerms      String?              @db.Text
   primaryColor           String?              @default("#3B82F6")
   secondaryColor         String?              @default("#1E293B")

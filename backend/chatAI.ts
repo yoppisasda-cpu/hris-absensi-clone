@@ -132,10 +132,18 @@ export async function processWhatsAppOrder(
     userMessage: string, 
     companyName: string, 
     availableProducts: any[], 
-    history: {role: ChatRole, content: string}[]
+    history: {role: ChatRole, content: string}[],
+    qrisUrl: string | null = null,
+    paymentInstructions: string | null = null
 ): Promise<{ text: string, orderPayload?: any }> {
     try {
         const productListString = availableProducts.map(p => `- ${p.name} (Harga: Rp ${p.price.toLocaleString('id-ID')}) [ID Produk: ${p.id}]`).join('\n');
+        const defaultPaymentText = "transfer ke rekening BCA 12345678 a.n Perusahaan dengan mengirimkan bukti transfer ke chat ini";
+        
+        let paymentRule = `5. SETELAH fungsi dipanggil, balas pelanggan dengan total tagihan pesanan TERBARU saja, dan minta ${paymentInstructions || defaultPaymentText}.`;
+        if (qrisUrl) {
+            paymentRule += ` WAJIB berikan link QRIS statis berikut agar mereka bisa bayar: ${qrisUrl}`;
+        }
 
         const createOrderDeclaration: FunctionDeclaration = {
             name: "create_pos_order",
@@ -176,7 +184,7 @@ ${productListString}
 2. Jika pelanggan bertanya menu, berikan menu yang tersedia beserta harganya dengan rapi.
 3. Jika pelanggan memesan, HITUNG TOTALNYA, konfirmasi pesanannya, dan TANYAKAN apakah sudah sesuai.
 4. JIKA pelanggan MENGONFIRMASI pesanan (misal: "Iya pesan", "Bungkus", "Oke"), SEGERA PANGGIL FUNGSI 'create_pos_order'.
-5. SETELAH fungsi dipanggil, balas pelanggan dengan total tagihan pesanan TERBARU saja, dan minta transfer ke rekening BCA 12345678 a.n Perusahaan dengan mengirimkan bukti transfer ke chat ini.
+${paymentRule}
 6. PENTING: JIKA pelanggan "memesan lagi" setelah pesanan sebelumnya selesai diproses, ANGGAP INI TRANSAKSI BARU. JANGAN MASUKKAN (jangan jumlahkan) item-item dari pesanan sebelumnya ke dalam keranjang atau tagihan baru ini. Fokus HANYA pada pesanan baru tersebut.
 7. Jawab dengan ringkas, to the point. Jangan terlalu kaku.`,
             tools: [{ functionDeclarations: [createOrderDeclaration] }]
