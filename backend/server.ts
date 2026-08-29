@@ -357,16 +357,14 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         // B. Cari atau Buat ChatSession
         let session = await prisma.chatSession.findFirst({
             where: { 
-                phone: senderPhone,
-                companyId: targetCompanyId,
-                isWhatsApp: true
+                id: `wa-${targetCompanyId}-${senderPhone}`
             }
         });
 
         if (!session) {
             session = await prisma.chatSession.create({
                 data: {
-                    id: `wa-${senderPhone}`,
+                    id: `wa-${targetCompanyId}-${senderPhone}`,
                     companyId: targetCompanyId,
                     visitorName: targetName,
                     phone: senderPhone,
