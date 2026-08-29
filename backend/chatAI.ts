@@ -199,6 +199,10 @@ Jawab dengan ringkas dan to the point.`,
                 validHistory.push({ role: mappedRole, parts: [{ text: h.content }] });
             }
         }
+        // Gemini expects history to start with 'user'
+        if (validHistory.length > 0 && validHistory[0].role === 'model') {
+            validHistory.shift();
+        }
         // Gemini expects history to end with 'model' before a new 'user' message is sent via sendMessage
         if (validHistory.length > 0 && validHistory[validHistory.length - 1].role === 'user') {
             validHistory.pop();
@@ -237,6 +241,7 @@ Jawab dengan ringkas dan to the point.`,
         return { text: result.response.text() };
 
     } catch (error: any) {
+        require('fs').appendFileSync('ai_error.log', new Date().toISOString() + ' - ' + error.message + '\n' + (error.stack || '') + '\n\n');
         console.error("❌ [AI Order Error]:", error.message);
         return { text: "Maaf, sistem pemesanan sedang sibuk. Mohon ulangi kembali." };
     }
