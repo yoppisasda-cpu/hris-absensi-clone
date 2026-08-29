@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, FunctionDeclaration, Schema, Type } from "@google/generative-ai";
+import { GoogleGenerativeAI, FunctionDeclaration, Schema, SchemaType } from "@google/generative-ai";
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -141,23 +141,23 @@ export async function processWhatsAppOrder(
             name: "create_pos_order",
             description: "Membuat pesanan baru di sistem kasir ketika pelanggan mengonfirmasi pesanan mereka secara jelas. Gunakan HANYA ID Produk yang ada di daftar menu.",
             parameters: {
-                type: Type.OBJECT,
+                type: SchemaType.OBJECT,
                 properties: {
                     items: {
-                        type: Type.ARRAY,
+                        type: SchemaType.ARRAY,
                         description: "Daftar produk yang dipesan",
                         items: {
-                            type: Type.OBJECT,
+                            type: SchemaType.OBJECT,
                             properties: {
-                                productId: { type: Type.NUMBER, description: "ID Produk dari daftar menu" },
-                                quantity: { type: Type.NUMBER, description: "Jumlah pesanan" },
-                                price: { type: Type.NUMBER, description: "Harga satuan produk" }
+                                productId: { type: SchemaType.NUMBER, description: "ID Produk dari daftar menu" },
+                                quantity: { type: SchemaType.NUMBER, description: "Jumlah pesanan" },
+                                price: { type: SchemaType.NUMBER, description: "Harga satuan produk" }
                             },
                             required: ["productId", "quantity", "price"]
                         }
                     },
-                    customerName: { type: Type.STRING, description: "Nama pelanggan (jika disebutkan)" },
-                    notes: { type: Type.STRING, description: "Catatan khusus pesanan" }
+                    customerName: { type: SchemaType.STRING, description: "Nama pelanggan (jika disebutkan)" },
+                    notes: { type: SchemaType.STRING, description: "Catatan khusus pesanan" }
                 },
                 required: ["items"]
             }
