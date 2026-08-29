@@ -63,6 +63,7 @@ export default function CompanyProfilePage() {
         posBlindClosing: false,
         globalTaxRate: 0,
         deliveryNoteTerms: '',
+        paymentInstructions: '',
         openTime: '08:00',
         closeTime: '22:00',
         isOpenManual: true
@@ -112,6 +113,7 @@ export default function CompanyProfilePage() {
                 posBlindClosing: response.data.posBlindClosing || false,
                 globalTaxRate: response.data.globalTaxRate || 0,
                 deliveryNoteTerms: response.data.deliveryNoteTerms || '',
+                paymentInstructions: response.data.paymentInstructions || '',
                 openTime: response.data.openTime || '08:00',
                 closeTime: response.data.closeTime || '22:00',
                 isOpenManual: response.data.isOpenManual ?? true
@@ -162,6 +164,7 @@ export default function CompanyProfilePage() {
                 posBlindClosing: formData.posBlindClosing,
                 globalTaxRate: formData.globalTaxRate,
                 deliveryNoteTerms: formData.deliveryNoteTerms,
+                paymentInstructions: formData.paymentInstructions,
                 openTime: formData.openTime,
                 closeTime: formData.closeTime,
                 isOpenManual: formData.isOpenManual
