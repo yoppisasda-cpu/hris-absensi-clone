@@ -410,35 +410,41 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                 try {
                     const items = aiResult.orderPayload.items;
                     let totalAmount = 0;
-                    const saleItemsData = items.map((item: any) => {
+                    
+                    // Kita format items agar sesuai dengan JSON format di POS Kasir
+                    const posItems = items.map((item: any) => {
                         const price = Number(item.price) || 0;
                         const qty = Number(item.quantity) || 1;
                         totalAmount += price * qty;
                         return {
-                            productId: item.productId,
-                            quantity: qty,
+                            id: item.productId,
+                            name: item.name || 'Produk AI',
                             price: price,
-                            originalPrice: price,
+                            qty: qty,
                             subtotal: price * qty
                         };
                     });
 
-                    const invoiceNumber = `WA-PO-${Date.now()}`;
-                    await prisma.sale.create({
+                    // Cari branch & admin pertama untuk menampung order ini
+                    const defaultBranch = await prisma.branch.findFirst({ where: { companyId: targetCompanyId } });
+                    const defaultAdmin = await prisma.user.findFirst({ where: { companyId: targetCompanyId } });
+
+                    const queueLabel = `WA-${senderPhone.slice(-4)} (${aiResult.orderPayload.customerName || targetName})`;
+                    
+                    await prisma.pendingBill.create({
                         data: {
                             companyId: targetCompanyId,
-                            invoiceNumber,
-                            totalAmount,
-                            customerPhone: senderPhone,
-                            customerName: aiResult.orderPayload.customerName || targetName,
+                            branchId: defaultBranch?.id || 0,
+                            cashierId: defaultAdmin?.id || 0,
+                            label: queueLabel,
+                            items: posItems,
                             saleType: 'PRE_ORDER',
-                            status: 'OPEN',
-                            paymentMethod: 'Belum Bayar',
-                            notes: aiResult.orderPayload.notes || 'Pesanan dari AI WhatsApp',
-                            SaleItem: { create: saleItemsData }
+                            kitchenStatus: 'PENDING',
+                            queueNumber: Math.floor(Math.random() * 900) + 100 // random queue for now
                         }
                     });
-                    console.log(`✅ [WA AI] Pesanan berhasil dibuat: ${invoiceNumber}`);
+                    
+                    console.log(`✅ [WA AI] Pesanan berhasil masuk ke Pending Bills: ${queueLabel}`);
                 } catch (err: any) {
                     console.error("Gagal membuat order dari AI:", err.message);
                 }
