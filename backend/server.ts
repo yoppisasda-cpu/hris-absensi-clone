@@ -20,7 +20,7 @@ import zlib from 'zlib';
 import { initCleanupCron, runCleanup } from './cron_jobs';
 import { compareFaces } from './faceAI';
 import { getAIChatResponse, generateSubscriptionResponse, processWhatsAppOrder } from './chatAI';
-import { sendWhatsAppMessage } from './whatsappAPI';
+import { sendWhatsAppMessage, sendWhatsAppImage } from './whatsappAPI';
 import aiRoutes from './src/routes/ai.routes';
 import prospectRoutes from './src/routes/prospect.routes';
 // import prospectingRoutes from './src/routes/prospecting.routes'; // Hold for now
@@ -389,6 +389,20 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                 where: { id: targetCompanyId }, 
                 select: { name: true, qrisUrl: true, paymentInstructions: true } 
             });
+            // Ambil rekening bank dari modul Kas & Bank (FinancialAccount type BANK)
+            const bankAccounts = await prisma.financialAccount.findMany({
+                where: { companyId: targetCompanyId, type: 'BANK' },
+                select: { bankName: true, accountNumber: true, name: true },
+                take: 3
+            });
+            let paymentInstructions = company?.paymentInstructions || null;
+            if (!paymentInstructions && bankAccounts.length > 0) {
+                const bankList = bankAccounts
+                    .filter(b => b.accountNumber)
+                    .map(b => `transfer ke rekening ${b.name} ${b.accountNumber} a.n ${b.bankName}`)
+                    .join(' atau ');
+                if (bankList) paymentInstructions = bankList + ' dan kirimkan bukti transfer ke chat ini';
+            }
             const products = await prisma.product.findMany({ 
                 where: { companyId: targetCompanyId, showInPos: true },
                 select: { id: true, name: true, price: true }
@@ -406,10 +420,12 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                 products, 
                 chatHistory.map((h: any) => ({ role: h.sender as 'USER' | 'AI', content: h.content })),
                 company?.qrisUrl || null,
-                company?.paymentInstructions || null
+                paymentInstructions
             );
             
             aiResponse = aiResult.text;
+            // Simpan referensi qrisUrl untuk dikirim sebagai gambar setelah teks
+            (req as any)._qrisUrlToSend = company?.qrisUrl && aiResult.orderPayload ? company.qrisUrl : null;
 
             if (aiResult.orderPayload) {
                 // Buat Order di Kasir!
@@ -479,6 +495,15 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         // G. Kirim kembali ke WhatsApp klien via Wablas
         await sendWhatsAppMessage(senderPhone, aiResponse);
         console.log(`✅ [WA AI] Balasan otomatis tersimpan di CRM & terkirim ke ${from}`);
+
+        // G2. Jika ada QRIS dan ini adalah pesan konfirmasi order, kirim QRIS sebagai gambar terpisah
+        const qrisToSend = (req as any)._qrisUrlToSend;
+        if (qrisToSend) {
+            setTimeout(async () => {
+                await sendWhatsAppImage(senderPhone, qrisToSend, '🔳 Scan QRIS ini untuk membayar pesanan Anda.');
+                console.log(`🖼️ [WA AI] QRIS gambar terkirim ke ${senderPhone}`);
+            }, 1500); // Delay 1.5 detik agar tidak bersamaan
+        }
 
         // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
         res.setHeader('Content-Type', 'text/plain');

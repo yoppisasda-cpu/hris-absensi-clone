@@ -141,9 +141,9 @@ export async function processWhatsAppOrder(
         const defaultPaymentText = "transfer ke rekening BCA 12345678 a.n Perusahaan dengan mengirimkan bukti transfer ke chat ini";
         
         let paymentRule = `5. SETELAH fungsi dipanggil, balas pelanggan dengan total tagihan pesanan TERBARU saja, dan minta ${paymentInstructions || defaultPaymentText}.`;
-        if (qrisUrl) {
-            paymentRule += ` WAJIB berikan link QRIS statis berikut agar mereka bisa bayar: ${qrisUrl}`;
-        }
+        // QRIS tidak lagi disertakan di dalam teks balasan AI karena
+        // QRIS akan dikirim sebagai foto terpisah oleh sendWhatsAppImage.
+        // Instruksi ini hanya memberi tahu AI bahwa metode QRIS tersedia.
 
         const createOrderDeclaration: FunctionDeclaration = {
             name: "create_pos_order",
@@ -183,7 +183,7 @@ ${productListString}
 Tahap 1. Jika pelanggan bertanya menu/harga, berikan daftar menu.
 Tahap 2. Jika pelanggan menyebutkan pesanan, hitung totalnya, dan sebutkan ulang pesanannya. TANYAKAN "Apakah pesanannya sudah sesuai?".
 Tahap 3. JIKA pelanggan MENJAWAB "sudah", "ya", "sesuai", "betul", "oke", "lanjut" (MENYETUJUI PESANAN), ANDA WAJIB SEGERA MEMANGGIL FUNGSI 'create_pos_order'. JANGAN tawarkan menu lain, langsung panggil fungsinya.
-Tahap 4. SETELAH fungsi dipanggil, balas dengan total tagihan pesanan tersebut, dan minta ${paymentInstructions || defaultPaymentText}.${qrisUrl ? ` WAJIB berikan link QRIS ini agar mereka bisa bayar: ${qrisUrl}` : ''}
+Tahap 4. SETELAH fungsi dipanggil, balas dengan total tagihan pesanan tersebut, dan minta ${paymentInstructions || defaultPaymentText}.${qrisUrl ? ' Informasikan bahwa QRIS akan dikirim terpisah.' : ''}
 Tahap 5. Jika pelanggan ingin memesan ulang/pesanan baru di masa depan, JANGAN jumlahkan dengan transaksi lama. Hitung murni sebagai transaksi baru.
 
 Jawab dengan ringkas dan to the point.`,
