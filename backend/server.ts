@@ -244,7 +244,7 @@ app.use('/uploads', express.static(uploadsDir));
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
-    version: 'v1.0.6-final-live',
+    version: 'v1.0.8-qris-image',
     env: process.env.NODE_ENV,
     time: new Date().toISOString() 
   });
@@ -384,6 +384,7 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
 
         // D. Dapatkan Balasan dari AI
         let aiResponse = '';
+        let qrisUrlForImage: string | null = null; // Deklarasi di outer scope agar bisa diakses di G2
         if (targetCompanyId !== 1) {
             const company = await prisma.company.findUnique({ 
                 where: { id: targetCompanyId }, 
@@ -424,8 +425,10 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
             );
             
             aiResponse = aiResult.text;
-            // Simpan referensi qrisUrl untuk dikirim sebagai gambar setelah teks
-            (req as any)._qrisUrlToSend = company?.qrisUrl && aiResult.orderPayload ? company.qrisUrl : null;
+            // Tentukan apakah perlu kirim QRIS gambar: cek apakah AI sedang meminta pembayaran
+            const lowerResp = aiResponse.toLowerCase();
+            const isPaymentMessage = lowerResp.includes('tagihan') || lowerResp.includes('transfer') || lowerResp.includes('qris') || lowerResp.includes('bayar');
+            qrisUrlForImage = (company?.qrisUrl && isPaymentMessage) ? company.qrisUrl : null;
 
             if (aiResult.orderPayload) {
                 // Buat Order di Kasir!
@@ -497,10 +500,10 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         console.log(`✅ [WA AI] Balasan otomatis tersimpan di CRM & terkirim ke ${from}`);
 
         // G2. Jika ada QRIS dan ini adalah pesan konfirmasi order, kirim QRIS sebagai gambar terpisah
-        const qrisToSend = (req as any)._qrisUrlToSend;
-        if (qrisToSend) {
+        // G2. Jika ada QRIS dan AI sedang meminta pembayaran, kirim QRIS sebagai gambar terpisah
+        if (qrisUrlForImage) {
             setTimeout(async () => {
-                await sendWhatsAppImage(senderPhone, qrisToSend, '🔳 Scan QRIS ini untuk membayar pesanan Anda.');
+                await sendWhatsAppImage(senderPhone, qrisUrlForImage, '🔳 Scan QRIS ini untuk membayar pesanan Anda.');
                 console.log(`🖼️ [WA AI] QRIS gambar terkirim ke ${senderPhone}`);
             }, 1500); // Delay 1.5 detik agar tidak bersamaan
         }
@@ -665,7 +668,7 @@ app.get('/api/setup-master', async (req: Request, res: Response) => {
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ 
     status: 'ok', 
-    version: 'v1.0.6-final-live',
+    version: 'v1.0.8-qris-image',
     env: process.env.NODE_ENV,
     time: new Date().toISOString() 
   });
