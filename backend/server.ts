@@ -348,7 +348,10 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         const customer = await prisma.customer.findFirst({
             where: { phone: { contains: senderPhone.slice(-8) } },
         });
-        const targetCompanyId = prospect?.companyId || customer?.companyId || 1;
+        
+        // Prioritaskan tenantId dari URL Webhook Wablas (misal: ?tenantId=31) jika ada pelanggan baru
+        const queryTenantId = req.query.tenantId ? Number(req.query.tenantId) : null;
+        const targetCompanyId = queryTenantId || prospect?.companyId || customer?.companyId || 1;
         const targetName = prospect?.name || customer?.name || pushName;
 
         // B. Cari atau Buat ChatSession
