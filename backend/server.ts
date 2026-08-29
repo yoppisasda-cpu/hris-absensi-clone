@@ -261,6 +261,28 @@ app.get('/api/my-ip', async (req, res) => {
   }
 });
 
+// --- ENDPOINT UNTUK DEBUG WABLAS ---
+app.get('/api/test-wablas', async (req, res) => {
+  try {
+    const { sendWhatsAppImage, sendWhatsAppMessage } = require('./whatsappAPI');
+    const phone = req.query.phone as string || '6287882716935';
+    
+    // 1. Test Text
+    const textRes = await sendWhatsAppMessage(phone, "Test dari backend /api/test-wablas");
+    
+    // 2. Test Image
+    const qrisUrl = "https://pstyjgaopsourwruhszf.supabase.co/storage/v1/object/public/hris-uploads/logos/3bea54a101eb3c6925265f70f95f8b6c.jpg";
+    const imgRes = await sendWhatsAppImage(phone, qrisUrl, "Test QRIS Image");
+    
+    res.json({
+        textResult: textRes,
+        imageResult: imgRes
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- ONE-TIME SEQUENCE FIX ENDPOINT ---
 // Visit http://localhost:5000/api/fix-sequences in your browser to fix auto-increment issues
 app.get('/api/fix-sequences', async (req: Request, res: Response) => {
@@ -506,9 +528,9 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
             data: { updatedAt: new Date() }
         });
 
-        // G. Kirim kembali ke WhatsApp klien via Wablas
-        await sendWhatsAppMessage(senderPhone, aiResponse);
-        console.log(`✅ [WA AI] Balasan otomatis tersimpan di CRM & terkirim ke ${from}`);
+        // G. (Di-comment karena Wablas akan auto-reply dari return response kita, mencegah double message)
+        // await sendWhatsAppMessage(senderPhone, aiResponse);
+        console.log(`✅ [WA AI] Balasan otomatis tersimpan di CRM (dikirim via webhook auto-reply) ke ${from}`);
 
         // G2. Jika ada QRIS dan ini adalah pesan konfirmasi order, kirim QRIS sebagai gambar terpisah
         // G2. Jika ada QRIS dan AI sedang meminta pembayaran, kirim QRIS sebagai gambar terpisah
@@ -519,9 +541,13 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
             }, 1500); // Delay 1.5 detik agar tidak bersamaan
         }
 
-        // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send(aiResponse);
+        // Return direct JSON response for Wablas "Get Auto Reply From Webhook"
+        return res.status(200).json({
+            status: true,
+            data: {
+                message: aiResponse
+            }
+        });
     }
 
     res.status(200).send('EVENT_RECEIVED');
