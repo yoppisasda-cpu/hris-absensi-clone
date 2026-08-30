@@ -365,9 +365,14 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
       from = messageObj.from;
       text = messageObj.text?.body;
       pushName = body.entry[0].changes[0].value.contacts?.[0]?.profile?.name || pushName;
-    } else if (body.phone && (body.message || body.text)) {
+    } else if (body.phone || body.sender) {
       from = body.phone || body.sender;
-      text = body.message || body.text;
+      text = body.message || body.text || '';
+      
+      // If Wablas sends an image without a caption
+      if (!text && (body.url || body.file || body.image || body.type === 'image')) {
+          text = "[User mengirimkan gambar/bukti transfer]";
+      }
     }
 
     if (text && from) {
@@ -540,7 +545,8 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
         return res.status(200).send(aiResponse);
     }
 
-    res.status(200).send('EVENT_RECEIVED');
+    // Hindari mengirimkan teks 'EVENT_RECEIVED' karena akan dibalas ke user oleh Wablas
+    res.status(200).send('');
 
   } catch (error: any) {
     console.error('❌ [WA WEBHOOK Error]:', error.message);
