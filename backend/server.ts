@@ -465,15 +465,19 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                     const items = aiResult.orderPayload.items;
                     let totalAmount = 0;
                     
-                    // Kita format items agar sesuai dengan JSON format di POS Kasir
                     const posItems = items.map((item: any) => {
                         const price = Number(item.price) || 0;
                         const qty = Number(item.quantity) || 1;
                         totalAmount += price * qty;
+                        
+                        // Cari nama produk yang asli dari database
+                        const matchedProduct = products.find(p => p.id === item.productId);
+                        const productName = matchedProduct ? matchedProduct.name : (item.name || 'Produk AI');
+
                         return {
                             productId: item.productId,
                             id: item.productId,
-                            name: item.name || 'Produk AI',
+                            name: productName,
                             price: price,
                             qty: qty,
                             quantity: qty,
@@ -17946,6 +17950,7 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
     res.json(closing);
   } catch (error: any) {
     console.error("SAVE CLOSING ERROR:", error);
+    require('fs').appendFileSync('debug_closing.txt', `[${new Date().toISOString()}] CLOSING ERROR: ${error.message}\n${error.stack}\n`);
     res.status(500).json({ error: 'Gagal melakukan closing: ' + error.message });
   }
 });
