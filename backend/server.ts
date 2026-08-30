@@ -494,7 +494,7 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
                     const defaultBranch = await prisma.branch.findFirst({ where: { companyId: targetCompanyId } });
                     const defaultAdmin = await prisma.user.findFirst({ where: { companyId: targetCompanyId } });
 
-                    const queueLabel = `WA-${senderPhone.slice(-4)} (${aiResult.orderPayload.customerName || targetName})`;
+                    const queueLabel = `${aiResult.orderPayload.customerName || targetName} (+${senderPhone})`;
                     
                     await prisma.pendingBill.create({
                         data: {
