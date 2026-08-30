@@ -369,8 +369,8 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
       from = body.phone || body.sender;
       text = body.message || body.text || '';
       
-      // If Wablas sends an image without a caption
-      if (!text && (body.url || body.file || body.image || body.type === 'image')) {
+      // If Wablas sends media (image/document) without a caption, the text will be empty.
+      if (!text) {
           text = "[User mengirimkan gambar/bukti transfer]";
       }
     }
