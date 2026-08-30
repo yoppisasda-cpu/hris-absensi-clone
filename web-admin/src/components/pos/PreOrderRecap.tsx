@@ -20,7 +20,7 @@ export default function PreOrderRecap({ branchId }: PreOrderRecapProps) {
   const fetchPreOrders = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/api/pos/pending?saleType=PRE_ORDER&branchId=${branchId}`);
+      const res = await api.get(`/pos/pending?saleType=PRE_ORDER&branchId=${branchId}`);
       setPendingBills(res.data);
     } catch (err: any) {
       toast.error('Gagal memuat data Pre Order');
