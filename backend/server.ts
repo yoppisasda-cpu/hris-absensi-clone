@@ -17489,13 +17489,23 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
   try {
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
+    const { branchId, saleType } = req.query;
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
+
+    // Gunakan branchId dari query jika ada, jika tidak fallback ke user.branchId, jika SUPERADMIN tampilkan semua
+    let targetBranchId: number | undefined = undefined;
+    if (branchId && branchId !== 'all') {
+      targetBranchId = Number(branchId);
+    } else if (branchId !== 'all' && user?.branchId) {
+      targetBranchId = user.branchId;
+    } // jika 'all' atau SUPERADMIN tanpa spesifik branchId, maka undefined (ambil semua cabang)
 
     const pendingBills = await prisma.pendingBill.findMany({
       where: {
         companyId: tenantId,
-        branchId: user?.branchId || 0,
+        ...(targetBranchId ? { branchId: targetBranchId } : {}),
+        ...(saleType ? { saleType: saleType as string } : {})
       },
       orderBy: { createdAt: 'desc' },
       include: { user: { select: { name: true } } }

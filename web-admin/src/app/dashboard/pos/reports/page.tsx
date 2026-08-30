@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { format, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
+import PreOrderRecap from "@/components/pos/PreOrderRecap";
 
 export default function POSReportsPage() {
     // Data State
@@ -46,7 +47,7 @@ export default function POSReportsPage() {
     const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [isRestricted, setIsRestricted] = useState(false);
-    const [activeTab, setActiveTab] = useState<'sales' | 'shifts'>('sales');
+    const [activeTab, setActiveTab] = useState<'sales' | 'shifts' | 'pre_orders'>('sales');
     const [shiftClosings, setShiftClosings] = useState<any[]>([]);
 
     useEffect(() => {
@@ -570,7 +571,18 @@ export default function POSReportsPage() {
                     Riwayat Shift (Closing)
                     {activeTab === 'shifts' && <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-t-full" />}
                 </button>
+                <button 
+                    onClick={() => setActiveTab('pre_orders')}
+                    className={`pb-4 px-2 text-sm font-bold transition-all relative ${activeTab === 'pre_orders' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    Pre-Order
+                    {activeTab === 'pre_orders' && <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-t-full" />}
+                </button>
             </div>
+
+            {activeTab === 'pre_orders' && (
+                <PreOrderRecap branchId={selectedBranchId} />
+            )}
 
             {activeTab === 'sales' ? (
                 <div className="bg-slate-900/50 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-md">
