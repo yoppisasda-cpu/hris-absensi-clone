@@ -584,7 +584,7 @@ export default function POSReportsPage() {
                 <PreOrderRecap branchId={selectedBranchId} />
             )}
 
-            {activeTab === 'sales' ? (
+            {activeTab === 'sales' && (
                 <div className="bg-slate-900/50 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-md">
                     <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex flex-wrap items-center gap-4">
@@ -788,8 +788,10 @@ export default function POSReportsPage() {
                         </tbody>
                     </table>
                 </div>
-            </div>
-            ) : (
+                </div>
+            )}
+            
+            {activeTab === 'shifts' && (
                 <div className="bg-slate-900/50 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-md">
                     <table className="w-full text-left">
                         <thead className="bg-slate-950/50 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-slate-800">
