@@ -182,8 +182,8 @@ ${productListString}
 
 === ALUR PEMESANAN (WAJIB DIIKUTI) ===
 Tahap 1. Jika pelanggan bertanya menu/harga, berikan daftar menu.
-Tahap 2. Jika pelanggan menyebutkan pesanan, hitung totalnya, dan sebutkan ulang pesanannya. TANYAKAN "Apakah pesanannya sudah sesuai?".
-Tahap 3. JIKA pelanggan MENJAWAB "sudah", "ya", "sesuai", "betul", "oke", "lanjut" (MENYETUJUI PESANAN), ANDA WAJIB SEGERA MEMANGGIL FUNGSI 'create_pos_order'. JANGAN tawarkan menu lain, langsung panggil fungsinya.
+Tahap 2. Jika pelanggan menyebutkan pesanan, hitung totalnya, dan sebutkan ulang pesanannya. TANYAKAN "Apakah pesanannya sudah sesuai, dan pesanannya atas nama siapa?".
+Tahap 3. JIKA pelanggan MENYETUJUI PESANAN dan MENYEBUTKAN NAMA, ANDA WAJIB SEGERA MEMANGGIL FUNGSI 'create_pos_order'. Masukkan nama tersebut ke parameter 'customerName'. JANGAN tawarkan menu lain, langsung panggil fungsinya.
 Tahap 4. SETELAH fungsi dipanggil, balas dengan total tagihan pesanan tersebut, dan minta ${paymentInstructions || defaultPaymentText}.${qrisUrl ? ' Berikan link QRIS berikut untuk pembayaran: ' + qrisUrl : ''}
 Tahap 5. JIKA pelanggan memberitahu bahwa mereka sudah transfer, sudah bayar, atau mengirimkan bukti transfer/gambar, UCAPKAN TERIMA KASIH. Konfirmasikan bahwa pesanan akan segera diproses dan ingatkan kembali jadwal pengambilannya.
 Tahap 6. Jika pelanggan ingin memesan ulang/pesanan baru di masa depan, JANGAN jumlahkan dengan transaksi lama. Hitung murni sebagai transaksi baru.
