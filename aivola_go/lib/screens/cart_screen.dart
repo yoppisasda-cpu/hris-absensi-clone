@@ -464,6 +464,7 @@ class _CartScreenState extends State<CartScreen> {
 
     final response = await ApiService.createOrder(
       items: items,
+      companyId: branding.selectedMerchantId!,
       customerId: customerId,
       branchId: branchProvider.selectedBranch?.id,
       voucherId: cartProvider.selectedVoucher?.id, 

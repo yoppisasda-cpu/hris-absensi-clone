@@ -973,7 +973,11 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
             if (decoded.role === 'SUPERADMIN') {
                 (req as any).tenantId = requestedTenantId;
             } 
-            // 2. Owner or Manager can switch if they have access in UserAccess table
+            // 2. Customers can switch to any tenant (since they buy from merchants in the ecosystem)
+            else if (decoded.role === 'CUSTOMER') {
+                (req as any).tenantId = requestedTenantId;
+            }
+            // 3. Owner or Manager can switch if they have access in UserAccess table
             else if ((decoded.role === 'OWNER' || decoded.role === 'MANAGER') && requestedTenantId !== Number(decoded.companyId)) {
                 const access = await prisma.userAccess.findUnique({
                     where: {

@@ -209,6 +209,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> createOrder({
     required List<Map<String, dynamic>> items,
+    required int companyId,
     int? customerId,
     int? branchId,
     String? notes,
@@ -225,6 +226,7 @@ class ApiService {
         headers: {
           "Authorization": "Bearer $token",
           "Content-Type": "application/json",
+          "x-tenant-id": companyId.toString(),
         },
         body: jsonEncode({
           "items": items,
