@@ -3548,7 +3548,13 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       posBlindClosing,
       globalTaxRate,
       deliveryNoteTerms,
-      paymentInstructions
+      paymentInstructions,
+      openTime,
+      closeTime,
+      isOpenManual,
+      allowDineIn,
+      allowPickUp,
+      allowDelivery
     } = req.body;
 
     console.log(`[DEBUG PATCH /companies/my] UPDATING Tenant: ${tenantId}`, {
@@ -3572,6 +3578,9 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       where: { id: tenantId },
       data: {
         name,
+        allowDineIn: (allowDineIn !== undefined) ? (allowDineIn === true || allowDineIn === 'true') : undefined,
+        allowPickUp: (allowPickUp !== undefined) ? (allowPickUp === true || allowPickUp === 'true') : undefined,
+        allowDelivery: (allowDelivery !== undefined) ? (allowDelivery === true || allowDelivery === 'true') : undefined,
         latitude: parseNum(latitude),
         longitude: parseNum(longitude),
         radius: parseIntNum(radius),

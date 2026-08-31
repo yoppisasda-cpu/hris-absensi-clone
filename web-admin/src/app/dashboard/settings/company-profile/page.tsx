@@ -173,7 +173,10 @@ export default function CompanyProfilePage() {
                 paymentInstructions: formData.paymentInstructions,
                 openTime: formData.openTime,
                 closeTime: formData.closeTime,
-                isOpenManual: formData.isOpenManual
+                isOpenManual: formData.isOpenManual,
+                allowDineIn: formData.allowDineIn,
+                allowPickUp: formData.allowPickUp,
+                allowDelivery: formData.allowDelivery,
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
