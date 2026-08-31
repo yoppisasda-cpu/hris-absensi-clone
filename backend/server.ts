@@ -2270,6 +2270,37 @@ app.get('/api/companies/public', async (req: Request, res: Response) => {
   }
 });
 
+// A1.1.2 Endpoint List Perusahaan Publik (Single)
+app.get('/api/companies/public/:id', async (req: Request, res: Response) => {
+  try {
+    const companyId = parseInt(req.params.id);
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        primaryColor: true,
+        secondaryColor: true,
+        allowDineIn: true,
+        allowPickUp: true,
+        allowDelivery: true,
+        openTime: true,
+        closeTime: true,
+        isOpenManual: true,
+        timezone: true
+      }
+    });
+    if (!company) {
+      return res.status(404).json({ error: 'Perusahaan tidak ditemukan' });
+    }
+    res.json(company);
+  } catch (error) {
+    console.error('[ERROR] Gagal mengambil data perusahaan publik:', error);
+    res.status(500).json({ error: 'Gagal mengambil data perusahaan' });
+  }
+});
+
 // --- GET PRODUCTS FOR SPECIFIC PUBLIC MERCHANT ---
 app.get('/api/companies/public/:id/products', async (req: Request, res: Response) => {
   try {

@@ -94,11 +94,55 @@ class BrandingProvider with ChangeNotifier {
     }
 
     if (_selectedMerchantId != null) {
+      fetchLatestMerchantInfo(_selectedMerchantId!);
       fetchBanners();
       fetchVouchers();
     }
     
     notifyListeners();
+  }
+
+  Future<void> fetchLatestMerchantInfo(int merchantId) async {
+    try {
+      final response = await http.get(Uri.parse('${ApiService.baseUrl}/companies/public/$merchantId'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        final primaryHex = data['primaryColor'] ?? "#3B82F6";
+        final secondaryHex = data['secondaryColor'] ?? "#1E293B";
+        
+        _primaryColor = Color(int.parse(primaryHex.replaceFirst('#', '0xFF')));
+        _secondaryColor = Color(int.parse(secondaryHex.replaceFirst('#', '0xFF')));
+        
+        _logoUrl = data['logoUrl'];
+        _selectedMerchantName = data['name'];
+        _openTime = data['openTime'];
+        _closeTime = data['closeTime'];
+        _isOpenManual = data['isOpenManual'] ?? true;
+        _timezone = data['timezone'];
+        _allowDineIn = data['allowDineIn'] ?? true;
+        _allowPickUp = data['allowPickUp'] ?? true;
+        _allowDelivery = data['allowDelivery'] ?? true;
+        
+        // Update SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('primaryColor', primaryHex);
+        await prefs.setString('secondaryColor', secondaryHex);
+        if (_logoUrl != null) await prefs.setString('logoUrl', _logoUrl!);
+        if (_selectedMerchantName != null) await prefs.setString('selectedMerchantName', _selectedMerchantName!);
+        if (_openTime != null) await prefs.setString('openTime', _openTime!);
+        if (_closeTime != null) await prefs.setString('closeTime', _closeTime!);
+        await prefs.setBool('isOpenManual', _isOpenManual);
+        if (_timezone != null) await prefs.setString('timezone', _timezone!);
+        await prefs.setBool('allowDineIn', _allowDineIn);
+        await prefs.setBool('allowPickUp', _allowPickUp);
+        await prefs.setBool('allowDelivery', _allowDelivery);
+        
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("Error fetching latest merchant info: $e");
+    }
   }
 
   Future<void> fetchBanners() async {
