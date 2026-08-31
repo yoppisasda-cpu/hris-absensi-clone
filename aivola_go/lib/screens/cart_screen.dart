@@ -171,7 +171,6 @@ class _CartScreenState extends State<CartScreen> {
 
 
   Widget _buildDeliveryOptions(BrandingProvider branding, Color primaryColor) {
-    final merchant = branding.merchant;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -179,9 +178,9 @@ class _CartScreenState extends State<CartScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (merchant?.allowDineIn ?? true) _buildOptionChip("Dine-in", Icons.restaurant, primaryColor),
-            if (merchant?.allowPickUp ?? true) _buildOptionChip("Pick-up", Icons.shopping_bag, primaryColor),
-            if (merchant?.allowDelivery ?? true) _buildOptionChip("Delivery", Icons.local_shipping, primaryColor),
+            if (branding.allowDineIn) _buildOptionChip("Dine-in", Icons.restaurant, primaryColor),
+            if (branding.allowPickUp) _buildOptionChip("Pick-up", Icons.shopping_bag, primaryColor),
+            if (branding.allowDelivery) _buildOptionChip("Delivery", Icons.local_shipping, primaryColor),
           ],
         ),
         if (_deliveryMethod == "Delivery") ...[

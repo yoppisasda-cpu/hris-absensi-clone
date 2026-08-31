@@ -18,6 +18,9 @@ class BrandingProvider with ChangeNotifier {
   String? _closeTime;
   bool _isOpenManual = true;
   String? _timezone;
+  bool _allowDineIn = true;
+  bool _allowPickUp = true;
+  bool _allowDelivery = true;
 
   Color get primaryColor => _primaryColor;
   Color get secondaryColor => _secondaryColor;
@@ -27,6 +30,9 @@ class BrandingProvider with ChangeNotifier {
   List<PromoBanner> get banners => _banners;
   List<Voucher> get vouchers => _vouchers;
   String? get timezone => _timezone;
+  bool get allowDineIn => _allowDineIn;
+  bool get allowPickUp => _allowPickUp;
+  bool get allowDelivery => _allowDelivery;
 
   bool get isStoreOpen {
     if (!_isOpenManual) return false;
@@ -76,6 +82,9 @@ class BrandingProvider with ChangeNotifier {
     _closeTime = prefs.getString('closeTime');
     _isOpenManual = prefs.getBool('isOpenManual') ?? true;
     _timezone = prefs.getString('timezone');
+    _allowDineIn = prefs.getBool('allowDineIn') ?? true;
+    _allowPickUp = prefs.getBool('allowPickUp') ?? true;
+    _allowDelivery = prefs.getBool('allowDelivery') ?? true;
 
     if (primary != null) {
       _primaryColor = Color(int.parse(primary.replaceFirst('#', '0xFF')));
@@ -140,6 +149,9 @@ class BrandingProvider with ChangeNotifier {
     _closeTime = null;
     _isOpenManual = true;
     _timezone = null;
+    _allowDineIn = true;
+    _allowPickUp = true;
+    _allowDelivery = true;
     _banners = [];
     _vouchers = [];
     notifyListeners();
@@ -155,6 +167,9 @@ class BrandingProvider with ChangeNotifier {
     String? closeTime,
     bool isOpenManual = true,
     String? timezone,
+    bool allowDineIn = true,
+    bool allowPickUp = true,
+    bool allowDelivery = true,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('primaryColor', primaryHex);
@@ -166,6 +181,9 @@ class BrandingProvider with ChangeNotifier {
     if (closeTime != null) await prefs.setString('closeTime', closeTime);
     await prefs.setBool('isOpenManual', isOpenManual);
     if (timezone != null) await prefs.setString('timezone', timezone);
+    await prefs.setBool('allowDineIn', allowDineIn);
+    await prefs.setBool('allowPickUp', allowPickUp);
+    await prefs.setBool('allowDelivery', allowDelivery);
 
     _primaryColor = Color(int.parse(primaryHex.replaceFirst('#', '0xFF')));
     _secondaryColor = Color(int.parse(secondaryHex.replaceFirst('#', '0xFF')));
@@ -176,6 +194,9 @@ class BrandingProvider with ChangeNotifier {
     _closeTime = closeTime;
     _isOpenManual = isOpenManual;
     _timezone = timezone;
+    _allowDineIn = allowDineIn;
+    _allowPickUp = allowPickUp;
+    _allowDelivery = allowDelivery;
     
     if (_selectedMerchantId != null) {
       fetchBanners();

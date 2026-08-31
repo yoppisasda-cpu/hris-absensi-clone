@@ -119,6 +119,9 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
       closeTime: merchant.closeTime,
       isOpenManual: merchant.isOpenManual,
       timezone: merchant.timezone,
+      allowDineIn: merchant.allowDineIn,
+      allowPickUp: merchant.allowPickUp,
+      allowDelivery: merchant.allowDelivery,
     );
 
     // Scope products to this merchant
