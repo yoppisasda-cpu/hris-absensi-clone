@@ -474,7 +474,7 @@ class _CartScreenState extends State<CartScreen> {
             width: double.infinity,
             height: 55,
             child: ElevatedButton(
-              onPressed: brandingProvider.isStoreOpen ? () => _handleCheckout(cartProvider, primaryColor) : null,
+              onPressed: brandingProvider.isStoreOpen ? () => _handleCheckout(cartProvider, brandingProvider, primaryColor) : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: brandingProvider.isStoreOpen ? primaryColor : Colors.grey.withOpacity(0.5), 
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), 
@@ -501,7 +501,7 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Future<void> _handleCheckout(CartProvider cartProvider, Color primaryColor) async {
+  Future<void> _handleCheckout(CartProvider cartProvider, BrandingProvider brandingProvider, Color primaryColor) async {
     showDialog(context: context, barrierDismissible: false, builder: (context) => Center(child: CircularProgressIndicator(color: primaryColor)));
 
     final items = cartProvider.items.values.map((item) => {"productId": item.product.id, "quantity": item.quantity, "price": item.product.price}).toList();
@@ -511,9 +511,9 @@ class _CartScreenState extends State<CartScreen> {
 
     // Tentukan order type jika merchant hanya buka salah satu
     String finalOrderType = _orderType;
-    if (!branding.allowOnlineOrder && branding.allowPreOrder) {
+    if (!brandingProvider.allowOnlineOrder && brandingProvider.allowPreOrder) {
       finalOrderType = "Pre-Order";
-    } else if (branding.allowOnlineOrder && !branding.allowPreOrder) {
+    } else if (brandingProvider.allowOnlineOrder && !brandingProvider.allowPreOrder) {
       finalOrderType = "Pesanan Langsung";
     }
 
@@ -521,7 +521,7 @@ class _CartScreenState extends State<CartScreen> {
 
     final response = await apiCall(
       items: items,
-      companyId: branding.selectedMerchantId!,
+      companyId: brandingProvider.selectedMerchantId!,
       customerId: customerId,
       branchId: branchProvider.selectedBranch?.id,
       voucherId: cartProvider.selectedVoucher?.id, 
