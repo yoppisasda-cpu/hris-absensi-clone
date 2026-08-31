@@ -796,7 +796,8 @@ class ApiService {
   Future<List<dynamic>> getActiveOrders() async {
     try {
       final response = await _dio.get('/sales', queryParameters: {
-        'status': 'PENDING,PROCESSING,READY'
+        'status': 'PENDING,PROCESSING,READY',
+        'saleType': 'ONLINE'
       });
       return response.data as List<dynamic>;
     } catch (e) {

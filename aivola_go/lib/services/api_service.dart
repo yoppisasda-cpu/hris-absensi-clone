@@ -237,6 +237,7 @@ class ApiService {
           "pointsUsed": pointsUsed,
           "notes": notes ?? "Order from Aivola GO",
           "status": "PENDING",
+          "saleType": "ONLINE",
           "accountId": 1,
           "date": DateTime.now().toIso8601String(),
         }),

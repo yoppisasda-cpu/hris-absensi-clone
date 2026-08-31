@@ -15678,11 +15678,18 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
   const isPosViewer = (user?.role as string) === 'POS_VIEWER';
   const isAdmin = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '');
 
-  let { branchId, startDate, endDate, paymentMethod, saleType } = query;
+  let { branchId, startDate, endDate, paymentMethod, saleType, status } = query;
 
   let whereConditions = [`s."companyId" = $1`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')` ];
   let queryParams: any[] = [tenantId];
   let paramIndex = 2;
+
+  if (status && status !== 'all') {
+    const statuses = (status as string).split(',');
+    const inList = statuses.map((_, i) => `$${paramIndex++}`).join(', ');
+    whereConditions.push(`s."status" IN (${inList})`);
+    queryParams.push(...statuses);
+  }
 
   if (isPosViewer) {
     whereConditions.push(`(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`);
