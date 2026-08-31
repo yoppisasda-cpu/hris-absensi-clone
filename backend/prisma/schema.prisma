@@ -894,6 +894,7 @@ model Sale {
   companyId             Int
   branchId              Int?
   invoiceNumber         String       @unique
+  poNumber              String?
   customerId            Int?
   customerName          String?
   customerPhone         String?

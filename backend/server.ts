@@ -15059,7 +15059,7 @@ app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Res
 app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { items, accountId, customerId, status, notes, date, dueDate, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod, taxRate, taxAmount, memberDiscountAmount } = req.body;
+    const { items, accountId, customerId, status, notes, date, dueDate, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod, taxRate, taxAmount, memberDiscountAmount, poNumber } = req.body;
     const userId = Number((req as any).userId);
     let finalCustomerId = customerId ? parseInt(customerId) : null;
     const dueDateVal = (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') ? new Date(dueDate) : null;
@@ -15146,8 +15146,8 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
       // 3. Create Sale Record (Merged with GitHub's new fields)
       const saleResult: any[] = await tx.$queryRawUnsafe(`
-        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "dueDate", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod", "taxRate", "taxAmount", "memberDiscountAmount")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "dueDate", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod", "taxRate", "taxAmount", "memberDiscountAmount", "poNumber")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
         RETURNING id
       `, 
       tenantId, 
@@ -15170,7 +15170,8 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       paymentMethod || 'Bayar di Kasir',
       taxRate || 0,
       taxAmount || 0,
-      memberDiscountAmount || 0);
+      memberDiscountAmount || 0,
+      poNumber || null);
       
       const saleId = saleResult[0].id;
 

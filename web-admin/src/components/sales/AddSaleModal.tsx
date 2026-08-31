@@ -79,6 +79,7 @@ export default function AddSaleModal({ isOpen, onClose, onSuccess }: AddSaleModa
     const [formData, setFormData] = useState({
         accountId: '',
         customerId: '',
+        poNumber: '',
         date: new Date().toISOString().split('T')[0],
         dueDate: '',
         status: 'PAID',
@@ -186,7 +187,7 @@ export default function AddSaleModal({ isOpen, onClose, onSuccess }: AddSaleModa
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-10 space-y-6 max-h-[80vh] overflow-y-auto no-scrollbar">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Market Segment</label>
                             <div className="relative group">
@@ -201,6 +202,16 @@ export default function AddSaleModal({ isOpen, onClose, onSuccess }: AddSaleModa
                                     ))}
                                 </select>
                             </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">PO Number (Optional)</label>
+                            <input
+                                type="text"
+                                placeholder="PO-12345"
+                                value={formData.poNumber}
+                                onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-blue-500/50 outline-none transition-all italic tracking-widest uppercase shadow-inner placeholder:text-slate-700"
+                            />
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Temporal Directive</label>
