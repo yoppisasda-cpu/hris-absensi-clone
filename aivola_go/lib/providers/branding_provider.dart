@@ -21,6 +21,8 @@ class BrandingProvider with ChangeNotifier {
   bool _allowDineIn = true;
   bool _allowPickUp = true;
   bool _allowDelivery = true;
+  bool _allowOnlineOrder = true;
+  bool _allowPreOrder = false;
 
   Color get primaryColor => _primaryColor;
   Color get secondaryColor => _secondaryColor;
@@ -33,6 +35,8 @@ class BrandingProvider with ChangeNotifier {
   bool get allowDineIn => _allowDineIn;
   bool get allowPickUp => _allowPickUp;
   bool get allowDelivery => _allowDelivery;
+  bool get allowOnlineOrder => _allowOnlineOrder;
+  bool get allowPreOrder => _allowPreOrder;
 
   bool get isStoreOpen {
     if (!_isOpenManual) return false;
@@ -85,6 +89,8 @@ class BrandingProvider with ChangeNotifier {
     _allowDineIn = prefs.getBool('allowDineIn') ?? true;
     _allowPickUp = prefs.getBool('allowPickUp') ?? true;
     _allowDelivery = prefs.getBool('allowDelivery') ?? true;
+    _allowOnlineOrder = prefs.getBool('allowOnlineOrder') ?? true;
+    _allowPreOrder = prefs.getBool('allowPreOrder') ?? false;
 
     if (primary != null) {
       _primaryColor = Color(int.parse(primary.replaceFirst('#', '0xFF')));
@@ -123,6 +129,8 @@ class BrandingProvider with ChangeNotifier {
         _allowDineIn = data['allowDineIn'] ?? true;
         _allowPickUp = data['allowPickUp'] ?? true;
         _allowDelivery = data['allowDelivery'] ?? true;
+        _allowOnlineOrder = data['allowOnlineOrder'] ?? true;
+        _allowPreOrder = data['allowPreOrder'] ?? false;
         
         // Update SharedPreferences
         final prefs = await SharedPreferences.getInstance();
@@ -137,6 +145,8 @@ class BrandingProvider with ChangeNotifier {
         await prefs.setBool('allowDineIn', _allowDineIn);
         await prefs.setBool('allowPickUp', _allowPickUp);
         await prefs.setBool('allowDelivery', _allowDelivery);
+        await prefs.setBool('allowOnlineOrder', _allowOnlineOrder);
+        await prefs.setBool('allowPreOrder', _allowPreOrder);
         
         notifyListeners();
       }
@@ -214,6 +224,8 @@ class BrandingProvider with ChangeNotifier {
     bool allowDineIn = true,
     bool allowPickUp = true,
     bool allowDelivery = true,
+    bool allowOnlineOrder = true,
+    bool allowPreOrder = false,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('primaryColor', primaryHex);
@@ -228,6 +240,8 @@ class BrandingProvider with ChangeNotifier {
     await prefs.setBool('allowDineIn', allowDineIn);
     await prefs.setBool('allowPickUp', allowPickUp);
     await prefs.setBool('allowDelivery', allowDelivery);
+    await prefs.setBool('allowOnlineOrder', allowOnlineOrder);
+    await prefs.setBool('allowPreOrder', allowPreOrder);
 
     _primaryColor = Color(int.parse(primaryHex.replaceFirst('#', '0xFF')));
     _secondaryColor = Color(int.parse(secondaryHex.replaceFirst('#', '0xFF')));
@@ -241,6 +255,8 @@ class BrandingProvider with ChangeNotifier {
     _allowDineIn = allowDineIn;
     _allowPickUp = allowPickUp;
     _allowDelivery = allowDelivery;
+    _allowOnlineOrder = allowOnlineOrder;
+    _allowPreOrder = allowPreOrder;
     
     if (_selectedMerchantId != null) {
       fetchBanners();

@@ -1199,10 +1199,33 @@ app.get('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respons
 app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { customerId, orderNumber, date, notes, items, taxRate } = req.body;
+    const { customerId, orderNumber, date, notes, items, taxRate, deliveryMethod, paymentMethod } = req.body;
 
-    if (!customerId || !orderNumber || !items || items.length === 0) {
+    if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Data pesanan tidak lengkap' });
+    }
+
+    let finalCustomerId = customerId ? Number(customerId) : null;
+    const userId = Number((req as any).userId);
+    if (userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        const linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
+        if (linkedCustomer) finalCustomerId = linkedCustomer.id;
+      }
+    }
+
+    if (!finalCustomerId) {
+       return res.status(400).json({ error: 'Data pelanggan tidak ditemukan' });
+    }
+
+    let finalOrderNumber = orderNumber;
+    if (!finalOrderNumber) {
+      const dateVal = date ? new Date(date) : new Date();
+      const y = dateVal.getFullYear();
+      const m = (dateVal.getMonth() + 1).toString().padStart(2, '0');
+      const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+      finalOrderNumber = `PO/${y}/${m}/ID${tenantId}-${randomStr}`;
     }
 
     let subtotal = 0;
@@ -1226,8 +1249,8 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
     const newOrder = await prisma.salesOrder.create({
       data: {
         companyId: tenantId,
-        customerId: Number(customerId),
-        orderNumber,
+        customerId: finalCustomerId,
+        orderNumber: finalOrderNumber,
         date: date ? new Date(date) : new Date(),
         subtotal,
         taxRate: parsedTaxRate,
@@ -1235,6 +1258,8 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
         totalAmount,
         notes,
         status: 'PENDING',
+        deliveryMethod,
+        paymentMethod: paymentMethod || 'Bayar di Kasir',
         items: {
           create: validatedItems
         }
@@ -1242,7 +1267,15 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
       include: { items: true, customer: true }
     });
 
-    res.status(201).json(newOrder);
+    const companyInfo = await prisma.company.findUnique({ where: { id: tenantId }, select: { qrisUrl: true, paymentInstructions: true } });
+    const qrisUrl = companyInfo?.qrisUrl || null;
+
+    res.status(201).json({
+      ...newOrder,
+      success: true,
+      qrisUrl,
+      paymentInstructions: companyInfo?.paymentInstructions || 'Silakan lakukan pembayaran untuk memproses pesanan.'
+    });
   } catch (error: any) {
     console.error("CREATE SALES ORDER ERROR:", error);
     if (error.code === 'P2002') return res.status(400).json({ error: 'Nomor PO sudah digunakan' });
@@ -2289,6 +2322,8 @@ app.get('/api/companies/public/:id', async (req: Request, res: Response) => {
         allowDineIn: true,
         allowPickUp: true,
         allowDelivery: true,
+        allowOnlineOrder: true,
+        allowPreOrder: true,
         openTime: true,
         closeTime: true,
         isOpenManual: true,
@@ -3616,6 +3651,8 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         allowDineIn: (allowDineIn !== undefined) ? (allowDineIn === true || allowDineIn === 'true') : undefined,
         allowPickUp: (allowPickUp !== undefined) ? (allowPickUp === true || allowPickUp === 'true') : undefined,
         allowDelivery: (allowDelivery !== undefined) ? (allowDelivery === true || allowDelivery === 'true') : undefined,
+        allowOnlineOrder: (req.body.allowOnlineOrder !== undefined) ? (req.body.allowOnlineOrder === true || req.body.allowOnlineOrder === 'true') : undefined,
+        allowPreOrder: (req.body.allowPreOrder !== undefined) ? (req.body.allowPreOrder === true || req.body.allowPreOrder === 'true') : undefined,
         latitude: parseNum(latitude),
         longitude: parseNum(longitude),
         radius: parseIntNum(radius),
@@ -3694,6 +3731,8 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         allowDineIn: (allowDineIn !== undefined) ? (allowDineIn === true || allowDineIn === 'true') : undefined,
         allowPickUp: (allowPickUp !== undefined) ? (allowPickUp === true || allowPickUp === 'true') : undefined,
         allowDelivery: (allowDelivery !== undefined) ? (allowDelivery === true || allowDelivery === 'true') : undefined,
+        allowOnlineOrder: (req.body.allowOnlineOrder !== undefined) ? (req.body.allowOnlineOrder === true || req.body.allowOnlineOrder === 'true') : undefined,
+        allowPreOrder: (req.body.allowPreOrder !== undefined) ? (req.body.allowPreOrder === true || req.body.allowPreOrder === 'true') : undefined,
         latitude: (latitude !== undefined && latitude !== null) ? parseFloat(latitude.toString()) : (latitude === null ? null : undefined),
         longitude: (longitude !== undefined && longitude !== null) ? parseFloat(longitude.toString()) : (longitude === null ? null : undefined),
         radius: safeParseInt(radius),

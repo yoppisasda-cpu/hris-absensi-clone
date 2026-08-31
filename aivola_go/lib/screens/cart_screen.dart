@@ -29,6 +29,7 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   String _deliveryMethod = "Dine-in"; // Default
   String _paymentMethod = "Bayar di Kasir"; // Default
+  String _orderType = "Pesanan Langsung";
   List<Voucher> _claimedVouchers = [];
   bool _loadingVouchers = false;
 
@@ -80,6 +81,11 @@ class _CartScreenState extends State<CartScreen> {
                       _buildSectionTitle("Pesanan Anda"),
                       ...cartProvider.items.values.map((item) => _buildCartItem(item, cartProvider, primaryColor)).toList(),
                       SizedBox(height: 20),
+                      if (brandingProvider.allowOnlineOrder && brandingProvider.allowPreOrder) ...[
+                        _buildSectionTitle("Jenis Pesanan"),
+                        _buildOrderTypeOptions(primaryColor),
+                        SizedBox(height: 20),
+                      ],
                       _buildSectionTitle("Metode Pengambilan"),
                       _buildDeliveryOptions(brandingProvider, primaryColor),
                       SizedBox(height: 25),
@@ -168,7 +174,48 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  void _onOrderTypeChanged(String type) {
+    setState(() {
+      _orderType = type;
+      if (type == "Pre-Order") {
+        _paymentMethod = "QRIS / Transfer (Online Payment)"; // PO selalu online payment
+      }
+    });
+  }
 
+  Widget _buildOrderTypeOptions(Color primaryColor) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _buildOrderTypeChip("Pesanan Langsung", Icons.flash_on, primaryColor),
+        _buildOrderTypeChip("Pre-Order", Icons.calendar_month, primaryColor),
+      ],
+    );
+  }
+
+  Widget _buildOrderTypeChip(String label, IconData icon, Color primaryColor) {
+    bool isSelected = _orderType == label;
+    return GestureDetector(
+      onTap: () => _onOrderTypeChanged(label),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryColor : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isSelected ? primaryColor : Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : primaryColor, size: 18),
+            SizedBox(width: 8),
+            Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildDeliveryOptions(BrandingProvider branding, Color primaryColor) {
     return Column(
@@ -462,7 +509,17 @@ class _CartScreenState extends State<CartScreen> {
     final prefs = await SharedPreferences.getInstance();
     final customerId = prefs.getInt('userId');
 
-    final response = await ApiService.createOrder(
+    // Tentukan order type jika merchant hanya buka salah satu
+    String finalOrderType = _orderType;
+    if (!branding.allowOnlineOrder && branding.allowPreOrder) {
+      finalOrderType = "Pre-Order";
+    } else if (branding.allowOnlineOrder && !branding.allowPreOrder) {
+      finalOrderType = "Pesanan Langsung";
+    }
+
+    final apiCall = (finalOrderType == "Pre-Order") ? ApiService.createPreOrder : ApiService.createOrder;
+
+    final response = await apiCall(
       items: items,
       companyId: branding.selectedMerchantId!,
       customerId: customerId,

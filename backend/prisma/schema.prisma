@@ -62,6 +62,8 @@ model Company {
   allowDineIn            Boolean              @default(true)
   allowPickUp            Boolean              @default(true)
   allowDelivery          Boolean              @default(true)
+  allowOnlineOrder       Boolean              @default(true)
+  allowPreOrder          Boolean              @default(false)
   pointsEarnRatio        Float                @default(0)
   pointsRedeemValue      Float                @default(0)
   globalTaxRate          Float                @default(0)
@@ -1185,10 +1187,12 @@ model SalesOrder {
   taxAmount   Float            @default(0)
   totalAmount Float            @default(0)
   status      SOStatus         @default(PENDING)
-  notes       String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  saleId      Int?             @unique
+  notes          String?
+  deliveryMethod String?
+  paymentMethod  String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  saleId         Int?             @unique
   shippedAt   DateTime?
   company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customer    Customer         @relation(fields: [customerId], references: [id])

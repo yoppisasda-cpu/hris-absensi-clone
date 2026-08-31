@@ -260,6 +260,56 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> createPreOrder({
+    required List<Map<String, dynamic>> items,
+    required int companyId,
+    int? customerId,
+    int? branchId,
+    String? notes,
+    int? voucherId,
+    int? customerAddressId,
+    String? deliveryMethod,
+    String? paymentMethod,
+    int pointsUsed = 0,
+  }) async {
+    try {
+      final token = await getToken();
+      final response = await http.post(
+        Uri.parse("$baseUrl/sales/orders"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+          "x-tenant-id": companyId.toString(),
+        },
+        body: jsonEncode({
+          "items": items,
+          "customerId": customerId,
+          "branchId": branchId,
+          "voucherId": voucherId,
+          "customerAddressId": customerAddressId,
+          "deliveryMethod": deliveryMethod,
+          "paymentMethod": paymentMethod ?? "Bayar di Kasir",
+          "pointsUsed": pointsUsed,
+          "notes": notes ?? "Pre-Order from Aivola GO",
+          "status": "PENDING",
+          "date": DateTime.now().toIso8601String(),
+        }),
+      );
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          "success": true,
+          "qrisUrl": data['qrisUrl'],
+          "paymentInstructions": data['paymentInstructions']
+        };
+      }
+      return {"success": false};
+    } catch (e) {
+      print("Error creating pre-order: $e");
+      return {"success": false, "message": e.toString()};
+    }
+  }
+
   static Future<List<dynamic>> fetchOrders() async {
     try {
       final token = await getToken();

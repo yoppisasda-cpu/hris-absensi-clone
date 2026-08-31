@@ -69,7 +69,9 @@ export default function CompanyProfilePage() {
         isOpenManual: true,
         allowDineIn: true,
         allowPickUp: true,
-        allowDelivery: true
+        allowDelivery: true,
+        allowOnlineOrder: true,
+        allowPreOrder: false
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -123,6 +125,8 @@ export default function CompanyProfilePage() {
                 allowDineIn: response.data.allowDineIn ?? true,
                 allowPickUp: response.data.allowPickUp ?? true,
                 allowDelivery: response.data.allowDelivery ?? true,
+                allowOnlineOrder: response.data.allowOnlineOrder ?? true,
+                allowPreOrder: response.data.allowPreOrder ?? false,
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -177,6 +181,8 @@ export default function CompanyProfilePage() {
                 allowDineIn: formData.allowDineIn,
                 allowPickUp: formData.allowPickUp,
                 allowDelivery: formData.allowDelivery,
+                allowOnlineOrder: formData.allowOnlineOrder,
+                allowPreOrder: formData.allowPreOrder,
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -762,10 +768,10 @@ export default function CompanyProfilePage() {
                                         </div>
 
                                         {/* Delivery */}
-                                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-between items-start gap-4">
+                                        <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
                                             <div>
-                                                <h4 className="font-bold text-slate-800 text-sm">Delivery</h4>
-                                                <p className="text-[10px] text-slate-500 mt-1">Terima layanan pesan antar.</p>
+                                                <h4 className="text-sm font-bold text-slate-800">Aktifkan Pengantaran (Delivery)</h4>
+                                                <p className="text-[10px] text-slate-500 mt-0.5">Menerima pesanan yang diantar oleh kurir toko/ojol</p>
                                             </div>
                                             <button
                                                 type="button"
@@ -773,6 +779,41 @@ export default function CompanyProfilePage() {
                                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowDelivery ? 'bg-amber-500' : 'bg-slate-300'}`}
                                             >
                                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowDelivery ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="pt-8 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <div className="h-6 w-1 bg-teal-500 rounded-full"></div>
+                                        <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Aivola GO (Online Ordering)</h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+                                            <div>
+                                                <h4 className="text-sm font-bold text-slate-800">Aktifkan Pesanan Instan</h4>
+                                                <p className="text-[10px] text-slate-500 mt-0.5">Terima pesanan online langsung bayar (Masuk Penjualan)</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, allowOnlineOrder: !formData.allowOnlineOrder })}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowOnlineOrder ? 'bg-teal-500' : 'bg-slate-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowOnlineOrder ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+                                            <div>
+                                                <h4 className="text-sm font-bold text-slate-800">Aktifkan Pre-Order (PO)</h4>
+                                                <p className="text-[10px] text-slate-500 mt-0.5">Terima pesanan PO untuk H+1 (Masuk Pesanan Penjualan)</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, allowPreOrder: !formData.allowPreOrder })}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowPreOrder ? 'bg-teal-500' : 'bg-slate-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowPreOrder ? 'translate-x-6' : 'translate-x-1'}`} />
                                             </button>
                                         </div>
                                     </div>
