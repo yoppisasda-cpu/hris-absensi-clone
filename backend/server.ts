@@ -2273,7 +2273,7 @@ app.get('/api/companies/public', async (req: Request, res: Response) => {
 // A1.1.2 Endpoint List Perusahaan Publik (Single)
 app.get('/api/companies/public/:id', async (req: Request, res: Response) => {
   try {
-    const companyId = parseInt(req.params.id);
+    const companyId = parseInt(req.params.id as string);
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: {
