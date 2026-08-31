@@ -2294,6 +2294,8 @@ app.get('/api/companies/public', async (req: Request, res: Response) => {
         allowDineIn: true,
         allowPickUp: true,
         allowDelivery: true,
+        allowOnlineOrder: true,
+        allowPreOrder: true,
         branches: true,
         openTime: true,
         closeTime: true,

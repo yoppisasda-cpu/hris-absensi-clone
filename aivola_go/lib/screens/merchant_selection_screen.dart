@@ -122,6 +122,8 @@ class _MerchantSelectionScreenState extends State<MerchantSelectionScreen> {
       allowDineIn: merchant.allowDineIn,
       allowPickUp: merchant.allowPickUp,
       allowDelivery: merchant.allowDelivery,
+      allowOnlineOrder: merchant.allowOnlineOrder,
+      allowPreOrder: merchant.allowPreOrder,
     );
 
     // Scope products to this merchant

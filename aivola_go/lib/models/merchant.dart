@@ -15,6 +15,8 @@ class Merchant {
   final bool allowDineIn;
   final bool allowPickUp;
   final bool allowDelivery;
+  final bool allowOnlineOrder;
+  final bool allowPreOrder;
   double? distance; // distance to nearest branch in km
 
   Merchant({
@@ -32,6 +34,8 @@ class Merchant {
     this.allowDineIn = true,
     this.allowPickUp = true,
     this.allowDelivery = true,
+    this.allowOnlineOrder = true,
+    this.allowPreOrder = false,
     this.distance,
   });
 
@@ -50,9 +54,9 @@ class Merchant {
       allowDineIn: json['allowDineIn'] ?? true,
       allowPickUp: json['allowPickUp'] ?? true,
       allowDelivery: json['allowDelivery'] ?? true,
-      branches: json['branches'] != null 
-          ? (json['branches'] as List).map((b) => Branch.fromJson(b)).toList()
-          : [],
+      allowOnlineOrder: json['allowOnlineOrder'] ?? true,
+      allowPreOrder: json['allowPreOrder'] ?? false,
+      branches: (json['branches'] as List?)?.map((b) => Branch.fromJson(b)).toList() ?? [],
     );
   }
 }
