@@ -476,16 +476,48 @@ class _CartScreenState extends State<CartScreen> {
 
     if (response['success'] == true) {
       cartProvider.clearCart();
-      if (response['invoiceUrl'] != null) {
-        final url = Uri.parse(response['invoiceUrl']);
-        if (await canLaunchUrl(url)) {
-          await launchUrl(url, mode: LaunchMode.externalApplication);
-        }
+      if (response['qrisUrl'] != null && response['qrisUrl'].toString().isNotEmpty) {
+        _showPaymentDialog(
+          primaryColor, 
+          response['qrisUrl'], 
+          response['paymentInstructions'] ?? 'Silakan lakukan pembayaran sesuai nominal pesanan.'
+        );
+      } else {
+        _showSuccessDialog(primaryColor);
       }
-      _showSuccessDialog(primaryColor);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal memproses pesanan: ${response['message'] ?? ''}"), backgroundColor: Colors.redAccent));
     }
+  }
+
+  void _showPaymentDialog(Color primaryColor, String qrisUrl, String instructions) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: Text("Pembayaran Manual", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("Silakan scan QRIS atau ikuti instruksi berikut:", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF94A3B8))),
+              SizedBox(height: 15),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: Image.network(qrisUrl, height: 200, width: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
+              ),
+              SizedBox(height: 15),
+              Text(instructions, textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 12)),
+              SizedBox(height: 20),
+              Text("Jika sudah bayar, pesanan Anda akan segera diproses.", textAlign: TextAlign.center, style: TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+            ]
+          ),
+        ),
+        actions: [Center(child: TextButton(onPressed: () { Navigator.pop(context); Navigator.pop(context); }, child: Text("SAYA SUDAH BAYAR", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16))))],
+      ),
+    );
   }
 
   void _showSuccessDialog(Color primaryColor) {

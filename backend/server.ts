@@ -15331,7 +15331,15 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       timeout: 30000
     });
 
+    // Fetch Static QR & Payment Instructions from Company profile
+    const companyInfo = await prisma.company.findUnique({ where: { id: tenantId }, select: { qrisUrl: true, paymentInstructions: true } });
+    const qrisUrl = companyInfo?.qrisUrl || null;
+    const paymentInstructions = companyInfo?.paymentInstructions || null;
+
     let invoiceUrl = null;
+    
+    // --- TEMPORARY BYPASS XENDIT (Using Static QR Instead) ---
+    /*
     if (result.paymentMethod.includes('Online Payment')) {
       const axios = require('axios');
       const XENDIT_SECRET = process.env.XENDIT_SECRET_KEY || '';
@@ -15363,10 +15371,13 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         console.warn("[XENDIT WARNING]: XENDIT_SECRET_KEY belum di-set di .env");
       }
     }
+    */
 
     res.status(201).json({
       ...result,
-      invoiceUrl
+      invoiceUrl,
+      qrisUrl,
+      paymentInstructions
     });
 
     // --- SOCKET NOTIFICATION ---

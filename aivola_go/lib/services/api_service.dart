@@ -246,7 +246,9 @@ class ApiService {
         final data = jsonDecode(response.body);
         return {
           "success": true,
-          "invoiceUrl": data['invoiceUrl']
+          "invoiceUrl": data['invoiceUrl'],
+          "qrisUrl": data['qrisUrl'],
+          "paymentInstructions": data['paymentInstructions']
         };
       }
       return {"success": false};
