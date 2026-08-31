@@ -59,6 +59,9 @@ model Company {
   waGatewayUrl           String?
   memberDiscountType     String?              @default("PERCENTAGE")
   memberDiscountValue    Float                @default(0)
+  allowDineIn            Boolean              @default(true)
+  allowPickUp            Boolean              @default(true)
+  allowDelivery          Boolean              @default(true)
   pointsEarnRatio        Float                @default(0)
   pointsRedeemValue      Float                @default(0)
   globalTaxRate          Float                @default(0)

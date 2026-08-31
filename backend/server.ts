@@ -2254,6 +2254,9 @@ app.get('/api/companies/public', async (req: Request, res: Response) => {
         picPhone: true,
         latitude: true,
         longitude: true,
+        allowDineIn: true,
+        allowPickUp: true,
+        allowDelivery: true,
         branches: true,
         openTime: true,
         closeTime: true,
@@ -3625,7 +3628,8 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons, purchasedInsights,
       discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion, discountProspecting,
-      adminEmail, adminPassword, adminName, globalTaxRate
+      adminEmail, adminPassword, adminName, globalTaxRate,
+      allowDineIn, allowPickUp, allowDelivery
     } = req.body;
 
     const payloadToLog = { 
@@ -3643,6 +3647,9 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       where: { id: companyId },
       data: {
         name,
+        allowDineIn: (allowDineIn !== undefined) ? (allowDineIn === true || allowDineIn === 'true') : undefined,
+        allowPickUp: (allowPickUp !== undefined) ? (allowPickUp === true || allowPickUp === 'true') : undefined,
+        allowDelivery: (allowDelivery !== undefined) ? (allowDelivery === true || allowDelivery === 'true') : undefined,
         latitude: (latitude !== undefined && latitude !== null) ? parseFloat(latitude.toString()) : (latitude === null ? null : undefined),
         longitude: (longitude !== undefined && longitude !== null) ? parseFloat(longitude.toString()) : (longitude === null ? null : undefined),
         radius: safeParseInt(radius),

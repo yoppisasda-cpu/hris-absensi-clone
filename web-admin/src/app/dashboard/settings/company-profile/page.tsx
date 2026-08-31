@@ -66,7 +66,10 @@ export default function CompanyProfilePage() {
         paymentInstructions: '',
         openTime: '08:00',
         closeTime: '22:00',
-        isOpenManual: true
+        isOpenManual: true,
+        allowDineIn: true,
+        allowPickUp: true,
+        allowDelivery: true
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -116,7 +119,10 @@ export default function CompanyProfilePage() {
                 paymentInstructions: response.data.paymentInstructions || '',
                 openTime: response.data.openTime || '08:00',
                 closeTime: response.data.closeTime || '22:00',
-                isOpenManual: response.data.isOpenManual ?? true
+                isOpenManual: response.data.isOpenManual ?? true,
+                allowDineIn: response.data.allowDineIn ?? true,
+                allowPickUp: response.data.allowPickUp ?? true,
+                allowDelivery: response.data.allowDelivery ?? true,
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -713,6 +719,60 @@ export default function CompanyProfilePage() {
                                     <p className="mt-4 text-[10px] text-slate-400 italic">
                                         * Jam ini akan membatasi pemesanan melalui aplikasi Aivola GO jika pelanggan mencoba memesan di luar jam ini.
                                     </p>
+                                </div>
+
+                                {/* PENGATURAN METODE PENGAMBILAN AIVOLA GO */}
+                                <div className="pt-8 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <div className="h-6 w-1 bg-amber-500 rounded-full"></div>
+                                        <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-widest">Metode Pesanan (Aivola GO)</h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {/* Dine-In */}
+                                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-between items-start gap-4">
+                                            <div>
+                                                <h4 className="font-bold text-slate-800 text-sm">Dine-in</h4>
+                                                <p className="text-[10px] text-slate-500 mt-1">Terima makan di tempat.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, allowDineIn: !formData.allowDineIn })}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowDineIn ? 'bg-amber-500' : 'bg-slate-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowDineIn ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </div>
+
+                                        {/* Pick-up */}
+                                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-between items-start gap-4">
+                                            <div>
+                                                <h4 className="font-bold text-slate-800 text-sm">Pick-up</h4>
+                                                <p className="text-[10px] text-slate-500 mt-1">Terima pesanan ambil sendiri.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, allowPickUp: !formData.allowPickUp })}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowPickUp ? 'bg-amber-500' : 'bg-slate-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowPickUp ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </div>
+
+                                        {/* Delivery */}
+                                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-between items-start gap-4">
+                                            <div>
+                                                <h4 className="font-bold text-slate-800 text-sm">Delivery</h4>
+                                                <p className="text-[10px] text-slate-500 mt-1">Terima layanan pesan antar.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, allowDelivery: !formData.allowDelivery })}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowDelivery ? 'bg-amber-500' : 'bg-slate-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowDelivery ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="pt-8 border-t border-slate-100">

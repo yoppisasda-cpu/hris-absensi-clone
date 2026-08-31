@@ -12,6 +12,9 @@ class Merchant {
   final String? closeTime;
   final bool isOpenManual;
   final String? timezone;
+  final bool allowDineIn;
+  final bool allowPickUp;
+  final bool allowDelivery;
   double? distance; // distance to nearest branch in km
 
   Merchant({
@@ -26,6 +29,9 @@ class Merchant {
     this.closeTime,
     this.isOpenManual = true,
     this.timezone,
+    this.allowDineIn = true,
+    this.allowPickUp = true,
+    this.allowDelivery = true,
     this.distance,
   });
 
@@ -41,6 +47,9 @@ class Merchant {
       closeTime: json['closeTime'],
       isOpenManual: json['isOpenManual'] ?? true,
       timezone: json['timezone'],
+      allowDineIn: json['allowDineIn'] ?? true,
+      allowPickUp: json['allowPickUp'] ?? true,
+      allowDelivery: json['allowDelivery'] ?? true,
       branches: json['branches'] != null 
           ? (json['branches'] as List).map((b) => Branch.fromJson(b)).toList()
           : [],

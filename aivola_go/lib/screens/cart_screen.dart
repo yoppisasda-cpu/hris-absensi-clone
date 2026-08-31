@@ -171,6 +171,7 @@ class _CartScreenState extends State<CartScreen> {
 
 
   Widget _buildDeliveryOptions(BrandingProvider branding, Color primaryColor) {
+    final merchant = branding.merchant;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -178,9 +179,9 @@ class _CartScreenState extends State<CartScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _buildOptionChip("Dine-in", Icons.restaurant, primaryColor),
-            _buildOptionChip("Pick-up", Icons.shopping_bag, primaryColor),
-            _buildOptionChip("Delivery", Icons.local_shipping, primaryColor),
+            if (merchant?.allowDineIn ?? true) _buildOptionChip("Dine-in", Icons.restaurant, primaryColor),
+            if (merchant?.allowPickUp ?? true) _buildOptionChip("Pick-up", Icons.shopping_bag, primaryColor),
+            if (merchant?.allowDelivery ?? true) _buildOptionChip("Delivery", Icons.local_shipping, primaryColor),
           ],
         ),
         if (_deliveryMethod == "Delivery") ...[
@@ -198,7 +199,7 @@ class _CartScreenState extends State<CartScreen> {
       if (method == "Dine-in") {
         _paymentMethod = "Bayar di Kasir";
       } else {
-        _paymentMethod = "Xendit (Online Payment)";
+        _paymentMethod = "QRIS / Transfer (Online Payment)";
       }
     });
   }
@@ -558,7 +559,7 @@ class _CartScreenState extends State<CartScreen> {
     } else {
       return Column(
         children: [
-          _buildPaymentItem("Xendit (Online Payment)", Icons.language_rounded, primaryColor),
+          _buildPaymentItem("QRIS / Transfer (Online Payment)", Icons.language_rounded, primaryColor),
           SizedBox(height: 10),
           Container(
             padding: EdgeInsets.all(12),
@@ -568,9 +569,14 @@ class _CartScreenState extends State<CartScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.lock_outline_rounded, color: primaryColor, size: 16),
-                SizedBox(width: 10),
-                Expanded(child: Text("Pembayaran online aman & terverifikasi otomatis.", style: TextStyle(color: primaryColor, fontSize: 11))),
+                Icon(Icons.lock_outline, size: 14, color: primaryColor.withOpacity(0.7)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Pembayaran online aman & terverifikasi otomatis.",
+                    style: TextStyle(color: primaryColor.withOpacity(0.8), fontSize: 10),
+                  ),
+                )
               ],
             ),
           )
