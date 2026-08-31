@@ -15763,7 +15763,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
 
     const sales = await prisma.$queryRawUnsafe(`
       SELECT s.*, 
-             c.name as "customerName", 
+             COALESCE(c.name, s."customerName") as "customerName", 
              fa.name as "accountName",
              (s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "netTotalAmount"
       FROM "Sale" s
@@ -16170,7 +16170,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
 
     const sales: any[] = await prisma.$queryRawUnsafe(`
       SELECT s.*, 
-             c.name as "customerName", 
+             COALESCE(c.name, s."customerName") as "customerName", 
              fa.name as "accountName", 
              b.name as "branchName",
              (s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "netTotalAmount"
