@@ -7455,22 +7455,55 @@ app.patch('/api/reimbursements/:id/pay', tenantMiddleware, async (req: Request, 
 app.post('/api/loans', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const { userId, amount, monthlyDeduction, description } = req.body;
+    const { userId, amount, monthlyDeduction, description, accountId } = req.body;
 
-    const loan = await prisma.loan.create({
-      data: {
-        companyId: tenantId,
-        userId: parseInt(userId),
-        amount: parseFloat(amount),
-        monthlyDeduction: parseFloat(monthlyDeduction),
-        remainingAmount: parseFloat(amount),
-        description,
-        status: 'ACTIVE' // Langsung aktif jika dibuat admin
-      }
-    });
+    // Use a transaction if accountId is provided to ensure atomicity
+    const parsedAmount = parseFloat(amount);
+    
+    let loan;
+    if (accountId) {
+        loan = await prisma.$transaction(async (tx) => {
+            // 1. Create the loan
+            const newLoan = await tx.loan.create({
+                data: {
+                    companyId: tenantId,
+                    userId: parseInt(userId),
+                    amount: parsedAmount,
+                    monthlyDeduction: parseFloat(monthlyDeduction),
+                    remainingAmount: parsedAmount,
+                    description,
+                    status: 'ACTIVE'
+                }
+            });
+            
+            // 2. Deduct from financial account
+            await tx.financialAccount.update({
+                where: { id: parseInt(accountId), companyId: tenantId },
+                data: {
+                    balance: { decrement: parsedAmount }
+                }
+            });
+            
+            return newLoan;
+        });
+    } else {
+        loan = await prisma.loan.create({
+            data: {
+                companyId: tenantId,
+                userId: parseInt(userId),
+                amount: parsedAmount,
+                monthlyDeduction: parseFloat(monthlyDeduction),
+                remainingAmount: parsedAmount,
+                description,
+                status: 'ACTIVE'
+            }
+        });
+    }
+
     res.status(201).json(loan);
-  } catch (error) {
-    res.status(500).json({ error: 'Gagal membuat data pinjaman' });
+  } catch (error: any) {
+    console.error("LOAN ERROR:", error);
+    res.status(500).json({ error: 'Gagal membuat data pinjaman: ' + error.message });
   }
 });
 

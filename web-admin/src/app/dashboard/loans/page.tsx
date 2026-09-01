@@ -14,6 +14,12 @@ import {
     Calendar
 } from "lucide-react";
 
+interface Account {
+    id: number;
+    name: string;
+    balance: number;
+}
+
 interface Loan {
     id: number;
     userId: number;
@@ -45,6 +51,7 @@ interface LoanHistory {
 export default function LoanPage() {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -58,7 +65,8 @@ export default function LoanPage() {
         userId: '',
         amount: '',
         monthlyDeduction: '',
-        description: ''
+        description: '',
+        accountId: ''
     });
 
     useEffect(() => {
@@ -68,12 +76,14 @@ export default function LoanPage() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [loansRes, employeesRes] = await Promise.all([
+            const [loansRes, employeesRes, accountsRes] = await Promise.all([
                 api.get('/loans'),
-                api.get('/users')
+                api.get('/users'),
+                api.get('/finance/accounts')
             ]);
             setLoans(loansRes.data);
             setEmployees(employeesRes.data);
+            setAccounts(accountsRes.data);
         } catch (error) {
             console.error("Gagal mengambil data", error);
         } finally {
@@ -91,7 +101,7 @@ export default function LoanPage() {
                 await api.post('/loans', formData);
             }
             setIsModalOpen(false);
-            setFormData({ userId: '', amount: '', monthlyDeduction: '', description: '' });
+            setFormData({ userId: '', amount: '', monthlyDeduction: '', description: '', accountId: '' });
             setEditId(null);
             fetchData();
         } catch (error) {
@@ -106,7 +116,8 @@ export default function LoanPage() {
             userId: loan.userId.toString(),
             amount: loan.amount.toString(),
             monthlyDeduction: loan.monthlyDeduction.toString(),
-            description: loan.description || ''
+            description: loan.description || '',
+            accountId: ''
         });
         setEditId(loan.id);
         setIsModalOpen(true);
@@ -188,7 +199,7 @@ export default function LoanPage() {
                         </div>
                         <button
                             onClick={() => {
-                                setFormData({ userId: '', amount: '', monthlyDeduction: '', description: '' });
+                                setFormData({ userId: '', amount: '', monthlyDeduction: '', description: '', accountId: '' });
                                 setEditId(null);
                                 setIsModalOpen(true);
                             }}
@@ -374,6 +385,30 @@ export default function LoanPage() {
                                             <option key={emp.id} value={emp.id} className="text-slate-900 bg-white">{emp.name}</option>
                                         ))}
                                     </select>
+                                </div>
+
+                                <div className="mb-4">
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                                        Sumber Dana (Kas/Bank) <span className="text-slate-500 font-normal italic text-xs ml-1">(Opsional)</span>
+                                    </label>
+                                    <select
+                                        className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                        value={formData.accountId || ''}
+                                        onChange={e => setFormData({ ...formData, accountId: e.target.value })}
+                                        disabled={!!editId}
+                                    >
+                                        <option value="" className="text-slate-900 bg-white">-- Tanpa Sumber Dana (Hanya Pencatatan) --</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id} className="text-slate-900 bg-white">
+                                                {acc.name} - Saldo: Rp {acc.balance.toLocaleString('id-ID')}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {!editId && (
+                                        <p className="text-xs text-slate-500 mt-1 italic">
+                                            Jika diisi, saldo bank ini otomatis terpotong (cair ke karyawan).
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
