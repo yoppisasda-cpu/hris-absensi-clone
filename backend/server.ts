@@ -3535,6 +3535,9 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
       });
 
       return { finalStatus, totalExpenseAmount };
+    }, {
+      maxWait: 10000,
+      timeout: 30000
     });
 
     res.json({ message: 'Barang berhasil diterima.', result });
