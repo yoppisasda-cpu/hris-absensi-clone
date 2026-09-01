@@ -12400,7 +12400,15 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     });
 
     const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs + ytdAssetDepreciation)) * 100) / 100;
-    const modalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
+    
+    // Fetch historical modal disetor
+    const equityIncomes = await prisma.income.findMany({
+      where: { companyId: tenantId, category: { type: 'EQUITY' } }
+    });
+    const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0);
+
+    const calculatedModalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
+    const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical) * 100) / 100;
 
     res.json({
       assets: {
@@ -12424,7 +12432,8 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       },
       equity: { 
         total: totalEquity,
-        modalDisetor,
+        modalDisetor: modalDisetorHistorical,
+        akunPenahan,
         labaBerjalan: ytdNetProfit
       }
     });
@@ -12579,7 +12588,15 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     });
 
     const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs + ytdAssetDepreciation)) * 100) / 100;
-    const modalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
+    
+    // Fetch historical modal disetor
+    const equityIncomes = await prisma.income.findMany({
+      where: { companyId: tenantId, category: { type: 'EQUITY' } }
+    });
+    const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0);
+
+    const calculatedModalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
+    const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical) * 100) / 100;
 
     // --- CREATE EXCEL ---
     const workbook = new ExcelJS.Workbook();
@@ -12671,7 +12688,9 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     worksheet.getCell(`A${currentRow}`).value = 'EKUITAS (MODAL)';
     worksheet.getCell(`A${currentRow}`).font = { bold: true };
     currentRow++;
-    worksheet.addRow(['Modal Disetor (Paid-in Capital)', '', modalDisetor]);
+    worksheet.addRow(['Modal Disetor (Paid-in Capital)', '', modalDisetorHistorical]);
+    currentRow++;
+    worksheet.addRow(['Akun Penahan (Selisih Belum Teridentifikasi)', '', akunPenahan]);
     currentRow++;
     worksheet.addRow(['Laba Tahun Berjalan (YTD Net Profit)', '', ytdNetProfit]);
     currentRow++;

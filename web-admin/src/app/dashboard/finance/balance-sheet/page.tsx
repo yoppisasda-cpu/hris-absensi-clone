@@ -312,6 +312,10 @@ export default function BalanceSheetPage() {
                                         <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(data?.equity.modalDisetor || 0).toLocaleString()}</td>
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Akun Penahan (Selisih Belum Teridentifikasi)</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-orange-600">Rp {(data?.equity.akunPenahan || 0).toLocaleString()}</td>
+                                    </tr>
+                                    <tr className="hover:bg-slate-50 transition-colors">
                                         <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Laba Tahun Berjalan (YTD Net Profit)</td>
                                         <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(data?.equity.labaBerjalan || 0).toLocaleString()}</td>
                                     </tr>
