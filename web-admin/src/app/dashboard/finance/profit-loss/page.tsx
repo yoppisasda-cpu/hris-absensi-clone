@@ -14,11 +14,13 @@ export default function ProfitLossPage() {
     const [loading, setLoading] = useState(true);
     const [month, setMonth] = useState(new Date().getMonth() + 1);
     const [year, setYear] = useState(new Date().getFullYear());
+    const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+    const [branches, setBranches] = useState<any[]>([]);
 
     const fetchReport = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/finance/reports/profit-loss?month=${month}&year=${year}`);
+            const res = await api.get(`/finance/reports/profit-loss?month=${month}&year=${year}&branchId=${selectedBranchId}`);
             setData(res.data);
         } catch (error) {
             console.error("Gagal mengambil laporan Laba Rugi", error);
@@ -28,8 +30,20 @@ export default function ProfitLossPage() {
     };
 
     useEffect(() => {
+        const init = async () => {
+            try {
+                const resBranches = await api.get('/branches');
+                setBranches(resBranches.data);
+            } catch (error) {
+                console.error("Gagal load cabang", error);
+            }
+        };
+        init();
+    }, []);
+
+    useEffect(() => {
         fetchReport();
-    }, [month, year]);
+    }, [month, year, selectedBranchId]);
 
     const months = [
         "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -42,7 +56,7 @@ export default function ProfitLossPage() {
     const handleExport = async () => {
         const toastId = toast.loading('Menyiapkan file Excel...');
         try {
-            const response = await api.get(`/finance/reports/profit-loss/export?month=${month}&year=${year}`, { responseType: 'blob' });
+            const response = await api.get(`/finance/reports/profit-loss/export?month=${month}&year=${year}&branchId=${selectedBranchId}`, { responseType: 'blob' });
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
@@ -116,6 +130,17 @@ export default function ProfitLossPage() {
                 >
                     {years.map(y => (
                         <option key={y} value={y}>{y}</option>
+                    ))}
+                </select>
+                <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+                <select
+                    value={selectedBranchId}
+                    onChange={(e) => setSelectedBranchId(e.target.value)}
+                    className="rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                    <option value="all">Semua Cabang (Global)</option>
+                    {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
                 </select>
                 {loading && <div className="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-600"></div>}

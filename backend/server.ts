@@ -11625,11 +11625,13 @@ app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, re
 });
 
 // Helper function to calculate B2B / Retail Sales COGS in high performance batch queries (solves N+1 database round-trip timeout)
-async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Date): Promise<number> {
+async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Date, branchId?: number): Promise<number> {
+  const branchFilter = branchId ? `AND "branchId" = ${branchId}` : ``;
   const sales: any[] = await prisma.$queryRawUnsafe(`
     SELECT id FROM "Sale" 
     WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
     AND "status" NOT IN ('CANCELLED', 'PENDING', 'RETURNED', 'VOID')
+    ${branchFilter}
   `, tenantId, startDate, endDate);
 
   if (sales.length === 0) return 0;
@@ -11714,24 +11716,30 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     const tenantId = Number((req as any).tenantId);
     const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const branchIdStr = req.query.branchId as string;
+    const selectedBranchId = branchIdStr && branchIdStr !== 'all' ? parseInt(branchIdStr) : undefined;
+    const branchFilter = selectedBranchId ? { branchId: selectedBranchId } : {};
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
+    // Use WIB Timezone (+07:00) to match POS Dashboard
+    const startDateWIB = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00+07:00`);
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const endDateWIB = new Date(`${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00+07:00`);
 
-    // 1. Fetch Incomes
+    // 1. Fetch Incomes (No branchId because Income is company-level)
     const incomes = await prisma.income.findMany({
       where: {
         companyId: tenantId,
-        date: { gte: startDate, lte: endDate }
+        date: { gte: startDateWIB, lt: endDateWIB }
       },
       include: { category: true }
     });
 
-    // 2. Fetch Expenses
+    // 2. Fetch Expenses (No branchId because Expense is company-level)
     const expenses = await prisma.expense.findMany({
       where: {
         companyId: tenantId,
-        date: { gte: startDate, lte: endDate }
+        date: { gte: startDateWIB, lt: endDateWIB }
       },
       include: { category: true }
     });
@@ -11747,23 +11755,27 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     const accrualSales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
-        date: { gte: startDate, lte: endDate },
-        status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] }
-      }
+        date: { gte: startDateWIB, lt: endDateWIB },
+        status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] },
+        ...branchFilter
+      },
+      include: { items: true }
     });
 
     accrualSales.forEach(sale => {
-      let amount = sale.totalAmount;
+      // Calculate omzet as sum of items total (to exactly match POS Profitability)
+      let amount = sale.items && sale.items.length > 0 
+        ? sale.items.reduce((sum, item) => sum + (Number(item.total) || 0), 0) 
+        : sale.totalAmount; // fallback
+
       const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
       
       if (sale.taxRate && sale.taxRate > 0) {
+        // Collect tax if any
         if (sale.taxAmount && sale.taxAmount > 0) {
-          amount = amount - sale.taxAmount;
           totalTaxCollected += sale.taxAmount;
         } else {
-          const taxAmount = amount * (sale.taxRate / (100 + sale.taxRate));
-          amount = amount - taxAmount;
-          totalTaxCollected += taxAmount;
+          totalTaxCollected += amount * (sale.taxRate / (100 + sale.taxRate));
         }
       }
       
@@ -11825,7 +11837,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     });
 
     // 4. Calculate Detailed COGS based on Sales in high-performance batch (solves PnL N+1 timeout)
-    const calculatedCogsFromSales = await calculateSalesCOGS(tenantId, startDate, endDate);
+    const calculatedCogsFromSales = await calculateSalesCOGS(tenantId, startDateWIB, endDateWIB, selectedBranchId);
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
     const grossProfit = totalSalesRevenue - totalCOGS;
 
@@ -11920,18 +11932,24 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
     const tenantId = Number((req as any).tenantId);
     const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const branchIdStr = req.query.branchId as string;
+    const selectedBranchId = branchIdStr && branchIdStr !== 'all' ? parseInt(branchIdStr) : undefined;
+    const branchFilter = selectedBranchId ? { branchId: selectedBranchId } : {};
     const ExcelJS = require('exceljs');
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
+    // Use WIB Timezone (+07:00) to match POS Dashboard
+    const startDateWIB = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00+07:00`);
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const endDateWIB = new Date(`${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00+07:00`);
 
     // --- LOGIC SAME AS PnL ---
     const incomes = await prisma.income.findMany({
-      where: { companyId: tenantId, date: { gte: startDate, lte: endDate } },
+      where: { companyId: tenantId, date: { gte: startDateWIB, lt: endDateWIB } },
       include: { category: true }
     });
     const expenses = await prisma.expense.findMany({
-      where: { companyId: tenantId, date: { gte: startDate, lte: endDate } },
+      where: { companyId: tenantId, date: { gte: startDateWIB, lt: endDateWIB } },
       include: { category: true }
     });
 
@@ -11945,23 +11963,26 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
     const accrualSales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
-        date: { gte: startDate, lte: endDate },
-        status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] }
-      }
+        date: { gte: startDateWIB, lt: endDateWIB },
+        status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] },
+        ...branchFilter
+      },
+      include: { items: true }
     });
 
     accrualSales.forEach(sale => {
-      let amount = sale.totalAmount;
+      // Calculate omzet as sum of items total (to exactly match POS Profitability)
+      let amount = sale.items && sale.items.length > 0 
+        ? sale.items.reduce((sum, item) => sum + (Number(item.total) || 0), 0) 
+        : sale.totalAmount; // fallback
+
       const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
       
       if (sale.taxRate && sale.taxRate > 0) {
         if (sale.taxAmount && sale.taxAmount > 0) {
-          amount = amount - sale.taxAmount;
           totalTaxCollected += sale.taxAmount;
         } else {
-          const taxAmount = amount * (sale.taxRate / (100 + sale.taxRate));
-          amount = amount - taxAmount;
-          totalTaxCollected += taxAmount;
+          totalTaxCollected += amount * (sale.taxRate / (100 + sale.taxRate));
         }
       }
       
@@ -12018,7 +12039,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
     });
 
     // Calculate B2B / Retail Sales COGS in high performance batch (solves export timeout)
-    const calculatedCogsFromSales = await calculateSalesCOGS(tenantId, startDate, endDate);
+    const calculatedCogsFromSales = await calculateSalesCOGS(tenantId, startDateWIB, endDateWIB, selectedBranchId);
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
     const grossProfit = totalSalesRevenue - totalCOGS;
 
