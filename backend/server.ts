@@ -11578,6 +11578,28 @@ app.put('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: 
         tenantId
       );
 
+      // 5. Auto-create Asset if Category is changed to CAPEX
+      if (categoryId) {
+        const cat = await tx.expenseCategory.findUnique({ where: { id: Number(categoryId) } });
+        if (cat && cat.type === 'CAPEX') {
+          const existingAsset = await tx.asset.findFirst({
+            where: { companyId: tenantId, purchasePrice: newAmount, name: description || (paidTo ? `Pembelian dari ${paidTo}` : 'Aset Tetap Baru') }
+          });
+          if (!existingAsset) {
+            await tx.asset.create({
+              data: {
+                companyId: tenantId,
+                name: description || (paidTo ? `Pembelian dari ${paidTo}` : 'Aset Tetap Baru'),
+                condition: 'NEW',
+                purchasePrice: newAmount,
+                purchaseDate: new Date(date),
+                isDepreciating: false
+              }
+            });
+          }
+        }
+      }
+
       return { id: expenseId, status, amount: newAmount };
     });
 
