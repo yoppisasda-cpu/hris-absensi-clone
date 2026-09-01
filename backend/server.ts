@@ -11759,13 +11759,13 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
         status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] },
         ...branchFilter
       },
-      include: { items: true }
+      include: { SaleItem: true }
     });
 
     accrualSales.forEach(sale => {
       // Calculate omzet as sum of items total (to exactly match POS Profitability)
-      let amount = sale.items && sale.items.length > 0 
-        ? sale.items.reduce((sum, item) => sum + (Number(item.total) || 0), 0) 
+      let amount = sale.SaleItem && sale.SaleItem.length > 0 
+        ? sale.SaleItem.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0) 
         : sale.totalAmount; // fallback
 
       const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
@@ -11967,13 +11967,13 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
         status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] },
         ...branchFilter
       },
-      include: { items: true }
+      include: { SaleItem: true }
     });
 
     accrualSales.forEach(sale => {
       // Calculate omzet as sum of items total (to exactly match POS Profitability)
-      let amount = sale.items && sale.items.length > 0 
-        ? sale.items.reduce((sum, item) => sum + (Number(item.total) || 0), 0) 
+      let amount = sale.SaleItem && sale.SaleItem.length > 0 
+        ? sale.SaleItem.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0) 
         : sale.totalAmount; // fallback
 
       const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
