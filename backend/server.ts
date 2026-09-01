@@ -3352,102 +3352,7 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
         throw new Error('PO sudah diproses sebelumnya (Terdeteksi klik ganda).');
       }
 
-      // If APPROVED, create a PENDING Expense (Hutang) AND update Inventory
-      if (status === 'APPROVED') {
-        const warehouseId = poData.warehouseId;
-        // 1. Create Finance Record (Hutang)
-        // Find or create "Pembelian (Auto-PO)" category
-        let category: any = await tx.expenseCategory.findFirst({
-          where: { companyId: tenantId, name: 'Pembelian (Auto-PO)' }
-        });
-
-        if (!category) {
-          const catResult: any[] = await tx.$queryRawUnsafe(`
-            INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
-            VALUES ($1, 'Pembelian (Auto-PO)', 'INVENTORY', NOW())
-            RETURNING id
-          `, tenantId);
-          
-          if (!catResult || catResult.length === 0) {
-            throw new Error('Gagal membuat kategori pengeluaran otomatis (Auto-PO).');
-          }
-          category = { id: catResult[0].id };
-        }
-
-        // Add to Expense (Hutang)
-        const finalApprovedDate = approvedDate ? new Date(approvedDate) : new Date();
-        const dueDate = new Date(finalApprovedDate.getTime() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
-        await tx.expense.create({
-          data: {
-            companyId: tenantId,
-            categoryId: category.id,
-            supplierId: poData.supplierId,
-            amount: poData.totalAmount,
-            date: finalApprovedDate,
-            dueDate: dueDate,
-            description: `Hutang otomatis dari PO #${poData.orderNumber}`,
-            status: 'PENDING',
-            paidTo: poData.supplier_name
-          }
-        });
-
-        // 2. Update Stock & Calculate Moving Average Cost for each item
-        for (const item of poItems) {
-          // Fetch current stock and cost price for WAC (Weighted Average Cost) calculation
-          const currentProduct = await tx.product.findUnique({
-            where: { id: item.productId },
-            select: { stock: true, costPrice: true, purchaseFactor: true }
-          });
-
-          if (currentProduct) {
-            const factor = currentProduct.purchaseFactor || 1;
-            const currentStock = Math.max(0, currentProduct.stock);
-            const currentCost = currentProduct.costPrice || 0;
-            
-            // CONVERSION LOGIC
-            const incomingQty = item.quantity * factor;
-            const incomingPrice = item.price / factor; // Price per base unit
-
-            const newTotalStock = currentStock + incomingQty;
-            
-            // Formula: ((Current Stock * Current Cost) + (Incoming Qty * Incoming Price)) / New Total Stock
-            const newAverageCost = newTotalStock > 0 
-              ? ((currentStock * currentCost) + (incomingQty * incomingPrice)) / newTotalStock
-              : incomingPrice;
-
-            // Update Global Stock & Moving Average Cost
-            await tx.product.update({
-              where: { id: item.productId },
-              data: { 
-                stock: { increment: incomingQty },
-                costPrice: Number(newAverageCost.toFixed(2))
-              }
-            });
-
-            // NEW: Update Warehouse Stock
-            if (warehouseId) {
-              await tx.$executeRawUnsafe(`
-                INSERT INTO "WarehouseStock" ("productId", "warehouseId", "quantity", "updatedAt")
-                VALUES ($1, $2, $3, NOW())
-                ON CONFLICT ("productId", "warehouseId") 
-                DO UPDATE SET "quantity" = "WarehouseStock"."quantity" + $3, "updatedAt" = NOW()
-              `, item.productId, warehouseId, incomingQty);
-            }
-
-            // Record Stock Transaction
-            await tx.stockTransaction.create({
-              data: {
-                productId: item.productId,
-                type: 'IN',
-                quantity: incomingQty,
-                reference: `PO #${poData.orderNumber} (Approved - Converted)`,
-                date: new Date(),
-                warehouseId: warehouseId || null
-              }
-            });
-          }
-        }
-      }
+      // (Stock & Expense update logic has been moved to the new Receive endpoint)
 
       return updateResult;
     }, {
@@ -3458,6 +3363,184 @@ app.patch('/api/inventory/purchase-orders/:id/status', tenantMiddleware, async (
   } catch (error: any) {
     console.error("PO STATUS ERROR:", error);
     res.status(500).json({ error: 'Gagal memproses PO: ' + error.message });
+  }
+});
+
+// PO3.5 Receive Goods
+app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = (req as any).userId;
+    const userRole = (req as any).userRole;
+    const id = parseInt(req.params.id as string);
+    const { receivedItems, receivedDate } = req.body; 
+    // receivedItems format: [{ id: purchaseOrderItemId, receivedQty: number }]
+
+    if (!['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'FINANCE', 'WAREHOUSE_ADMIN', 'OPERATIONAL', 'SUPERVISOR'].includes(userRole)) {
+      return res.status(403).json({ error: 'Anda tidak memiliki hak untuk menerima PO ini.' });
+    }
+
+    if (!Array.isArray(receivedItems) || receivedItems.length === 0) {
+      return res.status(400).json({ error: 'Data penerimaan barang tidak valid.' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const po: any = await tx.$queryRawUnsafe(`
+        SELECT po.*, s.name as supplier_name
+        FROM "PurchaseOrder" po
+        JOIN "Supplier" s ON po."supplierId" = s.id
+        WHERE po.id = $1 AND po."companyId" = $2
+      `, id, tenantId);
+
+      if (!po || po.length === 0) throw new Error('PO tidak ditemukan.');
+      const poData = po[0];
+
+      if (poData.status !== 'APPROVED' && poData.status !== 'PARTIAL') {
+        throw new Error('Hanya PO berstatus APPROVED atau PARTIAL yang bisa diterima barangnya.');
+      }
+
+      let totalExpenseAmount = 0;
+      let allFullyReceived = true;
+      const warehouseId = poData.warehouseId;
+
+      for (const rxItem of receivedItems) {
+        const qtyToReceive = Number(rxItem.receivedQty);
+        if (qtyToReceive <= 0) continue;
+
+        const poItem = await tx.purchaseOrderItem.findUnique({
+          where: { id: rxItem.id }
+        });
+
+        if (!poItem || poItem.purchaseOrderId !== id) continue;
+
+        // Check if we are over-receiving
+        const remainingToReceive = poItem.quantity - poItem.receivedQty;
+        if (qtyToReceive > remainingToReceive) {
+          throw new Error(`Jumlah terima untuk item ${poItem.productId} melebihi jumlah sisa yang dipesan.`);
+        }
+
+        // 1. Update receivedQty in PurchaseOrderItem
+        await tx.purchaseOrderItem.update({
+          where: { id: poItem.id },
+          data: { receivedQty: { increment: qtyToReceive } }
+        });
+
+        // Track if all items are fully received
+        if (poItem.receivedQty + qtyToReceive < poItem.quantity) {
+          allFullyReceived = false;
+        }
+
+        const costForReceivedQty = qtyToReceive * poItem.price;
+        totalExpenseAmount += costForReceivedQty;
+
+        // 2. Update Stock & WAC
+        const currentProduct = await tx.product.findUnique({
+          where: { id: poItem.productId },
+          select: { stock: true, costPrice: true, purchaseFactor: true }
+        });
+
+        if (currentProduct) {
+          const factor = currentProduct.purchaseFactor || 1;
+          const currentStock = Math.max(0, currentProduct.stock);
+          const currentCost = currentProduct.costPrice || 0;
+          
+          const incomingQty = qtyToReceive * factor;
+          const incomingPrice = poItem.price / factor;
+
+          const newTotalStock = currentStock + incomingQty;
+          const newAverageCost = newTotalStock > 0 
+            ? ((currentStock * currentCost) + (incomingQty * incomingPrice)) / newTotalStock
+            : incomingPrice;
+
+          await tx.product.update({
+            where: { id: poItem.productId },
+            data: { 
+              stock: { increment: incomingQty },
+              costPrice: Number(newAverageCost.toFixed(2))
+            }
+          });
+
+          if (warehouseId) {
+            await tx.$executeRawUnsafe(`
+              INSERT INTO "WarehouseStock" ("productId", "warehouseId", "quantity", "updatedAt")
+              VALUES ($1, $2, $3, NOW())
+              ON CONFLICT ("productId", "warehouseId") 
+              DO UPDATE SET "quantity" = "WarehouseStock"."quantity" + $3, "updatedAt" = NOW()
+            `, poItem.productId, warehouseId, incomingQty);
+          }
+
+          await tx.stockTransaction.create({
+            data: {
+              productId: poItem.productId,
+              type: 'IN',
+              quantity: incomingQty,
+              reference: `PO #${poData.orderNumber} (Goods Received)`,
+              date: new Date(),
+              warehouseId: warehouseId || null
+            }
+          });
+        }
+      }
+
+      // 3. Create Expense for received items
+      if (totalExpenseAmount > 0) {
+        let category: any = await tx.expenseCategory.findFirst({
+          where: { companyId: tenantId, name: 'Pembelian (Auto-PO)' }
+        });
+
+        if (!category) {
+          const catResult: any[] = await tx.$queryRawUnsafe(`
+            INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
+            VALUES ($1, 'Pembelian (Auto-PO)', 'INVENTORY', NOW())
+            RETURNING id
+          `, tenantId);
+          category = { id: catResult[0].id };
+        }
+
+        const finalReceivedDate = receivedDate ? new Date(receivedDate) : new Date();
+        const dueDate = new Date(finalReceivedDate.getTime() + 7 * 24 * 60 * 60 * 1000); 
+        await tx.expense.create({
+          data: {
+            companyId: tenantId,
+            categoryId: category.id,
+            supplierId: poData.supplierId,
+            amount: totalExpenseAmount,
+            date: finalReceivedDate,
+            dueDate: dueDate,
+            description: `Hutang otomatis dari PO #${poData.orderNumber} (Penerimaan Barang)`,
+            status: 'PENDING',
+            paidTo: poData.supplier_name
+          }
+        });
+      }
+
+      // Check if there are ANY unreceived items left across the entire PO
+      const allPoItems = await tx.purchaseOrderItem.findMany({
+        where: { purchaseOrderId: id }
+      });
+      let isFullyReceivedGlobal = true;
+      for (const item of allPoItems) {
+        // use epsilon for floating point comparison
+        if (item.quantity - item.receivedQty > 0.001) {
+          isFullyReceivedGlobal = false;
+          break;
+        }
+      }
+
+      // 4. Update PO Status
+      const finalStatus = isFullyReceivedGlobal ? 'COMPLETED' : 'PARTIAL';
+      await tx.purchaseOrder.update({
+        where: { id },
+        data: { status: finalStatus, updatedAt: new Date() }
+      });
+
+      return { finalStatus, totalExpenseAmount };
+    });
+
+    res.json({ message: 'Barang berhasil diterima.', result });
+  } catch (error: any) {
+    console.error("PO RECEIVE ERROR:", error);
+    res.status(500).json({ error: 'Gagal memproses penerimaan barang: ' + error.message });
   }
 });
 

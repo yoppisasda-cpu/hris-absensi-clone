@@ -1160,6 +1160,7 @@ model PurchaseOrderItem {
   purchaseOrderId Int
   productId       Int
   quantity        Float
+  receivedQty     Float         @default(0)
   price           Float
   total           Float
   product         Product       @relation(fields: [productId], references: [id])
@@ -1474,8 +1475,10 @@ enum RequestStatus {
 enum POStatus {
   PENDING
   APPROVED
+  PARTIAL
   REJECTED
   PAUSED
+  COMPLETED
   CANCELLED
 }
 

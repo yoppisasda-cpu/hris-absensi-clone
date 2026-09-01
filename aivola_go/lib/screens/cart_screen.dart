@@ -81,9 +81,9 @@ class _CartScreenState extends State<CartScreen> {
                       _buildSectionTitle("Pesanan Anda"),
                       ...cartProvider.items.values.map((item) => _buildCartItem(item, cartProvider, primaryColor)).toList(),
                       SizedBox(height: 20),
-                      if (brandingProvider.allowOnlineOrder && brandingProvider.allowPreOrder) ...[
+                      if (brandingProvider.allowOnlineOrder || brandingProvider.allowPreOrder) ...[
                         _buildSectionTitle("Jenis Pesanan"),
-                        _buildOrderTypeOptions(primaryColor),
+                        _buildOrderTypeOptions(primaryColor, brandingProvider),
                         SizedBox(height: 20),
                       ],
                       _buildSectionTitle("Metode Pengambilan"),
@@ -183,19 +183,28 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  Widget _buildOrderTypeOptions(Color primaryColor) {
+  Widget _buildOrderTypeOptions(Color primaryColor, BrandingProvider branding) {
+    String currentOrderType = _orderType;
+    if (!branding.allowOnlineOrder && branding.allowPreOrder) {
+      currentOrderType = "Pre-Order";
+    } else if (branding.allowOnlineOrder && !branding.allowPreOrder) {
+      currentOrderType = "Pesanan Langsung";
+    }
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        _buildOrderTypeChip("Pesanan Langsung", Icons.flash_on, primaryColor),
-        _buildOrderTypeChip("Pre-Order", Icons.calendar_month, primaryColor),
+        if (branding.allowOnlineOrder)
+          _buildOrderTypeChip("Pesanan Langsung", Icons.flash_on, primaryColor, currentOrderType),
+        if (branding.allowPreOrder)
+          _buildOrderTypeChip("Pre-Order", Icons.calendar_month, primaryColor, currentOrderType),
       ],
     );
   }
 
-  Widget _buildOrderTypeChip(String label, IconData icon, Color primaryColor) {
-    bool isSelected = _orderType == label;
+  Widget _buildOrderTypeChip(String label, IconData icon, Color primaryColor, String currentOrderType) {
+    bool isSelected = currentOrderType == label;
     return GestureDetector(
       onTap: () => _onOrderTypeChanged(label),
       child: Container(

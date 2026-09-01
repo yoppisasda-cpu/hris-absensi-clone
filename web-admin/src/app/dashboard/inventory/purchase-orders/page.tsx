@@ -11,6 +11,7 @@ import { toast } from "react-hot-toast";
 import PurchaseOrderModal from "@/components/inventory/PurchaseOrderModal";
 import EditPurchaseOrderModal from "@/components/inventory/EditPurchaseOrderModal";
 import PODetailModal from "@/components/inventory/PODetailModal";
+import ReceiveGoodsModal from "@/components/inventory/ReceiveGoodsModal";
 import AiPoModal from "@/components/inventory/AiPoModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -22,6 +23,7 @@ export default function PurchaseOrdersPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
     const [selectedPo, setSelectedPo] = useState<any>(null);
     const [selectedEditPo, setSelectedEditPo] = useState<any>(null);
     const [role, setRole] = useState<string>("");
@@ -249,6 +251,7 @@ export default function PurchaseOrdersPage() {
     const userRole = role.toUpperCase();
     const isPurchasingOrAdmin = ['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'MANAGER'].includes(userRole);
     const canCreatePO = ['OPERATIONAL', 'ADMIN', 'SUPERADMIN', 'OWNER', 'PURCHASING', 'MANAGER'].includes(userRole);
+    const canReceiveGoods = ['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'FINANCE', 'WAREHOUSE_ADMIN', 'OPERATIONAL', 'SUPERVISOR'].includes(userRole);
 
     return (
         <DashboardLayout>
@@ -538,6 +541,18 @@ export default function PurchaseOrdersPage() {
                                                          >
                                                              <Printer className="h-5 w-5" />
                                                          </button>
+                                                        {(po.status === 'APPROVED' || po.status === 'PARTIAL') && canReceiveGoods && (
+                                                            <button 
+                                                                className="h-10 w-10 flex items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all shadow-lg border border-emerald-500/30 active:scale-95"
+                                                                title="TERIMA BARANG (GOODS RECEIPT)"
+                                                                onClick={() => {
+                                                                    setSelectedPo(po);
+                                                                    setIsReceiveModalOpen(true);
+                                                                }}
+                                                            >
+                                                                <Package className="h-5 w-5 stroke-[2.5px]" />
+                                                            </button>
+                                                        )}
                                                         <button 
                                                             className="h-10 w-10 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 border border-white/10"
                                                             title="INSPECT MANIFEST"
@@ -571,7 +586,13 @@ export default function PurchaseOrdersPage() {
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* Modals */}
+            <ReceiveGoodsModal
+                isOpen={isReceiveModalOpen}
+                onClose={() => setIsReceiveModalOpen(false)}
+                po={selectedPo}
+                onSuccess={fetchPos}
+            />
             <AiPoModal 
                 isOpen={isAiModalOpen}
                 onClose={() => setIsAiModalOpen(false)}

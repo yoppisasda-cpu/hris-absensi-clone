@@ -102,10 +102,11 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-[9px] font-black uppercase text-slate-950 tracking-[0.15em] border-b border-slate-200 italic print:bg-white print:text-black">
                                     <tr>
-                                        <th className="px-6 py-4 text-slate-950 font-black">Nama Barang</th>
-                                        <th className="px-6 py-4 text-center text-slate-950 font-black">Jumlah</th>
-                                        <th className="px-6 py-4 text-right text-slate-950 font-black">Harga Satuan (IDR)</th>
-                                        <th className="px-6 py-4 text-right text-slate-950 font-black">Total (IDR)</th>
+                                        <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 w-1/4">Nama Barang</th>
+                                        <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 text-center">Dipesan</th>
+                                        <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 text-center">Diterima</th>
+                                        <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 text-right">Harga Satuan</th>
+                                        <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 text-right">Total (IDR)</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-slate-950 italic">
@@ -113,6 +114,7 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                                         <tr key={item.id} className="group hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4 font-black text-slate-950 text-[11px] uppercase tracking-tighter">{item.product?.name}</td>
                                             <td className="px-6 py-4 text-center font-black text-slate-950 text-[11px] uppercase">{item.quantity} <span className="text-[9px] text-slate-500">{(item.product?.purchaseUnit || item.product?.unit || 'PCS').toUpperCase()}</span></td>
+                                            <td className="px-6 py-4 text-center font-black text-emerald-600 text-[11px] uppercase">{item.receivedQty || 0}</td>
                                             <td className="px-6 py-4 text-right font-black text-slate-500 text-[11px] tracking-widest">{item.price.toLocaleString('id-ID')}</td>
                                             <td className="px-6 py-4 text-right font-black text-slate-950 text-[11px] tracking-widest">{(item.quantity * item.price).toLocaleString('id-ID')}</td>
                                         </tr>
@@ -120,7 +122,7 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                                 </tbody>
                                 <tfoot className="bg-slate-50 border-t-2 border-slate-950 print:bg-white print:border-t-2">
                                     <tr>
-                                        <td colSpan={3} className="px-6 py-5 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Total Bersih PO</td>
+                                        <td colSpan={4} className="px-6 py-5 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Total Bersih PO</td>
                                         <td className="px-6 py-5 text-right text-xl font-black italic text-slate-950 tracking-tighter uppercase">Rp {po.totalAmount.toLocaleString('id-ID')}</td>
                                     </tr>
                                 </tfoot>
