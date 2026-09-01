@@ -12050,8 +12050,9 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       let amount = inc.amount;
       
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
+      const isEquity = inc.category?.type === 'EQUITY';
       
-      if (!isSales) {
+      if (!isSales && !isEquity) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
         totalOtherIncome += amount;
       }
@@ -12071,8 +12072,12 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
     expenses.forEach(exp => {
       const catName = exp.category?.name || 'Uncategorized';
       const isCOGS = exp.category?.type === 'COGS';
+      const isCapex = exp.category?.type === 'CAPEX';
+      const isInventory = exp.category?.type === 'INVENTORY';
       
-      if (isCOGS) {
+      if (isCapex || isInventory) {
+        // Exclude CAPEX and INVENTORY from P&L completely
+      } else if (isCOGS) {
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
       } else {
