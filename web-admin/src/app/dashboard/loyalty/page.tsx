@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import { 
     Tag, Gift, Search, Plus, Edit, Trash2, 
-    Settings, Percent, Database, Save
+    Settings, Percent, Database, Save, History
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 import VoucherModal from "@/components/loyalty/VoucherModal";
 
 export default function LoyaltyPage() {
-    const [activeTab, setActiveTab] = useState<'vouchers' | 'settings'>('settings');
+    const [activeTab, setActiveTab] = useState<'vouchers' | 'settings' | 'used_vouchers'>('settings');
     const [loading, setLoading] = useState(true);
     
     // Vouchers State
@@ -18,6 +18,9 @@ export default function LoyaltyPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
     const [editingVoucher, setEditingVoucher] = useState<any>(null);
+
+    // Used Vouchers State
+    const [usedVouchers, setUsedVouchers] = useState<any[]>([]);
 
     // Settings State
     const [settingsLoading, setSettingsLoading] = useState(false);
@@ -31,8 +34,10 @@ export default function LoyaltyPage() {
     useEffect(() => {
         if (activeTab === 'vouchers') {
             fetchVouchers();
-        } else {
+        } else if (activeTab === 'settings') {
             fetchSettings();
+        } else if (activeTab === 'used_vouchers') {
+            fetchUsedVouchers();
         }
     }, [activeTab]);
 
@@ -43,6 +48,18 @@ export default function LoyaltyPage() {
             setVouchers(res.data);
         } catch (error) {
             console.error("Gagal mengambil data voucher", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchUsedVouchers = async () => {
+        try {
+            setLoading(true);
+            const res = await api.get('/vouchers/used');
+            setUsedVouchers(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil data riwayat voucher", error);
         } finally {
             setLoading(false);
         }
@@ -141,6 +158,12 @@ export default function LoyaltyPage() {
                     >
                         <Tag className="h-4 w-4" /> Manajemen Voucher
                     </button>
+                    <button 
+                        onClick={() => setActiveTab('used_vouchers')}
+                        className={`flex items-center gap-2 px-6 py-3 font-black text-xs uppercase tracking-widest rounded-t-2xl transition-all ${activeTab === 'used_vouchers' ? 'bg-slate-800 text-white border-t border-x border-slate-700' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'}`}
+                    >
+                        <History className="h-4 w-4" /> Riwayat Penggunaan
+                    </button>
                 </div>
 
                 {/* Content */}
@@ -227,7 +250,7 @@ export default function LoyaltyPage() {
                                 </form>
                             )}
                         </div>
-                    ) : (
+                    ) : activeTab === 'vouchers' ? (
                         <div className="space-y-6">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="relative flex-1 max-w-md">
@@ -332,6 +355,81 @@ export default function LoyaltyPage() {
                                                                 <Trash2 className="h-4 w-4" />
                                                             </button>
                                                         </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="relative flex-1 max-w-md">
+                                    <input
+                                        type="text"
+                                        placeholder="Cari nama pelanggan atau kode..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-11 pr-4 py-3 bg-white border border-slate-300 rounded-2xl text-sm font-bold text-slate-950 focus:border-indigo-500 transition-all outline-none"
+                                    />
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-800/50">
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 rounded-tl-xl">Kode Voucher</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">Pelanggan</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">Tanggal Penggunaan</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 rounded-tr-xl">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                        {loading ? (
+                                            Array(3).fill(0).map((_, i) => (
+                                                <tr key={i} className="animate-pulse">
+                                                    <td colSpan={4} className="px-6 py-4">
+                                                        <div className="h-10 bg-slate-800 rounded-xl"></div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : usedVouchers.filter(v => 
+                                                v.voucher?.code?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                                v.customer?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                                            ).length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-20 text-center space-y-3">
+                                                    <div className="h-16 w-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto">
+                                                        <History className="h-8 w-8 text-slate-500" />
+                                                    </div>
+                                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Belum ada riwayat penggunaan</p>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            usedVouchers.filter(v => 
+                                                v.voucher?.code?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                                v.customer?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                                            ).map((v) => (
+                                                <tr key={v.id} className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <span className="font-black text-white bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-lg border border-indigo-500/30">
+                                                            {v.voucher?.code}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm font-bold text-slate-300">
+                                                        {v.customer?.name}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm font-bold text-slate-300">
+                                                        {v.usedAt ? new Date(v.usedAt).toLocaleString('id-ID') : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-fuchsia-500/20 text-fuchsia-400">
+                                                            Terpakai
+                                                        </span>
                                                     </td>
                                                 </tr>
                                             ))

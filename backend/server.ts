@@ -14950,6 +14950,27 @@ app.patch('/api/company/loyalty', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
+// L2.5. Get Used Vouchers
+app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const usedVouchers = await prisma.customerVoucher.findMany({
+      where: { 
+        isUsed: true,
+        voucher: { companyId: tenantId }
+      },
+      include: {
+        customer: true,
+        voucher: true
+      },
+      orderBy: { usedAt: 'desc' }
+    });
+    res.json(usedVouchers);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // L3. Get Vouchers
 app.get('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) => {
   try {
