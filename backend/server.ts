@@ -1207,7 +1207,11 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
 
     let finalCustomerId = customerId ? Number(customerId) : null;
     const userId = Number((req as any).userId);
-    if (userId) {
+    const userRole = (req as any).userRole;
+    
+    if (userRole === 'CUSTOMER' && userId) {
+      finalCustomerId = userId;
+    } else if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
         const linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
@@ -15382,8 +15386,11 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     const dueDateVal = (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') ? new Date(dueDate) : null;
 
     // --- SECURITY & SYNC FIX ---
-    // If we have a userId (from token), always override customerId with the one linked to user email
-    if (userId) {
+    const userRole = (req as any).userRole;
+    
+    if (userRole === 'CUSTOMER' && userId) {
+      finalCustomerId = userId;
+    } else if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
         const linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
