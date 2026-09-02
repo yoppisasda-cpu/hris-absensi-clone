@@ -17904,7 +17904,7 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
       include: { user: { select: { name: true } } }
     });
 
-    let mergedResults = [...pendingBills];
+    let mergedResults: any[] = [...pendingBills];
 
     // If fetching PRE_ORDER or specific saleType, also fetch from Sale table 
     // to include paid orders from the mobile app
@@ -17922,10 +17922,9 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
           date: { gte: startOfDay }
         },
         include: {
-          items: {
+          SaleItem: {
             include: { product: true }
-          },
-          customer: true,
+          }
         },
         orderBy: { date: 'desc' }
       });
@@ -17935,13 +17934,13 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
         companyId: s.companyId,
         branchId: s.branchId,
         cashierId: 0,
-        label: s.customer?.name || s.customerName || 'Online Order',
+        label: s.customerName || 'Online Order',
         saleType: s.saleType,
         kitchenStatus: 'PENDING',
         createdAt: s.date,
         updatedAt: s.date,
         user: { name: 'Aivola GO' },
-        items: s.items.map(i => ({
+        items: s.SaleItem.map(i => ({
           productId: i.productId,
           name: i.product?.name || 'Item',
           qty: i.quantity,
