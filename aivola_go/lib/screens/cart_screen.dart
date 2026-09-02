@@ -537,6 +537,7 @@ class _CartScreenState extends State<CartScreen> {
       deliveryMethod: _deliveryMethod,
       paymentMethod: _paymentMethod,
       pointsUsed: cartProvider.isUsingPoints ? cartProvider.availablePoints : 0,
+      saleType: finalOrderType == "Pre-Order" ? "PRE_ORDER" : "ONLINE",
     );
 
     Navigator.pop(context); // Close loading

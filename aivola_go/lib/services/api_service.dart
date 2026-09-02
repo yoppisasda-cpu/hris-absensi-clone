@@ -218,6 +218,7 @@ class ApiService {
     String? deliveryMethod,
     String? paymentMethod,
     int pointsUsed = 0,
+    String saleType = "ONLINE",
   }) async {
     try {
       final token = await getToken();
@@ -239,7 +240,7 @@ class ApiService {
           "pointsUsed": pointsUsed,
           "notes": notes ?? "Order from Aivola GO",
           "status": "PENDING",
-          "saleType": "ONLINE",
+          "saleType": saleType,
           "accountId": 1,
           "date": DateTime.now().toIso8601String(),
         }),
@@ -273,6 +274,7 @@ class ApiService {
     String? deliveryMethod,
     String? paymentMethod,
     int pointsUsed = 0,
+    String saleType = "ONLINE",
   }) async {
     try {
       final token = await getToken();
