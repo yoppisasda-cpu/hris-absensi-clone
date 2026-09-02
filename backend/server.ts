@@ -14957,7 +14957,10 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
     const salesWithVoucher = await prisma.sale.findMany({
       where: { 
         companyId: tenantId,
-        voucherCode: { not: null }
+        OR: [
+          { voucherCode: { not: null } },
+          { memberDiscountAmount: { gt: 0 } }
+        ]
       },
       select: {
         id: true,
@@ -14965,6 +14968,7 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
         date: true,
         voucherCode: true,
         voucherDiscountAmount: true,
+        memberDiscountAmount: true,
         customerName: true
       },
       orderBy: { date: 'desc' }
@@ -14973,10 +14977,10 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
     // Map to a consistent format for frontend
     const mappedResult = salesWithVoucher.map(sale => ({
       id: sale.id,
-      voucher: { code: sale.voucherCode },
+      voucher: { code: sale.voucherCode || 'Diskon Member/Karyawan' },
       customer: { name: sale.customerName || 'Anonim (Tanpa Member)' },
       usedAt: sale.date,
-      discountAmount: sale.voucherDiscountAmount
+      discountAmount: sale.voucherDiscountAmount > 0 ? sale.voucherDiscountAmount : sale.memberDiscountAmount
     }));
 
     res.json(mappedResult);
