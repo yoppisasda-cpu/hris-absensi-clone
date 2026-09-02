@@ -17904,7 +17904,56 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
       include: { user: { select: { name: true } } }
     });
 
-    res.json(pendingBills);
+    let mergedResults = [...pendingBills];
+
+    // If fetching PRE_ORDER or specific saleType, also fetch from Sale table 
+    // to include paid orders from the mobile app
+    if (saleType) {
+      // Get start of today to only show recent/active pre-orders 
+      // (or we can just fetch all pending/paid pre-orders for today)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const salesAsPending = await prisma.sale.findMany({
+        where: {
+          companyId: tenantId,
+          ...(targetBranchId ? { branchId: targetBranchId } : {}),
+          saleType: saleType as string,
+          date: { gte: startOfDay }
+        },
+        include: {
+          items: {
+            include: { product: true }
+          },
+          customer: true,
+        },
+        orderBy: { date: 'desc' }
+      });
+
+      const mappedSales = salesAsPending.map(s => ({
+        id: `sale-${s.id}`,
+        companyId: s.companyId,
+        branchId: s.branchId,
+        cashierId: 0,
+        label: s.customer?.name || s.customerName || 'Online Order',
+        saleType: s.saleType,
+        kitchenStatus: 'PENDING',
+        createdAt: s.date,
+        updatedAt: s.date,
+        user: { name: 'Aivola GO' },
+        items: s.items.map(i => ({
+          productId: i.productId,
+          name: i.product?.name || 'Item',
+          qty: i.quantity,
+          price: i.price,
+          subtotal: i.total
+        }))
+      }));
+
+      mergedResults = [...mergedResults, ...mappedSales];
+    }
+
+    res.json(mergedResults);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil pending bills: ' + error.message });
   }
