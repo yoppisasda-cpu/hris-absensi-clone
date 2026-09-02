@@ -14950,22 +14950,37 @@ app.patch('/api/company/loyalty', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
-// L2.5. Get Used Vouchers
+// L2.5. Get Used Vouchers (From Sales)
 app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const usedVouchers = await prisma.customerVoucher.findMany({
+    const salesWithVoucher = await prisma.sale.findMany({
       where: { 
-        isUsed: true,
-        voucher: { companyId: tenantId }
+        companyId: tenantId,
+        voucherCode: { not: null }
       },
-      include: {
-        customer: true,
-        voucher: true
+      select: {
+        id: true,
+        invoiceNumber: true,
+        date: true,
+        voucherCode: true,
+        voucherDiscountAmount: true,
+        customerName: true,
+        customer: { select: { name: true } },
       },
-      orderBy: { usedAt: 'desc' }
+      orderBy: { date: 'desc' }
     });
-    res.json(usedVouchers);
+    
+    // Map to a consistent format for frontend
+    const mappedResult = salesWithVoucher.map(sale => ({
+      id: sale.id,
+      voucher: { code: sale.voucherCode },
+      customer: { name: sale.customer?.name || sale.customerName || 'Anonim (Tanpa Member)' },
+      usedAt: sale.date,
+      discountAmount: sale.voucherDiscountAmount
+    }));
+
+    res.json(mappedResult);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
