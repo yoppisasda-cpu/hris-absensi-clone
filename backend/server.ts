@@ -17949,7 +17949,43 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
         }))
       }));
 
-      mergedResults = [...mergedResults, ...mappedSales];
+      // Also fetch from SalesOrder (Web Admin POs)
+      const salesOrders = await prisma.salesOrder.findMany({
+        where: {
+          companyId: tenantId,
+          status: 'PENDING',
+          date: { gte: startOfDay }
+        },
+        include: {
+          items: {
+            include: { product: true }
+          },
+          customer: true
+        },
+        orderBy: { date: 'desc' }
+      });
+
+      const mappedSalesOrders = salesOrders.map(so => ({
+        id: `po-${so.id}`,
+        companyId: so.companyId,
+        branchId: targetBranchId || 0,
+        cashierId: 0,
+        label: so.customer?.name || 'Web Admin PO',
+        saleType: 'PRE_ORDER',
+        kitchenStatus: 'PENDING',
+        createdAt: so.date,
+        updatedAt: so.date,
+        user: { name: 'Web Admin' },
+        items: so.items.map(i => ({
+          productId: i.productId,
+          name: i.product?.name || 'Item',
+          qty: i.quantity,
+          price: i.price,
+          subtotal: i.total
+        }))
+      }));
+
+      mergedResults = [...mergedResults, ...mappedSales, ...mappedSalesOrders];
     }
 
     res.json(mergedResults);
