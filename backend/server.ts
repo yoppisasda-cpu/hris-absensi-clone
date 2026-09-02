@@ -15421,6 +15421,28 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
             where: { id: voucher.id },
             data: { usedCount: { increment: 1 } }
           });
+
+          // Create/Update CustomerVoucher to track usage history
+          if (finalCustomerId) {
+            const existingCustVoucher = await tx.customerVoucher.findFirst({
+              where: { customerId: finalCustomerId, voucherId: voucher.id }
+            });
+            if (existingCustVoucher) {
+              await tx.customerVoucher.update({
+                where: { id: existingCustVoucher.id },
+                data: { isUsed: true, usedAt: new Date() }
+              });
+            } else {
+              await tx.customerVoucher.create({
+                data: {
+                  customerId: finalCustomerId,
+                  voucherId: voucher.id,
+                  isUsed: true,
+                  usedAt: new Date()
+                }
+              });
+            }
+          }
         }
       }
 
