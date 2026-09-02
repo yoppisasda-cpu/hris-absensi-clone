@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { 
     Tag, Gift, Search, Plus, Edit, Trash2, 
-    Settings, Percent, Database, Save, History
+    Settings, Percent, Database, Save, History,
+    X, FileText, Calendar, DollarSign, Receipt
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
@@ -21,6 +22,8 @@ export default function LoyaltyPage() {
 
     // Used Vouchers State
     const [usedVouchers, setUsedVouchers] = useState<any[]>([]);
+    const [selectedSaleDetail, setSelectedSaleDetail] = useState<any>(null);
+    const [isSaleDetailOpen, setIsSaleDetailOpen] = useState(false);
 
     // Settings State
     const [settingsLoading, setSettingsLoading] = useState(false);
@@ -62,6 +65,17 @@ export default function LoyaltyPage() {
             console.error("Gagal mengambil data riwayat voucher", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleViewSaleDetail = async (saleId: number) => {
+        try {
+            const res = await api.get(`/sales/${saleId}`);
+            setSelectedSaleDetail(res.data);
+            setIsSaleDetailOpen(true);
+        } catch (error) {
+            console.error("Gagal mengambil detail penjualan", error);
+            alert("Gagal memuat detail transaksi.");
         }
     };
 
@@ -414,7 +428,11 @@ export default function LoyaltyPage() {
                                                 v.voucher?.code?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                                                 v.customer?.name?.toLowerCase().includes(searchQuery.toLowerCase())
                                             ).map((v) => (
-                                                <tr key={v.id} className="hover:bg-slate-800/30 transition-colors">
+                                                <tr 
+                                                    key={v.id} 
+                                                    onClick={() => handleViewSaleDetail(v.id)}
+                                                    className="hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                                                >
                                                     <td className="px-6 py-4">
                                                         <span className="font-black text-white bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-lg border border-indigo-500/30">
                                                             {v.voucher?.code}
@@ -448,6 +466,83 @@ export default function LoyaltyPage() {
                 onSuccess={fetchVouchers}
                 editData={editingVoucher}
             />
+
+            {/* Sale Detail Modal */}
+            {isSaleDetailOpen && selectedSaleDetail && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-slate-900 rounded-3xl w-full max-w-2xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-slate-800">
+                            <div>
+                                <h3 className="text-xl font-black text-white flex items-center gap-2">
+                                    <Receipt className="h-6 w-6 text-indigo-400" />
+                                    Detail Transaksi
+                                </h3>
+                                <p className="text-slate-400 text-sm mt-1 font-bold">
+                                    {selectedSaleDetail.invoiceNumber}
+                                </p>
+                            </div>
+                            <button onClick={() => setIsSaleDetailOpen(false)} className="text-slate-500 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 p-2 rounded-xl">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
+                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Pembayaran</p>
+                                    <p className="text-lg font-bold text-white flex items-center gap-2">
+                                        <DollarSign className="h-4 w-4 text-emerald-400" />
+                                        Rp {(selectedSaleDetail.totalAmount || 0).toLocaleString('id-ID')}
+                                    </p>
+                                </div>
+                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
+                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Potongan Diskon</p>
+                                    <p className="text-lg font-bold text-white flex items-center gap-2">
+                                        <Tag className="h-4 w-4 text-fuchsia-400" />
+                                        Rp {((selectedSaleDetail.voucherDiscountAmount > 0 ? selectedSaleDetail.voucherDiscountAmount : selectedSaleDetail.memberDiscountAmount) || 0).toLocaleString('id-ID')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Items List */}
+                            <div>
+                                <h4 className="text-sm font-black text-slate-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <FileText className="h-4 w-4" /> Item Pembelian
+                                </h4>
+                                <div className="bg-slate-950/50 rounded-2xl border border-slate-800 overflow-hidden">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-slate-800/50">
+                                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Produk</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Qty</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Harga</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800/50">
+                                            {selectedSaleDetail.items?.map((item: any) => (
+                                                <tr key={item.id}>
+                                                    <td className="px-4 py-3 text-sm font-bold text-slate-300">
+                                                        {item.product_name}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm font-bold text-slate-300 text-right">
+                                                        {item.quantity}x
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm font-bold text-slate-300 text-right">
+                                                        Rp {Number(item.price).toLocaleString('id-ID')}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
