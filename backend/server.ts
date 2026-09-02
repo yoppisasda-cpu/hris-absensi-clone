@@ -17937,13 +17937,17 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
         label: s.customerName || 'Online Order',
         saleType: s.saleType,
         kitchenStatus: 'PENDING',
+        queueNumber: 0,
+        preparedAt: null,
         createdAt: s.date,
         updatedAt: s.date,
         user: { name: 'Aivola GO' },
         items: s.SaleItem.map(i => ({
-          productId: i.productId,
+          id: i.productId || 0,
+          productId: i.productId || 0,
           name: i.product?.name || 'Item',
           qty: i.quantity,
+          quantity: i.quantity,
           price: i.price,
           subtotal: i.total
         }))
@@ -17973,13 +17977,17 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
         label: so.customer?.name || 'Web Admin PO',
         saleType: 'PRE_ORDER',
         kitchenStatus: 'PENDING',
+        queueNumber: 0,
+        preparedAt: null,
         createdAt: so.date,
         updatedAt: so.date,
         user: { name: 'Web Admin' },
         items: so.items.map(i => ({
-          productId: i.productId,
+          id: i.productId || 0,
+          productId: i.productId || 0,
           name: i.product?.name || 'Item',
           qty: i.quantity,
+          quantity: i.quantity,
           price: i.price,
           subtotal: i.total
         }))
