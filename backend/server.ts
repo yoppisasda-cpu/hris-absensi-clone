@@ -14965,8 +14965,7 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
         date: true,
         voucherCode: true,
         voucherDiscountAmount: true,
-        customerName: true,
-        customer: { select: { name: true } },
+        customerName: true
       },
       orderBy: { date: 'desc' }
     });
@@ -14975,7 +14974,7 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
     const mappedResult = salesWithVoucher.map(sale => ({
       id: sale.id,
       voucher: { code: sale.voucherCode },
-      customer: { name: sale.customer?.name || sale.customerName || 'Anonim (Tanpa Member)' },
+      customer: { name: sale.customerName || 'Anonim (Tanpa Member)' },
       usedAt: sale.date,
       discountAmount: sale.voucherDiscountAmount
     }));
