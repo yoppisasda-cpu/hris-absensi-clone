@@ -526,7 +526,7 @@ class _CartScreenState extends State<CartScreen> {
       finalOrderType = "Pesanan Langsung";
     }
 
-    final apiCall = (finalOrderType == "Pre-Order") ? ApiService.createPreOrder : ApiService.createOrder;
+    final apiCall = ApiService.createOrder;
 
     final response = await apiCall(
       items: items,
