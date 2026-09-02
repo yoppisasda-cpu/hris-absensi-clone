@@ -17906,9 +17906,9 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
 
     let mergedResults: any[] = [...pendingBills];
 
-    // If fetching PRE_ORDER or all pending bills (!saleType), also fetch from Sale table 
+    // If fetching PRE_ORDER explicitly (like Web Admin does), also fetch from Sale table 
     // to include paid orders from the mobile app
-    if (!saleType || saleType === 'PRE_ORDER') {
+    if (saleType === 'PRE_ORDER') {
       // Get start of today to only show recent/active pre-orders 
       // (or we can just fetch all pending/paid pre-orders for today)
       const startOfDay = new Date();
