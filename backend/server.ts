@@ -1214,7 +1214,18 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
     } else if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
-        const linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
+        let linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
+        if (!linkedCustomer) {
+           linkedCustomer = await prisma.customer.create({
+             data: {
+               companyId: user.companyId,
+               name: user.name,
+               email: user.email,
+               phone: '0000000000',
+               isActive: true,
+             }
+           });
+        }
         if (linkedCustomer) finalCustomerId = linkedCustomer.id;
       }
     }
@@ -15393,7 +15404,18 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     } else if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
-        const linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
+        let linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
+        if (!linkedCustomer) {
+           linkedCustomer = await prisma.customer.create({
+             data: {
+               companyId: user.companyId,
+               name: user.name,
+               email: user.email,
+               phone: '0000000000',
+               isActive: true,
+             }
+           });
+        }
         if (linkedCustomer) {
           finalCustomerId = linkedCustomer.id;
         }
