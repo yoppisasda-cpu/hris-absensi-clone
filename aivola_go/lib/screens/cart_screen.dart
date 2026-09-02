@@ -516,7 +516,7 @@ class _CartScreenState extends State<CartScreen> {
     final items = cartProvider.items.values.map((item) => {"productId": item.product.id, "quantity": item.quantity, "price": item.product.price}).toList();
     final branchProvider = Provider.of<BranchProvider>(context, listen: false);
     final prefs = await SharedPreferences.getInstance();
-    final customerId = prefs.getInt('userId');
+    final customerId = prefs.getInt('customerId');
 
     // Tentukan order type jika merchant hanya buka salah satu
     String finalOrderType = _orderType;

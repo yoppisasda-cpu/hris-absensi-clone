@@ -253,7 +253,9 @@ class ApiService {
           "paymentInstructions": data['paymentInstructions']
         };
       }
-      return {"success": false};
+            final errData = jsonDecode(response.body);
+      return {"success": false, "message": errData["error"] ?? "Terjadi kesalahan sistem"};
+    
     } catch (e) {
       print("Error creating order: $e");
       return {"success": false, "message": e.toString()};
@@ -303,7 +305,9 @@ class ApiService {
           "paymentInstructions": data['paymentInstructions']
         };
       }
-      return {"success": false};
+            final errData = jsonDecode(response.body);
+      return {"success": false, "message": errData["error"] ?? "Terjadi kesalahan sistem"};
+    
     } catch (e) {
       print("Error creating pre-order: $e");
       return {"success": false, "message": e.toString()};
