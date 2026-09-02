@@ -17930,7 +17930,7 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
       });
 
       const mappedSales = salesAsPending.map(s => ({
-        id: `sale-${s.id}`,
+        id: -(s.id + 1000000),
         companyId: s.companyId,
         branchId: s.branchId,
         cashierId: 0,
@@ -17966,7 +17966,7 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
       });
 
       const mappedSalesOrders = salesOrders.map(so => ({
-        id: `po-${so.id}`,
+        id: -(so.id + 2000000),
         companyId: so.companyId,
         branchId: targetBranchId || 0,
         cashierId: 0,
