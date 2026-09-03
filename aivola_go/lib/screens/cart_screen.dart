@@ -37,6 +37,24 @@ class _CartScreenState extends State<CartScreen> {
   void initState() {
     super.initState();
     _fetchClaimedVouchers();
+    // Pastikan data merchant (termasuk qrisUrl) sudah fresh saat CartScreen dibuka
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final branding = Provider.of<BrandingProvider>(context, listen: false);
+      final merchantId = branding.selectedMerchantId;
+      if (merchantId != null) {
+        branding.fetchLatestMerchantInfo(merchantId);
+      }
+      // Sesuaikan default delivery method
+      if (!branding.allowDineIn && _deliveryMethod == 'Dine-in') {
+        setState(() {
+          if (branding.allowPickUp) {
+            _deliveryMethod = 'Pick-up';
+          } else if (branding.allowDelivery) {
+            _deliveryMethod = 'Delivery';
+          }
+        });
+      }
+    });
   }
 
   Future<void> _fetchClaimedVouchers() async {
@@ -59,16 +77,8 @@ class _CartScreenState extends State<CartScreen> {
     final brandingProvider = Provider.of<BrandingProvider>(context);
     final primaryColor = brandingProvider.primaryColor;
     
-    // Pastikan metode pengiriman default valid sesuai pengaturan perusahaan
-    if (_deliveryMethod == "Dine-in" && !brandingProvider.allowDineIn) {
-      if (brandingProvider.allowPickUp) {
-        _deliveryMethod = "Pick-up";
-      } else if (brandingProvider.allowDelivery) {
-        _deliveryMethod = "Delivery";
-      }
-    }
-    
-    print("DEBUG CartScreen: qrisUrl = ${brandingProvider.qrisUrl}, delivery = $_deliveryMethod");
+    final qrisUrl = brandingProvider.qrisUrl;
+    final paymentInstructions = brandingProvider.paymentInstructions;
 
     return Scaffold(
       backgroundColor: brandingProvider.secondaryColor,
@@ -105,7 +115,7 @@ class _CartScreenState extends State<CartScreen> {
                       _buildVoucherSelector(cartProvider, brandingProvider, primaryColor),
                       SizedBox(height: 25),
                       _buildSectionTitle("Metode Pembayaran"),
-                      _buildPaymentOptions(brandingProvider, primaryColor),
+                      _buildPaymentOptions(brandingProvider, primaryColor, qrisUrl, paymentInstructions),
                     ],
                   ),
                 ),
@@ -623,7 +633,7 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildPaymentOptions(BrandingProvider brandingProvider, Color primaryColor) {
+  Widget _buildPaymentOptions(BrandingProvider brandingProvider, Color primaryColor, String? qrisUrl, String? paymentInstructions) {
     if (_deliveryMethod == "Dine-in") {
       return Column(
         children: [
@@ -635,15 +645,16 @@ class _CartScreenState extends State<CartScreen> {
             "QRIS", 
             Icons.qr_code_scanner_rounded, 
             primaryColor,
-            expandedChild: (brandingProvider.qrisUrl != null)
+            expandedChild: qrisUrl != null
               ? Column(
                   children: [
                     SizedBox(height: 15),
-                    Text(brandingProvider.paymentInstructions ?? 'Silakan scan QRIS untuk pembayaran', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    if ((paymentInstructions ?? '').isNotEmpty)
+                      Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
                     SizedBox(height: 15),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(brandingProvider.qrisUrl!, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
+                      child: Image.network(qrisUrl, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
                     )
                   ],
                 )
@@ -658,15 +669,18 @@ class _CartScreenState extends State<CartScreen> {
             "QRIS / Transfer (Online Payment)", 
             Icons.language_rounded, 
             primaryColor,
-            expandedChild: (brandingProvider.qrisUrl != null)
+            expandedChild: qrisUrl != null
               ? Column(
                   children: [
                     SizedBox(height: 15),
-                    Text(brandingProvider.paymentInstructions ?? 'Silakan scan QRIS untuk pembayaran online', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    if ((paymentInstructions ?? '').isNotEmpty)
+                      Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    SizedBox(height: 10),
+                    Text('Scan QRIS berikut untuk melakukan pembayaran:', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
                     SizedBox(height: 15),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(brandingProvider.qrisUrl!, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
+                      child: Image.network(qrisUrl, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
                     )
                   ],
                 )
