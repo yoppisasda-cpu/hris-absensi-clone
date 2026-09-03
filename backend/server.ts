@@ -2359,6 +2359,31 @@ app.get('/api/companies/public/:id', async (req: Request, res: Response) => {
   }
 });
 
+// --- GET PUBLIC BANK ACCOUNTS FOR MERCHANT ---
+app.get('/api/companies/public/:id/bank-accounts', async (req: Request, res: Response) => {
+  try {
+    const companyId = parseInt(req.params.id as string);
+    const accounts = await prisma.financialAccount.findMany({
+      where: {
+        companyId,
+        type: 'BANK',
+        accountNumber: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        bankName: true,
+        accountNumber: true,
+      },
+      orderBy: { id: 'asc' }
+    });
+    res.json(accounts);
+  } catch (error) {
+    console.error('[ERROR] Gagal mengambil data rekening bank publik:', error);
+    res.status(500).json({ error: 'Gagal mengambil data rekening bank' });
+  }
+});
+
 // --- GET PRODUCTS FOR SPECIFIC PUBLIC MERCHANT ---
 app.get('/api/companies/public/:id/products', async (req: Request, res: Response) => {
   try {

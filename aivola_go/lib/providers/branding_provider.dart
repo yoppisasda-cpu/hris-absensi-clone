@@ -6,6 +6,24 @@ import '../models/banner.dart';
 import '../models/voucher.dart';
 import '../services/api_service.dart';
 
+class BankAccount {
+  final int id;
+  final String name;
+  final String? bankName;
+  final String? accountNumber;
+
+  BankAccount({required this.id, required this.name, this.bankName, this.accountNumber});
+
+  factory BankAccount.fromJson(Map<String, dynamic> json) {
+    return BankAccount(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      bankName: json['bankName'] as String?,
+      accountNumber: json['accountNumber'] as String?,
+    );
+  }
+}
+
 class BrandingProvider with ChangeNotifier {
   Color _primaryColor = const Color(0xFF3B82F6); // Default Blue
   Color _secondaryColor = const Color(0xFF1E293B); // Default Dark
@@ -25,6 +43,7 @@ class BrandingProvider with ChangeNotifier {
   bool _allowPreOrder = false;
   String? _qrisUrl;
   String? _paymentInstructions;
+  List<BankAccount> _bankAccounts = [];
 
   Color get primaryColor => _primaryColor;
   Color get secondaryColor => _secondaryColor;
@@ -41,6 +60,7 @@ class BrandingProvider with ChangeNotifier {
   bool get allowPreOrder => _allowPreOrder;
   String? get qrisUrl => _qrisUrl;
   String? get paymentInstructions => _paymentInstructions;
+  List<BankAccount> get bankAccounts => _bankAccounts;
 
   bool get isStoreOpen {
     if (!_isOpenManual) return false;
@@ -196,6 +216,21 @@ class BrandingProvider with ChangeNotifier {
       }
     } catch (e) {
       print("DEBUG: Error fetching vouchers: $e");
+    }
+  }
+
+  Future<void> fetchBankAccounts(int merchantId) async {
+    try {
+      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+      final url = '${ApiService.baseUrl}/companies/public/$merchantId/bank-accounts?t=$cacheBuster';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        _bankAccounts = data.map((json) => BankAccount.fromJson(json)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("Error fetching bank accounts: $e");
     }
   }
 

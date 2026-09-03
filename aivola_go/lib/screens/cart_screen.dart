@@ -43,6 +43,7 @@ class _CartScreenState extends State<CartScreen> {
       final merchantId = branding.selectedMerchantId;
       if (merchantId != null) {
         branding.fetchLatestMerchantInfo(merchantId);
+        branding.fetchBankAccounts(merchantId);
       }
       // Sesuaikan default delivery method
       if (!branding.allowDineIn && _deliveryMethod == 'Dine-in') {
@@ -79,6 +80,7 @@ class _CartScreenState extends State<CartScreen> {
     
     final qrisUrl = brandingProvider.qrisUrl;
     final paymentInstructions = brandingProvider.paymentInstructions;
+    final bankAccounts = brandingProvider.bankAccounts;
 
     return Scaffold(
       backgroundColor: brandingProvider.secondaryColor,
@@ -115,7 +117,7 @@ class _CartScreenState extends State<CartScreen> {
                       _buildVoucherSelector(cartProvider, brandingProvider, primaryColor),
                       SizedBox(height: 25),
                       _buildSectionTitle("Metode Pembayaran"),
-                      _buildPaymentOptions(brandingProvider, primaryColor, qrisUrl, paymentInstructions),
+                      _buildPaymentOptions(brandingProvider, primaryColor, qrisUrl, paymentInstructions, bankAccounts),
                     ],
                   ),
                 ),
@@ -633,13 +635,65 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildPaymentOptions(BrandingProvider brandingProvider, Color primaryColor, String? qrisUrl, String? paymentInstructions) {
+  Widget _buildPaymentOptions(BrandingProvider brandingProvider, Color primaryColor, String? qrisUrl, String? paymentInstructions, List<BankAccount> bankAccounts) {
+    
+    // Widget daftar rekening bank
+    Widget? bankAccountChild = bankAccounts.isNotEmpty
+      ? Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 15),
+            Text('Silakan transfer ke salah satu rekening berikut:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            SizedBox(height: 10),
+            ...bankAccounts.map((acc) => Container(
+              margin: EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: primaryColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.account_balance_rounded, color: primaryColor, size: 20),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${(acc.bankName ?? acc.name).toUpperCase()}',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          acc.accountNumber ?? '-',
+                          style: TextStyle(color: primaryColor, fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                        ),
+                        Text(
+                          'a.n. ${acc.name}',
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )).toList(),
+          ],
+        )
+      : null;
+    
     if (_deliveryMethod == "Dine-in") {
       return Column(
         children: [
           _buildPaymentItem("Bayar di Kasir", Icons.payments_outlined, primaryColor),
           SizedBox(height: 10),
-          _buildPaymentItem("Transfer Bank", Icons.account_balance_outlined, primaryColor),
+          _buildPaymentItem(
+            "Transfer Bank",
+            Icons.account_balance_outlined,
+            primaryColor,
+            expandedChild: bankAccountChild,
+          ),
           SizedBox(height: 10),
           _buildPaymentItem(
             "QRIS", 
