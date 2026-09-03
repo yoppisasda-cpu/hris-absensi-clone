@@ -703,20 +703,24 @@ class _CartScreenState extends State<CartScreen> {
           "QRIS", 
           Icons.qr_code_scanner_rounded, 
           primaryColor,
-          expandedChild: qrisUrl != null
-            ? Column(
+          expandedChild: Column(
                 children: [
                   SizedBox(height: 15),
-                  if ((paymentInstructions ?? '').isNotEmpty)
-                    Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
-                  SizedBox(height: 15),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(qrisUrl, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
-                  )
+                  if (qrisUrl != null) ...[
+                    if ((paymentInstructions ?? '').isNotEmpty)
+                      Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    SizedBox(height: 15),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(qrisUrl, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
+                    )
+                  ] else ...[
+                    Text("QR Code belum diunggah oleh toko.", textAlign: TextAlign.center, style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                    SizedBox(height: 10),
+                    Icon(Icons.qr_code_scanner, size: 50, color: Colors.white24),
+                  ]
                 ],
-              )
-            : null,
+              ),
         ));
       }
       if (items.isNotEmpty && items.last is SizedBox) items.removeLast();
@@ -730,17 +734,23 @@ class _CartScreenState extends State<CartScreen> {
           primaryColor,
           expandedChild: Column(
             children: [
-              if (brandingProvider.allowQrisPayment && qrisUrl != null) ...[
+              if (brandingProvider.allowQrisPayment) ...[
                 SizedBox(height: 15),
-                if ((paymentInstructions ?? '').isNotEmpty)
-                  Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
-                SizedBox(height: 10),
-                Text('Scan QRIS berikut untuk melakukan pembayaran:', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
-                SizedBox(height: 15),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(qrisUrl, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
-                ),
+                if (qrisUrl != null) ...[
+                  if ((paymentInstructions ?? '').isNotEmpty)
+                    Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  SizedBox(height: 10),
+                  Text('Scan QRIS berikut untuk melakukan pembayaran:', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  SizedBox(height: 15),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(qrisUrl, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
+                  ),
+                ] else ...[
+                  Text("QR Code belum diunggah oleh toko.", textAlign: TextAlign.center, style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                  SizedBox(height: 10),
+                  Icon(Icons.qr_code_scanner, size: 50, color: Colors.white24),
+                ],
               ],
               if (brandingProvider.allowBankTransfer && bankAccountChild != null) ...[
                 SizedBox(height: 10),
