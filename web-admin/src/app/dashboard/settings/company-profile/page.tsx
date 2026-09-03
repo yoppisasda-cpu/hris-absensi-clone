@@ -885,8 +885,10 @@ export default function CompanyProfilePage() {
                                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowQrisPayment ? 'translate-x-6' : 'translate-x-1'}`} />
                                             </button>
                                         </div>
-                                    </>
-                                )}
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                                 <div className="pt-8 border-t border-slate-100">
                                     <div className="flex items-center gap-2 mb-6">
