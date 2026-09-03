@@ -2344,7 +2344,9 @@ app.get('/api/companies/public/:id', async (req: Request, res: Response) => {
         openTime: true,
         closeTime: true,
         isOpenManual: true,
-        timezone: true
+        timezone: true,
+        qrisUrl: true,
+        paymentInstructions: true
       }
     });
     if (!company) {

@@ -23,6 +23,8 @@ class BrandingProvider with ChangeNotifier {
   bool _allowDelivery = true;
   bool _allowOnlineOrder = true;
   bool _allowPreOrder = false;
+  String? _qrisUrl;
+  String? _paymentInstructions;
 
   Color get primaryColor => _primaryColor;
   Color get secondaryColor => _secondaryColor;
@@ -37,6 +39,8 @@ class BrandingProvider with ChangeNotifier {
   bool get allowDelivery => _allowDelivery;
   bool get allowOnlineOrder => _allowOnlineOrder;
   bool get allowPreOrder => _allowPreOrder;
+  String? get qrisUrl => _qrisUrl;
+  String? get paymentInstructions => _paymentInstructions;
 
   bool get isStoreOpen {
     if (!_isOpenManual) return false;
@@ -91,6 +95,8 @@ class BrandingProvider with ChangeNotifier {
     _allowDelivery = prefs.getBool('allowDelivery') ?? true;
     _allowOnlineOrder = prefs.getBool('allowOnlineOrder') ?? true;
     _allowPreOrder = prefs.getBool('allowPreOrder') ?? false;
+    _qrisUrl = prefs.getString('qrisUrl');
+    _paymentInstructions = prefs.getString('paymentInstructions');
 
     if (primary != null) {
       _primaryColor = Color(int.parse(primary.replaceFirst('#', '0xFF')));
@@ -131,6 +137,8 @@ class BrandingProvider with ChangeNotifier {
         _allowDelivery = data['allowDelivery'] ?? true;
         _allowOnlineOrder = data['allowOnlineOrder'] ?? true;
         _allowPreOrder = data['allowPreOrder'] ?? false;
+        _qrisUrl = data['qrisUrl'];
+        _paymentInstructions = data['paymentInstructions'];
         
         // Update SharedPreferences
         final prefs = await SharedPreferences.getInstance();
@@ -147,6 +155,8 @@ class BrandingProvider with ChangeNotifier {
         await prefs.setBool('allowDelivery', _allowDelivery);
         await prefs.setBool('allowOnlineOrder', _allowOnlineOrder);
         await prefs.setBool('allowPreOrder', _allowPreOrder);
+        if (_qrisUrl != null) await prefs.setString('qrisUrl', _qrisUrl!);
+        if (_paymentInstructions != null) await prefs.setString('paymentInstructions', _paymentInstructions!);
         
         notifyListeners();
       }
@@ -206,6 +216,8 @@ class BrandingProvider with ChangeNotifier {
     _allowDineIn = true;
     _allowPickUp = true;
     _allowDelivery = true;
+    _qrisUrl = null;
+    _paymentInstructions = null;
     _banners = [];
     _vouchers = [];
     notifyListeners();
@@ -226,6 +238,8 @@ class BrandingProvider with ChangeNotifier {
     bool allowDelivery = true,
     bool allowOnlineOrder = true,
     bool allowPreOrder = false,
+    String? qrisUrl,
+    String? paymentInstructions,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('primaryColor', primaryHex);
@@ -242,6 +256,8 @@ class BrandingProvider with ChangeNotifier {
     await prefs.setBool('allowDelivery', allowDelivery);
     await prefs.setBool('allowOnlineOrder', allowOnlineOrder);
     await prefs.setBool('allowPreOrder', allowPreOrder);
+    if (qrisUrl != null) await prefs.setString('qrisUrl', qrisUrl);
+    if (paymentInstructions != null) await prefs.setString('paymentInstructions', paymentInstructions);
 
     _primaryColor = Color(int.parse(primaryHex.replaceFirst('#', '0xFF')));
     _secondaryColor = Color(int.parse(secondaryHex.replaceFirst('#', '0xFF')));
@@ -257,6 +273,8 @@ class BrandingProvider with ChangeNotifier {
     _allowDelivery = allowDelivery;
     _allowOnlineOrder = allowOnlineOrder;
     _allowPreOrder = allowPreOrder;
+    _qrisUrl = qrisUrl;
+    _paymentInstructions = paymentInstructions;
     
     if (_selectedMerchantId != null) {
       fetchBanners();

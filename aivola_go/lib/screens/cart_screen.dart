@@ -94,7 +94,7 @@ class _CartScreenState extends State<CartScreen> {
                       _buildVoucherSelector(cartProvider, brandingProvider, primaryColor),
                       SizedBox(height: 25),
                       _buildSectionTitle("Metode Pembayaran"),
-                      _buildPaymentOptions(primaryColor),
+                      _buildPaymentOptions(brandingProvider, primaryColor),
                     ],
                   ),
                 ),
@@ -612,7 +612,7 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildPaymentOptions(Color primaryColor) {
+  Widget _buildPaymentOptions(BrandingProvider brandingProvider, Color primaryColor) {
     if (_deliveryMethod == "Dine-in") {
       return Column(
         children: [
@@ -620,13 +620,47 @@ class _CartScreenState extends State<CartScreen> {
           SizedBox(height: 10),
           _buildPaymentItem("Transfer Bank", Icons.account_balance_outlined, primaryColor),
           SizedBox(height: 10),
-          _buildPaymentItem("QRIS", Icons.qr_code_scanner_rounded, primaryColor),
+          _buildPaymentItem(
+            "QRIS", 
+            Icons.qr_code_scanner_rounded, 
+            primaryColor,
+            expandedChild: (brandingProvider.qrisUrl != null)
+              ? Column(
+                  children: [
+                    SizedBox(height: 15),
+                    Text(brandingProvider.paymentInstructions ?? 'Silakan scan QRIS untuk pembayaran', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    SizedBox(height: 15),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(brandingProvider.qrisUrl!, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
+                    )
+                  ],
+                )
+              : null,
+          ),
         ],
       );
     } else {
       return Column(
         children: [
-          _buildPaymentItem("QRIS / Transfer (Online Payment)", Icons.language_rounded, primaryColor),
+          _buildPaymentItem(
+            "QRIS / Transfer (Online Payment)", 
+            Icons.language_rounded, 
+            primaryColor,
+            expandedChild: (brandingProvider.qrisUrl != null)
+              ? Column(
+                  children: [
+                    SizedBox(height: 15),
+                    Text(brandingProvider.paymentInstructions ?? 'Silakan scan QRIS untuk pembayaran online', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    SizedBox(height: 15),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(brandingProvider.qrisUrl!, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
+                    )
+                  ],
+                )
+              : null,
+          ),
           SizedBox(height: 10),
           Container(
             padding: EdgeInsets.all(12),
@@ -652,24 +686,30 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Widget _buildPaymentItem(String label, IconData icon, Color primaryColor) {
+  Widget _buildPaymentItem(String label, IconData icon, Color primaryColor, {Widget? expandedChild}) {
     bool isSelected = _paymentMethod == label;
     return GestureDetector(
       onTap: () => setState(() => _paymentMethod = label),
-      child: Container(
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 300),
         padding: EdgeInsets.all(15),
         decoration: BoxDecoration(
           color: isSelected ? primaryColor.withOpacity(0.1) : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(15),
           border: Border.all(color: isSelected ? primaryColor : Colors.white.withOpacity(0.1)),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Icon(icon, color: isSelected ? primaryColor : Color(0xFF94A3B8)),
-            SizedBox(width: 15),
-            Text(label, style: TextStyle(color: isSelected ? Colors.white : Color(0xFF94A3B8), fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-            Spacer(),
-            if (isSelected) Icon(Icons.check_circle, color: primaryColor, size: 20),
+            Row(
+              children: [
+                Icon(icon, color: isSelected ? primaryColor : Color(0xFF94A3B8)),
+                SizedBox(width: 15),
+                Text(label, style: TextStyle(color: isSelected ? Colors.white : Color(0xFF94A3B8), fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                Spacer(),
+                if (isSelected) Icon(Icons.check_circle, color: primaryColor, size: 20),
+              ],
+            ),
+            if (isSelected && expandedChild != null) expandedChild,
           ],
         ),
       ),
