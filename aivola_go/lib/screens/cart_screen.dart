@@ -58,6 +58,17 @@ class _CartScreenState extends State<CartScreen> {
     final cartProvider = Provider.of<CartProvider>(context);
     final brandingProvider = Provider.of<BrandingProvider>(context);
     final primaryColor = brandingProvider.primaryColor;
+    
+    // Pastikan metode pengiriman default valid sesuai pengaturan perusahaan
+    if (_deliveryMethod == "Dine-in" && !brandingProvider.allowDineIn) {
+      if (brandingProvider.allowPickUp) {
+        _deliveryMethod = "Pick-up";
+      } else if (brandingProvider.allowDelivery) {
+        _deliveryMethod = "Delivery";
+      }
+    }
+    
+    print("DEBUG CartScreen: qrisUrl = ${brandingProvider.qrisUrl}, delivery = $_deliveryMethod");
 
     return Scaffold(
       backgroundColor: brandingProvider.secondaryColor,
