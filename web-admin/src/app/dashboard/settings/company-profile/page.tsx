@@ -739,8 +739,10 @@ export default function CompanyProfilePage() {
                                     </p>
                                 </div>
 
-                                {/* PENGATURAN METODE PENGAMBILAN AIVOLA GO */}
-                                <div className="pt-8 border-t border-slate-100">
+                                {company?.addons?.includes('AIVOLA_GO') && (
+                                    <>
+                                        {/* PENGATURAN METODE PENGAMBILAN AIVOLA GO */}
+                                        <div className="pt-8 border-t border-slate-100">
                                     <div className="flex items-center gap-2 mb-6">
                                         <div className="h-6 w-1 bg-amber-500 rounded-full"></div>
                                         <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-widest">Metode Pesanan (Aivola GO)</h3>
@@ -883,8 +885,8 @@ export default function CompanyProfilePage() {
                                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowQrisPayment ? 'translate-x-6' : 'translate-x-1'}`} />
                                             </button>
                                         </div>
-                                    </div>
-                                </div>
+                                    </>
+                                )}
 
                                 <div className="pt-8 border-t border-slate-100">
                                     <div className="flex items-center gap-2 mb-6">
