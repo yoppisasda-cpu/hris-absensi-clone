@@ -74,6 +74,9 @@ model Company {
   openTime               String?              @default("08:00")
   closeTime              String?              @default("22:00")
   isOpenManual           Boolean              @default(true)
+  allowCashPayment       Boolean              @default(true)
+  allowBankTransfer      Boolean              @default(true)
+  allowQrisPayment       Boolean              @default(true)
   announcements          Announcement[]
   assets                 Asset[]
   assignments            Assignment[]

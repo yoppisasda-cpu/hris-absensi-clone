@@ -71,7 +71,10 @@ export default function CompanyProfilePage() {
         allowPickUp: true,
         allowDelivery: true,
         allowOnlineOrder: true,
-        allowPreOrder: false
+        allowPreOrder: false,
+        allowCashPayment: true,
+        allowBankTransfer: true,
+        allowQrisPayment: true
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -127,6 +130,9 @@ export default function CompanyProfilePage() {
                 allowDelivery: response.data.allowDelivery ?? true,
                 allowOnlineOrder: response.data.allowOnlineOrder ?? true,
                 allowPreOrder: response.data.allowPreOrder ?? false,
+                allowCashPayment: response.data.allowCashPayment ?? true,
+                allowBankTransfer: response.data.allowBankTransfer ?? true,
+                allowQrisPayment: response.data.allowQrisPayment ?? true,
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -183,6 +189,9 @@ export default function CompanyProfilePage() {
                 allowDelivery: formData.allowDelivery,
                 allowOnlineOrder: formData.allowOnlineOrder,
                 allowPreOrder: formData.allowPreOrder,
+                allowCashPayment: formData.allowCashPayment,
+                allowBankTransfer: formData.allowBankTransfer,
+                allowQrisPayment: formData.allowQrisPayment,
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -814,6 +823,64 @@ export default function CompanyProfilePage() {
                                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowPreOrder ? 'bg-teal-500' : 'bg-slate-300'}`}
                                             >
                                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowPreOrder ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-8 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="h-6 w-1 bg-emerald-500 rounded-full"></div>
+                                        <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Metode Pembayaran (Aivola GO)</h3>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mb-4">Pilih metode pembayaran yang tersedia untuk pelanggan di aplikasi Aivola GO.</p>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600">💵</div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-800">Bayar di Kasir</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-0.5">Pelanggan bayar langsung ke kasir saat ambil pesanan</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, allowCashPayment: !formData.allowCashPayment })}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowCashPayment ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowCashPayment ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">🏦</div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-800">Transfer Bank</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-0.5">Tampilkan info rekening bank dari menu Kas &amp; Bank</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, allowBankTransfer: !formData.allowBankTransfer })}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowBankTransfer ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowBankTransfer ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">📱</div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-800">QRIS</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-0.5">Tampilkan QR Code statis dari pengaturan QRIS di atas</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, allowQrisPayment: !formData.allowQrisPayment })}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none ${formData.allowQrisPayment ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowQrisPayment ? 'translate-x-6' : 'translate-x-1'}`} />
                                             </button>
                                         </div>
                                     </div>

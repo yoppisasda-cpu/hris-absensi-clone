@@ -44,6 +44,9 @@ class BrandingProvider with ChangeNotifier {
   String? _qrisUrl;
   String? _paymentInstructions;
   List<BankAccount> _bankAccounts = [];
+  bool _allowCashPayment = true;
+  bool _allowBankTransfer = true;
+  bool _allowQrisPayment = true;
 
   Color get primaryColor => _primaryColor;
   Color get secondaryColor => _secondaryColor;
@@ -61,6 +64,9 @@ class BrandingProvider with ChangeNotifier {
   String? get qrisUrl => _qrisUrl;
   String? get paymentInstructions => _paymentInstructions;
   List<BankAccount> get bankAccounts => _bankAccounts;
+  bool get allowCashPayment => _allowCashPayment;
+  bool get allowBankTransfer => _allowBankTransfer;
+  bool get allowQrisPayment => _allowQrisPayment;
 
   bool get isStoreOpen {
     if (!_isOpenManual) return false;
@@ -160,6 +166,9 @@ class BrandingProvider with ChangeNotifier {
         _allowPreOrder = data['allowPreOrder'] ?? false;
         _qrisUrl = data['qrisUrl'];
         _paymentInstructions = data['paymentInstructions'];
+        _allowCashPayment = data['allowCashPayment'] ?? true;
+        _allowBankTransfer = data['allowBankTransfer'] ?? true;
+        _allowQrisPayment = data['allowQrisPayment'] ?? true;
         
         print("DEBUG BrandingProvider: Fetched data for $merchantId. qrisUrl=${data['qrisUrl']}, allowDineIn=${data['allowDineIn']}");
         

@@ -2346,7 +2346,10 @@ app.get('/api/companies/public/:id', async (req: Request, res: Response) => {
         isOpenManual: true,
         timezone: true,
         qrisUrl: true,
-        paymentInstructions: true
+        paymentInstructions: true,
+        allowCashPayment: true,
+        allowBankTransfer: true,
+        allowQrisPayment: true
       }
     });
     if (!company) {
@@ -3783,6 +3786,9 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         allowDelivery: (allowDelivery !== undefined) ? (allowDelivery === true || allowDelivery === 'true') : undefined,
         allowOnlineOrder: (req.body.allowOnlineOrder !== undefined) ? (req.body.allowOnlineOrder === true || req.body.allowOnlineOrder === 'true') : undefined,
         allowPreOrder: (req.body.allowPreOrder !== undefined) ? (req.body.allowPreOrder === true || req.body.allowPreOrder === 'true') : undefined,
+        allowCashPayment: (req.body.allowCashPayment !== undefined) ? (req.body.allowCashPayment === true || req.body.allowCashPayment === 'true') : undefined,
+        allowBankTransfer: (req.body.allowBankTransfer !== undefined) ? (req.body.allowBankTransfer === true || req.body.allowBankTransfer === 'true') : undefined,
+        allowQrisPayment: (req.body.allowQrisPayment !== undefined) ? (req.body.allowQrisPayment === true || req.body.allowQrisPayment === 'true') : undefined,
         latitude: parseNum(latitude),
         longitude: parseNum(longitude),
         radius: parseIntNum(radius),
@@ -3863,6 +3869,9 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         allowDelivery: (allowDelivery !== undefined) ? (allowDelivery === true || allowDelivery === 'true') : undefined,
         allowOnlineOrder: (req.body.allowOnlineOrder !== undefined) ? (req.body.allowOnlineOrder === true || req.body.allowOnlineOrder === 'true') : undefined,
         allowPreOrder: (req.body.allowPreOrder !== undefined) ? (req.body.allowPreOrder === true || req.body.allowPreOrder === 'true') : undefined,
+        allowCashPayment: (req.body.allowCashPayment !== undefined) ? (req.body.allowCashPayment === true || req.body.allowCashPayment === 'true') : undefined,
+        allowBankTransfer: (req.body.allowBankTransfer !== undefined) ? (req.body.allowBankTransfer === true || req.body.allowBankTransfer === 'true') : undefined,
+        allowQrisPayment: (req.body.allowQrisPayment !== undefined) ? (req.body.allowQrisPayment === true || req.body.allowQrisPayment === 'true') : undefined,
         latitude: (latitude !== undefined && latitude !== null) ? parseFloat(latitude.toString()) : (latitude === null ? null : undefined),
         longitude: (longitude !== undefined && longitude !== null) ? parseFloat(longitude.toString()) : (longitude === null ? null : undefined),
         radius: safeParseInt(radius),
