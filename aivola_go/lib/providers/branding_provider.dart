@@ -116,7 +116,8 @@ class BrandingProvider with ChangeNotifier {
 
   Future<void> fetchLatestMerchantInfo(int merchantId) async {
     try {
-      final response = await http.get(Uri.parse('${ApiService.baseUrl}/companies/public/$merchantId'));
+      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+      final response = await http.get(Uri.parse('${ApiService.baseUrl}/companies/public/$merchantId?t=$cacheBuster'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         
@@ -139,6 +140,8 @@ class BrandingProvider with ChangeNotifier {
         _allowPreOrder = data['allowPreOrder'] ?? false;
         _qrisUrl = data['qrisUrl'];
         _paymentInstructions = data['paymentInstructions'];
+        
+        print("DEBUG BrandingProvider: Fetched data for $merchantId. qrisUrl=${data['qrisUrl']}, allowDineIn=${data['allowDineIn']}");
         
         // Update SharedPreferences
         final prefs = await SharedPreferences.getInstance();
