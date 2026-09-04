@@ -76,12 +76,40 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
     final brandingProvider = Provider.of<BrandingProvider>(context);
-    final primaryColor = brandingProvider.primaryColor;
-    
-    final qrisUrl = brandingProvider.qrisUrl;
-    final paymentInstructions = brandingProvider.paymentInstructions;
     final bankAccounts = brandingProvider.bankAccounts;
 
+    // Safety check: if the currently selected delivery method is no longer allowed, 
+    // automatically switch to the next available one. This happens when the API 
+    // returns updated merchant settings after initState.
+    if (_deliveryMethod == 'Dine-in' && !brandingProvider.allowDineIn) {
+      if (brandingProvider.allowPickUp) {
+        _deliveryMethod = 'Pick-up';
+      } else if (brandingProvider.allowDelivery) {
+        _deliveryMethod = 'Delivery';
+      }
+      _paymentMethod = 'QRIS / Transfer (Online Payment)';
+    } else if (_deliveryMethod == 'Pick-up' && !brandingProvider.allowPickUp) {
+      if (brandingProvider.allowDelivery) {
+        _deliveryMethod = 'Delivery';
+      }
+      _paymentMethod = 'QRIS / Transfer (Online Payment)';
+    }
+
+    // Safety check for payment method
+    if (_deliveryMethod == "Dine-in") {
+      if (_paymentMethod != "Bayar di Kasir" && _paymentMethod != "Transfer Bank" && _paymentMethod != "QRIS") {
+        _paymentMethod = "Bayar di Kasir";
+      }
+    } else {
+      if (_paymentMethod != "QRIS / Transfer (Online Payment)") {
+        _paymentMethod = "QRIS / Transfer (Online Payment)";
+      }
+    }
+
+    final primaryColor = brandingProvider.primaryColor ?? Color(0xFF3B82F6);
+    final qrisUrl = brandingProvider.qrisUrl;
+    final paymentInstructions = brandingProvider.paymentInstructions;
+    
     return Scaffold(
       backgroundColor: brandingProvider.secondaryColor,
       appBar: AppBar(
