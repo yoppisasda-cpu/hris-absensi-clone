@@ -470,6 +470,9 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userRole = Provider.of<AuthProvider>(context).userRole;
+    final isKasir = userRole?.toLowerCase() == 'kasir';
+
     final filteredOrders = _orders.where((order) {
       // Filter Pembayaran
       if (_selectedPaymentMethod != 'Semua') {
@@ -594,7 +597,8 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('${filteredOrders.length} Pesanan Ditemukan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue[900])),
-                Text('Total: Rp ${NumberFormat('#,###', 'id').format(totalSum)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                if (!isKasir)
+                  Text('Total: Rp ${NumberFormat('#,###', 'id').format(totalSum)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blue[900])),
               ],
             ),
           ),
