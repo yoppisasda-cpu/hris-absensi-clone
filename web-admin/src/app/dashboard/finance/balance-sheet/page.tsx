@@ -2,13 +2,86 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Landmark, Wallet, ShieldCheck, Scale, FileText, Download, Printer, AlertCircle, Info, Building, HandCoins, Package } from "lucide-react";
+import { Landmark, Wallet, ShieldCheck, Scale, FileText, Download, Printer, AlertCircle, Info, Building, HandCoins, Package, Save, Clock, Calendar, ArchiveRestore } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 
 export default function BalanceSheetPage() {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'live' | 'saved'>('live');
+    const [savedReports, setSavedReports] = useState<any[]>([]);
+    const [loadingSaved, setLoadingSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [selectedSavedReport, setSelectedSavedReport] = useState<any>(null);
+    const [userRole, setUserRole] = useState<string>('USER');
+
+    const fetchSavedReports = async () => {
+        setLoadingSaved(true);
+        try {
+            const res = await api.get(`/finance/reports/balance-sheet/saved`);
+            setSavedReports(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil arsip neraca", error);
+        } finally {
+            setLoadingSaved(false);
+        }
+    };
+
+    useEffect(() => {
+        setUserRole(localStorage.getItem('userRole') || 'USER');
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'saved' && savedReports.length === 0) {
+            fetchSavedReports();
+        }
+    }, [activeTab]);
+
+    const handleSaveReport = async () => {
+        if (!confirm('Apakah Anda yakin ingin menyimpan laporan neraca saat ini? Laporan yang disimpan tidak dapat dihapus atau diubah lagi.')) return;
+        
+        const now = new Date();
+        const autoName = `Neraca ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} - ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        const autoDate = now.toISOString().split('T')[0];
+
+        setSaving(true);
+        try {
+            await api.post('/finance/reports/balance-sheet/save', {
+                name: autoName,
+                periodDate: autoDate,
+                assetsData: data.assets,
+                liabilitiesData: data.liabilities,
+                equityData: data.equity,
+                totalAssets: data.assets.total,
+                totalLiabilitiesAndEquity: data.liabilities.total + data.equity.total
+            });
+            import("react-hot-toast").then(t => t.toast.success('Laporan Neraca berhasil disimpan secara permanen'));
+            fetchSavedReports();
+        } catch (error: any) {
+            import("react-hot-toast").then(t => t.toast.error(error.response?.data?.error || 'Gagal menyimpan laporan'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleViewSavedReport = async (id: number) => {
+        let toastId = '';
+        import("react-hot-toast").then(t => { toastId = t.toast.loading('Memuat detail laporan...'); });
+        try {
+            const res = await api.get(`/finance/reports/balance-sheet/saved/${id}`);
+            setSelectedSavedReport({
+                ...res.data,
+                assets: res.data.assetsData,
+                liabilities: res.data.liabilitiesData,
+                equity: res.data.equityData
+            });
+            import("react-hot-toast").then(t => t.toast.dismiss(toastId));
+        } catch (error) {
+            import("react-hot-toast").then(t => t.toast.error('Gagal memuat detail laporan', { id: toastId }));
+        }
+    };
+
 
     const fetchReport = async () => {
         setLoading(true);
@@ -84,22 +157,124 @@ export default function BalanceSheetPage() {
                     <p className="mt-1 text-sm text-slate-400 font-medium italic">Posisi keuangan perusahaan per tanggal {today}.</p>
                 </div>
                 <div className="flex gap-2">
-                    <button 
-                        onClick={() => window.print()}
-                        className="flex items-center gap-2 rounded-xl bg-slate-900/50 border border-slate-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-all shadow-sm"
-                    >
-                        <Printer className="h-4 w-4" /> Cetak
-                    </button>
-                    <button 
-                        onClick={handleExport}
-                        className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all"
-                    >
-                        <Download className="h-4 w-4" /> Export Excel
-                    </button>
+                    
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        {(userRole === 'OWNER' || userRole === 'FINANCE' || userRole === 'SUPERADMIN' || userRole === 'ADMIN') && activeTab === 'live' && (
+                            <button
+                                onClick={handleSaveReport}
+                                disabled={saving}
+                                className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm transition-all font-medium text-sm border border-emerald-500 disabled:opacity-70"
+                            >
+                                <Save className="h-4 w-4" />
+                                {saving ? 'Menyimpan...' : 'Simpan Neraca (Snapshot)'}
+                            </button>
+                        )}
+                        <button
+                            onClick={handleExport}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl backdrop-blur-md border border-white/20 transition-all font-medium text-sm"
+                        >
+                            <Download className="h-4 w-4" />
+                            Export Excel
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div className="printable-content">
+            
+            {/* TABS */}
+            <div className="flex gap-4 mb-6 border-b border-slate-200">
+                <button 
+                    onClick={() => { setActiveTab('live'); setSelectedSavedReport(null); }}
+                    className={`pb-3 px-2 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'live' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    <Landmark className="h-4 w-4" />
+                    Neraca Saat Ini (Live)
+                </button>
+                <button 
+                    onClick={() => { setActiveTab('saved'); setSelectedSavedReport(null); }}
+                    className={`pb-3 px-2 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'saved' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    <ArchiveRestore className="h-4 w-4" />
+                    Arsip Laporan Tersimpan
+                </button>
+            </div>
+
+            {/* TAB CONTENT: SAVED REPORTS */}
+            {activeTab === 'saved' && !selectedSavedReport && (
+                <div className="space-y-6">
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <Clock className="h-5 w-5 text-indigo-500" />
+                                Daftar Arsip Neraca Keuangan
+                            </h3>
+                        </div>
+                        {loadingSaved ? (
+                            <div className="p-10 text-center text-slate-500">Memuat data...</div>
+                        ) : savedReports.length === 0 ? (
+                            <div className="p-10 text-center">
+                                <ArchiveRestore className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                                <p className="text-slate-500 font-medium">Belum ada arsip laporan yang disimpan.</p>
+                                <p className="text-slate-400 text-sm mt-1">Gunakan tombol "Simpan Neraca" di tab Live untuk merekam neraca saat ini.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left whitespace-nowrap">
+                                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4">Nama Laporan (Snapshot)</th>
+                                        <th className="px-6 py-4">Periode</th>
+                                        <th className="px-6 py-4">Total Aset</th>
+                                        <th className="px-6 py-4">Disimpan Oleh</th>
+                                        <th className="px-6 py-4">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {savedReports.map((r: any, i: number) => (
+                                        <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                                            <td className="px-6 py-4 font-bold text-slate-800">{r.name}</td>
+                                            <td className="px-6 py-4 text-slate-600">{new Date(r.periodDate).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</td>
+                                            <td className="px-6 py-4 font-bold text-indigo-600">Rp {Number(r.totalAssets).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-slate-500 text-xs">
+                                                {new Date(r.createdAt).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short', year: 'numeric' })}
+                                                <br/><span className="font-medium text-slate-600">{r.creator?.name || 'Sistem'}</span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <button onClick={() => handleViewSavedReport(r.id)} className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition-colors shadow-sm border border-indigo-100">Lihat Detail Laporan</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* TAB CONTENT: LIVE OR SAVED DETAIL */}
+            {((activeTab === 'live' && data) || (activeTab === 'saved' && selectedSavedReport)) && (
+                (() => {
+                    const displayData = activeTab === 'live' ? data : selectedSavedReport;
+                    return (
+                        <div className="space-y-6">
+                            {activeTab === 'saved' && selectedSavedReport && (
+                                <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-xl flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+                                    <div>
+                                        <h4 className="font-bold text-emerald-900 text-lg flex items-center gap-2">
+                                            <ArchiveRestore className="h-5 w-5" />
+                                            Melihat Arsip: {selectedSavedReport.name}
+                                        </h4>
+                                        <p className="text-emerald-700 text-sm mt-1 leading-relaxed">
+                                            Laporan ini adalah <strong>rekaman permanen</strong> yang disimpan pada tanggal {new Date(selectedSavedReport.createdAt).toLocaleString('id-ID')}. Perubahan transaksi apapun setelah waktu tersebut tidak akan memengaruhi laporan ini.
+                                        </p>
+                                    </div>
+                                    <button onClick={() => setSelectedSavedReport(null)} className="px-4 py-2 shrink-0 bg-white text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg font-bold text-sm shadow-sm transition-colors">
+                                        Tutup Detail
+                                    </button>
+                                </div>
+                            )}
+<div className="printable-content">
                 {/* Accounting Equation Banner */}
                 <div className="mb-8 flex items-center justify-between gap-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-xl shadow-blue-100 relative overflow-hidden">
                     <div className="relative z-10">
@@ -107,12 +282,12 @@ export default function BalanceSheetPage() {
                         <div className="flex items-center gap-4 sm:gap-8 flex-wrap">
                             <div className="text-center sm:text-left">
                                 <p className="text-[10px] font-bold opacity-70">TOTAL AKTIVA (ASET)</p>
-                                <p className="text-2xl font-black">Rp {data?.assets.total.toLocaleString()}</p>
+                                <p className="text-2xl font-black">Rp {displayData?.assets.total.toLocaleString()}</p>
                             </div>
                             <div className="text-2xl font-light opacity-50 hidden sm:block">=</div>
                             <div className="text-center sm:text-left">
                                 <p className="text-[10px] font-bold opacity-70">TOTAL PASIVA (KEWAJIBAN + MODAL)</p>
-                                <p className="text-2xl font-black">Rp {(data?.liabilities.total + data?.equity.total).toLocaleString()}</p>
+                                <p className="text-2xl font-black">Rp {(displayData?.liabilities.total + displayData?.equity.total).toLocaleString()}</p>
                             </div>
                             <div className="ml-auto flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-full backdrop-blur-sm">
                                 <ShieldCheck className="h-4 w-4 text-emerald-300" />
@@ -141,9 +316,9 @@ export default function BalanceSheetPage() {
                                     {/* ASSET LANCAR */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-blue-50/10 not-italic">ASET LANCAR (Current Assets)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-slate-400 italic">Rp {data?.assets.totalCurrent.toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-slate-400 italic">Rp {displayData?.assets.totalCurrent.toLocaleString()}</td>
                                     </tr>
-                                    {data?.assets.accounts.map((acc: any) => (
+                                    {displayData?.assets.accounts.map((acc: any) => (
                                         <tr key={acc.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
                                                 {acc.type === 'BANK' ? <Landmark className="h-3 w-3 text-blue-500" /> : <Wallet className="h-3 w-3 text-amber-500" />}
@@ -156,27 +331,27 @@ export default function BalanceSheetPage() {
                                     {/* PIUTANG (RECEIVABLES) */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-amber-50/10 not-italic">PIUTANG (Receivables)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {(Number(data?.assets.totalLoans || 0) + Number(data?.assets.totalCustomerReceivables || 0)).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {(Number(displayData?.assets.totalLoans || 0) + Number(displayData?.assets.totalCustomerReceivables || 0)).toLocaleString()}</td>
                                     </tr>
-                                    {(data?.assets.totalCustomerReceivables || 0) > 0 && (
+                                    {(displayData?.assets.totalCustomerReceivables || 0) > 0 && (
                                         <tr className="hover:bg-slate-50 transition-colors">
                                             <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
                                                 <Building className="h-3 w-3 text-blue-500" />
                                                 Piutang Usaha (Outstanding)
                                             </td>
-                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.assets.totalCustomerReceivables.toLocaleString()}</td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalCustomerReceivables.toLocaleString()}</td>
                                         </tr>
                                     )}
-                                    {(data?.assets.totalLoans || 0) > 0 && (
+                                    {(displayData?.assets.totalLoans || 0) > 0 && (
                                         <tr className="hover:bg-slate-50 transition-colors">
                                             <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
                                                 <HandCoins className="h-3 w-3 text-amber-500" />
                                                 Pinjaman Karyawan (Aktif)
                                             </td>
-                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.assets.totalLoans.toLocaleString()}</td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalLoans.toLocaleString()}</td>
                                         </tr>
                                     )}
-                                    {!((data?.assets.totalCustomerReceivables || 0) > 0 || (data?.assets.totalLoans || 0) > 0) && (
+                                    {!((displayData?.assets.totalCustomerReceivables || 0) > 0 || (displayData?.assets.totalLoans || 0) > 0) && (
                                         <tr>
                                             <td colSpan={2} className="px-10 py-2 text-[10px] text-slate-300 italic">Tidak ada piutang aktif</td>
                                         </tr>
@@ -185,15 +360,15 @@ export default function BalanceSheetPage() {
                                     {/* PERSEDIAAN (INVENTORY) */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-teal-50/10 not-italic border-t border-slate-100">PERSEDIAAN (Inventory)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-teal-600 italic border-t border-slate-100">Rp {(data?.assets.totalInventoryValue || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-teal-600 italic border-t border-slate-100">Rp {(displayData?.assets.totalInventoryValue || 0).toLocaleString()}</td>
                                     </tr>
-                                    {(data?.assets.totalInventoryValue || 0) > 0 ? (
+                                    {(displayData?.assets.totalInventoryValue || 0) > 0 ? (
                                         <tr className="hover:bg-slate-50 transition-colors">
                                             <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
                                                 <Package className="h-3 w-3 text-teal-500" />
                                                 Persediaan Barang Dagang
                                             </td>
-                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.assets.totalInventoryValue.toLocaleString()}</td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalInventoryValue.toLocaleString()}</td>
                                         </tr>
                                     ) : (
                                         <tr>
@@ -204,9 +379,9 @@ export default function BalanceSheetPage() {
                                     {/* ASSET TETAP */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-emerald-50/10 not-italic border-t border-slate-100">ASET TETAP (Fixed Assets)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-emerald-600 italic border-t border-slate-100">Rp {(data?.assets.totalFixed || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-emerald-600 italic border-t border-slate-100">Rp {(displayData?.assets.totalFixed || 0).toLocaleString()}</td>
                                     </tr>
-                                    {data?.assets.fixedAssets && data.assets.fixedAssets.length > 0 ? (
+                                    {displayData?.assets.fixedAssets && displayData.assets.fixedAssets.length > 0 ? (
                                         <>
                                             {/* HARGA PEROLEHAN PER KATEGORI */}
                                             {Object.entries(groupedAssets).map(([cat, vals]) => (
@@ -238,7 +413,7 @@ export default function BalanceSheetPage() {
 
                                             <tr className="bg-slate-50 border-t border-slate-100">
                                                 <td className="px-10 py-3 font-bold text-slate-700 text-xs not-italic">Total Aset Tetap Bersih</td>
-                                                <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {(data?.assets.totalFixed || 0).toLocaleString()}</td>
+                                                <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {(displayData?.assets.totalFixed || 0).toLocaleString()}</td>
                                             </tr>
                                         </>
                                     ) : (
@@ -249,7 +424,7 @@ export default function BalanceSheetPage() {
 
                                     <tr className="bg-blue-600 border-t-2 border-white">
                                         <td className="px-6 py-4 font-black text-white text-sm uppercase tracking-tighter not-italic">TOTAL AKTIVA (Total Assets)</td>
-                                        <td className="px-6 py-4 text-right font-black text-white text-lg italic underline decoration-double">Rp {data?.assets.total.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-right font-black text-white text-lg italic underline decoration-double">Rp {displayData?.assets.total.toLocaleString()}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -285,20 +460,20 @@ export default function BalanceSheetPage() {
                                             <AlertCircle className="h-3 w-3 text-red-500" />
                                             Hutang Usaha (Expense Pending)
                                         </td>
-                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(data?.liabilities.pendingExpensesTotal || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(displayData?.liabilities.pendingExpensesTotal || 0).toLocaleString()}</td>
                                     </tr>
-                                    {(data?.liabilities.taxLiability || 0) > 0 && (
+                                    {(displayData?.liabilities.taxLiability || 0) > 0 && (
                                         <tr className="hover:bg-slate-50 transition-colors">
                                             <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
                                                 <AlertCircle className="h-3 w-3 text-amber-500" />
                                                 Hutang Pajak (PPN Keluaran)
                                             </td>
-                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {data?.liabilities.taxLiability.toLocaleString()}</td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.liabilities.taxLiability.toLocaleString()}</td>
                                         </tr>
                                     )}
                                     <tr className="bg-slate-50">
                                         <td className="px-6 py-3 font-bold text-slate-700 text-xs italic not-italic">TOTAL KEWAJIBAN</td>
-                                        <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {data?.liabilities.total.toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {displayData?.liabilities.total.toLocaleString()}</td>
                                     </tr>
                                     
                                     <tr className="h-4 bg-white border-none"><td></td><td></td></tr>
@@ -309,19 +484,19 @@ export default function BalanceSheetPage() {
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">
                                         <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Modal Disetor (Paid-in Capital)</td>
-                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(data?.equity.modalDisetor || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(displayData?.equity.modalDisetor || 0).toLocaleString()}</td>
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">
                                         <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Akun Penahan (Selisih Belum Teridentifikasi)</td>
-                                        <td className="px-6 py-3 text-right text-sm font-bold text-orange-600">Rp {(data?.equity.akunPenahan || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-orange-600">Rp {(displayData?.equity.akunPenahan || 0).toLocaleString()}</td>
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">
                                         <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Laba Tahun Berjalan (YTD Net Profit)</td>
-                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(data?.equity.labaBerjalan || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(displayData?.equity.labaBerjalan || 0).toLocaleString()}</td>
                                     </tr>
                                     <tr className="bg-slate-50">
                                         <td className="px-6 py-3 font-bold text-slate-700 text-xs italic not-italic">TOTAL EKUITAS</td>
-                                        <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {data?.equity.total.toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {displayData?.equity.total.toLocaleString()}</td>
                                     </tr>
 
                                     <tr className="h-4 bg-white border-none"><td></td><td></td></tr>
@@ -329,7 +504,7 @@ export default function BalanceSheetPage() {
                                     <tr className="bg-indigo-700">
                                         <td className="px-6 py-5 font-black text-white text-sm uppercase tracking-tighter not-italic">TOTAL PASIVA</td>
                                         <td className="px-6 py-5 text-right font-black text-white text-lg italic underline decoration-double">
-                                            Rp {(data?.liabilities.total + data?.equity.total).toLocaleString()}
+                                            Rp {(displayData?.liabilities.total + displayData?.equity.total).toLocaleString()}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -344,6 +519,12 @@ export default function BalanceSheetPage() {
                     </div>
                 </div>
             </div>
+
+            
+                        </div>
+                    );
+                })()
+            )}
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-8 border-t border-slate-200">
                 <div className="flex items-center gap-4 text-xs font-bold text-slate-400">

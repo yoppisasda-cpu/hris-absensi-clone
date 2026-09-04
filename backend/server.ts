@@ -12810,6 +12810,99 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
   }
 });
 
+// F6.2.1. Save Balance Sheet Report
+app.post('/api/finance/reports/balance-sheet/save', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).user?.id);
+    const { name, periodDate, assetsData, liabilitiesData, equityData, totalAssets, totalLiabilitiesAndEquity } = req.body;
+
+    if (!name || !periodDate) {
+      return res.status(400).json({ error: 'Nama laporan dan periode tidak boleh kosong.' });
+    }
+
+    const savedReport = await prisma.savedBalanceSheetReport.create({
+      data: {
+        companyId: tenantId,
+        name,
+        periodDate: new Date(periodDate),
+        assetsData,
+        liabilitiesData,
+        equityData,
+        totalAssets: Number(totalAssets),
+        totalLiabilitiesAndEquity: Number(totalLiabilitiesAndEquity),
+        createdBy: userId || null
+      }
+    });
+
+    res.json({ message: 'Laporan Neraca berhasil disimpan', report: savedReport });
+  } catch (error: any) {
+    console.error('Error saving balance sheet:', error);
+    res.status(500).json({ error: 'Gagal menyimpan Laporan Neraca: ' + error.message });
+  }
+});
+
+// F6.2.2. Get Saved Balance Sheet Reports
+app.get('/api/finance/reports/balance-sheet/saved', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const reports = await prisma.savedBalanceSheetReport.findMany({
+      where: { companyId: tenantId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        periodDate: true,
+        totalAssets: true,
+        totalLiabilitiesAndEquity: true,
+        createdAt: true,
+        creator: {
+          select: { name: true }
+        }
+      }
+    });
+    res.json(reports);
+  } catch (error: any) {
+    console.error('Error fetching saved balance sheets:', error);
+    res.status(500).json({ error: 'Gagal mengambil arsip Laporan Neraca: ' + error.message });
+  }
+});
+
+// F6.2.3. Get Single Saved Balance Sheet Report
+app.get('/api/finance/reports/balance-sheet/saved/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = Number(req.params.id);
+    const report = await prisma.savedBalanceSheetReport.findFirst({
+      where: { id, companyId: tenantId },
+      include: {
+        creator: { select: { name: true } }
+      }
+    });
+    if (!report) return res.status(404).json({ error: 'Laporan tidak ditemukan' });
+    res.json(report);
+  } catch (error: any) {
+    console.error('Error fetching saved balance sheet details:', error);
+    res.status(500).json({ error: 'Gagal mengambil detail arsip Laporan Neraca: ' + error.message });
+  }
+});
+
+// F6.2.4. Delete Saved Balance Sheet Report
+app.delete('/api/finance/reports/balance-sheet/saved/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const id = Number(req.params.id);
+
+    await prisma.savedBalanceSheetReport.deleteMany({
+      where: { id, companyId: tenantId }
+    });
+    res.json({ message: 'Arsip laporan berhasil dihapus' });
+  } catch (error: any) {
+    console.error('Error deleting saved balance sheet:', error);
+    res.status(500).json({ error: 'Gagal menghapus arsip Laporan Neraca: ' + error.message });
+  }
+});
+
 app.get('/api/finance/reports/cash-flow', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);

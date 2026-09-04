@@ -9,125 +9,126 @@ datasource db {
 }
 
 model Company {
-  id                     Int                  @id @default(autoincrement())
-  name                   String
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
-  latitude               Float?
-  longitude              Float?
-  radius                 Int?                 @default(100)
-  absenceDeductionRate   Float                @default(0)
-  absenceDeductionType   AbsenceDeductionType @default(PRO_RATA)
-  integrationApiKey      String?              @unique
-  lateDeductionRate      Float                @default(50000)
-  sickLeaveDeductionRate Float                @default(0)
-  contractEnd            DateTime?
-  contractStart          DateTime?
-  contractType           ContractType         @default(BULANAN)
-  contractDuration       Int                  @default(1)
-  contractValue          Float                @default(0)
-  picName                String?
-  picPhone               String?
-  employeeLimit          Int                  @default(0)
-  adminLimit             Int                  @default(2)
-  posLimit               Int                  @default(1)
-  photoRetentionDays     Int                  @default(30)
-  modules                AppModule            @default(ABSENSI)
-  address                String?
-  logoUrl                String?
-  qrisUrl                String?
-  paymentInstructions    String?              @db.Text
-  deliveryNoteTerms      String?              @db.Text
-  primaryColor           String?              @default("#3B82F6")
-  secondaryColor         String?              @default("#1E293B")
-  lateGracePeriod        Int                  @default(0)
-  workDaysPerMonth       Int                  @default(25)
-  purchasedInsights      String[]             @default([])
-  addons                 String[]             @default([])
-  plan                   SubscriptionPlan     @default(STARTER)
-  isApiEnabled           Boolean              @default(false)
-  authorizedCapital      Float                @default(0)
-  discountKpi            Int                  @default(0)
-  discountLearning       Int                  @default(0)
-  discountInventory      Int                  @default(0)
-  discountAi             Int                  @default(0)
-  discountFraud          Int                  @default(0)
-  discountExpansion      Int                  @default(0)
-  crmEnabled             Boolean              @default(true)
-  isActive               Boolean              @default(true)
-  waApiKey               String?
-  waGatewayUrl           String?
-  memberDiscountType     String?              @default("PERCENTAGE")
-  memberDiscountValue    Float                @default(0)
-  allowDineIn            Boolean              @default(true)
-  allowPickUp            Boolean              @default(true)
-  allowDelivery          Boolean              @default(true)
-  allowOnlineOrder       Boolean              @default(true)
-  allowPreOrder          Boolean              @default(false)
-  pointsEarnRatio        Float                @default(0)
-  pointsRedeemValue      Float                @default(0)
-  globalTaxRate          Float                @default(0)
-  discountProspecting    Int                  @default(0)
-  waProspectTemplate     String?
-  timezone               String               @default("Asia/Jakarta")
-  posBlindClosing        Boolean              @default(false)
-  openTime               String?              @default("08:00")
-  closeTime              String?              @default("22:00")
-  isOpenManual           Boolean              @default(true)
-  allowCashPayment       Boolean              @default(true)
-  allowBankTransfer      Boolean              @default(true)
-  allowQrisPayment       Boolean              @default(true)
-  announcements          Announcement[]
-  assets                 Asset[]
-  assignments            Assignment[]
-  attendances            Attendance[]
-  Banner                 Banner[]
-  bonuses                Bonus[]
-  branches               Branch[]
-  chatSessions           ChatSession[]
-  customizationGroups    CustomizationGroup[]
-  dividends              Dividend[]
-  documents              EmployeeDocument[]
-  employeeVents          EmployeeVent[]
-  exams                  Exam[]
-  examAttempts           ExamAttempt[]
-  expenses               Expense[]
-  expenseCategories      ExpenseCategory[]
-  financialAccounts      FinancialAccount[]
-  holidays               Holiday[]
-  incomes                Income[]
-  incomeCategories       IncomeCategory[]
-  integrationRequests    IntegrationRequest[]
-  invoices               Invoice[]
-  kpiIndicators          KPIIndicator[]
-  kpiScores              KPIScore[]
-  knowledgeReviews       KnowledgeReview[]
-  learningMaterials      LearningMaterial[]
-  learningObjectives     LearningObjective[]
-  leaveRequests          LeaveRequest[]
-  loans                  Loan[]
-  notifications          Notification[]
-  overtimeRequests       OvertimeRequest[]
-  payrolls               Payroll[]
-  periodClosings         PeriodClosing[]
-  posClosings            PosClosing[]
-  Product                Product[]
-  productCategories      ProductCategory[]
-  prospects              Prospect[]
-  customers              Customer[]
-  purchaseOrders         PurchaseOrder[]
-  reimbursements         Reimbursement[]
-  salesOrders            SalesOrder[]
-  shareholders           Shareholder[]
-  shifts                 Shift[]
-  shiftSchedules         ShiftSchedule[]
-  transfers              Transfer[]
-  users                  User[]
-  userAccess             UserAccess[]
-  vouchers               Voucher[]
-  warehouses             Warehouse[]
-  competitors            Competitor[]
-  marketAnalyses         MarketAnalysis[]
+  id                      Int                       @id @default(autoincrement())
+  name                    String
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  latitude                Float?
+  longitude               Float?
+  radius                  Int?                      @default(100)
+  absenceDeductionRate    Float                     @default(0)
+  absenceDeductionType    AbsenceDeductionType      @default(PRO_RATA)
+  integrationApiKey       String?                   @unique
+  lateDeductionRate       Float                     @default(50000)
+  sickLeaveDeductionRate  Float                     @default(0)
+  contractEnd             DateTime?
+  contractStart           DateTime?
+  contractType            ContractType              @default(BULANAN)
+  contractDuration        Int                       @default(1)
+  contractValue           Float                     @default(0)
+  picName                 String?
+  picPhone                String?
+  employeeLimit           Int                       @default(0)
+  adminLimit              Int                       @default(2)
+  posLimit                Int                       @default(1)
+  photoRetentionDays      Int                       @default(30)
+  modules                 AppModule                 @default(ABSENSI)
+  address                 String?
+  logoUrl                 String?
+  qrisUrl                 String?
+  paymentInstructions     String?                   @db.Text
+  deliveryNoteTerms       String?                   @db.Text
+  primaryColor            String?                   @default("#3B82F6")
+  secondaryColor          String?                   @default("#1E293B")
+  lateGracePeriod         Int                       @default(0)
+  workDaysPerMonth        Int                       @default(25)
+  purchasedInsights       String[]                  @default([])
+  addons                  String[]                  @default([])
+  plan                    SubscriptionPlan          @default(STARTER)
+  isApiEnabled            Boolean                   @default(false)
+  authorizedCapital       Float                     @default(0)
+  discountKpi             Int                       @default(0)
+  discountLearning        Int                       @default(0)
+  discountInventory       Int                       @default(0)
+  discountAi              Int                       @default(0)
+  discountFraud           Int                       @default(0)
+  discountExpansion       Int                       @default(0)
+  crmEnabled              Boolean                   @default(true)
+  isActive                Boolean                   @default(true)
+  waApiKey                String?
+  waGatewayUrl            String?
+  memberDiscountType      String?                   @default("PERCENTAGE")
+  memberDiscountValue     Float                     @default(0)
+  allowDineIn             Boolean                   @default(true)
+  allowPickUp             Boolean                   @default(true)
+  allowDelivery           Boolean                   @default(true)
+  allowOnlineOrder        Boolean                   @default(true)
+  allowPreOrder           Boolean                   @default(false)
+  pointsEarnRatio         Float                     @default(0)
+  pointsRedeemValue       Float                     @default(0)
+  globalTaxRate           Float                     @default(0)
+  discountProspecting     Int                       @default(0)
+  waProspectTemplate      String?
+  timezone                String                    @default("Asia/Jakarta")
+  posBlindClosing         Boolean                   @default(false)
+  openTime                String?                   @default("08:00")
+  closeTime               String?                   @default("22:00")
+  isOpenManual            Boolean                   @default(true)
+  allowCashPayment        Boolean                   @default(true)
+  allowBankTransfer       Boolean                   @default(true)
+  allowQrisPayment        Boolean                   @default(true)
+  announcements           Announcement[]
+  assets                  Asset[]
+  assignments             Assignment[]
+  attendances             Attendance[]
+  Banner                  Banner[]
+  bonuses                 Bonus[]
+  branches                Branch[]
+  chatSessions            ChatSession[]
+  customizationGroups     CustomizationGroup[]
+  dividends               Dividend[]
+  documents               EmployeeDocument[]
+  employeeVents           EmployeeVent[]
+  exams                   Exam[]
+  examAttempts            ExamAttempt[]
+  expenses                Expense[]
+  expenseCategories       ExpenseCategory[]
+  financialAccounts       FinancialAccount[]
+  holidays                Holiday[]
+  incomes                 Income[]
+  incomeCategories        IncomeCategory[]
+  integrationRequests     IntegrationRequest[]
+  invoices                Invoice[]
+  kpiIndicators           KPIIndicator[]
+  kpiScores               KPIScore[]
+  knowledgeReviews        KnowledgeReview[]
+  learningMaterials       LearningMaterial[]
+  learningObjectives      LearningObjective[]
+  leaveRequests           LeaveRequest[]
+  loans                   Loan[]
+  notifications           Notification[]
+  overtimeRequests        OvertimeRequest[]
+  payrolls                Payroll[]
+  periodClosings          PeriodClosing[]
+  posClosings             PosClosing[]
+  Product                 Product[]
+  productCategories       ProductCategory[]
+  prospects               Prospect[]
+  customers               Customer[]
+  purchaseOrders          PurchaseOrder[]
+  reimbursements          Reimbursement[]
+  salesOrders             SalesOrder[]
+  shareholders            Shareholder[]
+  shifts                  Shift[]
+  shiftSchedules          ShiftSchedule[]
+  transfers               Transfer[]
+  users                   User[]
+  userAccess              UserAccess[]
+  vouchers                Voucher[]
+  warehouses              Warehouse[]
+  competitors             Competitor[]
+  marketAnalyses          MarketAnalysis[]
+  SavedBalanceSheetReport SavedBalanceSheetReport[]
 }
 
 model FinancialAccount {
@@ -244,61 +245,61 @@ model Supplier {
 }
 
 model Branch {
-  id         Int                @id @default(autoincrement())
-  companyId  Int
-  name       String
-  latitude   Float?
-  longitude  Float?
-  radius     Int?               @default(100)
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
-  company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  expenses   Expense[]
-  accounts   FinancialAccount[]
-  incomes    Income[]
-  sales      Sale[]
-  users      User[]
-  warehouses Warehouse[]
+  id          Int                @id @default(autoincrement())
+  companyId   Int
+  name        String
+  latitude    Float?
+  longitude   Float?
+  radius      Int?               @default(100)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+  accounts    FinancialAccount[]
+  incomes     Income[]
+  sales       Sale[]
+  users       User[]
+  warehouses  Warehouse[]
   posClosings PosClosing[]
 }
 
 model User {
-  id                      Int                 @id @default(autoincrement())
+  id                      Int                       @id @default(autoincrement())
   companyId               Int
-  email                   String              @unique
+  email                   String                    @unique
   password                String
   name                    String
-  role                    Role                @default(EMPLOYEE)
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
-  basicSalary             Float               @default(0)
+  role                    Role                      @default(EMPLOYEE)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  basicSalary             Float                     @default(0)
   shiftId                 Int?
-  allowance               Float               @default(0)
+  allowance               Float                     @default(0)
   branchId                Int?
   division                String?
-  emailNotifications      Boolean             @default(true)
+  emailNotifications      Boolean                   @default(true)
   grade                   String?
   jobTitle                String?
   joinDate                DateTime?
-  overtimeRate            Float               @default(0)
-  mealAllowance           Float               @default(0)
-  bpjsKesehatan           Boolean             @default(false)
-  bpjsKetenagakerjaan     Boolean             @default(false)
+  overtimeRate            Float                     @default(0)
+  mealAllowance           Float                     @default(0)
+  bpjsKesehatan           Boolean                   @default(false)
+  bpjsKetenagakerjaan     Boolean                   @default(false)
   contractEndDate         DateTime?
-  language                String              @default("id")
+  language                String                    @default("id")
   faceReferenceUrl        String?
   avatarUrl               String?
-  isActive                Boolean             @default(true)
+  isActive                Boolean                   @default(true)
   reportToId              Int?
   resignDate              DateTime?
   lastDeviceId            String?
-  taxStatus               String              @default("TK-0")
-  isTaxable               Boolean             @default(true)
-  isAttendanceExempt      Boolean             @default(false)
-  annualLeaveQuota        Int                 @default(12)
+  taxStatus               String                    @default("TK-0")
+  isTaxable               Boolean                   @default(true)
+  isAttendanceExempt      Boolean                   @default(false)
+  annualLeaveQuota        Int                       @default(12)
   assets                  Asset[]
-  createdAssignments      Assignment[]        @relation("AssignmentCreator")
-  assignments             Assignment[]        @relation("AssignmentUser")
+  createdAssignments      Assignment[]              @relation("AssignmentCreator")
+  assignments             Assignment[]              @relation("AssignmentUser")
   attendances             Attendance[]
   bonuses                 Bonus[]
   chatSessions            ChatSession[]
@@ -308,27 +309,28 @@ model User {
   kpiScores               KPIScore[]
   knowledgeReviews        KnowledgeReview[]
   learningObjectives      LearningObjective[]
-  managedLeaveRequests    LeaveRequest[]      @relation("LeaveApprover")
+  managedLeaveRequests    LeaveRequest[]            @relation("LeaveApprover")
   leaveRequests           LeaveRequest[]
   loans                   Loan[]
   notifications           Notification[]
-  managedOvertimeRequests OvertimeRequest[]   @relation("OvertimeApprover")
+  managedOvertimeRequests OvertimeRequest[]         @relation("OvertimeApprover")
   overtimeRequests        OvertimeRequest[]
   payrolls                Payroll[]
   pendingBills            PendingBill[]
   posClosings             PosClosing[]
-  poApprovedBy            PurchaseOrder[]     @relation("POApprovedBy")
-  poCreatedBy             PurchaseOrder[]     @relation("POCreatedBy")
+  poApprovedBy            PurchaseOrder[]           @relation("POApprovedBy")
+  poCreatedBy             PurchaseOrder[]           @relation("POCreatedBy")
   reimbursements          Reimbursement[]
   sales                   Sale[]
   shiftSchedules          ShiftSchedule[]
-  branch                  Branch?             @relation(fields: [branchId], references: [id])
-  company                 Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  reportTo                User?               @relation("ReportingLine", fields: [reportToId], references: [id])
-  subordinates            User[]              @relation("ReportingLine")
-  shift                   Shift?              @relation(fields: [shiftId], references: [id])
+  branch                  Branch?                   @relation(fields: [branchId], references: [id])
+  company                 Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reportTo                User?                     @relation("ReportingLine", fields: [reportToId], references: [id])
+  subordinates            User[]                    @relation("ReportingLine")
+  shift                   Shift?                    @relation(fields: [shiftId], references: [id])
   accessibleCompanies     UserAccess[]
   kpiIndicators           KPIIndicator[]
+  SavedBalanceSheetReport SavedBalanceSheetReport[]
 }
 
 model UserAccess {
@@ -786,26 +788,26 @@ model ChatMessage {
 }
 
 model Customer {
-  id          Int          @id @default(autoincrement())
-  companyId   Int
-  name        String
-  phone       String?
-  email       String?      
-  address     String?
-  points      Float        @default(0)
-  totalSpent  Float        @default(0)
-  createdAt   DateTime     @default(now()) @db.Timestamp(6)
-  updatedAt   DateTime     @default(now()) @db.Timestamp(6)
-  birthDate   DateTime?
-  gender      String?
-  isMember    Boolean      @default(false)
-  password    String?      // For Aivola GO self-registration
-  isActive    Boolean      @default(true)
-  salesOrders SalesOrder[]
-  pointHistory PointHistory[]
+  id              Int               @id @default(autoincrement())
+  companyId       Int
+  name            String
+  phone           String?
+  email           String?
+  address         String?
+  points          Float             @default(0)
+  totalSpent      Float             @default(0)
+  createdAt       DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime          @default(now()) @db.Timestamp(6)
+  birthDate       DateTime?
+  gender          String?
+  isMember        Boolean           @default(false)
+  password        String? // For Aivola GO self-registration
+  isActive        Boolean           @default(true)
+  salesOrders     SalesOrder[]
+  pointHistory    PointHistory[]
   claimedVouchers CustomerVoucher[]
-  addresses   CustomerAddress[]
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  addresses       CustomerAddress[]
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, phone], name: "companyId_phone")
   @@index([email])
@@ -815,21 +817,21 @@ model PointHistory {
   id          Int      @id @default(autoincrement())
   customerId  Int
   amount      Float
-  type        String   // "EARN" or "REDEEM"
+  type        String // "EARN" or "REDEEM"
   description String
   createdAt   DateTime @default(now())
   customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 }
 
 model CustomerVoucher {
-  id          Int      @id @default(autoincrement())
-  customerId  Int
-  voucherId   Int
-  isUsed      Boolean  @default(false)
-  claimedAt   DateTime @default(now())
-  usedAt      DateTime?
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  id         Int       @id @default(autoincrement())
+  customerId Int
+  voucherId  Int
+  isUsed     Boolean   @default(false)
+  claimedAt  DateTime  @default(now())
+  usedAt     DateTime?
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  voucher    Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
 
   @@unique([customerId, voucherId])
 }
@@ -954,7 +956,7 @@ model SaleItem {
   total         Float
   modifiers     Json?
   product       Product? @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  Sale          Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model SaleReturn {
@@ -1043,19 +1045,19 @@ model PeriodClosing {
 }
 
 model PendingBill {
-  id        Int      @id @default(autoincrement())
-  companyId Int
-  branchId  Int
-  cashierId Int
-  label     String?
-  items     Json
-  saleType  String   @default("WALK_IN")
-  queueNumber Int?
-  kitchenStatus String @default("PENDING")
-  preparedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [cashierId], references: [id])
+  id            Int       @id @default(autoincrement())
+  companyId     Int
+  branchId      Int
+  cashierId     Int
+  label         String?
+  items         Json
+  saleType      String    @default("WALK_IN")
+  queueNumber   Int?
+  kitchenStatus String    @default("PENDING")
+  preparedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [cashierId], references: [id])
 }
 
 model PosClosing {
@@ -1181,26 +1183,26 @@ model IntegrationRequest {
 }
 
 model SalesOrder {
-  id          Int              @id @default(autoincrement())
-  companyId   Int
-  customerId  Int
-  orderNumber String           @unique
-  date        DateTime         @default(now())
-  subtotal    Float            @default(0)
-  taxRate     Float            @default(0)
-  taxAmount   Float            @default(0)
-  totalAmount Float            @default(0)
-  status      SOStatus         @default(PENDING)
+  id             Int              @id @default(autoincrement())
+  companyId      Int
+  customerId     Int
+  orderNumber    String           @unique
+  date           DateTime         @default(now())
+  subtotal       Float            @default(0)
+  taxRate        Float            @default(0)
+  taxAmount      Float            @default(0)
+  totalAmount    Float            @default(0)
+  status         SOStatus         @default(PENDING)
   notes          String?
   deliveryMethod String?
   paymentMethod  String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   saleId         Int?             @unique
-  shippedAt   DateTime?
-  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customer    Customer         @relation(fields: [customerId], references: [id])
-  items       SalesOrderItem[]
+  shippedAt      DateTime?
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer       Customer         @relation(fields: [customerId], references: [id])
+  items          SalesOrderItem[]
 }
 
 model SalesOrderItem {
@@ -1296,24 +1298,24 @@ model Prospect {
 }
 
 model Voucher {
-  id            Int       @id @default(autoincrement())
-  companyId     Int
-  code          String
-  discountType  String    @default("PERCENTAGE")
-  discountValue Float
-  minPurchase   Float     @default(0)
-  minQuantity   Float     @default(0)
-  maxDiscount   Float?
-  validFrom     DateTime?
-  validUntil    DateTime?
-  quota         Int       @default(0)
-  usedCount     Int       @default(0)
-  isActive      Boolean   @default(true)
-  targetAudience String   @default("PUBLIC")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  claimedBy     CustomerVoucher[]
+  id             Int               @id @default(autoincrement())
+  companyId      Int
+  code           String
+  discountType   String            @default("PERCENTAGE")
+  discountValue  Float
+  minPurchase    Float             @default(0)
+  minQuantity    Float             @default(0)
+  maxDiscount    Float?
+  validFrom      DateTime?
+  validUntil     DateTime?
+  quota          Int               @default(0)
+  usedCount      Int               @default(0)
+  isActive       Boolean           @default(true)
+  targetAudience String            @default("PUBLIC")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  company        Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  claimedBy      CustomerVoucher[]
 
   @@unique([companyId, code])
 }
@@ -1530,14 +1532,32 @@ model MarketAnalysis {
 }
 
 model CustomerAddress {
-  id           Int      @id @default(autoincrement())
-  customerId   Int
-  label        String   // e.g. "Rumah", "Kantor"
+  id            Int      @id @default(autoincrement())
+  customerId    Int
+  label         String // e.g. "Rumah", "Kantor"
   recipientName String
-  phoneNumber  String
-  fullAddress  String
-  isDefault    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  phoneNumber   String
+  fullAddress   String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model SavedBalanceSheetReport {
+  id                        Int      @id @default(autoincrement())
+  companyId                 Int
+  name                      String
+  periodDate                DateTime
+  assetsData                Json
+  liabilitiesData           Json
+  equityData                Json
+  totalAssets               Float
+  totalLiabilitiesAndEquity Float
+  createdBy                 Int?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  creator User?   @relation(fields: [createdBy], references: [id])
 }
