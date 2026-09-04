@@ -123,6 +123,9 @@ class BrandingProvider with ChangeNotifier {
     _allowPreOrder = prefs.getBool('allowPreOrder') ?? false;
     _qrisUrl = prefs.getString('qrisUrl');
     _paymentInstructions = prefs.getString('paymentInstructions');
+    _allowCashPayment = prefs.getBool('allowCashPayment') ?? true;
+    _allowBankTransfer = prefs.getBool('allowBankTransfer') ?? true;
+    _allowQrisPayment = prefs.getBool('allowQrisPayment') ?? true;
 
     if (primary != null) {
       _primaryColor = Color(int.parse(primary.replaceFirst('#', '0xFF')));
@@ -189,6 +192,9 @@ class BrandingProvider with ChangeNotifier {
         await prefs.setBool('allowPreOrder', _allowPreOrder);
         if (_qrisUrl != null) await prefs.setString('qrisUrl', _qrisUrl!);
         if (_paymentInstructions != null) await prefs.setString('paymentInstructions', _paymentInstructions!);
+        await prefs.setBool('allowCashPayment', _allowCashPayment);
+        await prefs.setBool('allowBankTransfer', _allowBankTransfer);
+        await prefs.setBool('allowQrisPayment', _allowQrisPayment);
         
         notifyListeners();
       }
