@@ -1235,10 +1235,16 @@ class _POSScreenState extends State<POSScreen> {
         'subtotal': _subtotalAmount,
       };
 
-      // Print receipt in background to not block UI
-      _printerService.isAutoPrintEnabled().then((enabled) {
-        if (enabled) {
+      // Print in background to not block UI
+      _printerService.getAutoPrintSettings().then((settings) {
+        if (settings['receipt'] == true) {
           _printerService.printReceipt(saleData);
+        }
+        if (settings['label'] == true) {
+          _printerService.printStickerLabels(saleData);
+        }
+        if (settings['kitchen'] == true) {
+          _printerService.printKitchenReceipt(saleData);
         }
       });
       

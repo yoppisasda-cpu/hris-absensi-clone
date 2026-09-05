@@ -20,6 +20,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
   List<BluetoothInfo> _devices = [];
   bool _isScanning = false;
   bool _autoPrint = false;
+  bool _autoPrintLabel = false;
+  bool _autoPrintKitchen = false;
 
   // Metadata Controllers
   final TextEditingController _nameController = TextEditingController();
@@ -59,11 +61,14 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
 
   Future<void> _loadSettings() async {
     final ap = await _printerService.isAutoPrintEnabled();
+    final autoSettings = await _printerService.getAutoPrintSettings();
     final store = await _printerService.getStoreData();
     final config = await _printerService.getPrinterConfig();
     
     setState(() {
-      _autoPrint = ap;
+      _autoPrint = autoSettings['receipt'] ?? false;
+      _autoPrintLabel = autoSettings['label'] ?? false;
+      _autoPrintKitchen = autoSettings['kitchen'] ?? false;
       _nameController.text = store['name']!;
       _addressController.text = store['address']!;
       _phoneController.text = store['phone']!;
@@ -89,6 +94,10 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
     }
 
     _scanDevices();
+  }
+
+  Future<void> _saveSettings() async {
+    await _printerService.saveAutoPrintSettings(_autoPrint, _autoPrintLabel, _autoPrintKitchen);
   }
 
   Future<void> _autoFillFromProfile() async {
@@ -203,13 +212,34 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> with Sing
       child: Column(
         children: [
           SwitchListTile(
-            title: Text('Cetak Otomatis Setiap Checkout', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            title: Text('Otomatis Cetak Struk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text('Langsung cetak struk kasir setelah bayar', style: TextStyle(fontSize: 12)),
             value: _autoPrint,
             onChanged: (val) {
               setState(() => _autoPrint = val);
-              _printerService.setAutoPrint(val);
+              _saveSettings();
             },
-            secondary: Icon(Icons.flash_on, color: Colors.amber[800]),
+            secondary: Icon(Icons.receipt, color: Colors.blue[800]),
+          ),
+          SwitchListTile(
+            title: Text('Otomatis Cetak Label Sticker', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text('Langsung cetak stiker cup setelah bayar', style: TextStyle(fontSize: 12)),
+            value: _autoPrintLabel,
+            onChanged: (val) {
+              setState(() => _autoPrintLabel = val);
+              _saveSettings();
+            },
+            secondary: Icon(Icons.label_important_outline, color: Colors.amber[800]),
+          ),
+          SwitchListTile(
+            title: Text('Otomatis Cetak Dapur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text('Langsung kirim orderan ke dapur setelah bayar', style: TextStyle(fontSize: 12)),
+            value: _autoPrintKitchen,
+            onChanged: (val) {
+              setState(() => _autoPrintKitchen = val);
+              _saveSettings();
+            },
+            secondary: Icon(Icons.restaurant, color: Colors.orange[800]),
           ),
           Divider(),
           Center(

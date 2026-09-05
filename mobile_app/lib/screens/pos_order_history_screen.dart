@@ -471,7 +471,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final userRole = Provider.of<AuthProvider>(context).userRole;
-    final isKasir = userRole?.toLowerCase() == 'kasir';
+    final isKasir = userRole?.toUpperCase() == 'CASHIER' || userRole?.toUpperCase() == 'KASIR';
 
     final filteredOrders = _orders.where((order) {
       // Filter Pembayaran
@@ -637,7 +637,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                                     Text(order['invoiceNumber'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                     if (order['customerName'] != null && order['customerName'].toString().isNotEmpty) ...[
                                       SizedBox(width: 8),
-                                      Text('(${order['customerName']})', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+                                      Expanded(child: Text('(${order['customerName']})', style: TextStyle(fontSize: 12, color: Colors.grey[700]), overflow: TextOverflow.ellipsis)),
                                     ],
                                   ],
                                 ),

@@ -595,7 +595,7 @@ class _CartScreenState extends State<CartScreen> {
 
     if (response['success'] == true) {
       cartProvider.clearCart();
-      if (response['qrisUrl'] != null && response['qrisUrl'].toString().isNotEmpty) {
+      if (_paymentMethod != "Bayar di Kasir" && response['qrisUrl'] != null && response['qrisUrl'].toString().isNotEmpty) {
         _showPaymentDialog(
           primaryColor, 
           response['qrisUrl'], 

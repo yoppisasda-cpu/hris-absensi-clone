@@ -9,13 +9,16 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 import AddCustomerModal from "@/components/customers/AddCustomerModal";
-
+import CustomerHistoryModal from "@/components/customers/CustomerHistoryModal";
 export default function CustomersPage() {
     const [customers, setCustomers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState<any>(null);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [selectedHistoryCustomer, setSelectedHistoryCustomer] = useState<any>(null);
+    const [showInactiveOnly, setShowInactiveOnly] = useState(false);
 
     useEffect(() => {
         fetchCustomers();
@@ -43,11 +46,19 @@ export default function CustomersPage() {
         }
     };
 
-    const filteredCustomers = customers.filter(c => 
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.phone && c.phone.includes(searchQuery)) ||
-        (c.email && c.email.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredCustomers = customers.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (c.phone && c.phone.includes(searchQuery)) ||
+            (c.email && c.email.toLowerCase().includes(searchQuery.toLowerCase()));
+            
+        if (showInactiveOnly) {
+            if (!c.lastPurchaseDate) return matchesSearch; // Belum pernah belanja = pasif
+            const lastDate = new Date(c.lastPurchaseDate);
+            const daysSinceLastPurchase = (new Date().getTime() - lastDate.getTime()) / (1000 * 3600 * 24);
+            return matchesSearch && daysSinceLastPurchase > 30;
+        }
+        return matchesSearch;
+    });
 
     return (
         <DashboardLayout>
@@ -126,6 +137,13 @@ export default function CustomersPage() {
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
                         </div>
                         <div className="flex gap-2">
+                            <button 
+                                onClick={() => setShowInactiveOnly(!showInactiveOnly)}
+                                className={`p-3 rounded-xl transition-colors font-bold text-xs flex items-center gap-2 ${showInactiveOnly ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                            >
+                                <History className="h-4 w-4" />
+                                {showInactiveOnly ? 'Hapus Filter' : 'Pasif > 30 Hari'}
+                            </button>
                             <button className="p-3 bg-slate-800 text-slate-400 rounded-xl hover:bg-slate-700 transition-colors">
                                 <Filter className="h-5 w-5" />
                             </button>
@@ -140,6 +158,7 @@ export default function CustomersPage() {
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">Kontak</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 text-right">Total Belanja</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 text-right">Poin</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 text-right">Terakhir Belanja</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 text-center">Aksi</th>
                                 </tr>
                             </thead>
@@ -147,14 +166,14 @@ export default function CustomersPage() {
                                 {loading ? (
                                     Array(5).fill(0).map((_, i) => (
                                         <tr key={i} className="animate-pulse">
-                                            <td colSpan={5} className="px-6 py-4">
+                                            <td colSpan={6} className="px-6 py-4">
                                                 <div className="h-10 bg-slate-50 rounded-xl"></div>
                                             </td>
                                         </tr>
                                     ))
                                 ) : filteredCustomers.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-20 text-center space-y-3">
+                                        <td colSpan={6} className="px-6 py-20 text-center space-y-3">
                                             <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
                                                 <Users className="h-8 w-8 text-slate-200" />
                                             </div>
@@ -196,6 +215,18 @@ export default function CustomersPage() {
                                                     {customer.points || 0}
                                                 </div>
                                             </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {customer.lastPurchaseDate ? (
+                                                    <div>
+                                                        <p className="text-xs font-black text-white">{new Date(customer.lastPurchaseDate).toLocaleDateString('id-ID')}</p>
+                                                        <p className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">
+                                                            {Math.floor((new Date().getTime() - new Date(customer.lastPurchaseDate).getTime()) / (1000 * 3600 * 24))} hari lalu
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[10px] font-bold text-slate-500 italic">Belum Pernah</p>
+                                                )}
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center gap-1">
                                                     <button 
@@ -208,6 +239,10 @@ export default function CustomersPage() {
                                                         <Edit className="h-4 w-4" />
                                                     </button>
                                                     <button 
+                                                        onClick={() => {
+                                                            setSelectedHistoryCustomer(customer);
+                                                            setIsHistoryModalOpen(true);
+                                                        }}
                                                         className="p-2 text-slate-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-white border border-transparent hover:border-slate-100 shadow-none hover:shadow-sm"
                                                         title="Riwayat Belanja"
                                                     >
@@ -243,6 +278,12 @@ export default function CustomersPage() {
                 onClose={() => setIsAddModalOpen(false)} 
                 onSuccess={fetchCustomers}
                 editData={editingCustomer}
+            />
+
+            <CustomerHistoryModal 
+                isOpen={isHistoryModalOpen}
+                onClose={() => setIsHistoryModalOpen(false)}
+                customer={selectedHistoryCustomer}
             />
         </DashboardLayout>
     );

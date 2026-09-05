@@ -336,7 +336,7 @@ class ApiService {
     }
   }
 
-  static Future<ApiResponse> get(String path) async {
+  static Future<ApiResponse> get(String path, {Map<String, String>? headers}) async {
     try {
       final token = await getToken();
       final response = await http.get(

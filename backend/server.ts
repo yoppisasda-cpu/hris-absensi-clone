@@ -14875,7 +14875,11 @@ app.get('/api/customers', tenantMiddleware, async (req: Request, res: Response) 
   try {
     const tenantId = Number((req as any).tenantId);
     const customers = await prisma.$queryRawUnsafe(`
-      SELECT * FROM "Customer" WHERE "companyId" = $1 ORDER BY "name" ASC
+      SELECT c.*, 
+        (SELECT MAX("date") FROM "Sale" WHERE "customerId" = c.id) as "lastPurchaseDate"
+      FROM "Customer" c 
+      WHERE c."companyId" = $1 
+      ORDER BY c."name" ASC
     `, tenantId);
     res.json(customers);
   } catch (error: any) {

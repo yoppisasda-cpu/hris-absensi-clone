@@ -21,6 +21,8 @@ class PrinterService {
   static const String _prefLabelPrinterAddress = 'label_printer_address';
   static const String _prefLabelPrinterType = 'label_printer_type'; // 'bluetooth' or 'wifi'
   static const String _prefAutoPrint = 'auto_print_receipt';
+  static const String _prefAutoPrintLabel = 'auto_print_label';
+  static const String _prefAutoPrintKitchen = 'auto_print_kitchen';
   
   // Store Metadata keys
   static const String prefStoreName = 'print_store_name';
@@ -157,7 +159,7 @@ class PrinterService {
     bytes += generator.feed(1);
     bytes += generator.text('Receipt Printer OK (Bluetooth)', styles: PosStyles(align: PosAlign.center));
     bytes += generator.text(DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()), styles: PosStyles(align: PosAlign.center));
-    bytes += generator.feed(3);
+    bytes += generator.feed(1);
     bytes += generator.cut();
 
     final prefs = await SharedPreferences.getInstance();
@@ -190,6 +192,22 @@ class PrinterService {
     if (val == null) return 0.0;
     if (val is num) return val.toDouble();
     return double.tryParse(val.toString()) ?? 0.0;
+  }
+
+    Future<Map<String, bool>> getAutoPrintSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    return {
+      'receipt': prefs.getBool(_prefAutoPrint) ?? false,
+      'label': prefs.getBool(_prefAutoPrintLabel) ?? false,
+      'kitchen': prefs.getBool(_prefAutoPrintKitchen) ?? false,
+    };
+  }
+
+  Future<void> saveAutoPrintSettings(bool receipt, bool label, bool kitchen) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefAutoPrint, receipt);
+    await prefs.setBool(_prefAutoPrintLabel, label);
+    await prefs.setBool(_prefAutoPrintKitchen, kitchen);
   }
 
   Future<bool> printReceipt(Map<String, dynamic> saleData) async {
@@ -320,7 +338,7 @@ class PrinterService {
 
       bytes += generator.feed(1);
       bytes += generator.text(store['footer'] ?? '', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
-      bytes += generator.feed(3);
+      bytes += generator.feed(1);
       bytes += generator.cut();
 
       final prefs = await SharedPreferences.getInstance();
@@ -374,7 +392,7 @@ class PrinterService {
        bytes += generator.feed(1);
     }
     bytes += generator.hr();
-    bytes += generator.feed(3);
+    bytes += generator.feed(1);
     bytes += generator.cut();
 
     final prefs = await SharedPreferences.getInstance();
@@ -428,7 +446,7 @@ class PrinterService {
         
         bytes += generator.text('($i/$qty) - $time', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
         bytes += generator.text('--------------------------------', styles: PosStyles(align: PosAlign.center));
-        bytes += generator.feed(3);
+        bytes += generator.feed(1);
         bytes += generator.cut();
       }
     }

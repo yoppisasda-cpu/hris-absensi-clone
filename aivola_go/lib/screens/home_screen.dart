@@ -261,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: Image.network(banner.imageUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => Center(child: Icon(Icons.broken_image, color: Colors.white24))),
+                  child: Image.network(banner.imageUrl.startsWith('http') ? banner.imageUrl : '${ApiService.baseUrl.replaceAll('/api', '')}${banner.imageUrl}', fit: BoxFit.cover, errorBuilder: (c, e, s) => Center(child: Icon(Icons.broken_image, color: Colors.white24))),
                 ),
               )).toList(),
             ),
@@ -286,10 +286,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ],
-          SizedBox(height: 30),
-          Text("Promo Spesial", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          SizedBox(height: 15),
-          _buildSpecialPromo("Beli 1 Gratis 1", "Setiap hari Senin", "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&q=80&w=600"),
         ],
       ),
     );
@@ -409,18 +405,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSpecialPromo(String title, String subtitle, String imageUrl) {
-    return Container(
-      width: double.infinity,
-      height: 150,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), image: DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover, colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.4), BlendMode.darken))),
-      padding: EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.end, children: [
-        Text(title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
-        Text(subtitle, style: TextStyle(color: Colors.white70, fontSize: 14)),
-      ]),
-    );
-  }
+
 
   void _showBranchPicker(BuildContext context, BranchProvider branchProvider) {
     final brandingProvider = Provider.of<BrandingProvider>(context, listen: false);
