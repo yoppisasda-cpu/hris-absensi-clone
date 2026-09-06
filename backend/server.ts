@@ -19141,6 +19141,54 @@ app.post('/api/payments/xendit/webhook', async (req: Request, res: Response) => 
   }
 });
 
+// --- AI SUPPORT ASSISTANT ---
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+app.post('/api/chat', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { message, history } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY belum dikonfigurasi di server.' });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+    const systemPrompt = `Kamu adalah "Aivola Support Assistant", asisten AI resmi untuk aplikasi kasir dan SaaS Aivola.
+Tugasmu adalah membantu para pemilik usaha (tenant) menggunakan dashboard Aivola.
+Jawab dengan ramah, profesional, dan ringkas menggunakan bahasa Indonesia.
+Panduan singkat Aivola:
+- Menambahkan produk: Di menu Manajemen Produk > Tambah Produk.
+- Melihat riwayat transaksi pelanggan: Di menu Manajemen Pelanggan > Klik ikon Jam.
+- Pembayaran: Aivola mendukung Qris statis dan online payment.
+Jika kamu tidak tahu jawabannya, arahkan mereka untuk menghubungi tim IT Aivola.`;
+
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: "SYSTEM_INSTRUCTION: " + systemPrompt }],
+        },
+        {
+          role: "model",
+          parts: [{ text: "Mengerti, saya adalah Aivola Support Assistant." }],
+        },
+        ...(history || [])
+      ]
+    });
+
+    const result = await chat.sendMessage(message);
+    const response = await result.response;
+    
+    res.json({ reply: response.text() });
+  } catch (error: any) {
+    console.error("[AI CHAT ERROR]:", error.message);
+    res.status(500).json({ error: 'Gagal menghubungi AI Assistant.' });
+  }
+});
+
 runAutoMigration().then(() => {
   httpServer.listen(PORT, () => {
     console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);

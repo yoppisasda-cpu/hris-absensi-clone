@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from "@/components/layout/Header"
 import Sidebar from "@/components/layout/Sidebar"
+import AiAssistant from "@/components/chat/AiAssistant"
 
 export default function DashboardLayout({
     children,
@@ -52,6 +53,11 @@ export default function DashboardLayout({
                 {/* Background Decorative Gradients */}
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none -z-10 translate-x-1/4 -translate-y-1/4" />
                 <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-violet-500/10 rounded-full blur-[100px] pointer-events-none -z-10 -translate-x-1/4 translate-y-1/4" />
+            </div>
+
+            {/* AI Assistant Widget */}
+            <div className="print:hidden">
+                <AiAssistant />
             </div>
         </div>
     );
