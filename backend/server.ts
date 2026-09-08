@@ -3458,11 +3458,8 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
 
         if (!poItem || poItem.purchaseOrderId !== id) continue;
 
-        // Check if we are over-receiving
+        // Allow over-receiving (requested by user)
         const remainingToReceive = poItem.quantity - poItem.receivedQty;
-        if (qtyToReceive > remainingToReceive) {
-          throw new Error(`Jumlah terima untuk item ${poItem.productId} melebihi jumlah sisa yang dipesan.`);
-        }
 
         // 1. Update receivedQty in PurchaseOrderItem
         await tx.purchaseOrderItem.update({
@@ -19156,14 +19153,13 @@ app.post('/api/chat', tenantMiddleware, async (req: Request, res: Response) => {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
-    const systemPrompt = `Kamu adalah "Aivola Support Assistant", asisten AI resmi untuk aplikasi kasir dan SaaS Aivola.
-Tugasmu adalah membantu para pemilik usaha (tenant) menggunakan dashboard Aivola.
-Jawab dengan ramah, profesional, dan ringkas menggunakan bahasa Indonesia.
-Panduan singkat Aivola:
-- Menambahkan produk: Di menu Manajemen Produk > Tambah Produk.
-- Melihat riwayat transaksi pelanggan: Di menu Manajemen Pelanggan > Klik ikon Jam.
-- Pembayaran: Aivola mendukung Qris statis dan online payment.
-Jika kamu tidak tahu jawabannya, arahkan mereka untuk menghubungi tim IT Aivola.`;
+    const fs = require('fs');
+    const path = require('path');
+    const systemPromptPath = path.join(__dirname, 'ai_knowledge.md');
+    let systemPrompt = 'Kamu adalah Aivola Support Assistant.';
+    if (fs.existsSync(systemPromptPath)) {
+        systemPrompt = fs.readFileSync(systemPromptPath, 'utf8');
+    }
 
     const chat = model.startChat({
       history: [

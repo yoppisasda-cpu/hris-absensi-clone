@@ -135,15 +135,15 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                                                 <td className="px-4 py-3 text-center text-emerald-400 font-bold">{item.receivedQty || 0}</td>
                                                 <td className="px-4 py-3 text-center text-amber-400 font-bold">{remaining}</td>
                                                 <td className="px-4 py-3">
-                                                    {isDone ? (
-                                                        <div className="flex items-center justify-center gap-1 text-emerald-500 text-xs font-bold">
-                                                            <CheckCircle2 className="h-4 w-4" /> LENGKAP
-                                                        </div>
-                                                    ) : (
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        {isDone && (
+                                                            <div className="flex items-center justify-center gap-1 text-emerald-500 text-[10px] font-bold italic">
+                                                                <CheckCircle2 className="h-3 w-3" /> SUDAH LENGKAP
+                                                            </div>
+                                                        )}
                                                         <input
                                                             type="number"
                                                             min="0"
-                                                            max={remaining}
                                                             step="any"
                                                             value={item.newReceivedQty}
                                                             onChange={(e) => {
@@ -153,8 +153,9 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                                                                 setItems(newItems);
                                                             }}
                                                             className="w-full bg-slate-900 border border-indigo-500/30 rounded-lg px-3 py-2 text-center text-white focus:border-indigo-500 outline-none"
+                                                            placeholder={isDone ? "+ Tambah lagi" : ""}
                                                         />
-                                                    )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
