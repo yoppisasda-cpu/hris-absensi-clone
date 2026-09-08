@@ -15932,8 +15932,8 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
         data: { status, accountId: accountId ? parseInt(accountId) : sale.accountId, updatedAt: new Date() }
       });
 
-      // 2. If transitioning from PENDING to PROCESSING/PAID, run inventory & loyalty
-      if (oldStatus === 'PENDING' && (status === 'PROCESSING' || status === 'PAID')) {
+      // 2. If transitioning from PENDING to APPROVED/PROCESSING/PREPARING/PAID, run inventory & loyalty
+      if (oldStatus === 'PENDING' && ['APPROVED', 'PROCESSING', 'PREPARING', 'PAID', 'SHIPPED', 'COMPLETED'].includes(status)) {
         const totalAmount = sale.totalAmount;
         const invoiceNumber = sale.invoiceNumber;
         const finalCustomerId = sale.customerId;
