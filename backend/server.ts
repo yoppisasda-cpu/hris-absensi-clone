@@ -15807,7 +15807,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         const cust = await tx.customer.findUnique({where: {id: finalCustomerId}});
         customerEmail = cust?.email;
       }
-      return { saleId, invoiceNumber, totalAmount, paymentMethod: paymentMethod || 'Bayar di Kasir', customerEmail };
+      return { id: saleId, saleId, invoiceNumber, totalAmount, paymentMethod: paymentMethod || 'Bayar di Kasir', customerEmail };
     }, {
       maxWait: 5000,
       timeout: 30000
