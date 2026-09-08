@@ -15673,23 +15673,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       
       const saleId = saleResult[0].id;
 
-      // --- SKIP LOYALTY & INVENTORY FOR PENDING ORDERS ---
-      if (status === 'PENDING') {
-        // Just create Sale Items without updating stock/points
-        for (const item of items) {
-          const productId = parseInt(item.productId);
-          const quantity = parseFloat(item.quantity);
-          const price = parseFloat(item.price);
-          const total = quantity * price;
-
-          await tx.$executeRawUnsafe(`
-            INSERT INTO "SaleItem" ("saleId", "productId", "quantity", "price", "total")
-            VALUES ($1, $2, $3, $4, $5)
-          `, saleId, productId, quantity, price, total);
-        }
-        return { id: saleId, invoiceNumber, status: 'PENDING' };
-      }
-
+      // --- INVENTORY WILL BE DEDUCTED IMMEDIATELY FOR PENDING ORDERS TO RESERVE STOCK ---
       // --- LOYALTY LOGIC: Earn & Redeem Points ---
       if (finalCustomerId) {
         const custId = finalCustomerId;
@@ -15710,9 +15694,9 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           });
         }
 
-        // 2. Earn Points (e.g., 1 point for every Rp 1,000 spent)
+        // 2. Earn Points (e.g., 1 point for every Rp 1,000 spent) - Only if NOT pending
         const earnedPoints = Math.floor(totalAmount / 1000);
-        if (earnedPoints > 0) {
+        if (earnedPoints > 0 && status !== 'PENDING') {
           await tx.customer.update({
             where: { id: custId },
             data: { 
@@ -15939,17 +15923,8 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
         const finalCustomerId = sale.customerId;
         const pointsUsedNum = (sale as any).pointsUsed || 0;
 
-        // --- LOYALTY LOGIC ---
+        // --- LOYALTY LOGIC: Earn Points on transition ---
         if (finalCustomerId) {
-          if (pointsUsedNum > 0) {
-            await tx.customer.update({
-              where: { id: finalCustomerId },
-              data: { points: { decrement: pointsUsedNum } }
-            });
-            await tx.pointHistory.create({
-              data: { customerId: finalCustomerId, amount: pointsUsedNum, type: 'REDEEM', description: `Tukar poin untuk pesanan ${invoiceNumber}` }
-            });
-          }
           const earnedPoints = Math.floor(totalAmount / 1000);
           if (earnedPoints > 0) {
             await tx.customer.update({
@@ -15961,28 +15936,8 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
             });
           }
         }
-
-        // --- INVENTORY LOGIC ---
-        for (const item of sale.SaleItem) {
-          if (!item.productId) continue;
-          const productId = item.productId;
-          const quantity = item.quantity;
-
-          // Decrement product stock
-          await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2`, quantity, productId);
-          await tx.$executeRawUnsafe(`INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date") VALUES ($1, 'OUT', $2, $3, NOW())`, productId, quantity, `Penjualan Online ${invoiceNumber}`);
-
-          // BOM Logic
-          const recipes: any[] = await tx.$queryRawUnsafe(`SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr JOIN "Product" p ON pr."productId" = p.id WHERE pr."productId" = $1`, productId);
-          if (recipes.length > 0) {
-            const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
-            for (const recipe of recipes) {
-              const totalMaterialNeeded = (recipe.quantity / yieldVal) * quantity;
-              await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" - $1, "updatedAt" = NOW() WHERE "id" = $2`, totalMaterialNeeded, recipe.materialId);
-              await tx.$executeRawUnsafe(`INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date") VALUES ($1, 'OUT', $2, $3, NOW())`, recipe.materialId, totalMaterialNeeded, `Penjualan Online (BOM) ${invoiceNumber}`);
-            }
-          }
-        }
+        
+        // (Inventory already deducted at creation for PENDING orders)
 
         // --- FINANCE LOGIC (If PAID) ---
         const finalAccountId = accountId || sale.accountId;
@@ -16020,8 +15975,8 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
         }
         await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
 
-        // 3. Revert Inventory (If previously PAID or PROCESSING)
-        if (oldStatus === 'PAID' || oldStatus === 'PROCESSING') {
+        // 3. Revert Inventory (Because PENDING, PAID, and PROCESSING all have deducted stock)
+        if (oldStatus === 'PAID' || oldStatus === 'PROCESSING' || oldStatus === 'PENDING' || oldStatus === 'APPROVED' || oldStatus === 'PREPARING' || oldStatus === 'SHIPPED') {
           for (const item of sale.SaleItem) {
             if (!item.productId) continue;
             const qty = parseFloat(item.quantity as any);
