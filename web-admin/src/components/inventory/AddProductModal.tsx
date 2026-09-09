@@ -666,7 +666,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic group-hover:text-indigo-400 transition-colors">POS VISIBILITY</span>
                                 </label>
                             </div>
-                            <div className="flex items-center gap-6 py-4 px-1">
+                            <div className="flex flex-wrap items-center gap-6 py-4 px-1">
                                 <label className="flex items-center gap-4 cursor-pointer group">
                                     <div className="relative">
                                         <input 
@@ -694,7 +694,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     </label>
                                 )}
                                 {formData.type === 'FINISHED_GOOD' && (
-                                    <label className="flex items-center gap-4 cursor-pointer group ml-6">
+                                    <label className="flex items-center gap-4 cursor-pointer group">
                                         <div className="relative">
                                             <input 
                                                 type="checkbox" 
