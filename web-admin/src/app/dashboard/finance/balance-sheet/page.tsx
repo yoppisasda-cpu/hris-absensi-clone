@@ -331,7 +331,7 @@ export default function BalanceSheetPage() {
                                     {/* PIUTANG (RECEIVABLES) */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-amber-50/10 not-italic">PIUTANG (Receivables)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {(Number(displayData?.assets.totalLoans || 0) + Number(displayData?.assets.totalCustomerReceivables || 0)).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {(Number(displayData?.assets.totalLoans || 0) + Number(displayData?.assets.totalCustomerReceivables || 0) + Number(displayData?.assets.totalPiutangCabang || 0)).toLocaleString()}</td>
                                     </tr>
                                     {(displayData?.assets.totalCustomerReceivables || 0) > 0 && (
                                         <tr className="hover:bg-slate-50 transition-colors">
@@ -351,7 +351,16 @@ export default function BalanceSheetPage() {
                                             <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalLoans.toLocaleString()}</td>
                                         </tr>
                                     )}
-                                    {!((displayData?.assets.totalCustomerReceivables || 0) > 0 || (displayData?.assets.totalLoans || 0) > 0) && (
+                                    {(displayData?.assets.totalPiutangCabang || 0) !== 0 && (
+                                        <tr className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
+                                                <Building className="h-3 w-3 text-amber-500" />
+                                                Piutang Antar Cabang
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalPiutangCabang.toLocaleString()}</td>
+                                        </tr>
+                                    )}
+                                    {!((displayData?.assets.totalCustomerReceivables || 0) > 0 || (displayData?.assets.totalLoans || 0) > 0 || (displayData?.assets.totalPiutangCabang || 0) !== 0) && (
                                         <tr>
                                             <td colSpan={2} className="px-10 py-2 text-[10px] text-slate-300 italic">Tidak ada piutang aktif</td>
                                         </tr>
@@ -471,6 +480,24 @@ export default function BalanceSheetPage() {
                                             <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.liabilities.taxLiability.toLocaleString()}</td>
                                         </tr>
                                     )}
+                                    {(displayData?.liabilities.totalHutangCabang || 0) !== 0 && (
+                                        <tr className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
+                                                <AlertCircle className="h-3 w-3 text-indigo-500" />
+                                                Hutang Antar Cabang
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.liabilities.totalHutangCabang.toLocaleString()}</td>
+                                        </tr>
+                                    )}
+                                    {(displayData?.liabilities.totalHutangBank || 0) !== 0 && (
+                                        <tr className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
+                                                <AlertCircle className="h-3 w-3 text-orange-500" />
+                                                Hutang Bank / Pihak Luar
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.liabilities.totalHutangBank.toLocaleString()}</td>
+                                        </tr>
+                                    )}
                                     <tr className="bg-slate-50">
                                         <td className="px-6 py-3 font-bold text-slate-700 text-xs italic not-italic">TOTAL KEWAJIBAN</td>
                                         <td className="px-6 py-3 text-right font-black text-slate-900 text-sm italic underline">Rp {displayData?.liabilities.total.toLocaleString()}</td>
@@ -483,9 +510,15 @@ export default function BalanceSheetPage() {
                                         <td></td>
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Modal Disetor (Paid-in Capital)</td>
-                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(displayData?.equity.modalDisetor || 0).toLocaleString()}</td>
+                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Modal Disetor & Laba Ditahan</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {((displayData?.equity.modalDisetor || 0) + (displayData?.equity.totalPrive || 0)).toLocaleString()}</td>
                                     </tr>
+                                    {(displayData?.equity.totalPrive || 0) > 0 && (
+                                        <tr className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Prive (Penarikan Pribadi)</td>
+                                            <td className="px-6 py-3 text-right text-sm font-bold text-red-600">-Rp {displayData?.equity.totalPrive.toLocaleString()}</td>
+                                        </tr>
+                                    )}
                                     <tr className="hover:bg-slate-50 transition-colors">
                                         <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Akun Penahan (Selisih Belum Teridentifikasi)</td>
                                         <td className="px-6 py-3 text-right text-sm font-bold text-orange-600">Rp {(displayData?.equity.akunPenahan || 0).toLocaleString()}</td>
