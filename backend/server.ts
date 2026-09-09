@@ -10851,12 +10851,17 @@ app.get('/api/finance/income-categories', tenantMiddleware, async (req: Request,
       orderBy: { name: 'asc' }
     });
     
-    const systemCats = ['[SYSTEM] Hutang Cabang', '[SYSTEM] Pelunasan Piutang Cabang'];
+    const systemCats = [
+      { name: '[SYSTEM] Hutang Cabang', type: 'NON_OPERATIONAL' },
+      { name: '[SYSTEM] Pelunasan Piutang Cabang', type: 'NON_OPERATIONAL' },
+      { name: '[SYSTEM] Pencairan Pinjaman Bank/Luar', type: 'NON_OPERATIONAL' },
+      { name: '[SYSTEM] Setoran Modal Owner', type: 'EQUITY' }
+    ];
     let needsRefetch = false;
     for (const sys of systemCats) {
-      if (!categories.find(c => c.name === sys)) {
+      if (!categories.find(c => c.name === sys.name)) {
         await prisma.incomeCategory.create({
-          data: { companyId: (req as any).tenantId, name: sys, type: 'NON_OPERATIONAL' }
+          data: { companyId: (req as any).tenantId, name: sys.name, type: sys.type as any }
         }).catch(() => {});
         needsRefetch = true;
       }
@@ -11034,7 +11039,12 @@ app.get('/api/finance/expense-categories', tenantMiddleware, async (req: Request
       orderBy: { name: 'asc' }
     });
 
-    const systemCats = ['[SYSTEM] Piutang Cabang', '[SYSTEM] Pelunasan Hutang Cabang'];
+    const systemCats = [
+      '[SYSTEM] Piutang Cabang',
+      '[SYSTEM] Pelunasan Hutang Cabang',
+      '[SYSTEM] Prive / Penarikan Owner',
+      '[SYSTEM] Pelunasan Pokok Pinjaman'
+    ];
     let needsRefetch = false;
     for (const sys of systemCats) {
       if (!categories.find(c => c.name === sys)) {
@@ -12452,7 +12462,16 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     });
     const totalHutangCabang = hutangIncomes.reduce((sum, i) => sum + i.amount, 0) - hutangExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-    const totalLiabilities = totalPendingExpenses + totalTaxLiability + totalHutangCabang;
+    // 4c. Liabilities: Hutang Bank / Pihak Luar
+    const hutangBankIncomes = await prisma.income.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Pencairan Pinjaman Bank/Luar' } }
+    });
+    const hutangBankExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Pelunasan Pokok Pinjaman' }, status: 'PAID' }
+    });
+    const totalHutangBank = hutangBankIncomes.reduce((sum, i) => sum + i.amount, 0) - hutangBankExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const totalLiabilities = totalPendingExpenses + totalTaxLiability + totalHutangCabang + totalHutangBank;
 
     // 5. Equity: Assets - Liabilities
     const totalEquity = totalAssets - totalLiabilities;
@@ -12551,7 +12570,11 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const equityIncomes = await prisma.income.findMany({
       where: { companyId: tenantId, category: { type: 'EQUITY' } }
     });
-    const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0);
+    const priveExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Prive / Penarikan Owner' }, status: 'PAID' }
+    });
+    const totalPrive = priveExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0) - totalPrive;
 
     const calculatedModalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
     const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical) * 100) / 100;
@@ -12576,11 +12599,13 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         pendingExpensesTotal: totalPendingExpenses,
         taxLiability: totalTaxLiability,
         totalHutangCabang: totalHutangCabang,
+        totalHutangBank: totalHutangBank,
         details: pendingExpenses 
       },
       equity: { 
         total: totalEquity,
         modalDisetor: modalDisetorHistorical,
+        totalPrive: totalPrive,
         akunPenahan,
         labaBerjalan: ytdNetProfit
       }
@@ -12664,7 +12689,16 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     });
     const totalHutangCabang = hutangIncomes.reduce((sum, i) => sum + i.amount, 0) - hutangExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-    const totalLiabilities = totalPendingExpenses + totalTaxLiability + totalHutangCabang;
+    // 4c. Liabilities: Hutang Bank / Pihak Luar
+    const hutangBankIncomes = await prisma.income.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Pencairan Pinjaman Bank/Luar' } }
+    });
+    const hutangBankExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Pelunasan Pokok Pinjaman' }, status: 'PAID' }
+    });
+    const totalHutangBank = hutangBankIncomes.reduce((sum, i) => sum + i.amount, 0) - hutangBankExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const totalLiabilities = totalPendingExpenses + totalTaxLiability + totalHutangCabang + totalHutangBank;
     const totalEquity = totalAssets - totalLiabilities;
 
     // Equity Splits
@@ -12761,7 +12795,11 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     const equityIncomes = await prisma.income.findMany({
       where: { companyId: tenantId, category: { type: 'EQUITY' } }
     });
-    const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0);
+    const priveExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Prive / Penarikan Owner' }, status: 'PAID' }
+    });
+    const totalPrive = priveExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0) - totalPrive;
 
     const calculatedModalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
     const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical) * 100) / 100;
@@ -12853,6 +12891,10 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       worksheet.addRow(['Hutang Antar Cabang', '', totalHutangCabang]);
       currentRow++;
     }
+    if (totalHutangBank !== 0) {
+      worksheet.addRow(['Hutang Bank / Pinjaman Luar', '', totalHutangBank]);
+      currentRow++;
+    }
     worksheet.addRow(['TOTAL KEWAJIBAN', '', totalLiabilities]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 3;
@@ -12861,8 +12903,12 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     worksheet.getCell(`A${currentRow}`).value = 'EKUITAS (MODAL)';
     worksheet.getCell(`A${currentRow}`).font = { bold: true };
     currentRow++;
-    worksheet.addRow(['Modal Disetor (Paid-in Capital)', '', modalDisetorHistorical]);
+    worksheet.addRow(['Modal Disetor (Paid-in Capital) & Laba Ditahan', '', modalDisetorHistorical + totalPrive]);
     currentRow++;
+    if (totalPrive > 0) {
+      worksheet.addRow(['Prive (Penarikan Pribadi)', '', -totalPrive]);
+      currentRow++;
+    }
     worksheet.addRow(['Akun Penahan (Selisih Belum Teridentifikasi)', '', akunPenahan]);
     currentRow++;
     worksheet.addRow(['Laba Tahun Berjalan (YTD Net Profit)', '', ytdNetProfit]);
