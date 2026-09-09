@@ -10846,10 +10846,28 @@ app.delete('/api/finance/accounts/:id', tenantMiddleware, async (req: Request, r
 // F2.1. Get Income Categories
 app.get('/api/finance/income-categories', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const categories = await prisma.incomeCategory.findMany({
+    let categories = await prisma.incomeCategory.findMany({
       where: { companyId: (req as any).tenantId },
       orderBy: { name: 'asc' }
     });
+    
+    const systemCats = ['[SYSTEM] Hutang Cabang', '[SYSTEM] Pelunasan Piutang Cabang'];
+    let needsRefetch = false;
+    for (const sys of systemCats) {
+      if (!categories.find(c => c.name === sys)) {
+        await prisma.incomeCategory.create({
+          data: { companyId: (req as any).tenantId, name: sys, type: 'NON_OPERATIONAL' }
+        }).catch(() => {});
+        needsRefetch = true;
+      }
+    }
+    if (needsRefetch) {
+      categories = await prisma.incomeCategory.findMany({
+        where: { companyId: (req as any).tenantId },
+        orderBy: { name: 'asc' }
+      });
+    }
+
     res.json(categories);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil kategori pemasukan' });
@@ -11011,10 +11029,28 @@ app.delete('/api/finance/income/:id', tenantMiddleware, async (req: Request, res
 // F4.1. Get Expense Categories
 app.get('/api/finance/expense-categories', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const categories = await prisma.expenseCategory.findMany({
+    let categories = await prisma.expenseCategory.findMany({
       where: { companyId: (req as any).tenantId },
       orderBy: { name: 'asc' }
     });
+
+    const systemCats = ['[SYSTEM] Piutang Cabang', '[SYSTEM] Pelunasan Hutang Cabang'];
+    let needsRefetch = false;
+    for (const sys of systemCats) {
+      if (!categories.find(c => c.name === sys)) {
+        await prisma.expenseCategory.create({
+          data: { companyId: (req as any).tenantId, name: sys, type: 'OPERATIONAL' }
+        }).catch(() => {});
+        needsRefetch = true;
+      }
+    }
+    if (needsRefetch) {
+      categories = await prisma.expenseCategory.findMany({
+        where: { companyId: (req as any).tenantId },
+        orderBy: { name: 'asc' }
+      });
+    }
+
     res.json(categories);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil kategori pengeluaran: ' + error.message });
@@ -11892,8 +11928,9 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
       const isEquity = inc.category?.type === 'EQUITY';
+      const isSystem = inc.category?.name.startsWith('[SYSTEM]');
       
-      if (!isSales && !isEquity) {
+      if (!isSales && !isEquity && !isSystem) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
         totalOtherIncome += amount;
       }
@@ -11915,9 +11952,10 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       const isCOGS = exp.category?.type === 'COGS';
       const isCapex = exp.category?.type === 'CAPEX';
       const isInventory = exp.category?.type === 'INVENTORY';
+      const isSystem = exp.category?.name.startsWith('[SYSTEM]');
       
-      if (isCapex || isInventory) {
-        // Exclude CAPEX and INVENTORY from P&L completely
+      if (isCapex || isInventory || isSystem) {
+        // Exclude CAPEX, INVENTORY, and SYSTEM from P&L completely
       } else if (isCOGS) {
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
@@ -12099,8 +12137,9 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
       const isEquity = inc.category?.type === 'EQUITY';
+      const isSystem = inc.category?.name.startsWith('[SYSTEM]');
       
-      if (!isSales && !isEquity) {
+      if (!isSales && !isEquity && !isSystem) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
         totalOtherIncome += amount;
       }
@@ -12122,9 +12161,10 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       const isCOGS = exp.category?.type === 'COGS';
       const isCapex = exp.category?.type === 'CAPEX';
       const isInventory = exp.category?.type === 'INVENTORY';
+      const isSystem = exp.category?.name.startsWith('[SYSTEM]');
       
-      if (isCapex || isInventory) {
-        // Exclude CAPEX and INVENTORY from P&L completely
+      if (isCapex || isInventory || isSystem) {
+        // Exclude CAPEX, INVENTORY, and SYSTEM from P&L completely
       } else if (isCOGS) {
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
@@ -12381,7 +12421,16 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     });
     const totalInventoryValue = products.reduce((sum, p) => sum + (Math.max(0, p.stock || 0) * (p.costPrice || 0)), 0);
 
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue;
+    // 3d. Assets: Piutang Antar Cabang
+    const piutangExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Piutang Cabang' }, status: 'PAID' }
+    });
+    const piutangIncomes = await prisma.income.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Pelunasan Piutang Cabang' } }
+    });
+    const totalPiutangCabang = piutangExpenses.reduce((sum, e) => sum + e.amount, 0) - piutangIncomes.reduce((sum, i) => sum + i.amount, 0);
+
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue + totalPiutangCabang;
 
     // 4. Liabilities: Pending Expenses (Hutang Usaha) & Tax Liability (PPN Keluaran)
     const pendingExpenses = await prisma.expense.findMany({
@@ -12394,7 +12443,16 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       select: { taxAmount: true }
     });
     const totalTaxLiability = salesWithTaxInCompany.reduce((sum, s) => sum + (s.taxAmount || 0), 0);
-    const totalLiabilities = totalPendingExpenses + totalTaxLiability;
+    // 4b. Liabilities: Hutang Antar Cabang
+    const hutangIncomes = await prisma.income.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Hutang Cabang' } }
+    });
+    const hutangExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Pelunasan Hutang Cabang' }, status: 'PAID' }
+    });
+    const totalHutangCabang = hutangIncomes.reduce((sum, i) => sum + i.amount, 0) - hutangExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const totalLiabilities = totalPendingExpenses + totalTaxLiability + totalHutangCabang;
 
     // 5. Equity: Assets - Liabilities
     const totalEquity = totalAssets - totalLiabilities;
@@ -12439,7 +12497,8 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     ytdIncomesAll.forEach(inc => {
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
       const isEquity = inc.category?.type === 'EQUITY';
-      if (!isSales && !isEquity) {
+      const isSystem = inc.category?.name.startsWith('[SYSTEM]');
+      if (!isSales && !isEquity && !isSystem) {
         ytdTotalOtherIncome += inc.amount;
       }
     });
@@ -12458,7 +12517,8 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     ytdExpensesList.forEach(exp => {
       const isCapex = exp.category?.type === 'CAPEX';
       const isInventory = exp.category?.type === 'INVENTORY';
-      if (!isCapex && !isInventory) {
+      const isSystem = exp.category?.name.startsWith('[SYSTEM]');
+      if (!isCapex && !isInventory && !isSystem) {
         ytdExpense += exp.amount;
       }
     });
@@ -12506,6 +12566,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         totalLoans: totalLoans,
         totalCustomerReceivables: totalCustomerReceivables,
         totalInventoryValue: totalInventoryValue,
+        totalPiutangCabang: totalPiutangCabang,
         accounts,
         fixedAssets: assetsWithBookValue,
         loans: activeLoans
@@ -12514,6 +12575,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         total: totalLiabilities, 
         pendingExpensesTotal: totalPendingExpenses,
         taxLiability: totalTaxLiability,
+        totalHutangCabang: totalHutangCabang,
         details: pendingExpenses 
       },
       equity: { 
@@ -12574,7 +12636,16 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     const products = await prisma.product.findMany({ where: { companyId: tenantId } });
     const totalInventoryValue = products.reduce((sum, p) => sum + (Math.max(0, p.stock || 0) * (p.costPrice || 0)), 0);
 
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue;
+    // 3d. Assets: Piutang Antar Cabang
+    const piutangExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Piutang Cabang' }, status: 'PAID' }
+    });
+    const piutangIncomes = await prisma.income.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Pelunasan Piutang Cabang' } }
+    });
+    const totalPiutangCabang = piutangExpenses.reduce((sum, e) => sum + e.amount, 0) - piutangIncomes.reduce((sum, i) => sum + i.amount, 0);
+
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue + totalPiutangCabang;
 
     const pendingExpenses = await prisma.expense.findMany({ where: { companyId: tenantId, status: 'PENDING' } });
     const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -12584,7 +12655,16 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       select: { taxAmount: true }
     });
     const totalTaxLiability = salesWithTaxInCompany.reduce((sum, s) => sum + (s.taxAmount || 0), 0);
-    const totalLiabilities = totalPendingExpenses + totalTaxLiability;
+    // 4b. Liabilities: Hutang Antar Cabang
+    const hutangIncomes = await prisma.income.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Hutang Cabang' } }
+    });
+    const hutangExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, category: { name: '[SYSTEM] Pelunasan Hutang Cabang' }, status: 'PAID' }
+    });
+    const totalHutangCabang = hutangIncomes.reduce((sum, i) => sum + i.amount, 0) - hutangExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const totalLiabilities = totalPendingExpenses + totalTaxLiability + totalHutangCabang;
     const totalEquity = totalAssets - totalLiabilities;
 
     // Equity Splits
@@ -12627,7 +12707,8 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     ytdIncomesAll.forEach(inc => {
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
       const isEquity = inc.category?.type === 'EQUITY';
-      if (!isSales && !isEquity) {
+      const isSystem = inc.category?.name.startsWith('[SYSTEM]');
+      if (!isSales && !isEquity && !isSystem) {
         ytdTotalOtherIncome += inc.amount;
       }
     });
@@ -12646,7 +12727,8 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     ytdExpensesList.forEach(exp => {
       const isCapex = exp.category?.type === 'CAPEX';
       const isInventory = exp.category?.type === 'INVENTORY';
-      if (!isCapex && !isInventory) {
+      const isSystem = exp.category?.name.startsWith('[SYSTEM]');
+      if (!isCapex && !isInventory && !isSystem) {
         ytdExpense += exp.amount;
       }
     });
@@ -12712,8 +12794,9 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     worksheet.addRow(['Piutang Karyawan', '', totalLoans]);
     currentRow++;
     worksheet.addRow(['Persediaan Barang Dagang', '', totalInventoryValue]);
+    worksheet.addRow(['Piutang Antar Cabang', '', totalPiutangCabang]);
     currentRow++;
-    worksheet.addRow(['Total Aset Lancar & Piutang', '', totalCurrentAssets + totalLoans + totalCustomerReceivables + totalInventoryValue]);
+    worksheet.addRow(['Total Aset Lancar & Piutang', '', totalCurrentAssets + totalLoans + totalCustomerReceivables + totalInventoryValue + totalPiutangCabang]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 
@@ -12764,6 +12847,10 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     });
     if (totalTaxLiability > 0) {
       worksheet.addRow(['Hutang Pajak (PPN Keluaran)', '', totalTaxLiability]);
+      currentRow++;
+    }
+    if (totalHutangCabang !== 0) {
+      worksheet.addRow(['Hutang Antar Cabang', '', totalHutangCabang]);
       currentRow++;
     }
     worksheet.addRow(['TOTAL KEWAJIBAN', '', totalLiabilities]);
