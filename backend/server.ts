@@ -12495,7 +12495,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const pendingExpenses = await prisma.expense.findMany({
       where: { companyId: tenantId, status: 'PENDING' }
     });
-    const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + (e.amount - (e.paidAmount || 0)), 0);
 
     const salesWithTaxInCompany = await prisma.sale.findMany({
       where: { companyId: tenantId },
