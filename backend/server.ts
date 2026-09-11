@@ -12463,16 +12463,29 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
 
     // 3. Assets: Employee Loans (Piutang Karyawan)
     const activeLoans = await prisma.loan.findMany({
-      where: { companyId: tenantId, status: 'ACTIVE' }
+      where: { companyId: tenantId, status: 'ACTIVE' },
+      include: { user: { select: { name: true } } }
     });
     const totalLoans = activeLoans.reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
+    const loanDetails = activeLoans.map(l => ({
+        id: l.id,
+        name: l.user?.name || 'Karyawan',
+        amount: l.remainingAmount,
+        notes: l.description || '-'
+    }));
 
     // 3b. Assets: Customer Receivables (Piutang Usaha)
-    const unpaidSales: any[] = await prisma.$queryRawUnsafe(`
-      SELECT "totalAmount", "paidAmount" FROM "Sale"
-      WHERE "companyId" = $1 AND "status" NOT IN ('PAID', 'CANCELLED', 'RETURNED', 'VOID')
-    `, tenantId);
+    const unpaidSales = await prisma.sale.findMany({
+      where: { companyId: tenantId, status: { notIn: ['PAID', 'CANCELLED', 'RETURNED', 'VOID'] } },
+      select: { invoiceNumber: true, customerName: true, totalAmount: true, paidAmount: true }
+    });
     const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
+    const customerReceivableDetails = unpaidSales.map(s => ({
+        id: s.invoiceNumber,
+        name: s.customerName || 'Pelanggan Umum',
+        amount: Number(s.totalAmount) - Number(s.paidAmount || 0),
+        notes: `Inv: ${s.invoiceNumber}`
+    }));
 
     // 3c. Assets: Stock / Inventory Value (Persediaan Barang)
     const products = await prisma.product.findMany({
@@ -12488,8 +12501,16 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       where: { companyId: tenantId, category: { name: '[SYSTEM] Pelunasan Piutang Cabang' } }
     });
     const totalPiutangCabang = piutangExpenses.reduce((sum, e) => sum + e.amount, 0) - piutangIncomes.reduce((sum, i) => sum + i.amount, 0);
+    
+    // Simplistic detail for Piutang Cabang (just listing the origin expenses)
+    const piutangCabangDetails = piutangExpenses.map(e => ({
+        id: e.id,
+        name: e.paidTo || 'Cabang Lain',
+        amount: e.amount,
+        notes: e.description || '-'
+    }));
 
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue + totalPiutangCabang;
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalPiutangCabang + totalInventoryValue;
 
     // 4. Liabilities: Pending Expenses (Hutang Usaha) & Tax Liability (PPN Keluaran)
     const pendingExpenses = await prisma.expense.findMany({
@@ -12646,7 +12667,10 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         totalPiutangCabang: totalPiutangCabang,
         accounts,
         fixedAssets: assetsWithBookValue,
-        loans: activeLoans
+        loans: activeLoans,
+        loanDetails,
+        customerReceivableDetails,
+        piutangCabangDetails
       },
       liabilities: { 
         total: totalLiabilities, 

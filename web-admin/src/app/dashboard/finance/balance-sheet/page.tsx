@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Landmark, Wallet, ShieldCheck, Scale, FileText, Download, Printer, AlertCircle, Info, Building, HandCoins, Package, Save, Clock, Calendar, ArchiveRestore } from "lucide-react";
+import { Landmark, Wallet, ShieldCheck, Scale, FileText, Download, Printer, AlertCircle, Info, Building, HandCoins, Package, Save, Clock, Calendar, ArchiveRestore, ChevronDown, ChevronUp } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 
@@ -15,6 +15,11 @@ export default function BalanceSheetPage() {
     const [saving, setSaving] = useState(false);
     const [selectedSavedReport, setSelectedSavedReport] = useState<any>(null);
     const [userRole, setUserRole] = useState<string>('USER');
+    const [expandedPiutang, setExpandedPiutang] = useState<Record<string, boolean>>({});
+
+    const togglePiutang = (key: string) => {
+        setExpandedPiutang(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const fetchSavedReports = async () => {
         setLoadingSaved(true);
@@ -334,31 +339,82 @@ export default function BalanceSheetPage() {
                                         <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {(Number(displayData?.assets.totalLoans || 0) + Number(displayData?.assets.totalCustomerReceivables || 0) + Number(displayData?.assets.totalPiutangCabang || 0)).toLocaleString()}</td>
                                     </tr>
                                     {(displayData?.assets.totalCustomerReceivables || 0) > 0 && (
-                                        <tr className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
-                                                <Building className="h-3 w-3 text-blue-500" />
-                                                Piutang Usaha (Outstanding)
-                                            </td>
-                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalCustomerReceivables.toLocaleString()}</td>
-                                        </tr>
+                                        <>
+                                            <tr 
+                                                onClick={() => togglePiutang('customerReceivables')}
+                                                className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                            >
+                                                <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <Building className="h-3 w-3 text-blue-500" />
+                                                        Piutang Usaha (Outstanding)
+                                                    </div>
+                                                    {expandedPiutang['customerReceivables'] ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                                </td>
+                                                <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalCustomerReceivables.toLocaleString()}</td>
+                                            </tr>
+                                            {expandedPiutang['customerReceivables'] && displayData?.assets.customerReceivableDetails?.map((item: any, idx: number) => (
+                                                <tr key={`cr-${idx}`} className="bg-slate-50/50">
+                                                    <td className="pl-16 pr-6 py-2 text-xs text-slate-600 flex flex-col">
+                                                        <span className="font-semibold text-slate-800">{item.name}</span>
+                                                        <span className="italic text-slate-500">{item.notes}</span>
+                                                    </td>
+                                                    <td className="px-6 py-2 text-right text-xs font-semibold text-slate-700">Rp {item.amount.toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </>
                                     )}
                                     {(displayData?.assets.totalLoans || 0) > 0 && (
-                                        <tr className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
-                                                <HandCoins className="h-3 w-3 text-amber-500" />
-                                                Pinjaman Karyawan (Aktif)
-                                            </td>
-                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalLoans.toLocaleString()}</td>
-                                        </tr>
+                                        <>
+                                            <tr 
+                                                onClick={() => togglePiutang('loans')}
+                                                className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                            >
+                                                <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <HandCoins className="h-3 w-3 text-amber-500" />
+                                                        Pinjaman Karyawan (Aktif)
+                                                    </div>
+                                                    {expandedPiutang['loans'] ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                                </td>
+                                                <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalLoans.toLocaleString()}</td>
+                                            </tr>
+                                            {expandedPiutang['loans'] && displayData?.assets.loanDetails?.map((item: any, idx: number) => (
+                                                <tr key={`loan-${idx}`} className="bg-slate-50/50">
+                                                    <td className="pl-16 pr-6 py-2 text-xs text-slate-600 flex flex-col">
+                                                        <span className="font-semibold text-slate-800">{item.name}</span>
+                                                        <span className="italic text-slate-500">{item.notes}</span>
+                                                    </td>
+                                                    <td className="px-6 py-2 text-right text-xs font-semibold text-slate-700">Rp {item.amount.toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </>
                                     )}
                                     {(displayData?.assets.totalPiutangCabang || 0) !== 0 && (
-                                        <tr className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center gap-2">
-                                                <Building className="h-3 w-3 text-amber-500" />
-                                                Piutang Antar Cabang
-                                            </td>
-                                            <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalPiutangCabang.toLocaleString()}</td>
-                                        </tr>
+                                        <>
+                                            <tr 
+                                                onClick={() => togglePiutang('piutangCabang')}
+                                                className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                            >
+                                                <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <Building className="h-3 w-3 text-amber-500" />
+                                                        Piutang Antar Cabang
+                                                    </div>
+                                                    {expandedPiutang['piutangCabang'] ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                                </td>
+                                                <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {displayData?.assets.totalPiutangCabang.toLocaleString()}</td>
+                                            </tr>
+                                            {expandedPiutang['piutangCabang'] && displayData?.assets.piutangCabangDetails?.map((item: any, idx: number) => (
+                                                <tr key={`pc-${idx}`} className="bg-slate-50/50">
+                                                    <td className="pl-16 pr-6 py-2 text-xs text-slate-600 flex flex-col">
+                                                        <span className="font-semibold text-slate-800">{item.name}</span>
+                                                        <span className="italic text-slate-500">{item.notes}</span>
+                                                    </td>
+                                                    <td className="px-6 py-2 text-right text-xs font-semibold text-slate-700">Rp {item.amount.toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </>
                                     )}
                                     {!((displayData?.assets.totalCustomerReceivables || 0) > 0 || (displayData?.assets.totalLoans || 0) > 0 || (displayData?.assets.totalPiutangCabang || 0) !== 0) && (
                                         <tr>
