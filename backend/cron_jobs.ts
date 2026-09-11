@@ -9,10 +9,16 @@ const prisma = new PrismaClient();
  * Deletes photos older than X days based on GlobalSetting 'photo_retention_days'
  */
 export const initCleanupCron = () => {
-    // Run every day at 02:00 AM
+    // Run every day at 02:00 AM for photo cleanup
     cron.schedule('0 2 * * *', async () => {
         console.log('[CRON] Starting Photo Retention Cleanup...');
         await runCleanup();
+    });
+
+    // Run every 1st of the month at 00:00 AM for Asset Depreciation
+    cron.schedule('0 0 1 * *', async () => {
+        console.log('[CRON] Starting Asset Depreciation...');
+        await runAssetDepreciation();
     });
 };
 
@@ -81,6 +87,84 @@ export const runCleanup = async () => {
         console.log('[CRON] Per-company cleanup finished successfully.');
     } catch (error) {
         console.error('[CRON] Cleanup Error:', error);
+    }
+};
+
+export const runAssetDepreciation = async () => {
+    try {
+        console.log('[CRON] Starting Asset Depreciation calculation...');
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1; // 1-12
+
+        const assets = await prisma.asset.findMany({
+            where: { isDepreciating: true }
+        });
+
+        for (const asset of assets) {
+            if (asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
+                const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
+                
+                let monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
+                if (monthsPassed >= 0) monthsPassed += 1; // Termasuk bulan pertama
+
+                const residualValue = Number(asset.residualValue || 0);
+                const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - residualValue) / Number(asset.usefulLife)) * 100) / 100;
+                
+                // Cek apakah belum lewat umur ekonomis
+                if (monthsPassed <= asset.usefulLife) {
+                    const currentAccumulated = Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - residualValue);
+                    const bookValue = Number(asset.purchasePrice) - currentAccumulated;
+
+                    // Update asset static columns
+                    await prisma.asset.update({
+                        where: { id: asset.id },
+                        data: {
+                            accumulatedDepreciation: currentAccumulated,
+                            bookValue: bookValue
+                        }
+                    });
+
+                    // Cek apakah jurnal penyusutan bulan ini sudah ada
+                    const catName = `Penyusutan Kategori: ${asset.category || 'Lainnya'}`;
+                    const description = `Beban penyusutan otomatis ${asset.name} (Bulan ${monthsPassed} dari ${asset.usefulLife})`;
+                    
+                    const existingExpense = await prisma.expense.findFirst({
+                        where: {
+                            companyId: asset.companyId,
+                            description: description,
+                            // Ensure same month/year to avoid duplicates if cron runs multiple times
+                        }
+                    });
+
+                    if (!existingExpense) {
+                        // Cari atau buat kategori pengeluaran
+                        let category: any = await prisma.expenseCategory.findFirst({ where: { companyId: asset.companyId, name: catName } });
+                        if (!category) {
+                            category = await prisma.expenseCategory.create({
+                                data: { companyId: asset.companyId, name: catName, type: 'OPERATIONAL', updatedAt: new Date() }
+                            });
+                        }
+
+                        // Jurnal Pengeluaran (Expense) berstatus PAID secara sistem
+                        await prisma.expense.create({
+                            data: {
+                                companyId: asset.companyId,
+                                categoryId: category.id,
+                                amount: monthlyDepreciation,
+                                date: new Date(),
+                                description: description,
+                                paidTo: 'Sistem (Penyusutan Aset)',
+                                status: 'PAID'
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        console.log('[CRON] Asset Depreciation finished successfully.');
+    } catch (error) {
+        console.error('[CRON] Asset Depreciation Error:', error);
     }
 };
 

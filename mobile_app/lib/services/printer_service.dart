@@ -177,14 +177,22 @@ class PrinterService {
   }
 
   Future<void> _sendToWifiPrinter(String ip, List<int> bytes) async {
-    try {
-      final socket = await Socket.connect(ip, 9100, timeout: Duration(seconds: 5));
-      socket.add(bytes);
-      await socket.flush();
-      await socket.close();
-    } catch (e) {
-      print('Wifi print failed: $e');
-      throw e;
+    int maxRetries = 3;
+    for (int i = 0; i < maxRetries; i++) {
+      try {
+        final socket = await Socket.connect(ip, 9100, timeout: Duration(seconds: i == 0 ? 3 : 5));
+        socket.add(bytes);
+        await socket.flush();
+        await socket.close();
+        return; // Berhasil, keluar dari loop
+      } catch (e) {
+        print('Wifi print attempt ${i + 1} failed: $e');
+        if (i == maxRetries - 1) {
+          throw e; // Lempar error jika ini adalah percobaan terakhir
+        }
+        // Tunggu sejenak sebelum mencoba lagi (berguna jika printer sedang sibuk)
+        await Future.delayed(Duration(milliseconds: 800));
+      }
     }
   }
 

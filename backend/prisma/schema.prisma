@@ -204,6 +204,7 @@ model Expense {
   accountId   Int?
   categoryId  Int
   amount      Float
+  taxAmount   Float?            @default(0)
   paidAmount  Float             @default(0)
   date        DateTime          @default(now())
   paidAt      DateTime?
@@ -568,6 +569,8 @@ model Asset {
   residualValue  Float?    @default(0)
   usefulLife     Int?      @default(0)
   isDepreciating Boolean?  @default(false)
+  accumulatedDepreciation Float? @default(0)
+  bookValue      Float?    @default(0)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   imageUrl       String?
@@ -911,6 +914,7 @@ model Sale {
   date                  DateTime     @default(now()) @db.Timestamp(6)
   dueDate               DateTime?    @db.Timestamp(6)
   totalAmount           Float        @default(0)
+  totalCogs             Float        @default(0)
   paidAmount            Float        @default(0)
   status                String       @default("PAID")
   saleType              String       @default("WALK_IN")
@@ -1145,6 +1149,7 @@ model PurchaseOrder {
   orderNumber  String              @unique
   date         DateTime            @default(now())
   totalAmount  Float               @default(0)
+  taxAmount    Float?              @default(0)
   status       POStatus            @default(PENDING)
   notes        String?
   createdAt    DateTime            @default(now())

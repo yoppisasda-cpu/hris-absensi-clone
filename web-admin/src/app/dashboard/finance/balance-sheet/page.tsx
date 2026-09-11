@@ -510,8 +510,12 @@ export default function BalanceSheetPage() {
                                         <td></td>
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Modal Disetor & Laba Ditahan</td>
+                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Modal Disetor</td>
                                         <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {((displayData?.equity.modalDisetor || 0) + (displayData?.equity.totalPrive || 0)).toLocaleString()}</td>
+                                    </tr>
+                                    <tr className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Laba Ditahan (Tahun Sebelumnya)</td>
+                                        <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {(displayData?.equity.labaDitahanTahunLalu || 0).toLocaleString()}</td>
                                     </tr>
                                     {(displayData?.equity.totalPrive || 0) > 0 && (
                                         <tr className="hover:bg-slate-50 transition-colors">
@@ -520,7 +524,7 @@ export default function BalanceSheetPage() {
                                         </tr>
                                     )}
                                     <tr className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Akun Penahan (Selisih Belum Teridentifikasi)</td>
+                                        <td className="px-10 py-3 text-sm font-semibold text-slate-600 italic">Akun Penahan (Selisih / Koreksi)</td>
                                         <td className="px-6 py-3 text-right text-sm font-bold text-orange-600">Rp {(displayData?.equity.akunPenahan || 0).toLocaleString()}</td>
                                     </tr>
                                     <tr className="hover:bg-slate-50 transition-colors">

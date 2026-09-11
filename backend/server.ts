@@ -3236,7 +3236,7 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
   try {
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
-    const { supplierId, date, items, notes, warehouseId, customerId } = req.body;
+    const { supplierId, date, items, notes, warehouseId, customerId, taxAmount } = req.body;
     let finalCustomerId = customerId ? parseInt(customerId) : null;
 
     // --- SECURITY & SYNC FIX ---
@@ -3261,10 +3261,10 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
     // Using Raw SQL for Create to handle warehouseId without regenerating Prisma Client
     const poResult: any[] = await prisma.$queryRawUnsafe(`
       INSERT INTO "PurchaseOrder" 
-      ("companyId", "supplierId", "orderNumber", "date", "totalAmount", "status", "notes", "createdById", "updatedAt", "warehouseId")
-      VALUES ($1, $2, $3, $4, $5, 'PENDING', $6, $7, NOW(), $8)
+      ("companyId", "supplierId", "orderNumber", "date", "totalAmount", "taxAmount", "status", "notes", "createdById", "updatedAt", "warehouseId")
+      VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7, $8, NOW(), $9)
       RETURNING id
-    `, tenantId, parseInt(supplierId), orderNumber, date ? new Date(date) : new Date(), totalAmount, notes, userId, warehouseId ? parseInt(warehouseId) : null);
+    `, tenantId, parseInt(supplierId), orderNumber, date ? new Date(date) : new Date(), totalAmount, taxAmount ? parseFloat(taxAmount) : 0, notes, userId, warehouseId ? parseInt(warehouseId) : null);
 
     if (!poResult || poResult.length === 0) throw new Error("Gagal membuat data PO utama.");
     const poId = poResult[0].id;
@@ -11213,7 +11213,7 @@ app.get('/api/finance/expense', tenantMiddleware, async (req: Request, res: Resp
 // F5.2. Record Expense
 app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { accountId, categoryId, branchId, amount, date, description, paidTo, status, dueDate, productId, quantity, paidAt } = req.body;
+    const { accountId, categoryId, branchId, amount, taxAmount, date, description, paidTo, status, dueDate, productId, quantity, paidAt } = req.body;
     const tenantId = Number((req as any).tenantId);
 
     // --- CHECK CLOSING ---
@@ -11270,9 +11270,9 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
       const paidAtVal = (status !== 'PENDING') ? (paidAt ? new Date(paidAt) : dateVal) : null;
       
       const insertRes = await tx.$queryRawUnsafe<any[]>(
-        `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "paidAt", "dueDate", "status", "description", "paidTo", "branchId", "updatedAt")
-         VALUES ($1::INTEGER, $2::INTEGER, $3::INTEGER, $4::INTEGER, $5::INTEGER, $6, $7, $8, $9, $10, $11::"ExpenseStatus", $12, $13, $14::INTEGER, NOW())
-         RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "date", "paidAt", "dueDate", "status", "description", "paidTo", "branchId"`,
+        `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "taxAmount", "date", "paidAt", "dueDate", "status", "description", "paidTo", "branchId", "updatedAt")
+         VALUES ($1::INTEGER, $2::INTEGER, $3::INTEGER, $4::INTEGER, $5::INTEGER, $6, $7, $8, $9, $10, $11, $12::"ExpenseStatus", $13, $14, $15::INTEGER, NOW())
+         RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "taxAmount", "date", "paidAt", "dueDate", "status", "description", "paidTo", "branchId"`,
         tenantId, 
         accountId ? Number(accountId) : null,
         finalCategoryId,
@@ -11280,6 +11280,7 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
         prodIdNum,
         qtyNum,
         parseFloat(amount),
+        taxAmount ? parseFloat(taxAmount) : 0,
         dateVal,
         paidAtVal,
         dueDateVal,
@@ -11777,24 +11778,25 @@ app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, re
 async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Date, branchId?: number): Promise<number> {
   const branchFilter = branchId ? `AND "branchId" = ${branchId}` : ``;
   const sales: any[] = await prisma.$queryRawUnsafe(`
-    SELECT id FROM "Sale" 
+    SELECT SUM("totalCogs") as "total" FROM "Sale" 
     WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
     AND "status" NOT IN ('CANCELLED', 'PENDING', 'RETURNED', 'VOID')
     ${branchFilter}
   `, tenantId, startDate, endDate);
 
-  if (sales.length === 0) return 0;
-  const saleIds = sales.map(s => s.id);
+  return sales[0]?.total ? Number(sales[0].total) : 0;
+}
 
-  const saleItems: any[] = await prisma.$queryRawUnsafe(`
+// Helper to calculate COGS for a single sale
+async function calculateSingleSaleCOGS(tenantId: number, saleId: number, txClient: any = prisma): Promise<number> {
+  const saleItems: any[] = await txClient.$queryRawUnsafe(`
     SELECT "productId", "quantity", "modifiers" FROM "SaleItem" 
-    WHERE "saleId" IN (${saleIds.join(',')})
-  `);
+    WHERE "saleId" = $1
+  `, saleId);
 
   if (saleItems.length === 0) return 0;
 
-  // We need to fetch ALL products and recipes for this tenant to correctly resolve recursive recipes
-  const allProducts = await prisma.product.findMany({
+  const allProducts = await txClient.product.findMany({
     where: { companyId: tenantId },
     include: {
       Recipes: {
@@ -11805,37 +11807,44 @@ async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Da
 
   const getProductCost = (product: any, visited = new Set<number>()): number => {
     if (!product || visited.has(product.id)) return 0;
-    visited.add(product.id);
-
-    if (product.Recipes && product.Recipes.length > 0) {
-      const totalBatchCost = product.Recipes.reduce((sum: number, r: any) => {
-        const material = allProducts.find(m => m.id === r.materialId);
-        // Fallback to raw Material costPrice if not found in current products
-        const materialUnitCost = material ? getProductCost(material, new Set(visited)) : (r.Material?.costPrice || 0);
-        return sum + (Number(r.quantity || 0) * Number(materialUnitCost || 0));
-      }, 0);
-      return totalBatchCost / (product.recipeYield || 1);
+    
+    if (!product.isAutoDeduct || !product.Recipes || product.Recipes.length === 0) {
+      return Number(product.costPrice) || 0;
     }
-    return product.costPrice || 0;
+
+    visited.add(product.id);
+    let totalRecipeCost = 0;
+    const yieldFactor = Number(product.recipeYield) || 1;
+
+    for (const recipe of product.Recipes) {
+      const mat = recipe.Material;
+      if (mat) {
+        const matCost = getProductCost(mat, visited);
+        totalRecipeCost += (Number(recipe.quantity) * matCost);
+      }
+    }
+    visited.delete(product.id);
+    
+    return yieldFactor > 0 ? totalRecipeCost / yieldFactor : totalRecipeCost;
   };
 
   const productCostCache = new Map<number, number>();
-  
+
   let calculatedCogsFromSales = 0;
+
   for (const item of saleItems) {
-    const prodId = item.productId;
-    const qty = Number(item.quantity) || 0;
+    const prodId = Number(item.productId);
+    const qty = Number(item.quantity);
     
     let unitCogs = productCostCache.get(prodId);
     if (unitCogs === undefined) {
-      const product = allProducts.find(p => p.id === prodId);
+      const product = allProducts.find((p: any) => p.id === prodId);
       unitCogs = product ? getProductCost(product) : 0;
       productCostCache.set(prodId, unitCogs);
     }
 
     calculatedCogsFromSales += qty * unitCogs;
-    
-    // Add modifier COGS
+
     if (item.modifiers) {
        const mods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
        Object.values(mods).forEach((val: any) => {
@@ -11845,7 +11854,7 @@ async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Da
              
              let modUnitCogs = productCostCache.get(linkedProdId);
              if (modUnitCogs === undefined) {
-                 const modProduct = allProducts.find(p => p.id === linkedProdId);
+                 const modProduct = allProducts.find((p: any) => p.id === linkedProdId);
                  modUnitCogs = modProduct ? getProductCost(modProduct) : 0;
                  productCostCache.set(linkedProdId, modUnitCogs);
              }
@@ -11857,6 +11866,75 @@ async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Da
   }
 
   return calculatedCogsFromSales;
+}
+
+// Helper function to calculate Retained Earnings (Laba Ditahan) from all previous years
+async function calculatePreviousYearsRetainedEarnings(tenantId: number, startOfYear: Date): Promise<number> {
+  const endDate = new Date(startOfYear.getTime() - 1);
+  if (endDate.getFullYear() < 2000) return 0; // sanity check
+
+  // 1. Sales Revenue
+  const prevSales = await prisma.sale.findMany({
+    where: { companyId: tenantId, date: { lt: startOfYear }, status: { notIn: ['CANCELLED', 'PENDING'] } }
+  });
+  let prevRevenue = 0;
+  prevSales.forEach((sale: any) => {
+    let amount = sale.totalAmount;
+    if (sale.taxRate && sale.taxRate > 0) {
+      if (sale.taxAmount && sale.taxAmount > 0) amount -= sale.taxAmount;
+      else amount -= (amount * (sale.taxRate / (100 + sale.taxRate)));
+    }
+    prevRevenue += amount;
+  });
+
+  // 2. Incomes
+  const prevIncomes = await prisma.income.findMany({
+    where: { companyId: tenantId, date: { lt: startOfYear } },
+    include: { category: true }
+  });
+  prevIncomes.forEach((inc: any) => {
+    const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
+    const isEquity = inc.category?.type === 'EQUITY';
+    const isSystem = inc.category?.name?.startsWith('[SYSTEM]');
+    if (!isSales && !isEquity && !isSystem) prevRevenue += inc.amount;
+  });
+
+  // 3. Expenses
+  const prevExpenses = await prisma.expense.findMany({
+    where: { companyId: tenantId, date: { lt: startOfYear } },
+    include: { category: true }
+  });
+  let prevExpense = 0;
+  prevExpenses.forEach((exp: any) => {
+    const isCapex = exp.category?.type === 'CAPEX';
+    const isInventory = exp.category?.type === 'INVENTORY';
+    const isSystem = exp.category?.name?.startsWith('[SYSTEM]');
+    if (!isCapex && !isInventory && !isSystem) prevExpense += exp.amount;
+  });
+
+  // 4. COGS
+  const prevCogs = await calculateSalesCOGS(tenantId, new Date(0), endDate);
+
+  // 5. Depreciation
+  const physicalAssets = await prisma.asset.findMany({ where: { companyId: tenantId } });
+  let prevAssetDepreciation = 0;
+  physicalAssets.forEach((asset: any) => {
+    if (asset.isDepreciating && asset.purchasePrice && Number(asset.purchasePrice) > 0 && asset.usefulLife && Number(asset.usefulLife) > 0) {
+      const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
+      if (purchaseDate < startOfYear) {
+        let monthsBeforeThisYear = (startOfYear.getFullYear() - purchaseDate.getFullYear()) * 12 + (startOfYear.getMonth() - purchaseDate.getMonth());
+        if (monthsBeforeThisYear >= 0) monthsBeforeThisYear += 1;
+        if (monthsBeforeThisYear > Number(asset.usefulLife)) monthsBeforeThisYear = Number(asset.usefulLife);
+        
+        if (monthsBeforeThisYear > 0) {
+          const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+          prevAssetDepreciation += Math.max(0, Math.min(monthsBeforeThisYear * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
+        }
+      }
+    }
+  });
+
+  return Math.round((prevRevenue - (prevExpense + prevCogs + prevAssetDepreciation)) * 100) / 100;
 }
 
 // F6.1. Profit & Loss Report
@@ -11992,28 +12070,8 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
     const grossProfit = totalSalesRevenue - totalCOGS;
 
-    // 4b. Calculate Asset Depreciations/Amortizations for this month (such as Prepaid Rent / Sewa Kantor)
-    const assets = await prisma.asset.findMany({
-      where: {
-        companyId: tenantId,
-        isDepreciating: true
-      }
-    });
-
-    assets.forEach(asset => {
-      if (asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
-        const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
-        // Calculate months between purchaseDate and the target P&L month/year
-        const monthsFromPurchase = (year - purchaseDate.getFullYear()) * 12 + (month - 1 - purchaseDate.getMonth());
-        
-        if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
-          const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-          const depName = `Penyusutan Kategori: ${asset.category || 'Lainnya'}`;
-          depreciationByCategory[depName] = (depreciationByCategory[depName] || 0) + monthlyDepreciation;
-          totalDepreciation += monthlyDepreciation;
-        }
-      }
-    });
+    // 4b. Asset Depreciations/Amortizations are now automatically handled by the monthly Cron Job 
+    // which inserts them as regular Expense records with 'Penyusutan' in the category name.
 
     const operatingProfit = grossProfit - totalOpexGeneral;
 
@@ -12395,18 +12453,9 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     let totalFixedAssetsGross = 0;
     let totalAccumulatedDepreciation = 0;
     const assetsWithBookValue = physicalAssets.map(asset => {
-        let bookValue = Number(asset.purchasePrice || 0);
-        let accumulatedDepreciation = 0;
-        totalFixedAssetsGross += bookValue;
-        if (asset.isDepreciating && Number(asset.purchasePrice) > 0 && Number(asset.usefulLife) > 0) {
-            const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
-            const now = new Date();
-            let monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
-            if (monthsPassed >= 0) monthsPassed += 1; // Count purchase month as 1 full month
-            const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-            accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
-            bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
-        }
+        let bookValue = Number(asset.bookValue || asset.purchasePrice || 0);
+        let accumulatedDepreciation = Number(asset.accumulatedDepreciation || 0);
+        totalFixedAssetsGross += Number(asset.purchasePrice || 0);
         totalAccumulatedDepreciation += accumulatedDepreciation;
         totalFixedAssets += bookValue;
         return { ...asset, bookValue, accumulatedDepreciation };
@@ -12577,7 +12626,12 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0) - totalPrive;
 
     const calculatedModalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
-    const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical) * 100) / 100;
+    
+    // 5c. Calculate Laba Ditahan (Retained Earnings from Previous Years)
+    const labaDitahanTahunLalu = await calculatePreviousYearsRetainedEarnings(tenantId, startOfYear);
+    
+    // Akun Penahan (Selisih Pembukuan) = Calculated Modal - Modal Disetor - Laba Ditahan Tahun Lalu
+    const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical - labaDitahanTahunLalu) * 100) / 100;
 
     res.json({
       assets: {
@@ -12606,6 +12660,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         total: totalEquity,
         modalDisetor: modalDisetorHistorical,
         totalPrive: totalPrive,
+        labaDitahanTahunLalu,
         akunPenahan,
         labaBerjalan: ytdNetProfit
       }
@@ -12802,7 +12857,8 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0) - totalPrive;
 
     const calculatedModalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
-    const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical) * 100) / 100;
+    const labaDitahanTahunLalu = await calculatePreviousYearsRetainedEarnings(tenantId, startOfYear);
+    const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical - labaDitahanTahunLalu) * 100) / 100;
 
     // --- CREATE EXCEL ---
     const workbook = new ExcelJS.Workbook();
@@ -12903,13 +12959,15 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     worksheet.getCell(`A${currentRow}`).value = 'EKUITAS (MODAL)';
     worksheet.getCell(`A${currentRow}`).font = { bold: true };
     currentRow++;
-    worksheet.addRow(['Modal Disetor (Paid-in Capital) & Laba Ditahan', '', modalDisetorHistorical + totalPrive]);
+    worksheet.addRow(['Modal Disetor', '', modalDisetorHistorical]);
+    currentRow++;
+    worksheet.addRow(['Laba Ditahan (Tahun Sebelumnya)', '', labaDitahanTahunLalu]);
     currentRow++;
     if (totalPrive > 0) {
       worksheet.addRow(['Prive (Penarikan Pribadi)', '', -totalPrive]);
       currentRow++;
     }
-    worksheet.addRow(['Akun Penahan (Selisih Belum Teridentifikasi)', '', akunPenahan]);
+    worksheet.addRow(['Akun Penahan (Selisih/Koreksi)', '', akunPenahan]);
     currentRow++;
     worksheet.addRow(['Laba Tahun Berjalan (YTD Net Profit)', '', ytdNetProfit]);
     currentRow++;
@@ -14589,6 +14647,72 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
           where: { id: parseInt(accountId) },
           data: { balance: { decrement: totalCost } }
         });
+      }
+
+      // 6. Auto Jurnal Selisih Stok (Waste / Surplus) for 'ADJUST' type
+      if (type === 'ADJUST' && product.costPrice > 0) {
+        const stockDiff = quantity - product.stock;
+        if (stockDiff !== 0) {
+          const amount = Math.abs(stockDiff * product.costPrice);
+          const description = `Koreksi stok: ${product.name} dari ${product.stock} menjadi ${quantity}`;
+
+          if (stockDiff < 0) {
+            // Waste -> Expense
+            const catName = 'Penyusutan / Koreksi Stok (Waste)';
+            let category: any = await tx.expenseCategory.findFirst({ where: { companyId: tenantId, name: catName } });
+            if (!category) {
+              category = await tx.expenseCategory.create({
+                data: { companyId: tenantId, name: catName, type: 'OPERATIONAL', updatedAt: new Date() }
+              });
+            }
+            await tx.expense.create({
+              data: {
+                companyId: tenantId,
+                categoryId: category.id,
+                amount: amount,
+                date: transactionDate,
+                description: description,
+                paidTo: 'Sistem (Stock Opname)',
+                status: 'PAID', // It's a non-cash expense but recognized as paid to reduce profit
+                productId: productId
+              }
+            });
+          } else {
+            // Surplus -> Income
+            const catName = 'Surplus Stok / Koreksi Plus';
+            let category: any = await tx.incomeCategory.findFirst({ where: { companyId: tenantId, name: catName } });
+            if (!category) {
+              category = await tx.incomeCategory.create({
+                data: { companyId: tenantId, name: catName, type: 'OPERATIONAL', updatedAt: new Date() }
+              });
+            }
+            
+            // For income, we need an account. We can find a default account or use a system-generated one.
+            // But Income requires accountId in schema. Let's find any account or create a "Kas Selisih" account.
+            let account = await tx.financialAccount.findFirst({ where: { companyId: tenantId, name: 'Kas Selisih (Sistem)' } });
+            if (!account) {
+              // try to find any account if Kas Selisih doesn't exist yet to avoid failing
+              account = await tx.financialAccount.findFirst({ where: { companyId: tenantId } });
+              if (!account) {
+                 account = await tx.financialAccount.create({
+                    data: { companyId: tenantId, name: 'Kas Selisih (Sistem)', type: 'CASH', balance: 0 }
+                 });
+              }
+            }
+
+            await tx.income.create({
+              data: {
+                companyId: tenantId,
+                accountId: account.id,
+                categoryId: category.id,
+                amount: amount,
+                date: transactionDate,
+                description: description,
+                receivedFrom: 'Sistem (Stock Opname)'
+              }
+            });
+          }
+        }
       }
 
       return newStock;
