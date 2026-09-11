@@ -472,7 +472,7 @@ export default function PurchaseOrdersPage() {
                                             </div>
                                         </td>
                                         <td className="px-8 py-6 text-right">
-                                            <div className="flex items-center justify-end gap-3 translate-x-4 group-hover:translate-x-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                            <div className="flex items-center justify-end gap-3 translate-x-0 lg:translate-x-4 lg:group-hover:translate-x-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-300">
                                                 {po.status === 'PENDING' && isPurchasingOrAdmin ? (
                                                     <div className="flex items-center gap-3">
                                                         <button 
