@@ -14614,7 +14614,13 @@ app.post('/api/inventory/products/upload', tenantMiddleware, uploadProduct.singl
     // Delete the original uncompressed file uploaded by multer
     fs.unlinkSync(req.file.path);
 
-    const imageUrl = `/uploads/products/${filename}`;
+    let imageUrl = `/uploads/products/${filename}`;
+    try {
+      imageUrl = await uploadToSupabase(outputPath, 'products');
+    } catch (uploadError) {
+      console.error('Failed to upload product image to Supabase:', uploadError);
+    }
+
     res.json({ imageUrl });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengunggah gambar: ' + error.message });
