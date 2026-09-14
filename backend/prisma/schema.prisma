@@ -276,6 +276,7 @@ model User {
   basicSalary             Float                     @default(0)
   shiftId                 Int?
   allowance               Float                     @default(0)
+  salesTarget             Float                     @default(0)
   branchId                Int?
   division                String?
   emailNotifications      Boolean                   @default(true)
@@ -322,7 +323,8 @@ model User {
   poApprovedBy            PurchaseOrder[]           @relation("POApprovedBy")
   poCreatedBy             PurchaseOrder[]           @relation("POCreatedBy")
   reimbursements          Reimbursement[]
-  sales                   Sale[]
+  salesAsCashier          Sale[]                    @relation("SaleCashier")
+  salesAsSalesperson      Sale[]                    @relation("SaleSalesperson")
   shiftSchedules          ShiftSchedule[]
   branch                  Branch?                   @relation(fields: [branchId], references: [id])
   company                 Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -942,7 +944,9 @@ model Sale {
   kitchenStatus         String       @default("PENDING")
   preparedAt            DateTime?
   branch                Branch?      @relation(fields: [branchId], references: [id])
-  cashier               User?        @relation(fields: [cashierId], references: [id])
+  cashier               User?        @relation("SaleCashier", fields: [cashierId], references: [id])
+  salespersonId         Int?
+  salesperson           User?        @relation("SaleSalesperson", fields: [salespersonId], references: [id])
   SaleItem              SaleItem[]
   SaleReturn            SaleReturn[]
 

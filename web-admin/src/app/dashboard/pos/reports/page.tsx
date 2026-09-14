@@ -9,7 +9,7 @@ import {
     Search, Monitor, Download, Eye, Printer, 
     Building2, Calendar, Filter, CreditCard, 
     TrendingUp, ShoppingCart, ArrowUpRight, ArrowDownRight,
-    Trophy, Sparkles, Receipt, BrainCircuit, Trash2
+    Trophy, Sparkles, Receipt, BrainCircuit, Trash2, Users
 } from "lucide-react";
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -47,8 +47,9 @@ export default function POSReportsPage() {
     const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [isRestricted, setIsRestricted] = useState(false);
-    const [activeTab, setActiveTab] = useState<'sales' | 'shifts' | 'pre_orders'>('sales');
+    const [activeTab, setActiveTab] = useState<'sales' | 'shifts' | 'pre_orders' | 'performance'>('sales');
     const [shiftClosings, setShiftClosings] = useState<any[]>([]);
+    const [salespersonsPerformance, setSalespersonsPerformance] = useState<any[]>([]);
 
     useEffect(() => {
         const role = localStorage.getItem('userRole');
@@ -107,6 +108,18 @@ export default function POSReportsPage() {
                 }
             });
             setComprehensive(compRes.data);
+
+            // Fetch Salespersons Performance
+            const perfRes = await api.get('/pos/analytics/salespersons', {
+                params: { 
+                    branchId: selectedBranchId,
+                    startDate,
+                    endDate,
+                    paymentMethod: paymentFilter,
+                    saleType: saleTypeFilter
+                }
+            });
+            setSalespersonsPerformance(perfRes.data);
 
             // Fetch Shift Closings
             const closingsRes = await api.get('/pos/closings', {
@@ -578,6 +591,13 @@ export default function POSReportsPage() {
                     Pre-Order
                     {activeTab === 'pre_orders' && <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-t-full" />}
                 </button>
+                <button 
+                    onClick={() => setActiveTab('performance')}
+                    className={`pb-4 px-2 text-sm font-bold transition-all relative ${activeTab === 'performance' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    Performa Karyawan
+                    {activeTab === 'performance' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full" />}
+                </button>
             </div>
 
             {activeTab === 'pre_orders' && (
@@ -704,9 +724,10 @@ export default function POSReportsPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-black text-emerald-500 font-mono tracking-tighter text-sm">{sale.invoiceNumber}</div>
-                                            <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mt-0.5">
-                                                ID: #{sale.id} 
+                                            <div className="text-[10px] text-slate-400 font-medium flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                                                <span>ID: #{sale.id}</span>
                                                 {sale.customerName && <span className="text-slate-600">• {sale.customerName}</span>}
+                                                {sale.salespersonName && <span className="text-blue-500 font-bold">• 🤵 {sale.salespersonName}</span>}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -843,6 +864,86 @@ export default function POSReportsPage() {
                             )}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {/* PERFORMANCE TAB */}
+            {activeTab === 'performance' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
+                    <h2 className="text-lg font-black text-white flex items-center mb-6">
+                        <TrendingUp className="mr-3 text-blue-500 h-6 w-6" /> Performa Karyawan (Salesperson)
+                    </h2>
+                    
+                    {salespersonsPerformance.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                            <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                            <p className="text-lg">Belum ada data performa karyawan pada periode ini.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {salespersonsPerformance.map((perf, index) => {
+                                const target = perf.salesTarget || 0;
+                                const achieved = perf.achieved || 0;
+                                const percentage = target > 0 ? Math.min((achieved / target) * 100, 100) : 100;
+                                
+                                return (
+                                    <div key={index} className="bg-slate-950 border border-slate-800 rounded-2xl p-6 relative overflow-hidden group hover:border-blue-500/50 transition-all">
+                                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-all">
+                                            <Trophy className={`h-24 w-24 ${achieved >= target && target > 0 ? 'text-yellow-500' : 'text-slate-500'}`} />
+                                        </div>
+                                        
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                                                    <span className="text-xl font-black text-blue-400">{perf.name.charAt(0)}</span>
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-white text-lg">{perf.name}</h3>
+                                                    <p className="text-xs text-slate-400 uppercase tracking-widest">{perf.jobTitle || 'Salesperson'}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-end">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Pencapaian</p>
+                                                        <p className="text-xl font-black text-emerald-400">Rp {achieved.toLocaleString('id-ID')}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Target</p>
+                                                        <p className="text-sm font-bold text-slate-300">Rp {target.toLocaleString('id-ID')}</p>
+                                                    </div>
+                                                </div>
+
+                                                {target > 0 ? (
+                                                    <div>
+                                                        <div className="flex justify-between text-xs font-bold mb-2">
+                                                            <span className={percentage >= 100 ? 'text-emerald-400' : 'text-blue-400'}>
+                                                                {percentage.toFixed(1)}% Tercapai
+                                                            </span>
+                                                            <span className="text-slate-500">
+                                                                Sisa: Rp {Math.max(target - achieved, 0).toLocaleString('id-ID')}
+                                                            </span>
+                                                        </div>
+                                                        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+                                                            <div 
+                                                                className={`h-full rounded-full transition-all duration-1000 ${percentage >= 100 ? 'bg-gradient-to-r from-emerald-500 to-green-400' : 'bg-gradient-to-r from-blue-600 to-blue-400'}`} 
+                                                                style={{ width: `${percentage}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-4 p-3 bg-slate-900/50 rounded-xl border border-dashed border-slate-700 text-center">
+                                                        <p className="text-xs text-slate-400">Belum ada target yang diatur untuk karyawan ini.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 

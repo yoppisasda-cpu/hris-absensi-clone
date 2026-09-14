@@ -149,6 +149,12 @@ export default function KitchenDisplay() {
                                                     </li>
                                                 ))}
                                             </ul>
+                                            {order.notes && (
+                                                <div className="mt-4 pt-3 border-t border-white/10 text-amber-400 font-semibold bg-amber-500/10 p-2 rounded flex items-start gap-2">
+                                                    <span className="mt-0.5">📝</span>
+                                                    <span>{order.notes}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="p-4 border-t border-white/10 mt-auto">
                                             <button 
@@ -187,6 +193,9 @@ export default function KitchenDisplay() {
                                         <div>
                                             <h3 className="font-bold text-xl text-white">{order.label}</h3>
                                             <p className="text-sm text-emerald-400/80 mt-1">Selesai: {formatTime(order.preparedAt)}</p>
+                                            {order.notes && (
+                                                <p className="text-sm font-semibold text-amber-400 mt-1 bg-amber-500/10 px-2 py-0.5 rounded inline-block">📝 {order.notes}</p>
+                                            )}
                                         </div>
                                     </div>
                                     <button 

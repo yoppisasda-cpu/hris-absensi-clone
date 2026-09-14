@@ -454,7 +454,6 @@ class PrinterService {
         
         bytes += generator.text('($i/$qty) - $time', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
         bytes += generator.text('--------------------------------', styles: PosStyles(align: PosAlign.center));
-        bytes += generator.feed(1);
         bytes += generator.cut();
       }
     }

@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import fs from 'fs';
+import sharp from 'sharp';
 import { uploadToSupabase } from './supabase_storage';
 import { spawn } from 'child_process';
 import zlib from 'zlib';
@@ -4362,7 +4363,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
       basicSalary, allowance, overtimeRate, jobTitle, division, 
       grade, joinDate, contractEndDate, reportToId,
       bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance,
-      taxStatus, isTaxable, isAttendanceExempt
+      taxStatus, isTaxable, isAttendanceExempt, salesTarget
     } = req.body;
 
     const requestorRole = (req as any).userRole;
@@ -4449,6 +4450,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
     const parsedShiftId = shiftId ? parseInt(shiftId, 10) : null;
     const salary = typeof basicSalary === 'number' ? basicSalary : parseFloat(basicSalary || '0');
     const allow = typeof allowance === 'number' ? allowance : parseFloat(allowance || '0');
+    const sTarget = typeof salesTarget === 'number' ? salesTarget : parseFloat(salesTarget || '0');
     const overTime = typeof overtimeRate === 'number' ? overtimeRate : parseFloat(overtimeRate || '0');
 
     // Validasi Date
@@ -4469,6 +4471,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
         shiftId: isNaN(parsedShiftId as number) ? null : parsedShiftId,
         basicSalary: isNaN(salary) ? 0 : salary,
         allowance: isNaN(allow) ? 0 : allow,
+        salesTarget: isNaN(sTarget) ? 0 : sTarget,
         overtimeRate: isNaN(overTime) ? 0 : overTime,
         jobTitle: jobTitle || null,
         division: division || null,
@@ -4522,7 +4525,7 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
       jobTitle, division, grade, joinDate, contractEndDate, 
       reportToId, branchId, isActive, resignDate,
       bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance,
-      taxStatus, isTaxable, isAttendanceExempt
+      taxStatus, isTaxable, isAttendanceExempt, salesTarget
     } = req.body;
 
     // 3. Proteksi Role SUPERADMIN
@@ -4573,6 +4576,7 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
         role,
         basicSalary: basicSalary ? parseFloat(basicSalary.toString()) : undefined,
         allowance: allowance ? parseFloat(allowance.toString()) : undefined,
+        salesTarget: salesTarget !== undefined ? parseFloat(salesTarget.toString()) : undefined,
         overtimeRate: overtimeRate ? parseFloat(overtimeRate.toString()) : undefined,
         jobTitle: jobTitle || null,
         division: division || null,
@@ -12053,8 +12057,12 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
         const isNonOp = /admin bank|biaya bank|bunga bank|biaya lain|jasa manajemen|non-operasional|lain-lain/i.test(catName);
         
         if (isDep) {
-          depreciationByCategory[catName] = (depreciationByCategory[catName] || 0) + exp.amount;
-          totalDepreciation += exp.amount;
+          // Only add to P&L if it's a manual entry. System cron job entries are ignored here
+          // because we will calculate depreciation dynamically below to ensure real-time accuracy.
+          if (exp.paidTo !== 'Sistem (Penyusutan Aset)') {
+            depreciationByCategory[catName] = (depreciationByCategory[catName] || 0) + exp.amount;
+            totalDepreciation += exp.amount;
+          }
         } else if (isNonOp) {
           nonOpExpensesByCategory[catName] = (nonOpExpensesByCategory[catName] || 0) + exp.amount;
           totalNonOpExpenses += exp.amount;
@@ -12070,9 +12078,28 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     const totalCOGS = calculatedCogsFromSales + manualCOGS;
     const grossProfit = totalSalesRevenue - totalCOGS;
 
-    // 4b. Asset Depreciations/Amortizations are now automatically handled by the monthly Cron Job 
-    // which inserts them as regular Expense records with 'Penyusutan' in the category name.
+    // 4b. Asset Depreciations/Amortizations
+    // Dynamically calculate for current month (ignoring the cron job to provide real-time data)
+    const assets = await prisma.asset.findMany({
+      where: {
+        companyId: tenantId,
+        isDepreciating: true
+      }
+    });
 
+    assets.forEach(asset => {
+      if (asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
+        const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
+        const monthsFromPurchase = (year - purchaseDate.getFullYear()) * 12 + (month - 1 - purchaseDate.getMonth());
+        
+        if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
+          const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+          const depName = `Penyusutan Kategori: ${asset.category || 'Lainnya'}`;
+          depreciationByCategory[depName] = (depreciationByCategory[depName] || 0) + monthlyDepreciation;
+          totalDepreciation += monthlyDepreciation;
+        }
+      }
+    });
     const operatingProfit = grossProfit - totalOpexGeneral;
 
     // Combine other incomes and other expenses into Non-Operational details
@@ -12242,8 +12269,12 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
         const isNonOp = /admin bank|biaya bank|bunga bank|biaya lain|jasa manajemen|non-operasional|lain-lain/i.test(catName);
         
         if (isDep) {
-          depreciationByCategory[catName] = (depreciationByCategory[catName] || 0) + exp.amount;
-          totalDepreciation += exp.amount;
+          // Only add to P&L if it's a manual entry. System cron job entries are ignored here
+          // because we will calculate depreciation dynamically below to ensure real-time accuracy.
+          if (exp.paidTo !== 'Sistem (Penyusutan Aset)') {
+            depreciationByCategory[catName] = (depreciationByCategory[catName] || 0) + exp.amount;
+            totalDepreciation += exp.amount;
+          }
         } else if (isNonOp) {
           nonOpExpensesByCategory[catName] = (nonOpExpensesByCategory[catName] || 0) + exp.amount;
           totalNonOpExpenses += exp.amount;
@@ -14567,7 +14598,23 @@ app.post('/api/inventory/products/upload', tenantMiddleware, uploadProduct.singl
     if (!req.file) {
       return res.status(400).json({ error: 'Tidak ada file yang diunggah' });
     }
-    const imageUrl = `/uploads/products/${req.file.filename}`;
+
+    const filename = `${req.file.filename}.webp`;
+    const outputPath = path.join(process.cwd(), 'uploads/products', filename);
+
+    // Compress & crop (1:1) to max 800x800 webp
+    await sharp(req.file.path)
+      .resize(800, 800, {
+        fit: sharp.fit.cover,
+        position: sharp.strategy.entropy
+      })
+      .webp({ quality: 80 }) // High compression with good quality
+      .toFile(outputPath);
+
+    // Delete the original uncompressed file uploaded by multer
+    fs.unlinkSync(req.file.path);
+
+    const imageUrl = `/uploads/products/${filename}`;
     res.json({ imageUrl });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengunggah gambar: ' + error.message });
@@ -15802,7 +15849,7 @@ app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Res
 app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { items, accountId, customerId, status, notes, date, dueDate, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod, taxRate, taxAmount, memberDiscountAmount, poNumber } = req.body;
+    const { items, accountId, customerId, status, notes, date, dueDate, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod, taxRate, taxAmount, memberDiscountAmount, poNumber, salespersonId } = req.body;
     const userId = Number((req as any).userId);
     let finalCustomerId = customerId ? parseInt(customerId) : null;
     const dueDateVal = (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') ? new Date(dueDate) : null;
@@ -15925,13 +15972,14 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
       // 3. Create Sale Record (Merged with GitHub's new fields)
       const saleResult: any[] = await tx.$queryRawUnsafe(`
-        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "invoiceNumber", "customerId", "date", "dueDate", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod", "taxRate", "taxAmount", "memberDiscountAmount", "poNumber")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "salespersonId", "invoiceNumber", "customerId", "date", "dueDate", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod", "taxRate", "taxAmount", "memberDiscountAmount", "poNumber")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
         RETURNING id
       `, 
       tenantId, 
       branchId ? parseInt(branchId) : null, 
       userId, 
+      salespersonId ? parseInt(salespersonId) : null,
       invoiceNumber, 
       finalCustomerId, 
       dateVal, 
@@ -16510,10 +16558,12 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
       SELECT s.*, 
              COALESCE(c.name, s."customerName") as "customerName", 
              fa.name as "accountName",
+             u.name as "salespersonName",
              (s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "netTotalAmount"
       FROM "Sale" s
       LEFT JOIN "Customer" c ON s."customerId" = c.id
       LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+      LEFT JOIN "User" u ON s."salespersonId" = u.id
       LEFT JOIN (
         SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
         FROM "SaleReturn"
@@ -16526,6 +16576,37 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
     res.json(sales);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil data penjualan: ' + error.message });
+  }
+});
+
+app.get('/api/pos/analytics/salespersons', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
+
+    const filterRes = await buildPosWhereClause(req, tenantId, req.query);
+
+    const performance = await prisma.$queryRawUnsafe(`
+      SELECT 
+        u.id, u.name, u."jobTitle", u."salesTarget",
+        COALESCE(SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)), 0) as "achieved"
+      FROM "User" u
+      JOIN "Sale" s ON s."salespersonId" = u.id
+      LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
+      LEFT JOIN (
+        SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
+        FROM "SaleReturn"
+        GROUP BY "saleId"
+      ) sr ON sr."saleId" = s.id
+      WHERE ${filterRes.whereClause}
+      GROUP BY u.id, u.name, u."jobTitle", u."salesTarget"
+      ORDER BY "achieved" DESC
+    `, ...filterRes.queryParams);
+
+    res.json(performance);
+  } catch (error: any) {
+    console.error('Error fetching salespersons analytics:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -17784,7 +17865,11 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       taxAmount = 0,
       pendingBillId = null,
       date,
+      salespersonId,
     } = req.body;
+
+    console.log("[DEBUG /api/pos/checkout] salespersonId received:", salespersonId);
+    console.log("[DEBUG /api/pos/checkout] Full body:", req.body);
 
     const result = await prisma.$transaction(async (tx) => {
       // 0. Calculate Queue Number & Handle Pending Bill
@@ -17907,6 +17992,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           companyId: tenantId,
           branchId: user?.branchId || null,
           cashierId: userId,
+          salespersonId: salespersonId ? parseInt(salespersonId) : null,
           date: saleDate,
           customerId: finalCustomerId,
           customerName: customerName || null,

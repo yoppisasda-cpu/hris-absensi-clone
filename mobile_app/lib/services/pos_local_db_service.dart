@@ -5,6 +5,7 @@ class PosLocalDbService {
   static const String _categoriesBoxName = 'pos_categories_box';
   static const String _accountsBoxName = 'pos_accounts_box';
   static const String _offlineSalesBoxName = 'offline_sales_box';
+  static const String _usersBoxName = 'pos_users_box';
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -14,6 +15,7 @@ class PosLocalDbService {
     await Hive.openBox(_categoriesBoxName);
     await Hive.openBox(_accountsBoxName);
     await Hive.openBox(_offlineSalesBoxName);
+    await Hive.openBox(_usersBoxName);
   }
 
   // --- PRODUCTS ---
@@ -49,6 +51,17 @@ class PosLocalDbService {
     await box.put('accounts', accountsJson);
   }
 
+  // --- USERS / SALESPERSONS ---
+  static List<dynamic> getCachedUsers() {
+    final box = Hive.box(_usersBoxName);
+    return box.get('users', defaultValue: []) as List<dynamic>;
+  }
+
+  static Future<void> cacheUsers(List<dynamic> usersJson) async {
+    final box = Hive.box(_usersBoxName);
+    await box.put('users', usersJson);
+  }
+
   // --- OFFLINE SALES ---
   static List<dynamic> getOfflineSales() {
     final box = Hive.box(_offlineSalesBoxName);
@@ -80,5 +93,6 @@ class PosLocalDbService {
     await Hive.box(_categoriesBoxName).clear();
     await Hive.box(_accountsBoxName).clear();
     await Hive.box(_offlineSalesBoxName).clear();
+    await Hive.box(_usersBoxName).clear();
   }
 }

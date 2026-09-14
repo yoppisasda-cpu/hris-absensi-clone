@@ -24,6 +24,8 @@ class _POSScreenState extends State<POSScreen> {
   List<dynamic> _products = [];
   List<dynamic> _categories = [];
   List<dynamic> _accounts = [];
+  List<dynamic> _salespersons = [];
+  int? _selectedSalespersonId;
   List<Map<String, dynamic>> _cart = [];
   bool _isLoading = true;
   bool _isWaiterMode = false;
@@ -102,12 +104,14 @@ class _POSScreenState extends State<POSScreen> {
       final cachedProducts = PosLocalDbService.getCachedProducts();
       final cachedCategories = PosLocalDbService.getCachedCategories();
       final cachedAccounts = PosLocalDbService.getCachedAccounts();
+      final cachedUsers = PosLocalDbService.getCachedUsers();
 
-      if (cachedProducts.isNotEmpty || cachedCategories.isNotEmpty || cachedAccounts.isNotEmpty) {
+      if (cachedProducts.isNotEmpty || cachedCategories.isNotEmpty || cachedAccounts.isNotEmpty || cachedUsers.isNotEmpty) {
         setState(() {
           _products = cachedProducts;
           _categories = cachedCategories;
           _accounts = cachedAccounts;
+          _salespersons = cachedUsers;
           if (_accounts.isNotEmpty) {
              _selectedPaymentMethod = 'Tunai';
              final cashAcc = _accounts.firstWhere(
@@ -129,11 +133,13 @@ class _POSScreenState extends State<POSScreen> {
         _apiService.getPosProducts(),
         _apiService.getPosCategories(),
         _apiService.getFinancialAccounts(),
+        _apiService.getUsers(),
       ]);
 
       final prods = results[0];
       final cats = results[1];
       final accs = results[2];
+      final users = results[3];
 
       // Update cache
       if (prods.isNotEmpty) {
@@ -145,11 +151,15 @@ class _POSScreenState extends State<POSScreen> {
       if (accs.isNotEmpty) {
         await PosLocalDbService.cacheAccounts(accs);
       }
+      if (users.isNotEmpty) {
+        await PosLocalDbService.cacheUsers(users);
+      }
 
       setState(() {
         _products = prods;
         _categories = cats;
         _accounts = accs;
+        _salespersons = users;
         if (_accounts.isNotEmpty) {
            _selectedPaymentMethod = 'Tunai';
            final cashAcc = _accounts.firstWhere(
@@ -710,6 +720,36 @@ class _POSScreenState extends State<POSScreen> {
                   ),
                 ),
                 SizedBox(height: 16),
+                Text('Pilih Karyawan / Salesperson', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
+                SizedBox(height: 10),
+                DropdownButtonFormField<int?>(
+                  decoration: InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                  ),
+                  value: _selectedSalespersonId,
+                  hint: Text('-- Tidak Ada / Default Kasir --', style: TextStyle(fontSize: 14)),
+                  items: [
+                    DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('-- Tidak Ada / Default Kasir --', style: TextStyle(fontSize: 14)),
+                    ),
+                    ..._salespersons.map((sp) {
+                      return DropdownMenuItem<int?>(
+                        value: sp['id'],
+                        child: Text('${sp['name']} ${sp['jobTitle'] != null ? "(${sp['jobTitle']})" : ""}', style: TextStyle(fontSize: 14)),
+                      );
+                    }).toList(),
+                  ],
+                  onChanged: (val) {
+                    setPanelState(() {
+                      _selectedSalespersonId = val;
+                    });
+                    setState(() {});
+                  },
+                ),
+                SizedBox(height: 16),
                 Text('Nomor HP Pelanggan (Opsional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
                 SizedBox(height: 10),
                 TextField(
@@ -1212,8 +1252,12 @@ class _POSScreenState extends State<POSScreen> {
         taxRate: _globalTaxRate,
         taxAmount: _taxAmount,
         pendingBillId: _activePendingBillId,
+        salespersonId: _selectedSalespersonId,
       );
 
+      print("=== [DEBUG] CHECKOUT SUCCESS ===");
+      print("Salesperson ID used: $_selectedSalespersonId");
+      
       if (_activePendingBillId != null) {
         try {
           await _apiService.deletePendingPosBill(_activePendingBillId!);
@@ -1418,6 +1462,7 @@ class _POSScreenState extends State<POSScreen> {
           'taxAmount': _taxAmount,
           'paymentMethod': _selectedPaymentMethod,
           'date': DateTime.now().toIso8601String(),
+          'salespersonId': _selectedSalespersonId,
           'isSynced': false,
         };
 
@@ -2117,6 +2162,19 @@ class _POSScreenState extends State<POSScreen> {
                                     style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w500)),
                                 ],
                               ),
+                              if (order['notes'] != null && order['notes'].toString().isNotEmpty) ...[
+                                SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(Icons.notes, size: 16, color: Colors.blue),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text('Catatan: ${order['notes']}', 
+                                        style: TextStyle(color: Colors.blue[800], fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              ],
                               SizedBox(height: 16),
                               Row(
                                 children: [

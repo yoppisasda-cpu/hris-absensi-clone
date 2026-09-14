@@ -32,6 +32,13 @@ class _CartScreenState extends State<CartScreen> {
   String _orderType = "Pesanan Langsung";
   List<Voucher> _claimedVouchers = [];
   bool _loadingVouchers = false;
+  final TextEditingController _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -139,6 +146,8 @@ class _CartScreenState extends State<CartScreen> {
                       ],
                       _buildSectionTitle("Metode Pengambilan"),
                       _buildDeliveryOptions(brandingProvider, primaryColor),
+                      SizedBox(height: 15),
+                      _buildNotesField(primaryColor),
                       SizedBox(height: 25),
                       _buildPointsRedemption(cartProvider, primaryColor),
                       SizedBox(height: 25),
@@ -348,6 +357,27 @@ class _CartScreenState extends State<CartScreen> {
   }
 
 
+
+  Widget _buildNotesField(Color primaryColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: TextField(
+        controller: _notesController,
+        style: TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          icon: Icon(Icons.note_alt_outlined, color: primaryColor, size: 20),
+          hintText: _deliveryMethod == "Dine-in" ? "Cth: Nomor Meja (Meja 12)" : "Cth: Alamat lengkap / Titip di pos satpam",
+          hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+        ),
+      ),
+    );
+  }
 
   Widget _buildOptionChip(String label, IconData icon, Color primaryColor) {
     bool isSelected = _deliveryMethod == label;
@@ -587,6 +617,7 @@ class _CartScreenState extends State<CartScreen> {
       voucherId: cartProvider.selectedVoucher?.id, 
       deliveryMethod: _deliveryMethod,
       paymentMethod: _paymentMethod,
+      notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       pointsUsed: cartProvider.isUsingPoints ? cartProvider.availablePoints : 0,
       saleType: finalOrderType == "Pre-Order" ? "PRE_ORDER" : "ONLINE",
     );

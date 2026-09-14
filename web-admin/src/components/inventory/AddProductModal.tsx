@@ -345,6 +345,20 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         const file = e.target.files[0];
         if (!file) return;
 
+        // Validasi Ukuran (Maks 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error("Ukuran foto maksimal 2 MB");
+            e.target.value = "";
+            return;
+        }
+
+        // Validasi Format (Hanya Gambar)
+        if (!file.type.startsWith('image/')) {
+            toast.error("Format file harus berupa gambar (JPG/PNG)");
+            e.target.value = "";
+            return;
+        }
+
         setUploading(true);
         const formData = new FormData();
         formData.append('image', file);
@@ -476,7 +490,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                 <div className="h-40 w-40 rounded-[2.5rem] bg-slate-900 border-2 border-dashed border-slate-800 flex items-center justify-center overflow-hidden transition-all group-hover:border-indigo-500/50 shadow-2xl">
                                     {formData.imageUrl ? (
                                         <img 
-                                            src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${formData.imageUrl}`} 
+                                            src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5005').replace('/api', '')}${formData.imageUrl}`} 
                                             alt="Product" 
                                             className="h-full w-full object-cover"
                                         />
@@ -511,7 +525,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     </button>
                                 )}
                             </div>
-                            <p className="mt-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic">Visual Identification Asset</p>
+                            <p className="mt-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic">Rasio 1:1, Maks 2MB (JPG/PNG)</p>
                         </div>
                     )}
 

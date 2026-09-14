@@ -76,18 +76,22 @@ export default function POSPage() {
     const [scannedQRToken, setScannedQRToken] = useState("");
     const [showScanModal, setShowScanModal] = useState(false);
     const [scanLoading, setScanLoading] = useState(false);
+    const [salespersons, setSalespersons] = useState<any[]>([]);
+    const [selectedSalesperson, setSelectedSalesperson] = useState<string>("");
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [prodRes, catRes, accRes] = await Promise.all([
+            const [prodRes, catRes, accRes, usersRes] = await Promise.all([
                 api.get('/pos/products'),
                 api.get('/pos/categories'),
-                api.get('/finance/accounts')
+                api.get('/finance/accounts'),
+                api.get('/users')
             ]);
             setProducts(prodRes.data);
             setCategories(catRes.data);
             setAccounts(accRes.data);
+            setSalespersons(usersRes.data);
             
             // Force manual selection to prevent accidental usage of default account
             setSelectedAccount(null);
@@ -224,7 +228,8 @@ export default function POSPage() {
                 customerName,
                 customerPhone,
                 voucherCode,
-                memberDiscountAmount: discountAmount
+                memberDiscountAmount: discountAmount,
+                salespersonId: selectedSalesperson || null
             };
 
             const res = await api.post('/pos/checkout', payload);
@@ -550,6 +555,21 @@ export default function POSPage() {
                                             Terapkan
                                         </button>
                                     </div>
+                                </div>
+
+                                {/* SALESPERSON */}
+                                <div className="space-y-3 pt-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pilih Karyawan / Salesperson</label>
+                                    <select
+                                        value={selectedSalesperson}
+                                        onChange={(e) => setSelectedSalesperson(e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all"
+                                    >
+                                        <option value="">-- Tidak Ada / Default Kasir --</option>
+                                        {salespersons.map(sp => (
+                                            <option key={sp.id} value={sp.id}>{sp.name} {sp.jobTitle ? `(${sp.jobTitle})` : ''}</option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 {/* METODE PEMBAYARAN */}

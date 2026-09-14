@@ -171,6 +171,7 @@ export default function SalesPage() {
                                     <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Tanggal</th>
                                     <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">No. Invoice</th>
                                     <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Pelanggan</th>
+                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Salesperson</th>
                                     <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Status</th>
                                     <th className="px-6 py-4 text-right font-bold text-slate-500 uppercase tracking-wider text-[10px]">Total</th>
                                     <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">Aksi</th>
@@ -179,7 +180,7 @@ export default function SalesPage() {
                             <tbody className="divide-y divide-slate-100">
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, i) => (
-                                        <tr key={i} className="animate-pulse"><td colSpan={5} className="px-6 py-6"><div className="h-4 w-full rounded bg-slate-100"></div></td></tr>
+                                        <tr key={i} className="animate-pulse"><td colSpan={6} className="px-6 py-6"><div className="h-4 w-full rounded bg-slate-100"></div></td></tr>
                                     ))
                                 ) : filteredSales.length > 0 ? (
                                     filteredSales.map((sale) => (
@@ -193,6 +194,16 @@ export default function SalesPage() {
                                             </td>
                                             <td className="px-6 py-4 font-bold text-slate-700">
                                                 {sale.customerName || 'Umum'}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-600">
+                                                {sale.salespersonName ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-[10px]">
+                                                            {sale.salespersonName.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <span className="text-sm font-medium">{sale.salespersonName}</span>
+                                                    </div>
+                                                ) : '-'}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-tighter ${
@@ -248,7 +259,7 @@ export default function SalesPage() {
                                         </tr>
                                     ))
                                 ) : (
-                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">Belum ada transaksi penjualan.</td></tr>
+                                    <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">Belum ada transaksi penjualan.</td></tr>
                                 )}
                             </tbody>
                         </table>

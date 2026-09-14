@@ -26,6 +26,7 @@ interface User {
     role: string;
     basicSalary: number;
     allowance: number;
+    salesTarget?: number;
     jobTitle?: string;
     division?: string;
     grade?: string;
@@ -60,7 +61,7 @@ export default function EmployeesPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [formData, setFormData] = useState({
         id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
-        basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
+        basicSalary: 0, allowance: 0, salesTarget: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
         contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
         taxStatus: 'TK-0', isTaxable: true, isAttendanceExempt: false
     });
@@ -139,7 +140,7 @@ export default function EmployeesPage() {
             setIsModalOpen(false);
             setFormData({
                 id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
-                basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
+                basicSalary: 0, allowance: 0, salesTarget: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
                 contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
                 taxStatus: 'TK-0', isTaxable: true, isAttendanceExempt: false
             });
@@ -194,6 +195,7 @@ export default function EmployeesPage() {
             branchId: user.branch?.id?.toString() || '',
             basicSalary: user.basicSalary || 0,
             allowance: user.allowance || 0,
+            salesTarget: user.salesTarget || 0,
             overtimeRate: user.overtimeRate || 0,
             jobTitle: user.jobTitle || '',
             division: user.division || '',
@@ -298,7 +300,7 @@ export default function EmployeesPage() {
                             setIsEditMode(false);
                             setFormData({
                                 id: 0, name: '', email: '', password: '', role: 'EMPLOYEE', companyId: '', branchId: '',
-                                basicSalary: 0, allowance: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
+                                basicSalary: 0, allowance: 0, salesTarget: 0, mealAllowance: 0, overtimeRate: 0, jobTitle: '', division: '', grade: '', joinDate: '',
                                 contractEndDate: '', bpjsKesehatan: false, bpjsKetenagakerjaan: false, reportToId: '',
                                 taxStatus: 'TK-0', isTaxable: true, isAttendanceExempt: false
                             });
@@ -726,6 +728,13 @@ export default function EmployeesPage() {
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-400">Rp</span>
                                             <input type="number" value={formData.allowance || ''} onChange={e => setFormData({ ...formData, allowance: parseFloat(e.target.value) || 0 })} className="w-full bg-white border border-slate-300 rounded-xl py-3 pl-12 pr-4 text-sm text-slate-950 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="0" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2 italic">Target Penjualan Kasir</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-emerald-400">Rp</span>
+                                            <input type="number" value={formData.salesTarget || ''} onChange={e => setFormData({ ...formData, salesTarget: parseFloat(e.target.value) || 0 })} className="w-full bg-white border border-emerald-300 rounded-xl py-3 pl-12 pr-4 text-sm text-slate-950 focus:ring-1 focus:ring-emerald-500 outline-none transition-all" placeholder="0" />
                                         </div>
                                     </div>
                                     <div>

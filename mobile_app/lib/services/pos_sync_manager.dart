@@ -45,6 +45,7 @@ class PosSyncManager {
           memberDiscountAmount: ((sale['memberDiscountAmount'] ?? 0) as num).toDouble(),
           voucherCode: sale['voucherCode'],
           voucherDiscountAmount: ((sale['voucherDiscountAmount'] ?? 0) as num).toDouble(),
+          salespersonId: sale['salespersonId'],
           pointsUsed: ((sale['pointsUsed'] ?? 0) as num).toDouble(),
           pointsEarned: ((sale['pointsEarned'] ?? 0) as num).toDouble(),
           offlineInvoiceNumber: sale['localInvoiceNumber'],

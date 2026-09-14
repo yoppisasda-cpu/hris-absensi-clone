@@ -11,7 +11,8 @@ class ApiService {
   // PENTING: Jika menggunakan HP asli (Debug), ganti IP di bawah jika tidak menggunakan emulator
   static const String baseUrl = 'https://api.aivola.id/api'; // POINT TO PRODUCTION BACKEND
   // static const String baseUrl = 'http://127.0.0.1:5005/api'; // LOCAL BACKEND FOR IOS EMULATOR
-  // static const String baseUrl = 'http://192.168.1.166:5005/api'; // LOCAL BACKEND FOR PHYSICAL DEVICE (SAME WIFI)
+  // static const String baseUrl = 'http://192.168.1.187:5005/api'; // LOCAL BACKEND FOR PHYSICAL DEVICE (SAME WIFI)
+  
   final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
     connectTimeout: Duration(milliseconds: 60000),
@@ -641,6 +642,18 @@ class ApiService {
     }
   }
 
+  Future<List<dynamic>> getUsers() async {
+    try {
+      final response = await _dio.get('/users');
+      return response.data as List<dynamic>;
+    } on DioException catch (e) {
+      final errMsg = e.response?.data['error'] ?? e.message ?? e.toString();
+      throw Exception('Gagal mengambil data users: $errMsg');
+    } catch (e) {
+      throw Exception('Gagal mengambil data users: $e');
+    }
+  }
+
   // Ambil daftar kategori produk untuk POS
   Future<List<dynamic>> getPosCategories() async {
     try {
@@ -729,6 +742,7 @@ class ApiService {
     double taxAmount = 0,
     int? pendingBillId,
     String? date,
+    int? salespersonId,
   }) async {
     try {
       final response = await _dio.post('/pos/checkout', data: {
@@ -752,6 +766,7 @@ class ApiService {
         'taxRate': taxRate,
         'taxAmount': taxAmount,
         'pendingBillId': pendingBillId,
+        'salespersonId': salespersonId,
       });
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
