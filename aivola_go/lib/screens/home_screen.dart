@@ -354,11 +354,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: product.imageUrl != null 
                   ? ClipRRect(
                       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                      child: CachedNetworkImage(
-                        imageUrl: product.imageUrl!,
+                      child: Image.network(
+                        product.imageUrl!,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Center(child: CircularProgressIndicator(strokeWidth: 2, color: primaryColor.withOpacity(0.3))),
-                        errorWidget: (context, url, error) => Icon(Icons.broken_image_outlined, color: Colors.white10),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(child: CircularProgressIndicator(strokeWidth: 2, color: primaryColor.withOpacity(0.3)));
+                        },
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.broken_image_outlined, color: Colors.white10),
                       ),
                     ) 
                   : Center(child: Icon(Icons.coffee, size: 30, color: primaryColor.withOpacity(0.3))),
