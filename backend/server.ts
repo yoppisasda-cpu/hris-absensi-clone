@@ -1952,28 +1952,136 @@ app.post('/api/customer/send-otp', async (req: Request, res: Response) => {
   }
 });
 
+// --- FORGOT PASSWORD ---
+app.post('/api/customer/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email diperlukan' });
+
+    // Cek apakah customer ada
+    const customer = await prisma.customer.findFirst({
+      where: { email }
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: 'Email tidak terdaftar' });
+    }
+
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 menit
+
+    // Simpan token ke db
+    await prisma.passwordResetToken.create({
+      data: {
+        email,
+        token: otp,
+        expiresAt
+      }
+    });
+
+    // Mengirim email menggunakan Nodemailer
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 465,
+      secure: true, // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: `"Aivola GO" <${process.env.SMTP_USER || 'admin@aivola.id'}>`,
+      to: email,
+      subject: 'Kode OTP Reset Password - Aivola GO',
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
+          <h2>Reset Password Anda</h2>
+          <p>Halo,</p>
+          <p>Kami menerima permintaan untuk mereset password akun Aivola GO Anda.</p>
+          <p>Berikut adalah 6 digit kode OTP Anda:</p>
+          <h1 style="letter-spacing: 5px; color: #3B82F6;">${otp}</h1>
+          <p>Kode ini hanya berlaku selama 15 menit. Jika Anda tidak meminta reset password, abaikan email ini.</p>
+          <br/>
+          <p>Salam hangat,<br/>Tim Aivola GO</p>
+        </div>
+      `,
+    };
+
+    // Jika SMTP_USER belum disetel di .env, kita tetap print ke console sebagai fallback (simulasi)
+    if (!process.env.SMTP_USER) {
+      console.log(`\n\n=============================================`);
+      console.log(`[SIMULASI EMAIL] LUPA PASSWORD`);
+      console.log(`Kepada: ${email}`);
+      console.log(`Kode OTP Anda adalah: ${otp}`);
+      console.log(`=============================================\n\n`);
+      console.log(`(Info: Tambahkan SMTP_USER dkk di file .env untuk mengirim email asli)`);
+    } else {
+      await transporter.sendMail(mailOptions);
+    }
+
+    res.json({ message: 'Kode OTP telah dikirim ke email Anda', otp_for_dev: process.env.SMTP_USER ? undefined : otp });
+  } catch (error: any) {
+    console.error('[Forgot Password Error]', error);
+    res.status(500).json({ error: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// --- RESET PASSWORD ---
+app.post('/api/customer/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Data tidak lengkap' });
+    }
+
+    // Cari token yang valid
+    const resetToken = await prisma.passwordResetToken.findFirst({
+      where: {
+        email,
+        token: otp,
+        expiresAt: { gt: new Date() }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!resetToken) {
+      return res.status(400).json({ error: 'Kode OTP tidak valid atau sudah kedaluwarsa' });
+    }
+
+    // Hash password baru
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password customer
+    await prisma.customer.updateMany({
+      where: { email },
+      data: { password: hashedPassword }
+    });
+
+    // Hapus token yang sudah dipakai
+    await prisma.passwordResetToken.deleteMany({
+      where: { email }
+    });
+
+    res.json({ message: 'Password berhasil diubah. Silakan login kembali.' });
+  } catch (error: any) {
+    console.error('[Reset Password Error]', error);
+    res.status(500).json({ error: 'Terjadi kesalahan pada server' });
+  }
+});
+
 // 2. Register Customer with OTP verification
 app.post('/api/customer/register', async (req: Request, res: Response) => {
   try {
-    const { name, email, phone, password, otp } = req.body;
+    const { name, email, phone, password } = req.body;
 
-    if (!name || !email || !phone || !password || !otp) {
-      return res.status(400).json({ error: 'Semua field wajib diisi.' });
+    if (!name || !email || !phone || !password) {
+      return res.status(400).json({ error: 'Semua field wajib diisi (Nama, Email, No HP, Password).' });
     }
 
-    // Validasi OTP
-    const stored = customerOtpStore.get(phone.trim());
-    if (!stored) return res.status(400).json({ error: 'OTP tidak ditemukan. Kirim ulang OTP.' });
-    if (new Date() > stored.expiry) {
-      customerOtpStore.delete(phone.trim());
-      return res.status(400).json({ error: 'OTP sudah kadaluarsa. Kirim ulang OTP.' });
-    }
-    if (stored.otp !== otp.trim()) {
-      return res.status(400).json({ error: 'Kode OTP salah.' });
-    }
-
-    // Hapus OTP setelah dipakai
-    customerOtpStore.delete(phone.trim());
 
     // Cek duplikasi email di Customer
     const existingByEmail = await prisma.customer.findFirst({ where: { email: email.trim() } });
@@ -15891,6 +15999,16 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat mencatat penjualan pada tanggal ini.' });
     }
 
+    if (!finalCustomerId) {
+      let guest = await prisma.customer.findFirst({ where: { companyId: tenantId, email: 'guest@aivola.local' } });
+      if (!guest) {
+        guest = await prisma.customer.create({
+          data: { companyId: tenantId, name: 'Guest', email: 'guest@aivola.local', phone: '00000000000' }
+        });
+      }
+      finalCustomerId = guest.id;
+    }
+
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Minimal harus ada 1 barang' });
     }
@@ -18254,8 +18372,10 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             }
         }
 
-        // Execute all stock and item operations in parallel
-        await Promise.all(operations);
+        // Execute all stock and item operations sequentially to prevent connection pool exhaustion and Prisma transaction deadlocks
+        for (const op of operations) {
+            await op;
+        }
 
       // 4. Finance
       if (accountId) {
