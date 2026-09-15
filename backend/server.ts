@@ -18233,8 +18233,6 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             return [{ id: productId, qty: qtyNeeded }];
         }
 
-        const operations: Promise<any>[] = [];
-
         for (const item of items) {
             const productId = Number(item.productId);
             const quantity = Number(item.quantity);
@@ -18258,8 +18256,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             }
             const hasModifiers = Object.keys(finalModifiers).length > 0;
 
-            // Add Sale Item creation to operations
-            operations.push(tx.saleItem.create({
+            // Add Sale Item creation
+            await tx.saleItem.create({
                 data: {
                     saleId: sale.id,
                     productId: productId,
@@ -18269,7 +18267,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                     total: price * quantity,
                     modifiers: hasModifiers ? finalModifiers : null
                 }
-            }));
+            });
 
             // --- OPTIMIZED STOCK LOGIC ---
             const mainProduct = productsInCart.find(p => p.id === productId);
@@ -18278,18 +18276,18 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             // Mode Pabrikasi (isAutoDeduct = false): HANYA potong stok produk jadi.
             // Mode Made-to-Order (isAutoDeduct = true): JANGAN potong stok produk jadi.
             if (!isAutoDeduct) {
-                operations.push(tx.product.update({
+                await tx.product.update({
                     where: { id: productId },
                     data: { stock: { decrement: quantity } }
-                }));
+                });
 
-                operations.push(tx.warehouseStock.upsert({
+                await tx.warehouseStock.upsert({
                     where: { productId_warehouseId: { productId: productId, warehouseId: warehouse.id } },
                     update: { quantity: { decrement: quantity } },
                     create: { productId: productId, warehouseId: warehouse.id, quantity: -quantity }
-                }));
+                });
 
-                operations.push(tx.stockTransaction.create({
+                await tx.stockTransaction.create({
                     data: {
                         productId: productId,
                         warehouseId: warehouse.id,
@@ -18298,29 +18296,30 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                         reference: `POS ${invoiceNumber}`,
                         date: new Date()
                     }
-                }));
+                });
             }
 
             // --- MODIFIER STOCK DEDUCTION ---
             if (item.modifiers) {
-                Object.values(item.modifiers).forEach((val: any) => {
+                // Must use for..of for await inside loop
+                for (const val of Object.values(item.modifiers) as any[]) {
                     if (val && val.id && optionMap[val.id]) {
                         const opt = optionMap[val.id];
                         if (opt.linkedProductId) {
                             const modQty = quantity * (opt.linkedQuantity || 1);
                             
-                            operations.push(tx.product.update({
+                            await tx.product.update({
                                 where: { id: opt.linkedProductId },
                                 data: { stock: { decrement: modQty } }
-                            }));
+                            });
 
-                            operations.push(tx.warehouseStock.upsert({
+                            await tx.warehouseStock.upsert({
                                 where: { productId_warehouseId: { productId: opt.linkedProductId, warehouseId: warehouse.id } },
                                 update: { quantity: { decrement: modQty } },
                                 create: { productId: opt.linkedProductId, warehouseId: warehouse.id, quantity: -modQty }
-                            }));
+                            });
 
-                            operations.push(tx.stockTransaction.create({
+                            await tx.stockTransaction.create({
                                 data: {
                                     productId: opt.linkedProductId,
                                     warehouseId: warehouse.id,
@@ -18329,10 +18328,10 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                                     reference: `POS Add-on ${invoiceNumber}`,
                                     date: new Date()
                                 }
-                            }));
+                            });
                         }
                     }
-                });
+                }
             }
 
             // If it has a recipe AND is Made-to-Order, decrement the MATERIALS
@@ -18346,18 +18345,18 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                     const deductions = await getRecursiveDeductions(materialId, materialQtyNeeded);
                     
                     for (const ded of deductions) {
-                        operations.push(tx.product.update({
+                        await tx.product.update({
                             where: { id: ded.id },
                             data: { stock: { decrement: ded.qty } }
-                        }));
+                        });
     
-                        operations.push(tx.warehouseStock.upsert({
+                        await tx.warehouseStock.upsert({
                             where: { productId_warehouseId: { productId: ded.id, warehouseId: warehouse.id } },
                             update: { quantity: { decrement: ded.qty } },
                             create: { productId: ded.id, warehouseId: warehouse.id, quantity: -ded.qty }
-                        }));
+                        });
     
-                        operations.push(tx.stockTransaction.create({
+                        await tx.stockTransaction.create({
                             data: {
                                 productId: ded.id,
                                 warehouseId: warehouse.id,
@@ -18366,15 +18365,10 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                                 reference: `POS ${invoiceNumber} (BOM Result of ${sale.invoiceNumber})`,
                                 date: new Date()
                             }
-                        }));
+                        });
                     }
                 }
             }
-        }
-
-        // Execute all stock and item operations sequentially to prevent connection pool exhaustion and Prisma transaction deadlocks
-        for (const op of operations) {
-            await op;
         }
 
       // 4. Finance
