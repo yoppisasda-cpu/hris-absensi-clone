@@ -1570,3 +1570,13 @@ model SavedBalanceSheetReport {
   company Company @relation(fields: [companyId], references: [id])
   creator User?   @relation(fields: [createdBy], references: [id])
 }
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  email     String
+  token     String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
