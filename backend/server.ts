@@ -17915,8 +17915,8 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
       return res.status(400).json({ error: "QR Code kadaluarsa atau tidak valid" });
     }
 
-    if (decoded.companyId !== tenantId || decoded.type !== 'EMPLOYEE_DISCOUNT') {
-      return res.status(400).json({ error: "QR Code tidak valid untuk perusahaan ini" });
+    if (decoded.type !== 'EMPLOYEE_DISCOUNT') {
+      return res.status(400).json({ error: "QR Code tidak valid" });
     }
 
     // Ensure customer profile exists for this employee
