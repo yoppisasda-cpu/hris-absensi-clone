@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../providers/auth_provider.dart';
 import 'merchant_selection_screen.dart';
 import 'home_screen.dart';
@@ -8,8 +9,9 @@ import '../providers/branding_provider.dart';
 import 'forgot_password_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../providers/cart_provider.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html show window;
 
 class LoginScreen extends StatefulWidget {
   final Uri? initialUri;
@@ -36,15 +38,39 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isProcessingDeepLink = true;
 
   Future<void> _checkDeepLinkAndPersistence() async {
-    final uri = widget.initialUri ?? Uri.base;
-    
-    // Parse normal query parameters or fragment query parameters
-    Map<String, String> queryParams = uri.queryParameters;
-    if (uri.hasFragment && uri.fragment.contains('?')) {
-      final fragmentUri = Uri.parse(uri.fragment);
-      // Merge parameters (fragment takes precedence)
-      queryParams = {...queryParams, ...fragmentUri.queryParameters};
+    Map<String, String> queryParams = {};
+
+    if (kIsWeb) {
+      try {
+        // Directly read window.location from the browser via dart:html
+        final location = html.window.location;
+        final search = location.search ?? '';
+        final hash = location.hash ?? '';
+        print('[DeepLink] search=$search hash=$hash');
+
+        // Parse standard query string (e.g. ?tenant=1&table=2)
+        if (search.isNotEmpty && search.length > 1) {
+          final q = Uri.splitQueryString(search.substring(1));
+          queryParams.addAll(q);
+        }
+
+        // Parse hash fragment (e.g. #/?tenant=1&table=2)
+        if (hash.isNotEmpty && hash.contains('?')) {
+          final hashQuery = hash.substring(hash.indexOf('?') + 1);
+          final q = Uri.splitQueryString(hashQuery);
+          queryParams.addAll(q);
+        }
+      } catch (e) {
+        print('[DeepLink] dart:html error: $e');
+      }
     }
+
+    // Fallback: widget.initialUri passed from onGenerateRoute
+    if (queryParams.isEmpty && widget.initialUri != null) {
+      queryParams.addAll(widget.initialUri!.queryParameters);
+    }
+
+    print('[DeepLink] Final params = $queryParams');
 
     final tenantParam = queryParams['tenant'];
     final tableParam = queryParams['table'];
@@ -53,9 +79,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final cart = Provider.of<CartProvider>(context, listen: false);
 
     if (tenantParam != null) {
-      // Automatic QR Scan Login
       final tenantId = int.tryParse(tenantParam);
       if (tenantId != null) {
+        print('[DeepLink] QR flow: tenant=$tenantId table=$tableParam');
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt('selectedMerchantId', tenantId);
         await branding.loadBranding();
@@ -64,20 +90,21 @@ class _LoginScreenState extends State<LoginScreen> {
           cart.tableNumber = tableParam;
         }
         
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => HomeScreen())
-        );
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => HomeScreen())
+          );
+        }
         return;
       }
     }
 
     if (branding.selectedMerchantId != null) {
-      // If a merchant was already selected, we can try to skip selection
-      // but only if we are "logged in" or if the app allows guest discovery
-      // For now, let's just go to HomeScreen if branding is loaded
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeScreen())
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen())
+        );
+      }
       return;
     }
 
