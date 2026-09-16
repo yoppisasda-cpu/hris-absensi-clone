@@ -457,6 +457,10 @@ export default function Sidebar() {
                                     <Monitor className="h-5 w-5" />
                                     Laporan Kasir (POS)
                                 </Link>
+                                <Link href="/dashboard/pos/qr-table" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors border border-emerald-500/20">
+                                    <Monitor className="h-5 w-5" />
+                                    Cetak QR Meja
+                                </Link>
                                 <Link href="/dashboard/customers" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                                     <Users className="h-5 w-5 text-indigo-400" />
                                     Data Pelanggan

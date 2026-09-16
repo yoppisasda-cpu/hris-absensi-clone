@@ -7,6 +7,9 @@ import 'register_screen.dart';
 import '../providers/branding_provider.dart';
 import 'forgot_password_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../providers/cart_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -22,12 +25,48 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     // Use addPostFrameCallback to wait for the first frame and context availability
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkPersistence();
+      _checkDeepLinkAndPersistence();
     });
   }
 
-  void _checkPersistence() {
+  bool _isProcessingDeepLink = true;
+
+  Future<void> _checkDeepLinkAndPersistence() async {
+    final uri = Uri.base;
+    
+    // Parse normal query parameters or fragment query parameters
+    Map<String, String> queryParams = uri.queryParameters;
+    if (uri.hasFragment && uri.fragment.contains('?')) {
+      final fragmentUri = Uri.parse(uri.fragment);
+      // Merge parameters (fragment takes precedence)
+      queryParams = {...queryParams, ...fragmentUri.queryParameters};
+    }
+
+    final tenantParam = queryParams['tenant'];
+    final tableParam = queryParams['table'];
+
     final branding = Provider.of<BrandingProvider>(context, listen: false);
+    final cart = Provider.of<CartProvider>(context, listen: false);
+
+    if (tenantParam != null) {
+      // Automatic QR Scan Login
+      final tenantId = int.tryParse(tenantParam);
+      if (tenantId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('selectedMerchantId', tenantId);
+        await branding.loadBranding();
+        
+        if (tableParam != null) {
+          cart.tableNumber = tableParam;
+        }
+        
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen())
+        );
+        return;
+      }
+    }
+
     if (branding.selectedMerchantId != null) {
       // If a merchant was already selected, we can try to skip selection
       // but only if we are "logged in" or if the app allows guest discovery
@@ -35,6 +74,13 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => HomeScreen())
       );
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isProcessingDeepLink = false;
+      });
     }
   }
 
@@ -61,7 +107,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-        child: SafeArea(
+        child: _isProcessingDeepLink 
+          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          : SafeArea(
           child: SingleChildScrollView(
             physics: BouncingScrollPhysics(),
             child: Padding(

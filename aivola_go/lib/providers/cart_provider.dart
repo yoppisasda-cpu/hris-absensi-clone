@@ -15,6 +15,7 @@ class CartProvider with ChangeNotifier {
   Voucher? _selectedVoucher;
   bool _isUsingPoints = false;
   int _availablePoints = 0;
+  String? tableNumber;
 
   CartProvider() {
     _loadPoints();

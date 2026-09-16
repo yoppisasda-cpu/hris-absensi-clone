@@ -47,7 +47,13 @@ class _CartScreenState extends State<CartScreen> {
     // Pastikan data merchant (termasuk qrisUrl) sudah fresh saat CartScreen dibuka
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final branding = Provider.of<BrandingProvider>(context, listen: false);
+      final cart = Provider.of<CartProvider>(context, listen: false);
       final merchantId = branding.selectedMerchantId;
+      
+      if (cart.tableNumber != null && _notesController.text.isEmpty) {
+        _notesController.text = "Meja ${cart.tableNumber}";
+      }
+
       if (merchantId != null) {
         branding.fetchLatestMerchantInfo(merchantId);
         branding.fetchBankAccounts(merchantId);
