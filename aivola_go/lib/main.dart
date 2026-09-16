@@ -43,7 +43,20 @@ class MyApp extends StatelessWidget {
           Theme.of(context).textTheme,
         ),
       ),
-      home: LoginScreen(),
+      onGenerateRoute: (settings) {
+        // In Flutter Web, the initial route might contain query parameters
+        // like /?tenant=1&table=1. We must intercept it here so Flutter
+        // doesn't discard it by falling back to the default '/' route.
+        
+        Uri? initialUri;
+        if (settings.name != null) {
+          initialUri = Uri.parse(settings.name!);
+        }
+        
+        return MaterialPageRoute(
+          builder: (context) => LoginScreen(initialUri: initialUri),
+        );
+      },
     );
   }
 }

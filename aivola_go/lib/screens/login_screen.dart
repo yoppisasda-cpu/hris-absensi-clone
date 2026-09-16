@@ -12,6 +12,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/cart_provider.dart';
 
 class LoginScreen extends StatefulWidget {
+  final Uri? initialUri;
+
+  const LoginScreen({Key? key, this.initialUri}) : super(key: key);
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
@@ -32,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isProcessingDeepLink = true;
 
   Future<void> _checkDeepLinkAndPersistence() async {
-    final uri = Uri.base;
+    final uri = widget.initialUri ?? Uri.base;
     
     // Parse normal query parameters or fragment query parameters
     Map<String, String> queryParams = uri.queryParameters;
