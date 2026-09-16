@@ -18210,8 +18210,14 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
 
         // 3. Prepare all operations for parallel execution
         
-        // Helper for recursive deduction of materials
-        async function getRecursiveDeductions(productId: number, qtyNeeded: number): Promise<{ id: number, qty: number }[]> {
+        // Helper for recursive deduction of materials (with cycle detection)
+        async function getRecursiveDeductions(productId: number, qtyNeeded: number, visited = new Set<number>()): Promise<{ id: number, qty: number }[]> {
+            if (visited.has(productId)) {
+                console.warn(`[WARNING] Cycle detected in BOM for product ID ${productId}. Breaking infinite loop.`);
+                return [];
+            }
+            visited.add(productId);
+
             const product = await tx.product.findUnique({ where: { id: productId } });
             if (!product) return [];
 
@@ -18223,7 +18229,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                     for (const r of recipes) {
                         const yieldFactor = r.Product?.recipeYield || 1;
                         const matQty = (Number(r.quantity) / yieldFactor) * qtyNeeded;
-                        const childDeductions = await getRecursiveDeductions(Number(r.materialId), matQty);
+                        const childDeductions = await getRecursiveDeductions(Number(r.materialId), matQty, new Set(visited));
                         deductions = deductions.concat(childDeductions);
                     }
                     return deductions;
@@ -18342,7 +18348,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                     const materialId = Number(recipe.materialId);
                     const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
 
-                    const deductions = await getRecursiveDeductions(materialId, materialQtyNeeded);
+                    const deductions = await getRecursiveDeductions(materialId, materialQtyNeeded, new Set([productId]));
                     
                     for (const ded of deductions) {
                         await tx.product.update({
