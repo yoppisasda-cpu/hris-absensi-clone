@@ -11,7 +11,7 @@ class ApiService {
   }
 
   // Gunakan domain live api.aivola.id untuk koneksi backend
-  static String get baseUrl => "https://api.aivola.id/api";
+  static String get baseUrl => "https://api.aivola.id/api"; // Production Backend
 
   // Helper for images and other direct URLs
   static String? resolveUrl(String? path) {
@@ -91,7 +91,6 @@ class ApiService {
     required String email,
     required String phone,
     required String password,
-    required String otp,
   }) async {
     try {
       final response = await http.post(
@@ -102,7 +101,6 @@ class ApiService {
           "email": email,
           "phone": phone,
           "password": password,
-          "otp": otp,
         }),
       );
       final data = jsonDecode(response.body);
@@ -116,6 +114,44 @@ class ApiService {
         return {"success": true, "data": data};
       }
       return {"success": false, "message": data['error'] ?? "Pendaftaran gagal"};
+    } catch (e) {
+      return {"success": false, "message": "Koneksi gagal: $e"};
+    }
+  }
+
+  static Future<Map<String, dynamic>> requestPasswordReset(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/customer/forgot-password"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {"success": true, "message": data['message'] ?? "Kode OTP terkirim"};
+      }
+      return {"success": false, "message": data['error'] ?? "Gagal meminta OTP"};
+    } catch (e) {
+      return {"success": false, "message": "Koneksi gagal: $e"};
+    }
+  }
+
+  static Future<Map<String, dynamic>> submitNewPassword(String email, String otp, String newPassword) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/customer/reset-password"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": email,
+          "otp": otp,
+          "newPassword": newPassword,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {"success": true, "message": data['message'] ?? "Password berhasil diubah"};
+      }
+      return {"success": false, "message": data['error'] ?? "Gagal mereset password"};
     } catch (e) {
       return {"success": false, "message": "Koneksi gagal: $e"};
     }

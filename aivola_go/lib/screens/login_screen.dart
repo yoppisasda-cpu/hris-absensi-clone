@@ -5,6 +5,7 @@ import 'merchant_selection_screen.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
 import '../providers/branding_provider.dart';
+import 'forgot_password_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -149,9 +150,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      "Forgot Password?",
-                      style: TextStyle(color: primaryColor, fontSize: 13),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),
+                        );
+                      },
+                      child: Text(
+                        "Forgot Password?",
+                        style: TextStyle(color: primaryColor, fontSize: 13),
+                      ),
                     ),
                   ),
                   SizedBox(height: 30),
@@ -226,6 +235,35 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   
+                  SizedBox(height: 15),
+                  
+                  // Guest Login Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(builder: (context) => MerchantSelectionScreen())
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: primaryColor),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      child: Text(
+                        "Lanjutkan Tanpa Login",
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+
                   SizedBox(height: 40),
                   Center(
                     child: GestureDetector(

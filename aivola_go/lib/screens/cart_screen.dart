@@ -592,12 +592,53 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _handleCheckout(CartProvider cartProvider, BrandingProvider brandingProvider, Color primaryColor) async {
+    final prefs = await SharedPreferences.getInstance();
+    final customerId = prefs.getInt('customerId');
+    String guestName = "";
+
+    if (customerId == null) {
+      bool? proceed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          final nameController = TextEditingController();
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            title: const Text("Nama Pelanggan", style: TextStyle(color: Colors.white)),
+            content: TextField(
+              controller: nameController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: "Nama Anda (Contoh: Budi)",
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.1),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Batal", style: TextStyle(color: Colors.white38))),
+              ElevatedButton(
+                onPressed: () {
+                  if (nameController.text.trim().isNotEmpty) {
+                    guestName = nameController.text.trim();
+                    Navigator.pop(context, true);
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                child: const Text("Lanjut", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      );
+      if (proceed != true) return;
+    }
+
     showDialog(context: context, barrierDismissible: false, builder: (context) => Center(child: CircularProgressIndicator(color: primaryColor)));
 
     final items = cartProvider.items.values.map((item) => {"productId": item.product.id, "quantity": item.quantity, "price": item.product.price}).toList();
     final branchProvider = Provider.of<BranchProvider>(context, listen: false);
-    final prefs = await SharedPreferences.getInstance();
-    final customerId = prefs.getInt('customerId');
 
     // Tentukan order type jika merchant hanya buka salah satu
     String finalOrderType = _orderType;
@@ -605,6 +646,11 @@ class _CartScreenState extends State<CartScreen> {
       finalOrderType = "Pre-Order";
     } else if (brandingProvider.allowOnlineOrder && !brandingProvider.allowPreOrder) {
       finalOrderType = "Pesanan Langsung";
+    }
+
+    String finalNotes = _notesController.text.trim();
+    if (guestName.isNotEmpty) {
+      finalNotes = "Guest Name: $guestName" + (finalNotes.isNotEmpty ? "\nNotes: $finalNotes" : "");
     }
 
     final apiCall = ApiService.createOrder;
@@ -617,7 +663,7 @@ class _CartScreenState extends State<CartScreen> {
       voucherId: cartProvider.selectedVoucher?.id, 
       deliveryMethod: _deliveryMethod,
       paymentMethod: _paymentMethod,
-      notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+      notes: finalNotes.isNotEmpty ? finalNotes : null,
       pointsUsed: cartProvider.isUsingPoints ? cartProvider.availablePoints : 0,
       saleType: finalOrderType == "Pre-Order" ? "PRE_ORDER" : "ONLINE",
     );
