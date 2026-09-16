@@ -58,6 +58,7 @@ class _POSScreenState extends State<POSScreen> {
   double _calculatedFinalTotal = 0;
   
   double _globalTaxRate = 0.0;
+  String? _userRole;
 
   @override
   void initState() {
@@ -77,7 +78,10 @@ class _POSScreenState extends State<POSScreen> {
 
   Future<void> _loadWaiterMode() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _isWaiterMode = prefs.getBool(_prefWaiterMode) ?? false);
+    setState(() {
+      _isWaiterMode = prefs.getBool(_prefWaiterMode) ?? false;
+      _userRole = prefs.getString('userRole');
+    });
   }
 
   Future<void> _toggleWaiterMode(bool val) async {
@@ -1765,7 +1769,8 @@ class _POSScreenState extends State<POSScreen> {
               if (val == 'test_sound') Provider.of<SocketService>(context, listen: false).testNotificationSound();
             },
             itemBuilder: (context) => [
-              PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text('Riwayat Pesanan'), dense: true)),
+              if (_userRole != 'OPERATIONAL' && _userRole != 'CASHIER')
+                PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text('Riwayat Pesanan'), dense: true)),
               PopupMenuItem(value: 'closing', child: ListTile(leading: Icon(Icons.lock_clock), title: Text('Tutup Kasir (Closing)'), dense: true)),
               PopupMenuItem(value: 'refresh', child: ListTile(leading: Icon(Icons.refresh), title: Text('Sinkronisasi Data'), dense: true)),
               PopupMenuItem(value: 'test_sound', child: ListTile(leading: Icon(Icons.volume_up), title: Text('Tes Suara'), dense: true)),
