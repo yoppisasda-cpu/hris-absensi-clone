@@ -15607,7 +15607,8 @@ app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) 
         validFrom: validFrom ? new Date(validFrom) : null,
         validUntil: validUntil ? new Date(validUntil) : null,
         quota: Number(quota || 0),
-        isActive: isActive !== undefined ? isActive : true
+        isActive: isActive !== undefined ? isActive : true,
+        targetAudience: targetAudience || 'PUBLIC'
       }
     });
     res.status(201).json(voucher);
@@ -15621,7 +15622,7 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
   try {
     const tenantId = Number((req as any).tenantId);
     const voucherId = Number(req.params.id);
-    const { code, discountType, discountValue, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive } = req.body;
+    const { code, discountType, discountValue, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
     
     // Ensure voucher belongs to tenant
     const existing = await prisma.voucher.findFirst({ where: { id: voucherId, companyId: tenantId } });
@@ -15639,7 +15640,8 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
         validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
         validUntil: validUntil !== undefined ? (validUntil ? new Date(validUntil) : null) : undefined,
         quota: quota !== undefined ? Number(quota) : undefined,
-        isActive: isActive !== undefined ? isActive : undefined
+        isActive: isActive !== undefined ? isActive : undefined,
+        targetAudience: targetAudience !== undefined ? targetAudience : undefined
       }
     });
     res.json(voucher);
