@@ -26,8 +26,10 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
         isActive: true,
         targetAudience: "PUBLIC",
     });
+    const [userRole, setUserRole] = useState<string | null>(null);
 
     useEffect(() => {
+        setUserRole(localStorage.getItem('userRole'));
         if (editData) {
             setFormData({
                 code: editData.code || "",
@@ -67,6 +69,8 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                 code: formData.code,
                 discountType: formData.discountType,
                 discountValue: Number(formData.discountValue),
+                initialBalance: formData.discountType === 'STORED_VALUE' ? Number(formData.discountValue) : undefined,
+                currentBalance: formData.discountType === 'STORED_VALUE' ? Number(formData.discountValue) : undefined,
                 minPurchase: formData.minPurchase ? Number(formData.minPurchase) : 0,
                 minQuantity: formData.minQuantity ? Number(formData.minQuantity) : 0,
                 maxDiscount: formData.maxDiscount ? Number(formData.maxDiscount) : undefined,
@@ -135,11 +139,14 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                                 >
                                     <option value="PERCENTAGE">Persentase (%)</option>
                                     <option value="FIXED">Nominal Tetap (Rp)</option>
+                                    {(userRole === 'OWNER' || userRole === 'SUPERADMIN') && (
+                                        <option value="STORED_VALUE">Saldo Tunai (Gift Card)</option>
+                                    )}
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                                    Nilai Diskon * {formData.discountType === 'PERCENTAGE' ? '(%)' : '(Rp)'}
+                                    {formData.discountType === 'STORED_VALUE' ? 'Saldo Awal (Rp)' : `Nilai Diskon * ${formData.discountType === 'PERCENTAGE' ? '(%)' : '(Rp)'}`}
                                 </label>
                                 <div className="relative">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2">

@@ -381,7 +381,15 @@ class _POSScreenState extends State<POSScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Diskon Karyawan Diterapkan!'), backgroundColor: Colors.green));
       setState(() {});
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+      // Jika gagal discan sebagai Karyawan, coba jadikan Voucher
+      try {
+        _voucherController.text = token;
+        _aivolaIdController.clear();
+        await _calculateDiscounts(setPanelState);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Diterapkan sebagai Voucher/Promo!'), backgroundColor: Colors.teal));
+      } catch (err) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kode tidak valid (Bukan ID maupun Voucher)'), backgroundColor: Colors.red));
+      }
     }
   }
 

@@ -11,7 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/cart_provider.dart';
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html show window;
+import 'package:universal_html/html.dart' as html show window;
 
 class LoginScreen extends StatefulWidget {
   final Uri? initialUri;

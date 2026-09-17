@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { 
     Tag, Gift, Search, Plus, Edit, Trash2, 
     Settings, Percent, Database, Save, History,
-    X, FileText, Calendar, DollarSign, Receipt
+    X, FileText, Calendar, DollarSign, Receipt, QrCode
 } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 import VoucherModal from "@/components/loyalty/VoucherModal";
@@ -19,6 +20,7 @@ export default function LoyaltyPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
     const [editingVoucher, setEditingVoucher] = useState<any>(null);
+    const [qrCodeData, setQrCodeData] = useState<any>(null);
 
     // Used Vouchers State
     const [usedVouchers, setUsedVouchers] = useState<any[]>([]);
@@ -328,8 +330,15 @@ export default function LoyaltyPage() {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-sm font-bold text-slate-300">
-                                                        {v.discountType === 'PERCENTAGE' ? `${v.discountValue}%` : `Rp ${v.discountValue.toLocaleString()}`}
-                                                        {v.maxDiscount ? <span className="block text-[10px] text-slate-500 font-normal mt-1">Maks: Rp {v.maxDiscount.toLocaleString()}</span> : null}
+                                                        {v.discountType === 'PERCENTAGE' ? `${v.discountValue}%` : 
+                                                         v.discountType === 'STORED_VALUE' ? (
+                                                            <span>
+                                                                Sisa Saldo:<br/>
+                                                                <span className="text-emerald-400">Rp {(v.currentBalance || 0).toLocaleString('id-ID')}</span>
+                                                            </span>
+                                                         ) : `Rp ${v.discountValue.toLocaleString('id-ID')}`}
+                                                        {v.maxDiscount && v.discountType !== 'STORED_VALUE' ? <span className="block text-[10px] text-slate-500 font-normal mt-1">Maks: Rp {v.maxDiscount.toLocaleString('id-ID')}</span> : null}
+                                                        {v.discountType === 'STORED_VALUE' ? <span className="block text-[10px] text-slate-500 font-normal mt-1">Awal: Rp {(v.initialBalance || 0).toLocaleString('id-ID')}</span> : null}
                                                     </td>
                                                     <td className="px-6 py-4 text-sm font-bold text-slate-300">
                                                         <div>Belanja: {v.minPurchase ? `Rp ${v.minPurchase.toLocaleString()}` : '-'}</div>
@@ -353,6 +362,13 @@ export default function LoyaltyPage() {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center justify-center gap-1">
+                                                            <button 
+                                                                onClick={() => setQrCodeData(v)}
+                                                                className="p-2 text-slate-400 hover:text-emerald-400 transition-colors rounded-lg hover:bg-slate-800"
+                                                                title="Tampilkan QR Code"
+                                                            >
+                                                                <QrCode className="h-4 w-4" />
+                                                            </button>
                                                             <button 
                                                                 onClick={() => {
                                                                     setEditingVoucher(v);
@@ -540,6 +556,43 @@ export default function LoyaltyPage() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* QR Code Modal */}
+            {qrCodeData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden border border-slate-200 shadow-2xl flex flex-col items-center p-8">
+                        <div className="w-full flex justify-end">
+                            <button onClick={() => setQrCodeData(null)} className="text-slate-400 hover:text-slate-800 transition-colors">
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase italic text-center">Scan Voucher</h3>
+                        <p className="text-slate-500 text-sm mb-6 text-center">Tunjukkan QR code ini ke kasir</p>
+                        
+                        <div className="bg-white p-4 rounded-2xl shadow-xl shadow-indigo-100 mb-6">
+                            <QRCodeCanvas 
+                                value={qrCodeData.code}
+                                size={200}
+                                bgColor={"#ffffff"}
+                                fgColor={"#0f172a"}
+                                level={"H"}
+                            />
+                        </div>
+
+                        <div className="bg-slate-100 rounded-xl px-6 py-3 w-full text-center">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Kode Voucher</p>
+                            <p className="text-xl font-black text-slate-900 tracking-wider">{qrCodeData.code}</p>
+                        </div>
+                        
+                        {qrCodeData.discountType === 'STORED_VALUE' && (
+                            <div className="mt-4 text-center">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Sisa Saldo</p>
+                                <p className="text-lg font-black text-emerald-600">Rp {(qrCodeData.currentBalance || 0).toLocaleString('id-ID')}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

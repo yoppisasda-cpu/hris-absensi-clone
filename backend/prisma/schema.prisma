@@ -1312,6 +1312,8 @@ model Voucher {
   code           String
   discountType   String            @default("PERCENTAGE")
   discountValue  Float
+  initialBalance Float?
+  currentBalance Float?
   minPurchase    Float             @default(0)
   minQuantity    Float             @default(0)
   maxDiscount    Float?

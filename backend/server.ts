@@ -15595,18 +15595,26 @@ app.get('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) =
 app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { code, discountType, discountValue, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
+    const { code, discountType, discountValue, initialBalance, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
+    
+    let bal = undefined;
+    if (discountType === 'STORED_VALUE') {
+      bal = initialBalance ? Number(initialBalance) : Number(discountValue || 0);
+    }
+    
     const voucher = await prisma.voucher.create({
       data: {
         companyId: tenantId,
         code,
         discountType,
-        discountValue: Number(discountValue),
+        discountValue: Number(discountValue || 0),
+        initialBalance: bal,
+        currentBalance: bal,
         minPurchase: Number(minPurchase || 0),
         minQuantity: Number(minQuantity || 0),
         maxDiscount: maxDiscount ? Number(maxDiscount) : null,
         validFrom: validFrom ? new Date(validFrom) : null,
-        validUntil: validUntil ? new Date(validUntil) : null,
+        validUntil: validUntil ? new Date(new Date(validUntil).setHours(23, 59, 59, 999)) : null,
         quota: Number(quota || 0),
         isActive: isActive !== undefined ? isActive : true,
         targetAudience: targetAudience || 'PUBLIC'
@@ -15623,27 +15631,34 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
   try {
     const tenantId = Number((req as any).tenantId);
     const voucherId = Number(req.params.id);
-    const { code, discountType, discountValue, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
+    const { code, discountType, discountValue, initialBalance, currentBalance, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
     
     // Ensure voucher belongs to tenant
     const existing = await prisma.voucher.findFirst({ where: { id: voucherId, companyId: tenantId } });
     if (!existing) return res.status(404).json({ error: 'Voucher tidak ditemukan' });
 
+    let dataToUpdate: any = {
+      code,
+      discountType,
+      discountValue: discountValue !== undefined ? Number(discountValue) : undefined,
+      minPurchase: minPurchase !== undefined ? Number(minPurchase) : undefined,
+      minQuantity: minQuantity !== undefined ? Number(minQuantity) : undefined,
+      maxDiscount: maxDiscount !== undefined ? (maxDiscount ? Number(maxDiscount) : null) : undefined,
+      validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
+      validUntil: validUntil !== undefined ? (validUntil ? new Date(new Date(validUntil).setHours(23, 59, 59, 999)) : null) : undefined,
+      quota: quota !== undefined ? Number(quota) : undefined,
+      isActive: isActive !== undefined ? isActive : undefined,
+      targetAudience: targetAudience !== undefined ? targetAudience : undefined,
+    };
+
+    if (discountType === 'STORED_VALUE' || existing.discountType === 'STORED_VALUE') {
+      if (initialBalance !== undefined) dataToUpdate.initialBalance = Number(initialBalance);
+      if (currentBalance !== undefined) dataToUpdate.currentBalance = Number(currentBalance);
+    }
+
     const voucher = await prisma.voucher.update({
       where: { id: voucherId },
-      data: {
-        code,
-        discountType,
-        discountValue: discountValue !== undefined ? Number(discountValue) : undefined,
-        minPurchase: minPurchase !== undefined ? Number(minPurchase) : undefined,
-        minQuantity: minQuantity !== undefined ? Number(minQuantity) : undefined,
-        maxDiscount: maxDiscount !== undefined ? (maxDiscount ? Number(maxDiscount) : null) : undefined,
-        validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
-        validUntil: validUntil !== undefined ? (validUntil ? new Date(validUntil) : null) : undefined,
-        quota: quota !== undefined ? Number(quota) : undefined,
-        isActive: isActive !== undefined ? isActive : undefined,
-        targetAudience: targetAudience !== undefined ? targetAudience : undefined
-      }
+      data: dataToUpdate
     });
     res.json(voucher);
   } catch (error: any) {
@@ -16044,14 +16059,21 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
             if (voucher.maxDiscount && voucherDiscountAmount > voucher.maxDiscount) {
               voucherDiscountAmount = voucher.maxDiscount;
             }
+          } else if (voucher.discountType === 'STORED_VALUE') {
+            voucherDiscountAmount = Math.min(subtotal, voucher.currentBalance || 0);
           } else {
             voucherDiscountAmount = voucher.discountValue;
           }
           
-          // Increment used count
+          let updateData: any = { usedCount: { increment: 1 } };
+          if (voucher.discountType === 'STORED_VALUE') {
+            updateData.currentBalance = { decrement: voucherDiscountAmount };
+          }
+          
+          // Increment used count (and decrement balance)
           await tx.voucher.updateMany({
             where: { id: voucher.id },
-            data: { usedCount: { increment: 1 } }
+            data: updateData
           });
 
           // Create/Update CustomerVoucher to track usage history
@@ -17831,6 +17853,8 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
         if (voucher.maxDiscount && voucherDiscountAmount > voucher.maxDiscount) {
           voucherDiscountAmount = voucher.maxDiscount;
         }
+      } else if (voucher.discountType === 'STORED_VALUE') {
+        voucherDiscountAmount = Math.min(voucher.currentBalance || 0, baseDiscountAmount);
       } else {
         voucherDiscountAmount = Math.min(voucher.discountValue, baseDiscountAmount);
       }
@@ -18158,10 +18182,17 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       }
 
       if (voucherCode) {
-        await tx.voucher.updateMany({
-          where: { companyId: tenantId, code: voucherCode },
-          data: { usedCount: { increment: 1 } }
-        });
+        const voucher = await tx.voucher.findUnique({ where: { companyId_code: { companyId: tenantId, code: voucherCode } } });
+        if (voucher) {
+            let updateData: any = { usedCount: { increment: 1 } };
+            if (voucher.discountType === 'STORED_VALUE') {
+                updateData.currentBalance = { decrement: Number(voucherDiscountAmount) };
+            }
+            await tx.voucher.update({
+              where: { id: voucher.id },
+              data: updateData
+            });
+        }
       }
 
         // 2. Pre-fetch all recipes for items in the cart using Prisma findMany (more stable than raw SQL for Supabase)

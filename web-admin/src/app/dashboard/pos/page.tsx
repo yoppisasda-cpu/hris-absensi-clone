@@ -70,6 +70,7 @@ export default function POSPage() {
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [voucherCode, setVoucherCode] = useState("");
+    const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0);
 
     // NEW EMPLOYEE DISCOUNT FIELDS
     const [employeeDiscount, setEmployeeDiscount] = useState<{value: number, label: string} | null>(null);
@@ -174,8 +175,8 @@ export default function POSPage() {
     }, [subtotal, employeeDiscount]);
 
     const subtotalAfterDiscount = useMemo(() => {
-        return Math.max(0, subtotal - discountAmount);
-    }, [subtotal, discountAmount]);
+        return Math.max(0, subtotal - discountAmount - voucherDiscountAmount);
+    }, [subtotal, discountAmount, voucherDiscountAmount]);
 
     const taxAmount = useMemo(() => {
         return Math.round(subtotalAfterDiscount * taxRate / 100);
@@ -184,6 +185,27 @@ export default function POSPage() {
     const finalTotalAmount = useMemo(() => {
         return subtotalAfterDiscount + taxAmount;
     }, [subtotalAfterDiscount, taxAmount]);
+
+    const handleApplyVoucher = async (overrideCode?: string) => {
+        const codeToApply = overrideCode || voucherCode;
+        if (!codeToApply.trim()) {
+            setVoucherDiscountAmount(0);
+            return;
+        }
+        try {
+            const res = await api.post('/pos/calculate', {
+                subtotal,
+                discountableSubtotal: subtotal,
+                voucherCode: codeToApply,
+                totalQuantity: cart.reduce((sum, item) => sum + item.qty, 0)
+            });
+            setVoucherDiscountAmount(res.data.voucherDiscountAmount || 0);
+            toast.success("Voucher berhasil diaplikasikan!");
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Gagal mengaplikasikan voucher");
+            setVoucherDiscountAmount(0);
+        }
+    };
 
     const handleScanQR = async (tokenOverride?: string) => {
         const finalToken = tokenOverride || scannedQRToken;
@@ -198,7 +220,11 @@ export default function POSPage() {
             setShowScanModal(false);
             setScannedQRToken("");
         } catch (err: any) {
-            toast.error(err.response?.data?.error || "Gagal memvalidasi QR");
+            // Jika gagal discan sebagai Karyawan, coba jadikan Voucher
+            setVoucherCode(finalToken);
+            setShowScanModal(false);
+            setScannedQRToken("");
+            await handleApplyVoucher(finalToken);
         } finally {
             setScanLoading(false);
         }
@@ -228,6 +254,7 @@ export default function POSPage() {
                 customerName,
                 customerPhone,
                 voucherCode,
+                voucherDiscountAmount,
                 memberDiscountAmount: discountAmount,
                 salespersonId: selectedSalesperson || null
             };
@@ -245,6 +272,7 @@ export default function POSPage() {
 
             setCustomerPhone("");
             setVoucherCode("");
+            setVoucherDiscountAmount(0);
             setEmployeeDiscount(null);
             setLastCart([...cart]);
             setCart([]);
@@ -551,10 +579,13 @@ export default function POSPage() {
                                             onChange={(e) => setVoucherCode(e.target.value)}
                                             className="flex-1 px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 uppercase"
                                         />
-                                        <button className="px-4 py-3 bg-purple-500/10 text-purple-400 font-bold rounded-xl border border-purple-500/20 text-sm hover:bg-purple-500/20 transition-all">
+                                        <button onClick={() => handleApplyVoucher()} className="px-4 py-3 bg-purple-500/10 text-purple-400 font-bold rounded-xl border border-purple-500/20 text-sm hover:bg-purple-500/20 transition-all">
                                             Terapkan
                                         </button>
                                     </div>
+                                    {voucherDiscountAmount > 0 && (
+                                        <p className="mt-2 text-[10px] font-bold text-emerald-400">Diskon Voucher Aktif: -Rp {voucherDiscountAmount.toLocaleString('id-ID')}</p>
+                                    )}
                                 </div>
 
                                 {/* SALESPERSON */}
