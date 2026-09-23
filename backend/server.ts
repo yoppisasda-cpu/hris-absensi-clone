@@ -1222,7 +1222,7 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
                companyId: user.companyId,
                name: user.name,
                email: user.email,
-               phone: '0000000000',
+               phone: '00' + user.id.toString() + Math.floor(Math.random() * 1000).toString(),
                isActive: true,
              }
            });
@@ -16001,7 +16001,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
                companyId: user.companyId,
                name: user.name,
                email: user.email,
-               phone: '0000000000',
+               phone: '00' + user.id.toString() + Math.floor(Math.random() * 1000).toString(),
                isActive: true,
              }
            });
