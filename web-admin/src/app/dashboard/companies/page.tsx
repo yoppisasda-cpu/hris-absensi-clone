@@ -38,6 +38,7 @@ interface Company {
     discountProspecting?: number;
     waApiKey?: string | null;
     waGatewayUrl?: string | null;
+    franchiseId?: string | null;
 }
 
 export default function CompaniesPage() {
@@ -105,6 +106,8 @@ export default function CompaniesPage() {
     const [adminPassword, setAdminPassword] = useState('');
     const [waApiKey, setWaApiKey] = useState('');
     const [waGatewayUrl, setWaGatewayUrl] = useState('');
+    const [franchiseId, setFranchiseId] = useState('');
+    const [userRole, setUserRole] = useState('');
 
     const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
     const [isAiLoading, setIsAiLoading] = useState<number | null>(null);
@@ -148,6 +151,9 @@ export default function CompaniesPage() {
     // Fetch daftar perusahaan saat komponen dimuat
     useEffect(() => {
         fetchCompanies();
+        if (typeof window !== 'undefined') {
+            setUserRole(localStorage.getItem('userRole') || '');
+        }
     }, []);
 
     const fetchCompanies = async () => {
@@ -249,7 +255,7 @@ export default function CompaniesPage() {
                 discountProspecting: parseInt(discountProspecting) || 0,
                 modules: (plan === 'PRO' || plan === 'ENTERPRISE') ? 'BOTH' : 'ABSENSI',
                 adminName, adminEmail, adminPassword,
-                waApiKey, waGatewayUrl
+                waApiKey, waGatewayUrl, franchiseId
             };
 
             let res;
@@ -340,6 +346,7 @@ export default function CompaniesPage() {
         setDiscountProspecting(company.discountProspecting?.toString() || '0');
         setWaApiKey(company.waApiKey || '');
         setWaGatewayUrl(company.waGatewayUrl || '');
+        setFranchiseId(company.franchiseId || '');
         // Fetch mapped admin fields from backend
         setAdminName((company as any).adminName || '');
         setAdminEmail((company as any).adminEmail || '');
@@ -616,6 +623,21 @@ export default function CompaniesPage() {
                                         className="w-full rounded-md border border-slate-300 py-2 px-3 text-sm text-slate-900 bg-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                     />
                                 </div>
+                                {userRole === 'SUPERADMIN' && (
+                                    <div className="col-span-1 md:col-span-2 mt-2">
+                                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                                            ID Grup Franchise (Voucher Lintas-Tenant)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={franchiseId}
+                                            onChange={(e) => setFranchiseId(e.target.value)}
+                                            placeholder="Kosongkan jika tidak tergabung dalam grup"
+                                            className="w-full rounded-md border border-amber-300 py-2 px-3 text-sm text-amber-900 bg-amber-50 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                        />
+                                        <p className="text-[10px] text-amber-700 mt-1">Hanya Super Admin yang dapat mengatur Grup Franchise. Tenant dengan ID yang sama dapat menggunakan voucher yang sama.</p>
+                                    </div>
+                                )}
                                 <div>
                                     <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">API Key Wablas (Token)</label>
                                     <input
