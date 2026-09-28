@@ -57,6 +57,7 @@ model Company {
   isActive                Boolean                   @default(true)
   waApiKey                String?
   waGatewayUrl            String?
+  franchiseId             String?
   memberDiscountType      String?                   @default("PERCENTAGE")
   memberDiscountValue     Float                     @default(0)
   allowDineIn             Boolean                   @default(true)

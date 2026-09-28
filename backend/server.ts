@@ -17824,9 +17824,14 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
 
     // Voucher Discount
     if (voucherCode) {
-      const voucher = await prisma.voucher.findUnique({
+      let voucher = await prisma.voucher.findUnique({
         where: { companyId_code: { companyId: tenantId, code: voucherCode } }
       });
+      if (!voucher && company.franchiseId) {
+        voucher = await prisma.voucher.findFirst({
+          where: { code: voucherCode, company: { franchiseId: company.franchiseId } }
+        });
+      }
 
       if (!voucher || !voucher.isActive) {
         return res.status(400).json({ error: 'Voucher tidak valid atau sudah tidak aktif.' });
@@ -18182,15 +18187,24 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       }
 
       if (voucherCode) {
-        const voucher = await tx.voucher.findUnique({ where: { companyId_code: { companyId: tenantId, code: voucherCode } } });
+        let voucher = await tx.voucher.findUnique({ where: { companyId_code: { companyId: tenantId, code: voucherCode } } });
+        if (!voucher) {
+            const company = await tx.company.findUnique({ where: { id: tenantId } });
+            if (company && company.franchiseId) {
+                voucher = await tx.voucher.findFirst({
+                    where: { code: voucherCode, company: { franchiseId: company.franchiseId } }
+                });
+            }
+        }
+
         if (voucher) {
             let updateData: any = { usedCount: { increment: 1 } };
             if (voucher.discountType === 'STORED_VALUE') {
                 updateData.currentBalance = { decrement: Number(voucherDiscountAmount) };
             }
             await tx.voucher.update({
-              where: { id: voucher.id },
-              data: updateData
+                where: { id: voucher.id },
+                data: updateData
             });
         }
       }
