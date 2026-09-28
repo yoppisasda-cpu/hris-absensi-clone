@@ -6,12 +6,38 @@ import { ChefHat, BarChart3, Clock, Calendar, CalendarDays, History } from 'luci
 export default function KitchenReports() {
     const [reports, setReports] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const [startDate, setStartDate] = useState(todayStr);
+    const [endDate, setEndDate] = useState(todayStr);
+
+    const setQuickFilter = (type: 'today' | 'week' | 'month' | 'all') => {
+        const today = new Date();
+        if (type === 'today') {
+            const str = today.toISOString().split('T')[0];
+            setStartDate(str);
+            setEndDate(str);
+        } else if (type === 'week') {
+            const first = today.getDate() - today.getDay();
+            const start = new Date(today.setDate(first));
+            setStartDate(start.toISOString().split('T')[0]);
+            setEndDate(new Date().toISOString().split('T')[0]);
+        } else if (type === 'month') {
+            const start = new Date(today.getFullYear(), today.getMonth(), 1);
+            setStartDate(start.toISOString().split('T')[0]);
+            setEndDate(new Date().toISOString().split('T')[0]);
+        } else if (type === 'all') {
+            setStartDate('');
+            setEndDate('');
+        }
+    };
 
     const fetchReports = async () => {
         try {
+            setLoading(true);
             const token = localStorage.getItem('jwt_token');
             const tenantId = localStorage.getItem('currentTenantId');
-            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/reports`, {
+            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/reports?startDate=${startDate}&endDate=${endDate}`, {
                 headers: { 
                     Authorization: `Bearer ${token}`,
                     ...(tenantId ? { 'x-tenant-id': tenantId } : {})
@@ -27,7 +53,7 @@ export default function KitchenReports() {
 
     useEffect(() => {
         fetchReports();
-    }, []);
+    }, [startDate, endDate]);
 
     const formatSeconds = (seconds: number) => {
         if (!seconds || isNaN(seconds)) return '0 detik';
@@ -42,6 +68,11 @@ export default function KitchenReports() {
         return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const formatDate = (isoString: string) => {
+        if (!isoString) return '-';
+        return new Date(isoString).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
     if (loading) return <div className="p-8 text-center text-white/50 animate-pulse">Memuat laporan...</div>;
 
     return (
@@ -53,6 +84,30 @@ export default function KitchenReports() {
                         Laporan Produksi Dapur
                     </h1>
                     <p className="text-white/60 mt-1">Pantau rata-rata waktu masak dan riwayat pesanan</p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => setQuickFilter('today')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Hari Ini</button>
+                        <button onClick={() => setQuickFilter('week')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Minggu Ini</button>
+                        <button onClick={() => setQuickFilter('month')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Bulan Ini</button>
+                        <button onClick={() => setQuickFilter('all')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Semua</button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <input 
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg"
+                        />
+                        <span className="text-white/60">-</span>
+                        <input 
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg"
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -101,6 +156,7 @@ export default function KitchenReports() {
                             <tr className="bg-white/5 border-b border-white/10 text-white/60 text-sm">
                                 <th className="p-4 font-semibold">No. Pesanan</th>
                                 <th className="p-4 font-semibold">Pelanggan</th>
+                                <th className="p-4 font-semibold text-center">Tanggal Transaksi</th>
                                 <th className="p-4 font-semibold text-center">Jam Masuk</th>
                                 <th className="p-4 font-semibold text-center">Jam Selesai</th>
                                 <th className="p-4 font-semibold text-right">Durasi Masak</th>
@@ -109,7 +165,7 @@ export default function KitchenReports() {
                         <tbody className="divide-y divide-white/5">
                             {reports?.history?.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="p-8 text-center text-white/40">Belum ada data produksi</td>
+                                    <td colSpan={6} className="p-8 text-center text-white/40">Belum ada data produksi</td>
                                 </tr>
                             ) : (
                                 reports?.history?.map((sale: any) => (
@@ -121,6 +177,7 @@ export default function KitchenReports() {
                                             </div>
                                         </td>
                                         <td className="p-4 text-white/80">{sale.customerName || '-'}</td>
+                                        <td className="p-4 text-center text-white/80">{formatDate(sale.date || sale.createdAt)}</td>
                                         <td className="p-4 text-center text-white/80">{formatTime(sale.createdAt)}</td>
                                         <td className="p-4 text-center text-white/80">{formatTime(sale.preparedAt)}</td>
                                         <td className="p-4 text-right">

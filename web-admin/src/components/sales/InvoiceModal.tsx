@@ -308,6 +308,15 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                             <tr key={idx} className="group hover:bg-slate-50 transition-colors print:text-black">
                                                 <td className="px-8 py-2">
                                                     <p className="font-black text-slate-950 text-[11px] uppercase tracking-tighter print:text-black">{item.product_name}</p>
+                                                    {item.modifiers && Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
+                                                        <div className="mt-0.5">
+                                                            {item.modifiers.map((mod: any, mIdx: number) => (
+                                                                <p key={mIdx} className="text-[9px] text-slate-500 italic print:text-black/70">
+                                                                    - {mod.optionName || mod.name}
+                                                                </p>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-8 py-2 text-center">
                                                     <span className="font-black text-slate-950 text-[11px] print:text-black">{item.quantity}</span>

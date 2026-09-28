@@ -40,6 +40,7 @@ class _POSScreenState extends State<POSScreen> {
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerPhoneController = TextEditingController();
   final TextEditingController _cashReceivedController = TextEditingController();
+  final TextEditingController _paymentReferenceController = TextEditingController();
   final TextEditingController _aivolaIdController = TextEditingController();
   double _cashReceived = 0;
 
@@ -1047,7 +1048,32 @@ class _POSScreenState extends State<POSScreen> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 24),
+                  ];
+                })(),
+                
+                ...(() {
+                  final bool isNonCash = _selectedPaymentMethod != 'Tunai' && _selectedPaymentMethod != 'Aivola Pay' && _selectedPaymentMethod != 'Piutang';
+                  if (!isNonCash) return <Widget>[];
+
+                  return <Widget>[
+                    Text('Nomor Referensi/Approval (Opsional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
+                    SizedBox(height: 10),
+                    TextField(
+                      controller: _paymentReferenceController,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Contoh: 123456 (EDC)',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
+                      ),
+                    ),
+                  ];
+                })(),
+
+                SizedBox(height: 24),
                   ];
                 })(),
 
@@ -1282,6 +1308,7 @@ class _POSScreenState extends State<POSScreen> {
         'totalAmount': _grandTotal,
         'cashReceived': _cashReceived > 0 ? _cashReceived : _grandTotal,
         'paymentMethod': _selectedPaymentMethod,
+        'paymentReference': _paymentReferenceController.text.trim(),
         'customerName': _customerNameController.text.trim(),
         'taxRate': _globalTaxRate,
         'taxAmount': _taxAmount,
@@ -1473,6 +1500,7 @@ class _POSScreenState extends State<POSScreen> {
           'taxRate': _globalTaxRate,
           'taxAmount': _taxAmount,
           'paymentMethod': _selectedPaymentMethod,
+          'paymentReference': _paymentReferenceController.text.trim(),
           'date': DateTime.now().toIso8601String(),
           'salespersonId': _selectedSalespersonId,
           'isSynced': false,

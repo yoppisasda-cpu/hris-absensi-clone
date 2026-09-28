@@ -2827,7 +2827,8 @@ app.post('/api/companies', async (req: Request, res: Response) => {
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
       plan, addons,
       discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion, discountProspecting,
-      adminEmail, adminPassword, adminName
+      adminEmail, adminPassword, adminName,
+      franchiseId
     } = req.body;
 
     // Gunakan Prisma Transaction agar jika salah satu gagal, semuanya dibatalkan
@@ -3953,7 +3954,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       plan, addons, purchasedInsights,
       discountKpi, discountLearning, discountInventory, discountAi, discountFraud, discountExpansion, discountProspecting,
       adminEmail, adminPassword, adminName, globalTaxRate,
-      allowDineIn, allowPickUp, allowDelivery
+      allowDineIn, allowPickUp, allowDelivery, franchiseId
     } = req.body;
 
     const payloadToLog = { 
@@ -3971,6 +3972,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       where: { id: companyId },
       data: {
         name,
+        franchiseId: franchiseId === undefined ? undefined : (franchiseId === '' ? null : franchiseId),
         allowDineIn: (allowDineIn !== undefined) ? (allowDineIn === true || allowDineIn === 'true') : undefined,
         allowPickUp: (allowPickUp !== undefined) ? (allowPickUp === true || allowPickUp === 'true') : undefined,
         allowDelivery: (allowDelivery !== undefined) ? (allowDelivery === true || allowDelivery === 'true') : undefined,
@@ -16522,7 +16524,7 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
     const userId = Number((req as any).userId);
 
     // 1. Role Verification
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, name: true } });
     if (!['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(user?.role || '')) {
       return res.status(403).json({ error: 'Akses Ditolak. Hanya Admin, Owner, dan Finance yang dapat menghapus transaksi penjualan.' });
     }
@@ -16605,6 +16607,19 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
 
       // 5. Hapus Penjualan Utama
       await tx.sale.delete({ where: { id: saleId }});
+
+      // 6. Record Audit Log
+      await tx.auditLog.create({
+        data: {
+          companyId: tenantId,
+          userId: userId,
+          userName: user?.name || 'Unknown',
+          action: 'DELETE_SALE',
+          entity: 'Sale',
+          entityId: sale.invoiceNumber,
+          details: JSON.stringify({ totalAmount: sale.totalAmount, date: sale.date }),
+        }
+      });
     });
 
     res.json({ message: 'Penjualan beserta seluruh jurnal terkait berhasil dihapus secara permanen' });
@@ -18018,6 +18033,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       pointsUsed = 0,
       pointsEarned = 0,
       taxRate = 0,
+      paymentMethod,
+      paymentReference,
       taxAmount = 0,
       pendingBillId = null,
       date,
@@ -18160,6 +18177,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           notes: finalNotes,
           status: 'PAID',
           saleType,
+          paymentMethod: paymentMethod || 'Bayar di Kasir',
+          paymentReference: paymentReference || null,
           serviceFee: Number(serviceFee),
           markupPercentage: Number(markupPercentage),
           memberDiscountAmount: Number(memberDiscountAmount),
@@ -18649,6 +18668,16 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
   try {
     const tenantId = Number((req as any).tenantId);
     const user = (req as any).user;
+    const { startDate, endDate } = req.query;
+    
+    let dateFilter: any = {};
+    if (startDate && endDate) {
+      dateFilter = {
+        gte: new Date(startDate as string),
+        lte: new Date(endDate as string)
+      };
+    }
+
     
     // We only care about orders that are READY or SERVED (i.e. they finished preparing)
     // and have both createdAt and preparedAt set.
@@ -18657,18 +18686,20 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
         companyId: tenantId,
         branchId: user?.branchId || undefined,
         kitchenStatus: { in: ['READY', 'SERVED'] },
-        preparedAt: { not: null }
+        preparedAt: { not: null },
+        ...(startDate && endDate ? { createdAt: dateFilter } : {})
       },
       select: {
         id: true,
         invoiceNumber: true,
         customerName: true,
+        date: true,
         createdAt: true,
         preparedAt: true,
         queueNumber: true
       },
       orderBy: { createdAt: 'desc' },
-      take: 100 // limit to recent 100 for table
+      take: (startDate && endDate) ? undefined : 100 // limit to 100 if no date filter, else fetch all in range
     });
 
     // Calculate times
@@ -18706,6 +18737,7 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
         invoiceNumber: sale.invoiceNumber,
         customerName: sale.customerName,
         queueNumber: sale.queueNumber,
+        date: sale.date,
         createdAt: sale.createdAt,
         preparedAt: sale.preparedAt,
         durationSeconds: diffSeconds
@@ -19697,5 +19729,23 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('[GLOBAL ERROR HANDLER]', req.method, req.url, '\nError:', err?.message, err?.stack?.substring(0, 300));
   if (!res.headersSent) {
     res.status(500).json({ error: err?.message || 'Internal Server Error' });
+  }
+});
+
+app.get('/api/audit-logs', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userRole = (req as any).userRole;
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(userRole)) {
+      return res.status(403).json({ error: 'Akses Ditolak.' });
+    }
+    const logs = await prisma.auditLog.findMany({
+      where: { companyId: tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    res.json(logs);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Terjadi kesalahan saat mengambil log audit' });
   }
 });

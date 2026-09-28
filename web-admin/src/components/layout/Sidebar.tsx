@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, CalendarCheck, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit, Sparkles, Database, Upload, Gift, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, LogOut, Receipt, Banknote, CalendarDays, CalendarCheck, Building2, Wallet, CreditCard, FileSpreadsheet, Settings, Watch, Megaphone, MapPin, Laptop, TrendingUp, Heart, GraduationCap, MessageSquare, Briefcase, BarChart3, PieChart, Coins, FileText, Box, ShoppingCart, Truck, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Monitor, BrainCircuit, Sparkles, Database, Upload, Gift, Image as ImageIcon, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useFeatures } from '@/lib/FeatureContext';
 import api from '@/lib/api';
@@ -661,6 +661,12 @@ export default function Sidebar() {
                     <Settings className="h-5 w-5" />
                     Pengaturan
                 </Link>
+                {userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
+                    <Link href="/dashboard/audit-log" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-rose-300 hover:text-rose-400 transition-colors">
+                        <ShieldCheck className="h-5 w-5 text-rose-500" />
+                        Audit Log
+                    </Link>
+                )}
                 <button
                     onClick={() => {
                         localStorage.clear();

@@ -128,6 +128,7 @@ model Company {
   vouchers                Voucher[]
   warehouses              Warehouse[]
   competitors             Competitor[]
+  auditLogs               AuditLog[]
   marketAnalyses          MarketAnalysis[]
   SavedBalanceSheetReport SavedBalanceSheetReport[]
 }
@@ -327,6 +328,7 @@ model User {
   salesAsCashier          Sale[]                    @relation("SaleCashier")
   salesAsSalesperson      Sale[]                    @relation("SaleSalesperson")
   shiftSchedules          ShiftSchedule[]
+  auditLogs               AuditLog[]
   branch                  Branch?                   @relation(fields: [branchId], references: [id])
   company                 Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   reportTo                User?                     @relation("ReportingLine", fields: [reportToId], references: [id])
@@ -922,6 +924,7 @@ model Sale {
   status                String       @default("PAID")
   saleType              String       @default("WALK_IN")
   paymentMethod         String?      @default("Bayar di Kasir")
+  paymentReference      String?
   deliveryMethod        String?      @default("Dine-in")
   serviceFee            Float        @default(0)
   markupPercentage      Float        @default(0)
@@ -1582,4 +1585,19 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  userId      Int?
+  userName    String?
+  action      String   // e.g. "DELETE_SALE", "UPDATE_SALE"
+  entity      String   // e.g. "Sale"
+  entityId    String   // e.g. "INV-123"
+  details     String?  // JSON string
+  createdAt   DateTime @default(now())
+  
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

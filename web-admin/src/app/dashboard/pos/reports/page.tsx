@@ -747,6 +747,11 @@ export default function POSReportsPage() {
                                                 <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest pl-1">
                                                     {sale.saleType || 'Direct'}
                                                 </div>
+                                                {sale.paymentReference && (
+                                                    <div className="text-[9px] text-amber-500/80 font-bold tracking-widest pl-1 mt-1">
+                                                        REF: {sale.paymentReference}
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-slate-300">
