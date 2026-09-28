@@ -354,8 +354,20 @@ class _POSScreenState extends State<POSScreen> {
       });
       // also update main screen to reflect grand total
       setState(() {});
+      if (_voucherController.text.isNotEmpty && _voucherDiscountAmount == 0) {
+        // If voucher was sent but no discount applied and no error thrown, we might need a generic message, but backend should throw.
+      }
     } catch (e) {
       print("Calc Error: $e");
+      String errMsg = e.toString();
+      if (errMsg.contains('Exception:')) {
+        errMsg = errMsg.replaceAll('Exception:', '').trim();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errMsg), backgroundColor: Colors.red));
+      setPanelState(() {
+        _voucherDiscountAmount = 0;
+      });
+      setState(() {});
     }
   }
 
@@ -1929,6 +1941,17 @@ class _POSScreenState extends State<POSScreen> {
                                             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF2D3748)),
                                             textAlign: TextAlign.center,
                                           ),
+                                          if (p['trackStock'] == true) ...[
+                                            SizedBox(height: 4),
+                                            Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue[50],
+                                                borderRadius: BorderRadius.circular(4)
+                                              ),
+                                              child: Text('Stok: ${p['stock'] ?? 0}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue[800])),
+                                            )
+                                          ],
                                           SizedBox(height: 8),
                                         ],
                                       ),
