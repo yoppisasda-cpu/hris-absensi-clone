@@ -56,15 +56,17 @@ export default function KitchenDisplay() {
             const token = localStorage.getItem('jwt_token');
             const tenantId = localStorage.getItem('currentTenantId');
             const orderKey = `${type}-${id}`;
-            const staffName = selectedStaffs[orderKey];
+            const staffId = selectedStaffs[orderKey];
 
-            if (!staffName) {
+            if (!staffId) {
                 toast.error('Mohon pilih staf yang mengerjakan terlebih dahulu!');
                 return;
             }
 
+            const staffName = staffs.find(s => s.id.toString() === staffId)?.name || '';
+
             await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/orders/${type}/${id}/ready`, 
-            { staffName }, {
+            { staffId: Number(staffId), staffName }, {
                 headers: { 
                     Authorization: `Bearer ${token}`,
                     ...(tenantId ? { 'x-tenant-id': tenantId } : {})
@@ -193,7 +195,7 @@ export default function KitchenDisplay() {
                                                 >
                                                     <option value="" disabled>-- Pilih Staf --</option>
                                                     {staffs.map(staff => (
-                                                        <option key={staff.id} value={staff.name}>{staff.name}</option>
+                                                        <option key={staff.id} value={staff.id.toString()}>{staff.name}</option>
                                                     ))}
                                                 </select>
                                             </div>

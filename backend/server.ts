@@ -18872,19 +18872,104 @@ app.patch('/api/kitchen/orders/:type/:id/ready', tenantMiddleware, async (req: R
   try {
     const tenantId = Number((req as any).tenantId);
     const { type, id } = req.params;
-    const { staffName } = req.body;
+    const { staffName, staffId } = req.body;
     
+    let orderCreatedAt: Date | null = null;
+    let totalItems = 0;
+
     if (type === 'pending') {
-      await prisma.pendingBill.update({
+      const order = await prisma.pendingBill.update({
         where: { id: Number(id), companyId: tenantId },
-        data: { kitchenStatus: 'READY', preparedAt: new Date(), kitchenStaffName: staffName || null }
+        data: { kitchenStatus: 'READY', preparedAt: new Date(), kitchenStaffName: staffName || null, kitchenStaffId: staffId ? Number(staffId) : null }
       });
+      orderCreatedAt = order.createdAt;
+      totalItems = Array.isArray(order.items) ? order.items.length : 1;
     } else if (type === 'sale') {
-      await prisma.sale.update({
+      const order = await prisma.sale.update({
         where: { id: Number(id), companyId: tenantId },
-        data: { kitchenStatus: 'READY', preparedAt: new Date(), kitchenStaffName: staffName || null }
+        data: { kitchenStatus: 'READY', preparedAt: new Date(), kitchenStaffName: staffName || null, kitchenStaffId: staffId ? Number(staffId) : null },
+        include: { SaleItem: true }
       });
+      orderCreatedAt = order.createdAt;
+      totalItems = order.SaleItem?.length || 1;
     }
+
+    // --- AUTO KPI SCORING LOGIC ---
+    if (staffId && orderCreatedAt) {
+        const leadTimeMin = Math.max(1, Math.round((new Date().getTime() - new Date(orderCreatedAt).getTime()) / 60000));
+        const currentMonth = new Date().getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+
+        // Ensure KPI Indicators exist
+        let speedIndicator = await prisma.kPIIndicator.findFirst({ where: { companyId: tenantId, systemType: 'KITCHEN_SPEED' }});
+        if (!speedIndicator) {
+            speedIndicator = await prisma.kPIIndicator.create({
+                data: { companyId: tenantId, name: 'Kecepatan Dapur (Auto)', target: 15, weight: 1, isSystem: true, systemType: 'KITCHEN_SPEED' }
+            });
+        }
+        
+        let volumeIndicator = await prisma.kPIIndicator.findFirst({ where: { companyId: tenantId, systemType: 'KITCHEN_VOLUME' }});
+        if (!volumeIndicator) {
+            volumeIndicator = await prisma.kPIIndicator.create({
+                data: { companyId: tenantId, name: 'Volume Masakan (Auto)', target: 500, weight: 1, isSystem: true, systemType: 'KITCHEN_VOLUME' }
+            });
+        }
+
+        // --- Calculate Average Speed & Total Volume for this Month ---
+        // Fetch all done sales this month
+        const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+        const endOfMonth = new Date(currentYear, currentMonth, 1);
+        
+        const salesThisMonth = await prisma.sale.findMany({
+            where: { companyId: tenantId, kitchenStaffId: Number(staffId), preparedAt: { not: null }, createdAt: { gte: startOfMonth, lt: endOfMonth } },
+            include: { SaleItem: true }
+        });
+        const pendingBillsThisMonth = await prisma.pendingBill.findMany({
+            where: { companyId: tenantId, kitchenStaffId: Number(staffId), preparedAt: { not: null }, createdAt: { gte: startOfMonth, lt: endOfMonth } }
+        });
+
+        let totalLeadTime = 0;
+        let orderCount = 0;
+        let itemVolume = 0;
+
+        salesThisMonth.forEach((s: any) => {
+            if (s.preparedAt && s.createdAt) {
+                totalLeadTime += Math.max(1, Math.round((s.preparedAt.getTime() - s.createdAt.getTime()) / 60000));
+                orderCount++;
+                itemVolume += s.SaleItem?.length || 1;
+            }
+        });
+        pendingBillsThisMonth.forEach((pb: any) => {
+            if (pb.preparedAt && pb.createdAt) {
+                totalLeadTime += Math.max(1, Math.round((pb.preparedAt.getTime() - pb.createdAt.getTime()) / 60000));
+                orderCount++;
+                itemVolume += Array.isArray(pb.items) ? pb.items.length : 1;
+            }
+        });
+
+        const averageSpeed = orderCount > 0 ? (totalLeadTime / orderCount) : leadTimeMin;
+        
+        // 1. Update Speed KPI (Score is calculated, for speed maybe we just save the minutes directly or calculate out of 100)
+        // If target is 15 mins, and they do it in 5, score = 100. Let's just save average minutes as score for simplicity, 
+        // or a percentage: (Target / AvgTime) * 100 (Capped at 100)
+        const speedScore = Math.min(100, Math.round((speedIndicator.target / averageSpeed) * 100));
+
+        await prisma.kPIScore.upsert({
+            where: { userId_indicatorId_month_year: { userId: Number(staffId), indicatorId: speedIndicator.id, month: currentMonth, year: currentYear } },
+            update: { score: speedScore, comment: `Rata-rata kecepatan: ${averageSpeed.toFixed(1)} menit (Auto Update dari KDS)` },
+            create: { companyId: tenantId, userId: Number(staffId), indicatorId: speedIndicator.id, score: speedScore, month: currentMonth, year: currentYear, comment: `Rata-rata kecepatan: ${averageSpeed.toFixed(1)} menit (Auto Update dari KDS)` }
+        });
+
+        // 2. Update Volume KPI
+        // Score = (Volume / Target) * 100
+        const volumeScore = Math.min(100, Math.round((itemVolume / volumeIndicator.target) * 100));
+        await prisma.kPIScore.upsert({
+            where: { userId_indicatorId_month_year: { userId: Number(staffId), indicatorId: volumeIndicator.id, month: currentMonth, year: currentYear } },
+            update: { score: volumeScore, comment: `Total pesanan: ${itemVolume} (Auto Update dari KDS)` },
+            create: { companyId: tenantId, userId: Number(staffId), indicatorId: volumeIndicator.id, score: volumeScore, month: currentMonth, year: currentYear, comment: `Total pesanan: ${itemVolume} (Auto Update dari KDS)` }
+        });
+    }
+
     res.json({ message: 'Status diubah ke READY' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal update status: ' + error.message });

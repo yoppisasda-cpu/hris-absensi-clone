@@ -948,6 +948,7 @@ model Sale {
   kitchenStatus         String       @default("PENDING")
   preparedAt            DateTime?
   kitchenStaffName      String?
+  kitchenStaffId        Int?
   branch                Branch?      @relation(fields: [branchId], references: [id])
   cashier               User?        @relation("SaleCashier", fields: [cashierId], references: [id])
   salespersonId         Int?
@@ -1069,6 +1070,7 @@ model PendingBill {
   kitchenStatus String    @default("PENDING")
   preparedAt    DateTime?
   kitchenStaffName String?
+  kitchenStaffId   Int?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   user          User      @relation(fields: [cashierId], references: [id])
