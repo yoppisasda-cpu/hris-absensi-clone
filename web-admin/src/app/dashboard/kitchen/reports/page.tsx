@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ChefHat, BarChart3, Clock, Calendar, CalendarDays, History } from 'lucide-react';
+import { ChefHat, BarChart3, Clock, Calendar, CalendarDays, History, ArrowUpDown } from 'lucide-react';
 
 export default function KitchenReports() {
     const [reports, setReports] = useState<any>(null);
@@ -10,6 +10,19 @@ export default function KitchenReports() {
     const todayStr = new Date().toISOString().split('T')[0];
     const [startDate, setStartDate] = useState(todayStr);
     const [endDate, setEndDate] = useState(todayStr);
+    const [sortOrder, setSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
+
+    const sortedHistory = [...(reports?.history || [])].sort((a, b) => {
+        if (sortOrder === 'asc') return (a.durationSeconds || 0) - (b.durationSeconds || 0);
+        if (sortOrder === 'desc') return (b.durationSeconds || 0) - (a.durationSeconds || 0);
+        return 0;
+    });
+
+    const toggleSort = () => {
+        if (sortOrder === 'none') setSortOrder('desc');
+        else if (sortOrder === 'desc') setSortOrder('asc');
+        else setSortOrder('none');
+    };
 
     const setQuickFilter = (type: 'today' | 'week' | 'month' | 'all') => {
         const today = new Date();
@@ -159,16 +172,25 @@ export default function KitchenReports() {
                                 <th className="p-4 font-semibold text-center">Tanggal Transaksi</th>
                                 <th className="p-4 font-semibold text-center">Jam Masuk</th>
                                 <th className="p-4 font-semibold text-center">Jam Selesai</th>
-                                <th className="p-4 font-semibold text-right">Durasi Masak</th>
+                                <th className="p-4 font-semibold text-right">
+                                    <button 
+                                        onClick={toggleSort} 
+                                        className="inline-flex items-center gap-1 hover:text-white transition-colors"
+                                        title="Urutkan berdasarkan durasi"
+                                    >
+                                        Durasi Masak 
+                                        <ArrowUpDown size={14} className={sortOrder !== 'none' ? 'text-amber-400' : 'text-white/40'} />
+                                    </button>
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {reports?.history?.length === 0 ? (
+                            {sortedHistory.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="p-8 text-center text-white/40">Belum ada data produksi</td>
                                 </tr>
                             ) : (
-                                reports?.history?.map((sale: any) => (
+                                sortedHistory.map((sale: any) => (
                                     <tr key={sale.id} className="hover:bg-white/5 transition-colors">
                                         <td className="p-4 text-white">
                                             <div className="flex flex-col">
