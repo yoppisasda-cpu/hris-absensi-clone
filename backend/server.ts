@@ -16201,12 +16201,13 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         const quantity = parseFloat(item.quantity);
         const price = parseFloat(item.price);
         const total = quantity * price;
+        const modifiersStr = item.modifiers ? JSON.stringify(item.modifiers) : null;
 
         // Insert Sale Item
         await tx.$executeRawUnsafe(`
-          INSERT INTO "SaleItem" ("saleId", "productId", "quantity", "price", "total")
-          VALUES ($1, $2, $3, $4, $5)
-        `, saleId, productId, quantity, price, total);
+          INSERT INTO "SaleItem" ("saleId", "productId", "quantity", "price", "total", "modifiers")
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+        `, saleId, productId, quantity, price, total, modifiersStr);
 
         // --- NEW BOM LOGIC ---
         // Check if product has a recipe (BOM)
