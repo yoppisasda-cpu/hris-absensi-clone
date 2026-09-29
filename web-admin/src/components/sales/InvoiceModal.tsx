@@ -1,7 +1,7 @@
 'use client';
 // Active B2B Invoice Protocol
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { X, Printer, Download, Mail, Phone, MapPin, Package, CreditCard, CheckCircle, Clock } from "lucide-react";
 import api from "@/lib/api";
 import { format } from "date-fns";
@@ -304,32 +304,50 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 italic print:divide-black text-slate-950">
-                                        {sale.items.map((item: any, idx: number) => (
-                                            <tr key={idx} className="group hover:bg-slate-50 transition-colors print:text-black">
-                                                <td className="px-8 py-2">
-                                                    <p className="font-black text-slate-950 text-[11px] uppercase tracking-tighter print:text-black">{item.product_name}</p>
-                                                    {item.modifiers && Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
-                                                        <div className="mt-0.5">
-                                                            {item.modifiers.map((mod: any, mIdx: number) => (
-                                                                <p key={mIdx} className="text-[9px] text-slate-500 italic print:text-black/70">
+                                        {sale.items.map((item: any, idx: number) => {
+                                            const hasModifiers = item.modifiers && Array.isArray(item.modifiers) && item.modifiers.length > 0;
+                                            const isBuy1Get1 = item.product_name.toLowerCase().includes('buy 1 get 1');
+                                            const mainUnit = isBuy1Get1 ? 'PAKET' : item.product_unit;
+
+                                            return (
+                                                <Fragment key={idx}>
+                                                    <tr className="group hover:bg-slate-50 transition-colors print:text-black">
+                                                        <td className="px-8 py-2">
+                                                            <p className="font-black text-slate-950 text-[11px] uppercase tracking-tighter print:text-black">{item.product_name}</p>
+                                                        </td>
+                                                        <td className="px-8 py-2 text-center">
+                                                            <span className="font-black text-slate-950 text-[11px] print:text-black">{item.quantity}</span>
+                                                            <span className="ml-2 text-[9px] text-slate-500 font-black uppercase tracking-widest print:text-black/60">{mainUnit}</span>
+                                                        </td>
+                                                        <td className="px-8 py-2 text-right font-black text-slate-500 text-[11px] tracking-widest print:text-black">
+                                                            {parseFloat(item.price).toLocaleString()}
+                                                        </td>
+                                                        <td className="px-8 py-2 text-right font-black text-slate-950 text-[11px] tracking-widest print:text-black">
+                                                            {parseFloat(item.total).toLocaleString()}
+                                                        </td>
+                                                    </tr>
+                                                    {hasModifiers && item.modifiers.map((mod: any, mIdx: number) => (
+                                                        <tr key={`mod-${idx}-${mIdx}`} className="border-b border-slate-50 last:border-0 print:border-black/10 bg-slate-50/50 print:bg-transparent">
+                                                            <td className="px-8 py-1.5 pl-12">
+                                                                <p className="text-[10px] text-slate-600 italic font-black uppercase tracking-tighter print:text-black/80">
                                                                     - {mod.optionName || mod.name}
                                                                 </p>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-8 py-2 text-center">
-                                                    <span className="font-black text-slate-950 text-[11px] print:text-black">{item.quantity}</span>
-                                                    <span className="ml-2 text-[9px] text-slate-500 font-black uppercase tracking-widest print:text-black/60">{item.product_unit}</span>
-                                                </td>
-                                                <td className="px-8 py-2 text-right font-black text-slate-500 text-[11px] tracking-widest print:text-black">
-                                                    {parseFloat(item.price).toLocaleString()}
-                                                </td>
-                                                <td className="px-8 py-2 text-right font-black text-slate-950 text-[11px] tracking-widest print:text-black">
-                                                    {parseFloat(item.total).toLocaleString()}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                            </td>
+                                                            <td className="px-8 py-1.5 text-center">
+                                                                <span className="font-black text-slate-500 text-[10px] print:text-black/80">{item.quantity}</span>
+                                                                <span className="ml-2 text-[8px] text-slate-400 font-black uppercase tracking-widest print:text-black/50">CUP</span>
+                                                            </td>
+                                                            <td className="px-8 py-1.5 text-right font-black text-slate-400 text-[10px] tracking-widest print:text-black/60">
+                                                                0
+                                                            </td>
+                                                            <td className="px-8 py-1.5 text-right font-black text-slate-400 text-[10px] tracking-widest print:text-black/60">
+                                                                0
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </Fragment>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
