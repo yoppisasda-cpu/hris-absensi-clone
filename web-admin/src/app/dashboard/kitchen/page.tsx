@@ -8,17 +8,18 @@ import Link from 'next/link';
 export default function KitchenDisplay() {
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [staffs, setStaffs] = useState<any[]>([]);
+    const [selectedStaffs, setSelectedStaffs] = useState<Record<string, string>>({});
 
     const fetchOrders = async () => {
         try {
             const token = localStorage.getItem('jwt_token');
             const tenantId = localStorage.getItem('currentTenantId');
-            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/orders`, {
-                headers: { 
-                    Authorization: `Bearer ${token}`,
-                    ...(tenantId ? { 'x-tenant-id': tenantId } : {})
-                }
-            });
+            const headers = { 
+                Authorization: `Bearer ${token}`,
+                ...(tenantId ? { 'x-tenant-id': tenantId } : {})
+            };
+            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/orders`, { headers });
             setOrders(res.data);
         } catch (error: any) {
             console.error('Error fetching kitchen orders', error);
@@ -27,8 +28,25 @@ export default function KitchenDisplay() {
         }
     };
 
+    const fetchStaffs = async () => {
+        try {
+            const token = localStorage.getItem('jwt_token');
+            const tenantId = localStorage.getItem('currentTenantId');
+            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
+                headers: { 
+                    Authorization: `Bearer ${token}`,
+                    ...(tenantId ? { 'x-tenant-id': tenantId } : {})
+                }
+            });
+            setStaffs(res.data);
+        } catch (error: any) {
+            console.error('Error fetching staffs', error);
+        }
+    };
+
     useEffect(() => {
         fetchOrders();
+        fetchStaffs();
         const interval = setInterval(fetchOrders, 10000); // Polling every 10 seconds
         return () => clearInterval(interval);
     }, []);
@@ -37,7 +55,16 @@ export default function KitchenDisplay() {
         try {
             const token = localStorage.getItem('jwt_token');
             const tenantId = localStorage.getItem('currentTenantId');
-            await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/orders/${type}/${id}/ready`, {}, {
+            const orderKey = `${type}-${id}`;
+            const staffName = selectedStaffs[orderKey];
+
+            if (!staffName) {
+                toast.error('Mohon pilih staf yang mengerjakan terlebih dahulu!');
+                return;
+            }
+
+            await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/orders/${type}/${id}/ready`, 
+            { staffName }, {
                 headers: { 
                     Authorization: `Bearer ${token}`,
                     ...(tenantId ? { 'x-tenant-id': tenantId } : {})
@@ -156,7 +183,20 @@ export default function KitchenDisplay() {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="p-4 border-t border-white/10 mt-auto">
+                                        <div className="p-4 border-t border-white/10 mt-auto space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-white/60 text-sm font-semibold whitespace-nowrap">Dikerjakan Oleh:</span>
+                                                <select
+                                                    value={selectedStaffs[`${order.type}-${order.id}`] || ''}
+                                                    onChange={(e) => setSelectedStaffs({...selectedStaffs, [`${order.type}-${order.id}`]: e.target.value})}
+                                                    className="w-full bg-slate-800 text-white text-sm font-bold border border-slate-700 rounded-lg p-2 outline-none focus:border-amber-500"
+                                                >
+                                                    <option value="" disabled>-- Pilih Staf --</option>
+                                                    {staffs.map(staff => (
+                                                        <option key={staff.id} value={staff.name}>{staff.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                             <button 
                                                 onClick={() => markAsReady(order.type, order.id)}
                                                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">

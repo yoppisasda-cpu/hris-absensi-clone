@@ -18872,16 +18872,17 @@ app.patch('/api/kitchen/orders/:type/:id/ready', tenantMiddleware, async (req: R
   try {
     const tenantId = Number((req as any).tenantId);
     const { type, id } = req.params;
+    const { staffName } = req.body;
     
     if (type === 'pending') {
       await prisma.pendingBill.update({
         where: { id: Number(id), companyId: tenantId },
-        data: { kitchenStatus: 'READY', preparedAt: new Date() }
+        data: { kitchenStatus: 'READY', preparedAt: new Date(), kitchenStaffName: staffName || null }
       });
     } else if (type === 'sale') {
       await prisma.sale.update({
         where: { id: Number(id), companyId: tenantId },
-        data: { kitchenStatus: 'READY', preparedAt: new Date() }
+        data: { kitchenStatus: 'READY', preparedAt: new Date(), kitchenStaffName: staffName || null }
       });
     }
     res.json({ message: 'Status diubah ke READY' });
