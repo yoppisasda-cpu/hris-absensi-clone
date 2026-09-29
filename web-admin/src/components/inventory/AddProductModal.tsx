@@ -1088,17 +1088,27 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                                 />
                                             </div>
                                             <div className="flex-1 flex flex-col items-end gap-1">
-                                                <input
-                                                    required
-                                                    type="number"
-                                                    placeholder="QTY"
-                                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3 px-5 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all text-center italic"
-                                                    value={item.quantity || ""}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value);
-                                                        updateRecipeItem(index, 'quantity', isNaN(val) ? 0 : val);
-                                                    }}
-                                                />
+                                                <div className="relative w-full">
+                                                    <input
+                                                        required
+                                                        type="number"
+                                                        placeholder="QTY"
+                                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3 px-5 text-[11px] font-black text-white focus:border-amber-500/50 outline-none transition-all text-center italic"
+                                                        value={item.quantity || ""}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value);
+                                                            updateRecipeItem(index, 'quantity', isNaN(val) ? 0 : val);
+                                                        }}
+                                                    />
+                                                    {item.materialId && (
+                                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase text-slate-500 pointer-events-none">
+                                                            {(() => {
+                                                                const mat = productList.find((p: any) => p.id.toString() === item.materialId);
+                                                                return mat?.unit || '';
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 {item.materialId && (
                                                     <span className="text-[9px] font-black text-amber-500/80 italic pr-2">
                                                         = Rp {(() => {

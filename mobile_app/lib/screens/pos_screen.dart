@@ -1074,8 +1074,6 @@ class _POSScreenState extends State<POSScreen> {
                 })(),
 
                 SizedBox(height: 24),
-                  ];
-                })(),
 
                 Row(
                   children: [
