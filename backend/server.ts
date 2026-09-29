@@ -18700,9 +18700,24 @@ app.delete('/api/pos/pending/:id', tenantMiddleware, async (req: Request, res: R
     const tenantId = Number((req as any).tenantId);
     const id = Number(req.params.id);
 
-    await prisma.pendingBill.delete({
-      where: { id, companyId: tenantId },
-    });
+    const pendingBill = await prisma.pendingBill.findFirst({ where: { id, companyId: tenantId } });
+    if (pendingBill) {
+        await prisma.pendingBill.delete({
+          where: { id, companyId: tenantId },
+        });
+
+        const userId = Number((req as any).userId) || pendingBill.cashierId;
+        await prisma.auditLog.create({
+          data: {
+            companyId: tenantId,
+            userId: userId,
+            action: 'DELETE_PENDING_BILL',
+            entity: 'PendingBill',
+            entityId: id,
+            details: `Menghapus pending bill (Hold Bill) ${pendingBill.label || id}`,
+          }
+        });
+    }
 
     res.json({ message: 'Pending bill dihapus' });
   } catch (error: any) {
