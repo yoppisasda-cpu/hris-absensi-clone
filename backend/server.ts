@@ -18713,7 +18713,7 @@ app.delete('/api/pos/pending/:id', tenantMiddleware, async (req: Request, res: R
             userId: userId,
             action: 'DELETE_PENDING_BILL',
             entity: 'PendingBill',
-            entityId: id,
+            entityId: String(id),
             details: `Menghapus pending bill (Hold Bill) ${pendingBill.label || id}`,
           }
         });
