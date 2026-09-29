@@ -16523,6 +16523,20 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
           }
         }
       }
+
+      const userId = Number((req as any).userId);
+      if (userId && (status === 'VOID' || status === 'CANCELLED')) {
+          await tx.auditLog.create({
+            data: {
+              companyId: tenantId,
+              userId: userId,
+              action: 'VOID_SALE',
+              entity: 'Sale',
+              entityId: sale.invoiceNumber,
+              details: `Membatalkan (Void) penjualan ${sale.invoiceNumber}`,
+            }
+          });
+      }
     });
 
     res.json({ message: `Status updated to ${status}` });
@@ -17594,6 +17608,17 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
       }
 
       await tx.$executeRawUnsafe(`UPDATE "Sale" SET "status" = $1, "updatedAt" = NOW() WHERE id = $2`, newStatus, saleId);
+
+      await tx.auditLog.create({
+        data: {
+          companyId: tenantId,
+          userId: userId,
+          action: 'REFUND_SALE',
+          entity: 'Sale',
+          entityId: originalSale.invoiceNumber,
+          details: `Memproses Refund/Retur dengan nomor ${returnNumber} senilai ${totalRefundAmount}`,
+        }
+      });
 
       return { returnId, returnNumber, refundAmount: totalRefundAmount, newStatus };
     }, {
