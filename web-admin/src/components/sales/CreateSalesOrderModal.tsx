@@ -44,6 +44,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
   const [price, setPrice] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [activeContractItems, setActiveContractItems] = useState<Record<number, number>>({});
 
   const fetchData = async () => {
     try {
@@ -120,8 +121,35 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     setSelectedProduct(pId);
     setIsProductDropdownOpen(false);
     const prod = products.find(p => p.id.toString() === pId);
-    if (prod) setPrice(prod.price.toString());
-    else setPrice("");
+    if (prod) {
+      // Gunakan harga kontrak jika ada, fallback ke harga normal
+      const contractPrice = activeContractItems[prod.id];
+      setPrice(contractPrice !== undefined ? contractPrice.toString() : prod.price.toString());
+    } else {
+      setPrice("");
+    }
+  };
+
+  // Fetch kontrak B2B aktif saat customer berubah
+  const handleCustomerChange = async (newCustomerId: string) => {
+    setCustomerId(newCustomerId);
+    setActiveContractItems({});
+    if (!newCustomerId) return;
+    try {
+      const res = await api.get('/b2b-contracts');
+      const contracts: any[] = res.data;
+      const activeContract = contracts.find(
+        (c: any) => c.customerId.toString() === newCustomerId && c.status === 'ACTIVE'
+      );
+      if (activeContract?.items?.length) {
+        const map: Record<number, number> = {};
+        activeContract.items.forEach((item: any) => {
+          map[item.productId] = item.contractPrice;
+        });
+        setActiveContractItems(map);
+        toast.success(`Harga Kontrak B2B "${activeContract.contractNumber}" diterapkan`);
+      }
+    } catch {}
   };
 
   const filteredProducts = products.filter(p => 
@@ -203,7 +231,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Corporate Identity (PT/CV)</label>
                 <select
                   value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
+                  onChange={(e) => handleCustomerChange(e.target.value)}
                   required
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none cursor-pointer"
                 >

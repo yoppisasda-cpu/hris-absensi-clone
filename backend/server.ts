@@ -188,7 +188,8 @@ const requiredFolders = [
   path.join(process.cwd(), 'uploads/announcements'),
   path.join(process.cwd(), 'uploads/logos'),
   path.join(process.cwd(), 'uploads/products'),
-  path.join(process.cwd(), 'uploads/avatars')
+  path.join(process.cwd(), 'uploads/avatars'),
+  path.join(process.cwd(), 'uploads/contracts')
 ];
 
 requiredFolders.forEach(folder => {
@@ -941,6 +942,7 @@ const uploadLogo = multer({ dest: path.join(process.cwd(), 'uploads/logos/') });
 const uploadBanner = multer({ dest: path.join(process.cwd(), 'uploads/banners/') });
 const uploadProduct = multer({ dest: path.join(process.cwd(), 'uploads/products/') });
 const uploadAvatar = multer({ dest: path.join(process.cwd(), 'uploads/avatars/') });
+const uploadContract = multer({ dest: path.join(process.cwd(), 'uploads/contracts/') });
 
 // --- 1. MIDDLEWARE MULTI-TENANT & AUTH (CRITICAL) ---
 // Middleware ini mengekstrak profil Karyawan dari token JWT.
@@ -1433,6 +1435,30 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
         }
       }
 
+      // --- B2B CONTRACT CREDIT CHECK ---
+      const activeContract = await tx.b2BContract.findFirst({
+        where: {
+          companyId: tenantId,
+          customerId: order.customerId,
+          status: 'ACTIVE',
+          startDate: { lte: new Date() },
+          endDate: { gte: new Date() }
+        }
+      });
+
+      if (activeContract) {
+        const availableCredit = activeContract.creditLimit - activeContract.usedCredit;
+        if (order.totalAmount > availableCredit) {
+          throw new Error(`Limit Kredit Kontrak B2B Tidak Mencukupi! Sisa limit: Rp ${availableCredit.toLocaleString('id-ID')}`);
+        }
+        
+        await tx.b2BContract.update({
+          where: { id: activeContract.id },
+          data: { usedCredit: { increment: order.totalAmount } }
+        });
+      }
+      // ---------------------------------
+
       await tx.salesOrder.update({
         where: { id: order.id },
         data: { status: 'INVOICED', saleId: newSale.id }
@@ -1528,6 +1554,25 @@ app.post('/api/sales/orders/:id/revert-invoice', tenantMiddleware, async (req: R
 
       // 6. Hapus Penjualan Utama (Invoice)
       await tx.sale.delete({ where: { id: saleId }});
+
+      // --- RESTORE B2B CONTRACT CREDIT ---
+      const activeContract = await tx.b2BContract.findFirst({
+        where: {
+          companyId: tenantId,
+          customerId: order.customerId,
+          status: 'ACTIVE',
+          startDate: { lte: new Date() },
+          endDate: { gte: new Date() }
+        }
+      });
+
+      if (activeContract) {
+        await tx.b2BContract.update({
+          where: { id: activeContract.id },
+          data: { usedCredit: { decrement: order.totalAmount } }
+        });
+      }
+      // ---------------------------------
 
       // 7. Revert Sales Order status
       await tx.salesOrder.update({
@@ -14108,6 +14153,27 @@ app.patch('/api/finance/sales/:id/pay', tenantMiddleware, async (req: Request, r
         data: { balance: { increment: amountToPay } }
       });
 
+      // --- RESTORE B2B CONTRACT CREDIT ---
+      if (sale.customerId) {
+        const activeContract = await (tx as any).b2BContract.findFirst({
+          where: {
+            companyId: tenantId,
+            customerId: sale.customerId,
+            status: 'ACTIVE',
+            startDate: { lte: dateVal },
+            endDate: { gte: dateVal }
+          }
+        });
+
+        if (activeContract) {
+          await (tx as any).b2BContract.update({
+            where: { id: activeContract.id },
+            data: { usedCredit: { decrement: amountToPay } }
+          });
+        }
+      }
+      // ---------------------------------
+
       return { id, status: newStatus, paidAmount: newPaidAmount, invoiceNumber: sale.invoiceNumber, amountPaidThisTime: amountToPay };
     });
 
@@ -19886,24 +19952,7 @@ app.post('/api/chat', tenantMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-runAutoMigration().then(() => {
-  httpServer.listen(PORT, () => {
-    console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
-    console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);
-    initCleanupCron(); // Start the background cleanup job
-  });
-});
-// Trigger reload
 
-// ==========================================
-// GLOBAL ERROR HANDLER (Express 5 Compatible)
-// ==========================================
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error('[GLOBAL ERROR HANDLER]', req.method, req.url, '\nError:', err?.message, err?.stack?.substring(0, 300));
-  if (!res.headersSent) {
-    res.status(500).json({ error: err?.message || 'Internal Server Error' });
-  }
-});
 
 app.get('/api/audit-logs', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -19931,3 +19980,213 @@ app.get('/api/audit-logs', tenantMiddleware, async (req: Request, res: Response)
     res.status(500).json({ error: 'Terjadi kesalahan saat mengambil log audit' });
   }
 });
+
+// ==========================================
+// 🚀 B2B CONTRACT APIs
+// ==========================================
+
+// 1. Get all B2B Contracts
+app.get('/api/b2b-contracts', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const contracts = await prisma.b2BContract.findMany({
+      where: { companyId: tenantId },
+      include: { customer: true, items: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(contracts);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data kontrak B2B: ' + error.message });
+  }
+});
+
+// 2. Create B2B Contract
+app.post('/api/b2b-contracts', tenantMiddleware, uploadContract.single('file'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+    const { customerId, contractNumber, title, startDate, endDate, creditLimit, reminderDays, picName, picContact, notes } = req.body;
+    let fileUrl = req.body.fileUrl || '';
+    let parsedItems = [];
+    if (req.body.items) {
+      try { parsedItems = JSON.parse(req.body.items); } catch(e) {}
+    }
+
+    if (req.file) {
+      const fullLocalPath = path.join(process.cwd(), 'uploads/contracts', req.file.filename);
+      try {
+        fileUrl = await uploadToSupabase(fullLocalPath, 'contracts');
+        if (fileUrl.startsWith('/uploads/')) {
+          fileUrl = process.env.NEXT_PUBLIC_API_URL 
+            ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api', '')}${fileUrl}`
+            : `http://localhost:${PORT || 5005}${fileUrl}`;
+        }
+      } catch (uploadError) {
+        console.error('Failed to upload contract file:', uploadError);
+        fileUrl = `/uploads/contracts/${req.file.filename}`;
+        fileUrl = process.env.NEXT_PUBLIC_API_URL 
+          ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api', '')}${fileUrl}`
+          : `http://localhost:${PORT || 5005}${fileUrl}`;
+      }
+    }
+    
+    const newContract = await prisma.b2BContract.create({
+      data: {
+        companyId: tenantId,
+        customerId: Number(customerId),
+        contractNumber,
+        title,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        fileUrl,
+        creditLimit: Number(creditLimit) || 0,
+        reminderDays: Number(reminderDays) || 30,
+        picName,
+        picContact,
+        notes,
+        items: {
+          create: parsedItems.map((item: any) => ({
+            productId: Number(item.productId),
+            contractPrice: Number(item.contractPrice)
+          }))
+        }
+      },
+      include: { items: true }
+    });
+    
+    await prisma.auditLog.create({
+      data: {
+        companyId: tenantId,
+        userId: userId,
+        action: 'CREATE_B2B_CONTRACT',
+        entity: 'B2BContract',
+        entityId: contractNumber,
+        details: `Membuat Kontrak B2B: ${title}`,
+      }
+    });
+
+    res.json(newContract);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal membuat kontrak B2B: ' + error.message });
+  }
+});
+
+// 3. Update B2B Contract
+app.put('/api/b2b-contracts/:id', tenantMiddleware, uploadContract.single('file'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+    const contractId = Number(req.params.id);
+    const { status, title, startDate, endDate, creditLimit, reminderDays, picName, picContact, notes } = req.body;
+    let fileUrl = req.body.fileUrl;
+    let parsedItems = [];
+    if (req.body.items) {
+      try { parsedItems = JSON.parse(req.body.items); } catch(e) {}
+    }
+
+    if (req.file) {
+      const fullLocalPath = path.join(process.cwd(), 'uploads/contracts', req.file.filename);
+      try {
+        fileUrl = await uploadToSupabase(fullLocalPath, 'contracts');
+        if (fileUrl.startsWith('/uploads/')) {
+          fileUrl = process.env.NEXT_PUBLIC_API_URL 
+            ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api', '')}${fileUrl}`
+            : `http://localhost:${PORT || 5005}${fileUrl}`;
+        }
+      } catch (uploadError) {
+        console.error('Failed to upload contract file:', uploadError);
+        fileUrl = `/uploads/contracts/${req.file.filename}`;
+        fileUrl = process.env.NEXT_PUBLIC_API_URL 
+          ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api', '')}${fileUrl}`
+          : `http://localhost:${PORT || 5005}${fileUrl}`;
+      }
+    }
+
+    const updated = await prisma.b2BContract.update({
+      where: { id: contractId, companyId: tenantId },
+      data: {
+        status, title, picName, picContact, notes,
+        ...(fileUrl ? { fileUrl } : {}),
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+        creditLimit: creditLimit !== undefined ? Number(creditLimit) : undefined,
+        reminderDays: reminderDays !== undefined ? Number(reminderDays) : undefined,
+        items: {
+          deleteMany: {},
+          create: parsedItems.map((item: any) => ({
+            productId: Number(item.productId),
+            contractPrice: Number(item.contractPrice)
+          }))
+        }
+      },
+      include: { items: true }
+    });
+    
+    await prisma.auditLog.create({
+      data: {
+        companyId: tenantId,
+        userId: userId,
+        action: 'UPDATE_B2B_CONTRACT',
+        entity: 'B2BContract',
+        entityId: updated.contractNumber,
+        details: `Update Kontrak B2B: ${updated.title}`,
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengupdate kontrak B2B: ' + error.message });
+  }
+});
+
+// 4. Delete B2B Contract
+app.delete('/api/b2b-contracts/:id', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+    const contractId = Number(req.params.id);
+
+    const contract = await prisma.b2BContract.findFirst({ where: { id: contractId, companyId: tenantId } });
+    if (!contract) return res.status(404).json({ error: 'Kontrak tidak ditemukan' });
+
+    await prisma.b2BContract.delete({
+      where: { id: contractId, companyId: tenantId }
+    });
+    
+    await prisma.auditLog.create({
+      data: {
+        companyId: tenantId,
+        userId: userId,
+        action: 'DELETE_B2B_CONTRACT',
+        entity: 'B2BContract',
+        entityId: contract.contractNumber,
+        details: `Menghapus Kontrak B2B: ${contract.title}`,
+      }
+    });
+
+    res.json({ message: 'Kontrak B2B berhasil dihapus' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal menghapus kontrak B2B: ' + error.message });
+  }
+});
+
+
+runAutoMigration().then(() => {
+  httpServer.listen(PORT, () => {
+    console.log(`✅ Backend SaaS aivola berjalan di http://localhost:${PORT}`);
+    console.log(`⚠️  Peringatan: Pastikan PostgreSQL database berjalan dan URLnya sudah diset di file .env (DATABASE_URL)`);
+    initCleanupCron(); // Start the background cleanup job
+  });
+});
+// Trigger reload
+
+// ==========================================
+// GLOBAL ERROR HANDLER (Express 5 Compatible)
+// ==========================================
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error('[GLOBAL ERROR HANDLER]', req.method, req.url, '\nError:', err?.message, err?.stack?.substring(0, 300));
+  if (!res.headersSent) {
+    res.status(500).json({ error: err?.message || 'Internal Server Error' });
+  }
+});
+

@@ -131,6 +131,7 @@ model Company {
   auditLogs               AuditLog[]
   marketAnalyses          MarketAnalysis[]
   SavedBalanceSheetReport SavedBalanceSheetReport[]
+  B2BContract             B2BContract[]
 }
 
 model FinancialAccount {
@@ -561,26 +562,26 @@ model EmployeeDocument {
 }
 
 model Asset {
-  id             Int       @id @default(autoincrement())
-  companyId      Int
-  userId         Int?
-  name           String
-  category       String    @default("ELECTRONIC")
-  taxCategory    String?   @default("NON_TAXABLE")
-  serialNumber   String?
-  condition      String    @default("GOOD")
-  purchaseDate   DateTime?
-  purchasePrice  Float?    @default(0)
-  residualValue  Float?    @default(0)
-  usefulLife     Int?      @default(0)
-  isDepreciating Boolean?  @default(false)
-  accumulatedDepreciation Float? @default(0)
-  bookValue      Float?    @default(0)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  imageUrl       String?
-  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user           User?     @relation(fields: [userId], references: [id])
+  id                      Int       @id @default(autoincrement())
+  companyId               Int
+  userId                  Int?
+  name                    String
+  category                String    @default("ELECTRONIC")
+  taxCategory             String?   @default("NON_TAXABLE")
+  serialNumber            String?
+  condition               String    @default("GOOD")
+  purchaseDate            DateTime?
+  purchasePrice           Float?    @default(0)
+  residualValue           Float?    @default(0)
+  usefulLife              Int?      @default(0)
+  isDepreciating          Boolean?  @default(false)
+  accumulatedDepreciation Float?    @default(0)
+  bookValue               Float?    @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  imageUrl                String?
+  company                 Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user                    User?     @relation(fields: [userId], references: [id])
 
   @@index([companyId, serialNumber])
 }
@@ -815,6 +816,7 @@ model Customer {
   pointHistory    PointHistory[]
   claimedVouchers CustomerVoucher[]
   addresses       CustomerAddress[]
+  b2bContracts    B2BContract[]
   company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, phone], name: "companyId_phone")
@@ -893,6 +895,7 @@ model Product {
   salesOrderItems    SalesOrderItem[]
   StockTransaction   StockTransaction[]
   WarehouseStock     WarehouseStock[]
+  b2bContractItems   B2BContractItem[]
 
   @@unique([companyId, sku])
 }
@@ -1059,21 +1062,21 @@ model PeriodClosing {
 }
 
 model PendingBill {
-  id            Int       @id @default(autoincrement())
-  companyId     Int
-  branchId      Int
-  cashierId     Int
-  label         String?
-  items         Json
-  saleType      String    @default("WALK_IN")
-  queueNumber   Int?
-  kitchenStatus String    @default("PENDING")
-  preparedAt    DateTime?
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  branchId         Int
+  cashierId        Int
+  label            String?
+  items            Json
+  saleType         String    @default("WALK_IN")
+  queueNumber      Int?
+  kitchenStatus    String    @default("PENDING")
+  preparedAt       DateTime?
   kitchenStaffName String?
   kitchenStaffId   Int?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  user          User      @relation(fields: [cashierId], references: [id])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [cashierId], references: [id])
 }
 
 model PosClosing {
@@ -1592,16 +1595,54 @@ model PasswordResetToken {
 }
 
 model AuditLog {
-  id          Int      @id @default(autoincrement())
-  companyId   Int
-  userId      Int?
-  userName    String?
-  action      String   // e.g. "DELETE_SALE", "UPDATE_SALE"
-  entity      String   // e.g. "Sale"
-  entityId    String   // e.g. "INV-123"
-  details     String?  // JSON string
-  createdAt   DateTime @default(now())
-  
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  userId    Int?
+  userName  String?
+  action    String // e.g. "DELETE_SALE", "UPDATE_SALE"
+  entity    String // e.g. "Sale"
+  entityId  String // e.g. "INV-123"
+  details   String? // JSON string
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model B2BContract {
+  id             Int      @id @default(autoincrement())
+  companyId      Int
+  customerId     Int
+  contractNumber String   @unique
+  title          String
+  startDate      DateTime
+  endDate        DateTime
+  status         String   @default("ACTIVE") // ACTIVE, EXPIRED, TERMINATED
+  fileUrl        String?
+  creditLimit    Float    @default(0)
+  usedCredit     Float    @default(0)
+  reminderDays   Int      @default(30)
+  picName        String?
+  picContact     String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items    B2BContractItem[]
+}
+
+model B2BContractItem {
+  id             Int         @id @default(autoincrement())
+  contractId     Int
+  productId      Int
+  contractPrice  Float
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  contract       B2BContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, productId])
 }
