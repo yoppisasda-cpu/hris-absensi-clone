@@ -19915,9 +19915,18 @@ app.get('/api/audit-logs', tenantMiddleware, async (req: Request, res: Response)
     const logs = await prisma.auditLog.findMany({
       where: { companyId: tenantId },
       orderBy: { createdAt: 'desc' },
-      take: 100
+      take: 100,
+      include: {
+        user: { select: { name: true } }
+      }
     });
-    res.json(logs);
+    
+    const formattedLogs = logs.map(log => ({
+      ...log,
+      userName: log.userName || log.user?.name || 'Unknown'
+    }));
+
+    res.json(formattedLogs);
   } catch (error: any) {
     res.status(500).json({ error: 'Terjadi kesalahan saat mengambil log audit' });
   }
