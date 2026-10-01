@@ -18863,7 +18863,7 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
         ...(fnbType && fnbType !== 'ALL' ? {
           SaleItem: {
             some: {
-              product: { fnbType: fnbType as string }
+              product: { fnbType: fnbType as any }
             }
           }
         } : {})
