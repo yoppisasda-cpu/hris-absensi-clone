@@ -1647,6 +1647,13 @@ class _POSScreenState extends State<POSScreen> {
                             subtitle: (opt['price'] ?? 0) > 0 ? Text('+Rp ${opt['price']}') : null,
                             value: isSelected,
                             onChanged: (bool? val) {
+                              if (val == true) {
+                                int currentSelected = selectedModifiers.where((m) => m['groupId'] == group['id']).length;
+                                if (group['maxSelections'] > 1 && currentSelected >= group['maxSelections']) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Maksimal ${group['maxSelections']} pilihan untuk ${group['name']}')));
+                                  return;
+                                }
+                              }
                               setDialogState(() {
                                 if (val == true) {
                                   if (group['maxSelections'] == 1) {
@@ -1685,6 +1692,13 @@ class _POSScreenState extends State<POSScreen> {
                         int selectedInGroup = selectedModifiers.where((m) => m['groupId'] == group['id']).length;
                         if (selectedInGroup < (group['minSelections'] ?? 1)) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kustomisasi ${group['name']} wajib dipilih!')));
+                          return;
+                        }
+                      }
+                      if (group != null) {
+                        int selectedInGroup = selectedModifiers.where((m) => m['groupId'] == group['id']).length;
+                        if (selectedInGroup > (group['maxSelections'] ?? 1)) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kustomisasi ${group['name']} maksimal ${group['maxSelections']} pilihan!')));
                           return;
                         }
                       }

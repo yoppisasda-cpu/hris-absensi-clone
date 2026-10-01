@@ -20,6 +20,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         stock: 0,
         showInPos: true,
         type: "FINISHED_GOOD",
+        fnbType: "OTHER",
         trackStock: true,
         isAutoDeduct: false,
         isDiscountable: true,
@@ -74,6 +75,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     stock: freshProduct.stock || 0,
                     showInPos: freshProduct.showInPos !== undefined ? freshProduct.showInPos : true,
                     type: freshProduct.type || "FINISHED_GOOD",
+                    fnbType: freshProduct.fnbType || "OTHER",
                     trackStock: freshProduct.trackStock !== undefined ? freshProduct.trackStock : true,
                     isDiscountable: freshProduct.isDiscountable !== undefined ? freshProduct.isDiscountable : true,
                     isAutoDeduct: freshProduct.isAutoDeduct !== undefined ? freshProduct.isAutoDeduct : false,
@@ -120,6 +122,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     stock: product.stock || 0,
                     showInPos: product.showInPos !== undefined ? product.showInPos : true,
                     type: product.type || "FINISHED_GOOD",
+                    fnbType: product.fnbType || "OTHER",
                     trackStock: product.trackStock !== undefined ? product.trackStock : true,
                     isDiscountable: product.isDiscountable !== undefined ? product.isDiscountable : true,
                     isAutoDeduct: product.isAutoDeduct !== undefined ? product.isAutoDeduct : false,
@@ -143,7 +146,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 setVendorPrice((product.costPrice || 0) * (product.purchaseFactor || 1));
             } else {
                 setFormData({
-                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", fnbType: "OTHER", trackStock: true, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
@@ -434,7 +437,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
 
             setFormData({
-                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", trackStock: true, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", fnbType: "OTHER", trackStock: true, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
             });
             setHasRecipe(false);
             setRecipeItems([]);
@@ -663,6 +666,18 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     <option value="FINISHED_GOOD">FINISHED GOODS / MENU</option>
                                     <option value="WIP">WORK IN PROGRESS (WIP)</option>
                                     <option value="RAW_MATERIAL">RAW MATERIAL / STOCK</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">F&B Type (KDS Routing)</label>
+                                <select
+                                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 px-5 text-sm font-black text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all italic"
+                                    value={formData.fnbType}
+                                    onChange={(e) => setFormData({ ...formData, fnbType: e.target.value })}
+                                >
+                                    <option value="OTHER">TIDAK SPESIFIK (OTHER)</option>
+                                    <option value="FOOD">MAKANAN (FOOD)</option>
+                                    <option value="BEVERAGE">MINUMAN (BEVERAGE)</option>
                                 </select>
                             </div>
                             <div className="flex items-center gap-6 py-4 px-1">

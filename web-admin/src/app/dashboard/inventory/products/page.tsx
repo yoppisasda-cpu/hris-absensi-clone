@@ -352,6 +352,7 @@ export default function ProductsPage() {
                             <tr className="bg-[#050505]">
                                 <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic min-w-[250px]">Identitas & Deskripsi</th>
                                 <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic">Global SKU</th>
+                                <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic">F&B Type</th>
                                 <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">CAPEX / HPP</th>
                                 <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-center">POS</th>
                                 <th className="px-4 py-5 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-800 text-slate-500 italic text-right">Market Price</th>
@@ -366,7 +367,7 @@ export default function ProductsPage() {
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan={8} className="px-6 py-4"><div className="h-10 w-full rounded bg-slate-50"></div></td>
+                                        <td colSpan={9} className="px-6 py-4"><div className="h-10 w-full rounded bg-slate-50"></div></td>
                                     </tr>
                                 ))
                             ) : filteredProducts.length > 0 ? (
@@ -403,6 +404,11 @@ export default function ProductsPage() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-6 font-mono text-[11px] text-slate-600 font-black italic tracking-widest">{product.sku || '-----------'}</td>
+                                        <td className="px-4 py-6 text-center">
+                                            <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${product.fnbType === 'FOOD' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : product.fnbType === 'BEVERAGE' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-slate-800 text-slate-500'} uppercase tracking-widest italic`}>
+                                                {product.fnbType || 'OTHER'}
+                                            </span>
+                                        </td>
                                         <td className="px-4 py-6 text-right">
                                             <div className="flex flex-col items-end">
                                                  <span className="text-xs font-black text-slate-500 italic tracking-tighter">
@@ -623,7 +629,7 @@ export default function ProductsPage() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={8} className="px-6 py-20 text-center">
+                                    <td colSpan={9} className="px-6 py-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="rounded-full bg-slate-50 p-6"><Package className="h-10 w-10 text-slate-200" /></div>
                                             <p className="text-sm font-bold text-slate-400 italic">Belum ada produk yang terdaftar.</p>

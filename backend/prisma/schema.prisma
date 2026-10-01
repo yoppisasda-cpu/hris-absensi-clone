@@ -875,6 +875,7 @@ model Product {
   showInPos          Boolean                @default(true)
   isDiscountable     Boolean                @default(true)
   type               ProductType            @default(FINISHED_GOOD)
+  fnbType            FnbType                @default(OTHER)
   trackStock         Boolean                @default(true)
   isAutoDeduct       Boolean                @default(false)
   priceGofood        Float                  @default(0)
@@ -1490,6 +1491,12 @@ enum ProductType {
   RAW_MATERIAL
   WIP
   FINISHED_GOOD
+}
+
+enum FnbType {
+  FOOD
+  BEVERAGE
+  OTHER
 }
 
 enum RequestStatus {

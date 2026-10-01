@@ -11,6 +11,7 @@ export default function KitchenReports() {
     const [startDate, setStartDate] = useState(todayStr);
     const [endDate, setEndDate] = useState(todayStr);
     const [sortOrder, setSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
+    const [reportFilter, setReportFilter] = useState<'ALL' | 'FOOD' | 'BEVERAGE'>('ALL');
 
     const sortedHistory = [...(reports?.history || [])].sort((a, b) => {
         if (sortOrder === 'asc') return (a.durationSeconds || 0) - (b.durationSeconds || 0);
@@ -50,7 +51,7 @@ export default function KitchenReports() {
             setLoading(true);
             const token = localStorage.getItem('jwt_token');
             const tenantId = localStorage.getItem('currentTenantId');
-            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/reports?startDate=${startDate}&endDate=${endDate}`, {
+            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/reports?startDate=${startDate}&endDate=${endDate}&fnbType=${reportFilter}`, {
                 headers: { 
                     Authorization: `Bearer ${token}`,
                     ...(tenantId ? { 'x-tenant-id': tenantId } : {})
@@ -66,7 +67,7 @@ export default function KitchenReports() {
 
     useEffect(() => {
         fetchReports();
-    }, [startDate, endDate]);
+    }, [startDate, endDate, reportFilter]);
 
     const formatSeconds = (seconds: number) => {
         if (!seconds || isNaN(seconds)) return '0 detik';
@@ -97,6 +98,26 @@ export default function KitchenReports() {
                         Laporan Produksi Dapur
                     </h1>
                     <p className="text-white/60 mt-1">Pantau rata-rata waktu masak dan riwayat pesanan</p>
+                    <div className="flex bg-slate-800/50 p-1 rounded-xl mt-4 w-max">
+                        <button 
+                            onClick={() => setReportFilter('ALL')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${reportFilter === 'ALL' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Semua Pesanan
+                        </button>
+                        <button 
+                            onClick={() => setReportFilter('FOOD')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${reportFilter === 'FOOD' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Dapur (Makanan)
+                        </button>
+                        <button 
+                            onClick={() => setReportFilter('BEVERAGE')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${reportFilter === 'BEVERAGE' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Bar (Minuman)
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex flex-col gap-3">

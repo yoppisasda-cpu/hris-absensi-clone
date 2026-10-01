@@ -10,6 +10,7 @@ export default function KitchenDisplay() {
     const [loading, setLoading] = useState(true);
     const [staffs, setStaffs] = useState<any[]>([]);
     const [selectedStaffs, setSelectedStaffs] = useState<Record<string, string>>({});
+    const [kdsFilter, setKdsFilter] = useState<'ALL' | 'FOOD' | 'BEVERAGE'>('ALL');
 
     const fetchOrders = async () => {
         try {
@@ -96,8 +97,16 @@ export default function KitchenDisplay() {
         }
     };
 
-    const preparingOrders = orders.filter(o => o.status === 'PREPARING');
-    const readyOrders = orders.filter(o => o.status === 'READY');
+    const filteredOrders = orders.map(order => {
+        const filteredItems = order.items?.filter((item: any) => {
+            if (kdsFilter === 'ALL') return true;
+            return item.fnbType === kdsFilter;
+        }) || [];
+        return { ...order, items: filteredItems };
+    }).filter(order => order.items.length > 0);
+
+    const preparingOrders = filteredOrders.filter(o => o.status === 'PREPARING');
+    const readyOrders = filteredOrders.filter(o => o.status === 'READY');
 
     const formatTime = (isoString: string) => {
         if (!isoString) return '';
@@ -122,10 +131,32 @@ export default function KitchenDisplay() {
                     </h1>
                     <p className="text-white/60 mt-1">Kelola antrean pesanan yang masuk secara real-time</p>
                 </div>
-                <Link href="/dashboard/kitchen/reports" className="flex items-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-xl transition-colors font-medium">
-                    <BarChart3 size={18} />
-                    Laporan Produksi
-                </Link>
+                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                    <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                        <button 
+                            onClick={() => setKdsFilter('ALL')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${kdsFilter === 'ALL' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Semua Pesanan
+                        </button>
+                        <button 
+                            onClick={() => setKdsFilter('FOOD')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${kdsFilter === 'FOOD' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Dapur (Makanan)
+                        </button>
+                        <button 
+                            onClick={() => setKdsFilter('BEVERAGE')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${kdsFilter === 'BEVERAGE' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Bar (Minuman)
+                        </button>
+                    </div>
+                    <Link href="/dashboard/kitchen/reports" className="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-xl transition-colors font-bold h-full">
+                        <BarChart3 size={18} />
+                        Laporan Produksi
+                    </Link>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

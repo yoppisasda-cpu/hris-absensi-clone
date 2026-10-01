@@ -14558,6 +14558,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           isAutoDeduct: isAutoDeduct !== undefined ? isAutoDeduct : false,
           categoryId: categoryId && !isNaN(parseInt(String(categoryId))) ? parseInt(String(categoryId)) : null,
           type: req.body.type || 'FINISHED_GOOD',
+          fnbType: req.body.fnbType || 'OTHER',
           trackStock: req.body.trackStock !== undefined ? req.body.trackStock : true,
           priceGofood: Number(priceGofood) || 0,
           priceGrabfood: Number(priceGrabfood) || 0,
@@ -14690,6 +14691,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
         isAutoDeduct: isAutoDeduct !== undefined ? isAutoDeduct : existingProduct.isAutoDeduct,
         categoryId: categoryId && !isNaN(parseInt(String(categoryId))) ? parseInt(String(categoryId)) : null,
         type: req.body.type || existingProduct.type,
+        fnbType: req.body.fnbType || existingProduct.fnbType,
         trackStock: req.body.trackStock !== undefined ? req.body.trackStock : existingProduct.trackStock,
         priceGofood: priceGofood !== undefined ? Number(priceGofood) : existingProduct.priceGofood,
         priceGrabfood: priceGrabfood !== undefined ? Number(priceGrabfood) : existingProduct.priceGrabfood,
@@ -18838,7 +18840,7 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
   try {
     const tenantId = Number((req as any).tenantId);
     const user = (req as any).user;
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, fnbType } = req.query;
     
     let dateFilter: any = {};
     if (startDate && endDate) {
@@ -18857,7 +18859,14 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
         branchId: user?.branchId || undefined,
         kitchenStatus: { in: ['READY', 'SERVED'] },
         preparedAt: { not: null },
-        ...(startDate && endDate ? { createdAt: dateFilter } : {})
+        ...(startDate && endDate ? { createdAt: dateFilter } : {}),
+        ...(fnbType && fnbType !== 'ALL' ? {
+          SaleItem: {
+            some: {
+              product: { fnbType: fnbType as string }
+            }
+          }
+        } : {})
       },
       select: {
         id: true,
@@ -18953,16 +18962,29 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
       }
     });
 
-    const formattedPending = pendingBills.map(pb => ({
-      id: pb.id,
-      type: 'pending',
-      label: pb.label || 'Pesanan ' + pb.id,
-      items: typeof pb.items === 'string' ? JSON.parse(pb.items) : pb.items,
-      status: pb.kitchenStatus,
-      queueNumber: pb.queueNumber,
-      createdAt: pb.createdAt,
-      preparedAt: pb.preparedAt
-    }));
+    // Create a map for product fnbType for pending bills
+    const allProducts = await prisma.product.findMany({ 
+      where: { companyId: tenantId }, 
+      select: { id: true, fnbType: true } 
+    });
+    const productFnbMap = new Map(allProducts.map(p => [p.id, p.fnbType]));
+
+    const formattedPending = pendingBills.map(pb => {
+      const parsedItems = typeof pb.items === 'string' ? JSON.parse(pb.items) : pb.items;
+      return {
+        id: pb.id,
+        type: 'pending',
+        label: pb.label || 'Pesanan ' + pb.id,
+        items: parsedItems.map((item: any) => ({
+          ...item,
+          fnbType: productFnbMap.get(item.productId) || 'OTHER'
+        })),
+        status: pb.kitchenStatus,
+        queueNumber: pb.queueNumber,
+        createdAt: pb.createdAt,
+        preparedAt: pb.preparedAt
+      };
+    });
 
     const formattedSales = sales.map(s => ({
       id: s.id,
@@ -18973,6 +18995,7 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
         name: si.product?.name || 'Item Terhapus',
         quantity: si.quantity,
         price: si.price,
+        fnbType: si.product?.fnbType || 'OTHER',
         modifiers: typeof si.modifiers === 'string' ? JSON.parse(si.modifiers) : si.modifiers
       })),
       status: s.kitchenStatus,
