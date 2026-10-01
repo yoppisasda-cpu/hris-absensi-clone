@@ -16126,6 +16126,14 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       }
     }
 
+    let finalBranchId = branchId ? parseInt(branchId) : null;
+    if (!finalBranchId && userId) {
+      const u = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
+      if (u && u.branchId) {
+        finalBranchId = u.branchId;
+      }
+    }
+
     // --- CHECK CLOSING ---
     if (await isPeriodClosed(tenantId, date || new Date())) {
       return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat mencatat penjualan pada tanggal ini.' });
@@ -16240,7 +16248,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         RETURNING id
       `, 
       tenantId, 
-      branchId ? parseInt(branchId) : null, 
+      finalBranchId, 
       userId, 
       salespersonId ? parseInt(salespersonId) : null,
       invoiceNumber, 
@@ -16791,8 +16799,13 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
     if (effectiveBranchId === 'null') {
       whereConditions.push(`s."branchId" IS NULL`);
     } else {
-      whereConditions.push(`s."branchId" = $${paramIndex++}`);
+      if (isPosViewer) {
+        whereConditions.push(`(s."branchId" = $${paramIndex} OR s."branchId" IS NULL)`);
+      } else {
+        whereConditions.push(`s."branchId" = $${paramIndex}`);
+      }
       queryParams.push(parseInt(effectiveBranchId as string));
+      paramIndex++;
     }
   }
 
@@ -16834,8 +16847,12 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
     queryParams.push(saleType as string);
   }
 
+  const whereClause = whereConditions.join(' AND ');
+  console.log('[DEBUG-POS] WHERE:', whereClause);
+  console.log('[DEBUG-POS] PARAMS:', queryParams);
+
   return {
-    whereClause: whereConditions.join(' AND '),
+    whereClause,
     queryParams
   };
 };
