@@ -17822,9 +17822,10 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
 
       const meta = prodMetaMap.get(productId);
       
-      // If it's a leaf node (not AutoDeduct), check if we even track its stock
+      if (meta && meta.trackStock === false) return Infinity;
+
+      // If it's a leaf node (not AutoDeduct), return its physical stock
       if (!meta || !meta.isAutoDeduct) {
-        if (meta && meta.trackStock === false) return Infinity;
         return stockMap.get(productId) || 0;
       }
 
@@ -18508,7 +18509,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                 const quantity = Number(item.quantity);
                 const product = productsInCart.find(p => p.id === productId);
 
-                if (product) {
+                if (product && product.trackStock !== false) {
                     if (product.isAutoDeduct) {
                         const recipes = recipeMap[productId] || [];
                         for (const recipe of recipes) {
@@ -18519,7 +18520,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                                 requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
                             }
                         }
-                    } else if (product.trackStock) {
+                    } else {
                         requiredStock[productId] = (requiredStock[productId] || 0) + quantity;
                     }
                 }
