@@ -117,7 +117,7 @@ export default function POSPage() {
     }, [products, searchTerm, selectedCategory]);
 
     const addToCart = (product: Product, withModifiers: any = null) => {
-        if (product.trackStock !== false && !product.isAutoDeduct && product.stock <= 0) {
+        if (product.trackStock !== false && product.stock <= 0) {
             toast.error("Stok habis!");
             return;
         }
@@ -134,7 +134,7 @@ export default function POSPage() {
                 JSON.stringify(item.modifiers || null) === JSON.stringify(withModifiers || null)
             );
             if (existing) {
-                if (product.trackStock !== false && !product.isAutoDeduct && existing.qty >= product.stock) {
+                if (product.trackStock !== false && existing.qty >= product.stock) {
                     toast.error("Stok tidak cukup");
                     return prev;
                 }
@@ -151,7 +151,7 @@ export default function POSPage() {
             if (item.cartId === cartId) {
                 const newQty = item.qty + delta;
                 if (newQty <= 0) return item;
-                if (item.trackStock !== false && !item.isAutoDeduct && newQty > item.stock) {
+                if (item.trackStock !== false && newQty > item.stock) {
                     toast.error("Stok tidak cukup");
                     return item;
                 }

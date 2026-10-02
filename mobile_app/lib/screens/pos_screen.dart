@@ -307,7 +307,7 @@ class _POSScreenState extends State<POSScreen> {
       });
 
       if (index >= 0) {
-        if (trackStock && !isAutoDeduct && _cart[index]['quantity'] >= product['stock']) {
+        if (trackStock && _cart[index]['quantity'] >= product['stock']) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Stok tidak cukup')),
           );
@@ -412,10 +412,9 @@ class _POSScreenState extends State<POSScreen> {
           _cart.removeAt(index);
         } else {
           bool trackStock = _cart[index]['trackStock'] ?? true;
-          bool isAutoDeduct = _cart[index]['isAutoDeduct'] == true;
           int maxStock = int.tryParse(_cart[index]['maxStock']?.toString() ?? '0') ?? 0;
 
-          if (!trackStock || isAutoDeduct || newQty <= maxStock) {
+          if (!trackStock || newQty <= maxStock) {
             _cart[index]['quantity'] = newQty;
           } else {
             ScaffoldMessenger.of(context).showSnackBar(

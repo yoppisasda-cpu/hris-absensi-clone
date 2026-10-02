@@ -17801,12 +17801,57 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
       orderBy: { name: 'asc' }
     });
 
-    // Map stock to branch-specific quantity
+    // Pre-fetch all recipes and stocks for in-memory calculation
+    const allRecipes = await prisma.productRecipe.findMany({
+      where: { Product: { companyId: tenantId } },
+      select: { productId: true, materialId: true, quantity: true, Product: { select: { recipeYield: true } } }
+    });
+    const allStocks = await prisma.warehouseStock.findMany({
+      where: { warehouseId: warehouse?.id }
+    });
+    const stockMap = new Map(allStocks.map((s: any) => [s.productId, s.quantity]));
+    const allTenantProducts = await prisma.product.findMany({
+      where: { companyId: tenantId },
+      select: { id: true, isAutoDeduct: true }
+    });
+    const prodMetaMap = new Map(allTenantProducts.map((p: any) => [p.id, p]));
+
+    function getMaxStock(productId: number, visited = new Set<number>()): number {
+      if (visited.has(productId)) return 0;
+      visited.add(productId);
+
+      const meta = prodMetaMap.get(productId);
+      if (!meta || !meta.isAutoDeduct) {
+        return stockMap.get(productId) || 0;
+      }
+
+      const recipes = allRecipes.filter((r: any) => r.productId === productId);
+      if (recipes.length === 0) {
+        return stockMap.get(productId) || 0;
+      }
+
+      let maxCanMake = Infinity;
+      for (const r of recipes) {
+        const yieldFactor = r.Product?.recipeYield || 1;
+        const matQtyNeededForOne = Number(r.quantity) / yieldFactor;
+        if (matQtyNeededForOne <= 0) continue;
+        
+        let matAvailable = getMaxStock(r.materialId, new Set(visited));
+        const canMake = Math.floor(matAvailable / matQtyNeededForOne);
+        if (canMake < maxCanMake) maxCanMake = canMake;
+      }
+      return maxCanMake === Infinity ? 0 : Math.max(0, maxCanMake);
+    }
+
+    // Map stock to branch-specific quantity or computed BOM max stock
     const mappedProducts = products.map((p: any) => {
-      // Ensure we keep all original fields while overriding/adding specific ones for POS
+      let finalStock = p.WarehouseStock && p.WarehouseStock.length > 0 ? p.WarehouseStock[0].quantity : 0;
+      if (p.isAutoDeduct) {
+        finalStock = getMaxStock(p.id);
+      }
       return {
         ...p,
-        stock: p.WarehouseStock && p.WarehouseStock.length > 0 ? p.WarehouseStock[0].quantity : 0
+        stock: finalStock
       };
     });
 
