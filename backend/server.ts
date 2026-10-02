@@ -17812,7 +17812,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
     const stockMap = new Map(allStocks.map((s: any) => [s.productId, s.quantity]));
     const allTenantProducts = await prisma.product.findMany({
       where: { companyId: tenantId },
-      select: { id: true, isAutoDeduct: true }
+      select: { id: true, isAutoDeduct: true, trackStock: true }
     });
     const prodMetaMap = new Map(allTenantProducts.map((p: any) => [p.id, p]));
 
@@ -17821,7 +17821,10 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
       visited.add(productId);
 
       const meta = prodMetaMap.get(productId);
+      
+      // If it's a leaf node (not AutoDeduct), check if we even track its stock
       if (!meta || !meta.isAutoDeduct) {
+        if (meta && meta.trackStock === false) return Infinity;
         return stockMap.get(productId) || 0;
       }
 
@@ -17840,7 +17843,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
         const canMake = Math.floor(matAvailable / matQtyNeededForOne);
         if (canMake < maxCanMake) maxCanMake = canMake;
       }
-      return maxCanMake === Infinity ? 0 : Math.max(0, maxCanMake);
+      return maxCanMake === Infinity ? 999999 : Math.max(0, maxCanMake);
     }
 
     // Map stock to branch-specific quantity or computed BOM max stock
