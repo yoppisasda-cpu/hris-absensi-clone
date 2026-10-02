@@ -18423,17 +18423,6 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             select: { id: true, name: true, stock: true, trackStock: true, isAutoDeduct: true }
         });
 
-        if (!req.body.offlineInvoiceNumber) {
-            for (const item of items) {
-                const product = productsInCart.find(p => p.id === Number(item.productId));
-                if (product && product.trackStock && !product.isAutoDeduct && product.stock < Number(item.quantity)) {
-                    throw new Error(`Stok tidak mencukupi untuk produk: ${product.name}. Stok tersedia: ${product.stock}`);
-                }
-            }
-        }
-
-        // 3. Prepare all operations for parallel execution
-        
         // Helper for recursive deduction of materials (with cycle detection)
         async function getRecursiveDeductions(productId: number, qtyNeeded: number, visited = new Set<number>()): Promise<{ id: number, qty: number }[]> {
             if (visited.has(productId)) {
@@ -18461,6 +18450,60 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             }
             // If it's not an Auto Deduct WIP (or has no recipe), we just deduct it directly
             return [{ id: productId, qty: qtyNeeded }];
+        }
+
+        if (!req.body.offlineInvoiceNumber) {
+            const requiredStock: Record<number, number> = {};
+
+            for (const item of items) {
+                const productId = Number(item.productId);
+                const quantity = Number(item.quantity);
+                const product = productsInCart.find(p => p.id === productId);
+
+                if (product) {
+                    if (product.isAutoDeduct) {
+                        const recipes = recipeMap[productId] || [];
+                        for (const recipe of recipes) {
+                            const materialId = Number(recipe.materialId);
+                            const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
+                            const deductions = await getRecursiveDeductions(materialId, materialQtyNeeded, new Set([productId]));
+                            for (const ded of deductions) {
+                                requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
+                            }
+                        }
+                    } else if (product.trackStock) {
+                        requiredStock[productId] = (requiredStock[productId] || 0) + quantity;
+                    }
+                }
+
+                // Add modifiers
+                if (item.modifiers) {
+                    Object.values(item.modifiers).forEach((val: any) => {
+                        if (val && val.id && optionMap[val.id]) {
+                            const opt = optionMap[val.id];
+                            if (opt.linkedProductId) {
+                                const modQty = quantity * (opt.linkedQuantity || 1);
+                                requiredStock[opt.linkedProductId] = (requiredStock[opt.linkedProductId] || 0) + modQty;
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Fetch actual stock for all required products
+            const requiredProductIds = Object.keys(requiredStock).map(Number);
+            if (requiredProductIds.length > 0) {
+                const stockCheckProducts = await tx.product.findMany({
+                    where: { id: { in: requiredProductIds } },
+                    select: { id: true, name: true, stock: true, trackStock: true }
+                });
+
+                for (const p of stockCheckProducts) {
+                    if (p.trackStock && p.stock < requiredStock[p.id]) {
+                        throw new Error(`Stok tidak mencukupi untuk bahan/produk: ${p.name}. Dibutuhkan: ${requiredStock[p.id]}, Tersedia: ${p.stock}`);
+                    }
+                }
+            }
         }
 
         for (const item of items) {
