@@ -291,7 +291,7 @@ class _POSScreenState extends State<POSScreen> {
     bool trackStock = product['trackStock'] ?? true;
     bool isAutoDeduct = product['isAutoDeduct'] == true;
     
-    if (trackStock && !isAutoDeduct && (product['stock'] ?? 0) <= 0) {
+    if (trackStock && (product['stock'] ?? 0) <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Stok habis!'), backgroundColor: Colors.orange),
       );
@@ -1911,7 +1911,7 @@ class _POSScreenState extends State<POSScreen> {
                             final bool trackStock = p['trackStock'] == true;
                             final bool isAutoDeduct = p['isAutoDeduct'] == true;
                             final double currentStock = double.tryParse(p['stock']?.toString() ?? '0') ?? 0;
-                            final bool isOutOfStock = trackStock && !isAutoDeduct && currentStock <= 0;
+                            final bool isOutOfStock = trackStock && currentStock <= 0;
 
                             return GestureDetector(
                               onTap: isOutOfStock 
