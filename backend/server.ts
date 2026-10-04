@@ -18597,10 +18597,11 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             // --- OPTIMIZED STOCK LOGIC ---
             const mainProduct = productsInCart.find(p => p.id === productId);
             const isAutoDeduct = mainProduct?.isAutoDeduct || false;
+            const recipes = recipeMap[productId] || [];
 
             // Mode Pabrikasi (isAutoDeduct = false): HANYA potong stok produk jadi.
-            // Mode Made-to-Order (isAutoDeduct = true): JANGAN potong stok produk jadi.
-            if (!isAutoDeduct) {
+            // Mode Made-to-Order (isAutoDeduct = true): JANGAN potong stok produk jadi (KECUALI TIDAK ADA RESEP).
+            if (!isAutoDeduct || recipes.length === 0) {
                 await tx.product.update({
                     where: { id: productId },
                     data: { stock: { decrement: quantity } }
@@ -18661,7 +18662,6 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
 
             // If it has a recipe AND is Made-to-Order, decrement the MATERIALS
             // (If it's Pabrikasi/isAutoDeduct=false, we DO NOT deduct materials here, because they were deducted during Production)
-            const recipes = recipeMap[productId] || [];
             if (isAutoDeduct && recipes.length > 0) {
                 for (const recipe of recipes) {
                     const materialId = Number(recipe.materialId);
