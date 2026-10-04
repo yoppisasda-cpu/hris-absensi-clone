@@ -14478,7 +14478,7 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 
        const recipeCogs = (p.Recipes && p.Recipes.length > 0) ? getProductCost(p) : 0;
        
-       let displayStock = p.stock;
+       let displayStock = 0;
        if (warehouseId && warehouseId !== 'all') {
          const ws = p.WarehouseStock.find((ws: any) => ws.warehouseId === Number(warehouseId));
          displayStock = ws ? ws.quantity : 0;
@@ -14490,6 +14490,9 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
             const branchWarehouses = p.WarehouseStock.filter((ws: any) => ws.warehouse.branchId === Number(branchId));
             displayStock = branchWarehouses.reduce((sum: number, ws: any) => sum + ws.quantity, 0);
          }
+       } else {
+         // Global stock: source of truth is the sum of all WarehouseStock, ignoring potentially desynced p.stock
+         displayStock = p.WarehouseStock ? p.WarehouseStock.reduce((sum: number, ws: any) => sum + ws.quantity, 0) : p.stock;
        }
 
        return { ...p, stock: displayStock, originalTotalStock: p.stock, recipeCogs };
