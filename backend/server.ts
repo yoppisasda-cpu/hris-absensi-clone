@@ -18513,8 +18513,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                 const product = productsInCart.find(p => p.id === productId);
 
                 if (product && product.trackStock !== false) {
-                    if (product.isAutoDeduct) {
-                        const recipes = recipeMap[productId] || [];
+                    const recipes = recipeMap[productId] || [];
+                    if (product.isAutoDeduct && recipes.length > 0) {
                         for (const recipe of recipes) {
                             const materialId = Number(recipe.materialId);
                             const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
@@ -18547,12 +18547,21 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             if (requiredProductIds.length > 0) {
                 const stockCheckProducts = await tx.product.findMany({
                     where: { id: { in: requiredProductIds } },
-                    select: { id: true, name: true, stock: true, trackStock: true }
+                    select: { 
+                        id: true, 
+                        name: true, 
+                        trackStock: true,
+                        WarehouseStock: {
+                            where: { warehouseId: warehouse.id },
+                            select: { quantity: true }
+                        }
+                    }
                 });
 
                 for (const p of stockCheckProducts) {
-                    if (p.trackStock && p.stock < requiredStock[p.id]) {
-                        throw new Error(`Stok tidak mencukupi untuk bahan/produk: ${p.name}. Dibutuhkan: ${requiredStock[p.id]}, Tersedia: ${p.stock}`);
+                    const availableStock = p.WarehouseStock && p.WarehouseStock.length > 0 ? p.WarehouseStock[0].quantity : 0;
+                    if (p.trackStock && availableStock < requiredStock[p.id]) {
+                        throw new Error(`Stok tidak mencukupi untuk bahan/produk: ${p.name}. Dibutuhkan: ${requiredStock[p.id]}, Tersedia: ${availableStock}`);
                     }
                 }
             }
