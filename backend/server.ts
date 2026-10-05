@@ -151,6 +151,7 @@ const runAutoMigration = async () => {
     `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "bankName" TEXT`,
     `ALTER TABLE "FinancialAccount" ADD COLUMN IF NOT EXISTS "accountNumber" TEXT`,
     `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "priceQpoon" FLOAT DEFAULT 0`,
+    `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "priceTiktok" FLOAT DEFAULT 0`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "openTime" TEXT DEFAULT '08:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "closeTime" TEXT DEFAULT '22:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "isOpenManual" BOOLEAN DEFAULT true`,
@@ -14364,6 +14365,7 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
           priceGrabfood: Number(sourceProd.priceGrabfood) || 0,
           priceShopeefood: Number(sourceProd.priceShopeefood) || 0,
           priceQpoon: Number(sourceProd.priceQpoon) || 0,
+          priceTiktok: Number(sourceProd.priceTiktok) || 0,
           recipeYield: Number(sourceProd.recipeYield) || 1,
           type: sourceProd.type || 'FINISHED_GOOD',
           imageUrl: sourceProd.imageUrl,
@@ -14512,7 +14514,7 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
+    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, priceTiktok, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
 
     // --- SKU LIMIT CHECK ---
     const company = await prisma.company.findUnique({
@@ -14567,6 +14569,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           priceGrabfood: Number(priceGrabfood) || 0,
           priceShopeefood: Number(priceShopeefood) || 0,
           priceQpoon: Number(priceQpoon) || 0,
+          priceTiktok: Number(priceTiktok) || 0,
           recipeYield: Number(recipeYield) || 1,
           imageUrl: imageUrl || null,
           purchaseUnit: String(purchaseUnit || unit || "Pcs"),
@@ -14669,7 +14672,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
   try {
     const tenantId = Number((req as any).tenantId);
     const productId = parseInt(req.params.id as string);
-    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, recipeYield, imageUrl, type, trackStock, purchaseUnit, purchaseFactor } = req.body;
+    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, priceTiktok, recipeYield, imageUrl, type, trackStock, purchaseUnit, purchaseFactor } = req.body;
 
     // Verify ownership
     const existingProduct = await prisma.product.findFirst({
@@ -14700,6 +14703,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
         priceGrabfood: priceGrabfood !== undefined ? Number(priceGrabfood) : existingProduct.priceGrabfood,
         priceShopeefood: priceShopeefood !== undefined ? Number(priceShopeefood) : existingProduct.priceShopeefood,
         priceQpoon: priceQpoon !== undefined ? Number(priceQpoon) : (existingProduct as any).priceQpoon,
+        priceTiktok: priceTiktok !== undefined ? Number(priceTiktok) : (existingProduct as any).priceTiktok,
         recipeYield: recipeYield !== undefined ? Number(recipeYield) : existingProduct.recipeYield,
         imageUrl: req.body.imageUrl !== undefined ? req.body.imageUrl : existingProduct.imageUrl,
         purchaseUnit: purchaseUnit !== undefined ? String(purchaseUnit) : existingProduct.purchaseUnit,
@@ -17770,6 +17774,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
         priceGrabfood: true,
         priceShopeefood: true,
         priceQpoon: true,
+        priceTiktok: true,
         imageUrl: true,
         categoryId: true,
         trackStock: true,

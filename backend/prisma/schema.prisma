@@ -882,6 +882,7 @@ model Product {
   priceGrabfood      Float                  @default(0)
   priceShopeefood    Float                  @default(0)
   priceQpoon         Float                  @default(0)
+  priceTiktok        Float                  @default(0)
   recipeYield        Float                  @default(1)
   imageUrl           String?
   expenses           Expense[]
