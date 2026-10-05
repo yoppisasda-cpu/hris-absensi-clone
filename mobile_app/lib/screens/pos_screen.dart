@@ -909,7 +909,7 @@ class _POSScreenState extends State<POSScreen> {
                       if (_voucherDiscountAmount > 0)
                         _buildSummaryRow('Voucher Dipakai', '- Rp ${_voucherDiscountAmount.toStringAsFixed(0)}', isPositive: true),
                       if (_voucherBalanceRemaining != null)
-                        _buildSummaryRow('Sisa Saldo Giftcard', 'Rp ${_voucherBalanceRemaining!.toStringAsFixed(0)}', isPositive: false, isSubText: true),
+                        _buildSummaryRow('Sisa Saldo Giftcard', 'Rp ${_voucherBalanceRemaining!.toStringAsFixed(0)}', isPositive: false),
                       if (_pointValueUsed > 0)
                         _buildSummaryRow('Poin Ditukar', '- Rp ${_pointValueUsed.toStringAsFixed(0)}', isPositive: true),
                       if (_globalTaxRate > 0)
