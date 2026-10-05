@@ -18021,6 +18021,7 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
     let voucherDiscountAmount = 0;
     let pointsUsed = Number(pointsToUse);
     let pointsEarned = 0;
+    let voucherBalanceRemaining = null;
 
     const company = await prisma.company.findUnique({ where: { id: tenantId } });
     if (!company) return res.status(404).json({ error: 'Perusahaan tidak ditemukan' });
@@ -18089,6 +18090,7 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
         }
       } else if (voucher.discountType === 'STORED_VALUE') {
         voucherDiscountAmount = Math.min(voucher.currentBalance || 0, baseDiscountAmount);
+        voucherBalanceRemaining = (voucher.currentBalance || 0) - voucherDiscountAmount;
       } else {
         voucherDiscountAmount = Math.min(voucher.discountValue, baseDiscountAmount);
       }
@@ -18111,7 +18113,8 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
       pointsUsed,
       pointValueUsed: pointsUsed * (company.pointsRedeemValue || 1),
       finalTotal,
-      pointsEarned
+      pointsEarned,
+      voucherBalanceRemaining
     });
   } catch (error: any) {
     console.error("CALCULATION ERROR:", error);

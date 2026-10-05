@@ -53,6 +53,7 @@ class _POSScreenState extends State<POSScreen> {
   double _memberDiscountAmount = 0;
   double _employeeDiscountAmount = 0;
   double _voucherDiscountAmount = 0;
+  double? _voucherBalanceRemaining;
   double _pointsUsed = 0;
   double _pointsEarned = 0;
   double _pointValueUsed = 0;
@@ -352,6 +353,11 @@ class _POSScreenState extends State<POSScreen> {
       setPanelState(() {
         _memberDiscountAmount = (res['memberDiscountAmount'] ?? 0).toDouble();
         _voucherDiscountAmount = (res['voucherDiscountAmount'] ?? 0).toDouble();
+        if (res['voucherBalanceRemaining'] != null) {
+          _voucherBalanceRemaining = res['voucherBalanceRemaining'].toDouble();
+        } else {
+          _voucherBalanceRemaining = null;
+        }
         _pointsUsed = (res['pointsUsed'] ?? 0).toDouble();
         _pointValueUsed = (res['pointValueUsed'] ?? 0).toDouble();
         _calculatedFinalTotal = (res['finalTotal'] ?? _subtotalAmount).toDouble();
@@ -902,6 +908,8 @@ class _POSScreenState extends State<POSScreen> {
                         _buildSummaryRow('Diskon Member', '- Rp ${_memberDiscountAmount.toStringAsFixed(0)}', isPositive: true),
                       if (_voucherDiscountAmount > 0)
                         _buildSummaryRow('Voucher Dipakai', '- Rp ${_voucherDiscountAmount.toStringAsFixed(0)}', isPositive: true),
+                      if (_voucherBalanceRemaining != null)
+                        _buildSummaryRow('Sisa Saldo Giftcard', 'Rp ${_voucherBalanceRemaining!.toStringAsFixed(0)}', isPositive: false, isSubText: true),
                       if (_pointValueUsed > 0)
                         _buildSummaryRow('Poin Ditukar', '- Rp ${_pointValueUsed.toStringAsFixed(0)}', isPositive: true),
                       if (_globalTaxRate > 0)
@@ -1599,6 +1607,7 @@ class _POSScreenState extends State<POSScreen> {
       _availablePoints = 0;
       _memberDiscountAmount = 0;
       _voucherDiscountAmount = 0;
+      _voucherBalanceRemaining = null;
       _pointsUsed = 0;
       _pointsEarned = 0;
       _pointValueUsed = 0;
