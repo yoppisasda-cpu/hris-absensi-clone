@@ -497,10 +497,10 @@ class PrinterService {
                   child: pw.Image(logoImage, width: 40, height: 40),
                 ),
               pw.Center(
-                child: pw.Text(store['name']!, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
+                child: pw.Text(store['name']!, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
               ),
-              pw.Center(child: pw.Text(store['address']!, style: pw.TextStyle(fontSize: 8))),
-              pw.Center(child: pw.Text('Telp: ${store['phone']}', style: pw.TextStyle(fontSize: 8))),
+              pw.Center(child: pw.Text(store['address']!, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8))),
+              pw.Center(child: pw.Text('Telp: ${store['phone']}', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8))),
               pw.Divider(thickness: 0.5),
               pw.Text('Invoice: ${saleData['invoiceNumber'] ?? '-'}', style: pw.TextStyle(fontSize: 8)),
               if (saleData['customerName'] != null && saleData['customerName'].toString().isNotEmpty)
@@ -600,8 +600,8 @@ class PrinterService {
                 ),
               ],
               pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text(store['footer']!, style: pw.TextStyle(fontSize: 7))),
-              pw.Center(child: pw.Text('Powered by HRIS Absensi', style: pw.TextStyle(fontSize: 6))),
+              pw.Center(child: pw.Text(store['footer']!, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 7))),
+              pw.Center(child: pw.Text('Powered by HRIS Absensi', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 6))),
             ],
           );
         },
