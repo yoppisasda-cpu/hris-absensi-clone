@@ -233,6 +233,7 @@ class _POSScreenState extends State<POSScreen> {
     double pGrabfood = double.tryParse(item['priceGrabfood']?.toString() ?? '0') ?? 0;
     double pShopeefood = double.tryParse(item['priceShopeefood']?.toString() ?? '0') ?? 0;
     double pQpoon = double.tryParse(item['priceQpoon']?.toString() ?? '0') ?? 0;
+    double pTiktok = double.tryParse(item['priceTiktok']?.toString() ?? '0') ?? 0;
     double pNormal = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
 
     if (_saleType == 'GOFOOD' && pGofood > 0) {
@@ -243,6 +244,8 @@ class _POSScreenState extends State<POSScreen> {
       basePrice = pShopeefood;
     } else if (_saleType == 'QPOON' && pQpoon > 0) {
       basePrice = pQpoon;
+    } else if (_saleType == 'TIKTOK' && pTiktok > 0) {
+      basePrice = pTiktok;
     } else {
       basePrice = pNormal;
     }
@@ -323,6 +326,7 @@ class _POSScreenState extends State<POSScreen> {
           'priceGrabfood': product['priceGrabfood'],
           'priceShopeefood': product['priceShopeefood'],
           'priceQpoon': product['priceQpoon'],
+          'priceTiktok': product['priceTiktok'],
           'quantity': 1,
           'maxStock': product['stock'],
           'trackStock': product['trackStock'] ?? true,
@@ -400,7 +404,7 @@ class _POSScreenState extends State<POSScreen> {
     if (name.contains('qris')) return Icons.qr_code_scanner;
     if (name.contains('debit') || name.contains('credit')) return Icons.credit_card_outlined;
     if (name.contains('transfer')) return Icons.account_balance_outlined;
-    if (name.contains('gofood') || name.contains('grabfood') || name.contains('shopeefood') || name.contains('qpoon')) return Icons.delivery_dining;
+    if (name.contains('gofood') || name.contains('grabfood') || name.contains('shopeefood') || name.contains('qpoon') || name.contains('tiktok')) return Icons.delivery_dining;
     return Icons.account_balance_wallet_outlined;
   }
 
@@ -656,6 +660,7 @@ class _POSScreenState extends State<POSScreen> {
                     _buildCompactSaleTypeChip('GRABFOOD', 'GrabFood', Icons.delivery_dining, setPanelState),
                     _buildCompactSaleTypeChip('SHOPEEFOOD', 'ShopeeFood', Icons.delivery_dining, setPanelState),
                     _buildCompactSaleTypeChip('QPOON', 'QPoon', Icons.delivery_dining, setPanelState),
+                    _buildCompactSaleTypeChip('TIKTOK', 'Tiktok Go', Icons.delivery_dining, setPanelState),
                   ],
                 ),
                 SizedBox(height: 24),
@@ -1151,13 +1156,14 @@ class _POSScreenState extends State<POSScreen> {
     if (type == 'GRABFOOD') activeColor = Colors.green[800]!;
     if (type == 'SHOPEEFOOD') activeColor = Colors.orange[800]!;
     if (type == 'QPOON') activeColor = Colors.amber[600]!;
+    if (type == 'TIKTOK') activeColor = Colors.black87;
 
     return GestureDetector(
       onTap: () {
         setPanelState(() {
           _saleType = type;
-          if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD' || type == 'QPOON') {
-            _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : (type == 'SHOPEEFOOD' ? 'ShopeeFood' : 'QPoon'));
+          if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD' || type == 'QPOON' || type == 'TIKTOK') {
+            _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : (type == 'SHOPEEFOOD' ? 'ShopeeFood' : (type == 'QPOON' ? 'QPoon' : 'Tiktok Go')));
             final marketAcc = _accounts.firstWhere(
               (a) => a['name'].toString().toLowerCase().contains('market') || a['name'].toString().toLowerCase().contains('delivery'),
               orElse: () => _accounts.isNotEmpty ? _accounts.first : null
@@ -1197,14 +1203,15 @@ class _POSScreenState extends State<POSScreen> {
     if (type == 'GRABFOOD') activeColor = Colors.green[800]!;
     if (type == 'SHOPEEFOOD') activeColor = Colors.orange[800]!;
     if (type == 'QPOON') activeColor = Colors.amber[600]!;
+    if (type == 'TIKTOK') activeColor = Colors.black87;
 
     return Expanded(
       child: GestureDetector(
         onTap: () {
           setPanelState(() {
             _saleType = type;
-            if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD' || type == 'QPOON') {
-              _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : (type == 'SHOPEEFOOD' ? 'ShopeeFood' : 'QPoon'));
+            if (type == 'GOFOOD' || type == 'GRABFOOD' || type == 'SHOPEEFOOD' || type == 'QPOON' || type == 'TIKTOK') {
+              _selectedPaymentMethod = type == 'GOFOOD' ? 'GoFood' : (type == 'GRABFOOD' ? 'GrabFood' : (type == 'SHOPEEFOOD' ? 'ShopeeFood' : (type == 'QPOON' ? 'QPoon' : 'Tiktok Go')));
               
               final marketAcc = _accounts.firstWhere(
                 (a) => a['name'].toString().toLowerCase().contains('market') || a['name'].toString().toLowerCase().contains('delivery'),
