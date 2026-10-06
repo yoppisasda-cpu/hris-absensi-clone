@@ -7897,8 +7897,8 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
       }
     }
 
-    if (!title || !amount) {
-      return res.status(400).json({ error: 'Judul dan nominal klaim wajib diisi.' });
+    if (!title || !amount || !req.file) {
+      return res.status(400).json({ error: 'Judul, nominal klaim, dan bukti kuitansi wajib diisi.' });
     }
 
     // Gunakan req.file.path (path absolut dari multer) agar tidak salah di Railway
