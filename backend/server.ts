@@ -17345,6 +17345,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
           p.name as "productName", 
           p.sku as "productSku", 
           pc.name as "categoryName", 
+          si.modifiers as "modifiers",
           s."invoiceNumber", 
           s."date"
         FROM "SaleItem" si
@@ -17455,11 +17456,20 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     worksheet3.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
     saleItems.forEach(item => {
+      let modText = '';
+      if (item.modifiers) {
+         try {
+           const parsedMods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
+           const modsArr = Array.isArray(parsedMods) ? parsedMods : Object.values(parsedMods);
+           modText = modsArr.map((m: any) => m.optionName || m.name).filter(Boolean).join(', ');
+         } catch(e) {}
+      }
+
       const row = worksheet3.addRow({
         date: new Date(item.date).toLocaleDateString('id-ID'),
         invoiceNumber: item.invoiceNumber,
         sku: item.productSku || '-',
-        name: item.productName || 'Produk Tidak Diketahui',
+        name: item.productName ? (modText ? `${item.productName} (${modText})` : item.productName) : 'Produk Tidak Diketahui',
         category: item.categoryName || 'Uncategorized',
         quantity: item.quantity || 0,
         price: item.price || 0,
