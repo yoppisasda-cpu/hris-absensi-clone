@@ -305,7 +305,8 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 italic print:divide-black text-slate-950">
                                         {sale.items.map((item: any, idx: number) => {
-                                            const hasModifiers = item.modifiers && Array.isArray(item.modifiers) && item.modifiers.length > 0;
+                                            const parsedModifiers = item.modifiers ? (Array.isArray(item.modifiers) ? item.modifiers : Object.values(item.modifiers)) : [];
+                                            const hasModifiers = parsedModifiers.length > 0;
                                             const isBuy1Get1 = item.product_name.toLowerCase().includes('buy 1 get 1');
                                             const mainUnit = isBuy1Get1 ? 'PAKET' : item.product_unit;
 
@@ -326,7 +327,7 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                                             {parseFloat(item.total).toLocaleString()}
                                                         </td>
                                                     </tr>
-                                                    {hasModifiers && item.modifiers.map((mod: any, mIdx: number) => (
+                                                    {hasModifiers && parsedModifiers.map((mod: any, mIdx: number) => (
                                                         <tr key={`mod-${idx}-${mIdx}`} className="border-b border-slate-50 last:border-0 print:border-black/10 bg-slate-50/50 print:bg-transparent">
                                                             <td className="px-8 py-1.5 pl-12">
                                                                 <p className="text-[10px] text-slate-600 italic font-black uppercase tracking-tighter print:text-black/80">
