@@ -174,7 +174,7 @@ export default function PurchaseOrdersPage() {
                 head: [['NO', 'NAMA BARANG', 'JUMLAH', 'HARGA SATUAN', 'TOTAL']],
                 body: tableBody,
                 headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
-                foot: [['', '', '', 'TOTAL KESELURUHAN', `Rp ${(po.totalAmount || 0).toLocaleString('id-ID')}`]],
+                foot: [['', '', '', 'TOTAL KESELURUHAN', `Rp ${((po.items?.some((i: any) => (i.receivedQty || 0) > 0) ? po.items.reduce((sum: number, item: any) => sum + ((item.receivedQty || 0) * item.price), 0) : po.totalAmount) || 0).toLocaleString('id-ID')}`]],
                 footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 11 },
                 theme: 'grid',
                 styles: { fontSize: 9, cellPadding: 4, font: 'helvetica' }
@@ -442,7 +442,7 @@ export default function PurchaseOrdersPage() {
                                             </div>
                                         </td>
                                         <td className="px-8 py-6 text-right">
-                                            <p className="font-black text-white text-base tracking-tighter text-glow-sm italic">Rp {po.totalAmount.toLocaleString()}</p>
+                                            <p className="font-black text-white text-base tracking-tighter text-glow-sm italic">Rp {((po.items?.some((i: any) => (i.receivedQty || 0) > 0) ? po.items.reduce((sum: number, item: any) => sum + ((item.receivedQty || 0) * item.price), 0) : po.totalAmount) || 0).toLocaleString('id-ID')}</p>
                                         </td>
                                          <td className="px-8 py-6 text-center">
                                             {po.status === 'PENDING' && (
