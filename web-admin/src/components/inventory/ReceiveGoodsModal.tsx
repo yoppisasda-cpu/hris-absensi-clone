@@ -33,7 +33,7 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
         e.preventDefault();
         
         const receivedItems = items
-            .filter(item => Number(item.newReceivedQty) > 0)
+            .filter(item => Number(item.newReceivedQty) !== 0)
             .map(item => ({
                 id: item.id,
                 receivedQty: Number(item.newReceivedQty)
