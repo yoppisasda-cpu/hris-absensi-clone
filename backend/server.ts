@@ -17182,7 +17182,8 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
     const hourlyDistribution: Record<number, number> = {};
 
     sales.forEach((s: any) => {
-      const hour = new Date(s.date).getHours();
+      // Adjust to WIB (UTC+7) to ensure AI receives the correct local hour
+      const hour = (new Date(s.date).getUTCHours() + 7) % 24;
       hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
       
       s.SaleItem.forEach((item: any) => {
