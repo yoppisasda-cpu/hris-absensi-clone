@@ -3607,7 +3607,7 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
 
       for (const rxItem of receivedItems) {
         const qtyToReceive = Number(rxItem.receivedQty);
-        if (qtyToReceive <= 0) continue;
+        if (qtyToReceive === 0) continue;
 
         const poItem = await tx.purchaseOrderItem.findUnique({
           where: { id: rxItem.id }
@@ -3671,9 +3671,9 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
           await tx.stockTransaction.create({
             data: {
               productId: poItem.productId,
-              type: 'IN',
-              quantity: incomingQty,
-              reference: `PO #${poData.orderNumber} (Goods Received)`,
+              type: incomingQty < 0 ? 'OUT' : 'IN',
+              quantity: Math.abs(incomingQty),
+              reference: incomingQty < 0 ? `PO #${poData.orderNumber} (Koreksi Terima)` : `PO #${poData.orderNumber} (Goods Received)`,
               date: new Date(),
               warehouseId: warehouseId || null
             }
@@ -3682,7 +3682,7 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
       }
 
       // 3. Create Expense for received items
-      if (totalExpenseAmount > 0) {
+      if (totalExpenseAmount !== 0) {
         let category: any = await tx.expenseCategory.findFirst({
           where: { companyId: tenantId, name: 'Pembelian (Auto-PO)' }
         });

@@ -143,7 +143,6 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                                                         )}
                                                         <input
                                                             type="number"
-                                                            min="0"
                                                             step="any"
                                                             value={item.newReceivedQty}
                                                             onChange={(e) => {
