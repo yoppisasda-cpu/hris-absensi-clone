@@ -110,20 +110,32 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-slate-950 italic">
-                                    {po.items?.map((item: any) => (
+                                    {po.items?.map((item: any) => {
+                                        const hasReceivedItems = po.items?.some((i: any) => (i.receivedQty || 0) > 0);
+                                        const qtyToCalculate = hasReceivedItems ? (item.receivedQty || 0) : item.quantity;
+                                        return (
                                         <tr key={item.id} className="group hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4 font-black text-slate-950 text-[11px] uppercase tracking-tighter">{item.product?.name}</td>
                                             <td className="px-6 py-4 text-center font-black text-slate-950 text-[11px] uppercase">{item.quantity} <span className="text-[9px] text-slate-500">{(item.product?.purchaseUnit || item.product?.unit || 'PCS').toUpperCase()}</span></td>
                                             <td className="px-6 py-4 text-center font-black text-emerald-600 text-[11px] uppercase">{item.receivedQty || 0}</td>
                                             <td className="px-6 py-4 text-right font-black text-slate-500 text-[11px] tracking-widest">{item.price.toLocaleString('id-ID')}</td>
-                                            <td className="px-6 py-4 text-right font-black text-slate-950 text-[11px] tracking-widest">{(item.quantity * item.price).toLocaleString('id-ID')}</td>
+                                            <td className="px-6 py-4 text-right font-black text-slate-950 text-[11px] tracking-widest">{(qtyToCalculate * item.price).toLocaleString('id-ID')}</td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                                 <tfoot className="bg-slate-50 border-t-2 border-slate-950 print:bg-white print:border-t-2">
                                     <tr>
                                         <td colSpan={4} className="px-6 py-5 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Total Bersih PO</td>
-                                        <td className="px-6 py-5 text-right text-xl font-black italic text-slate-950 tracking-tighter uppercase">Rp {po.totalAmount.toLocaleString('id-ID')}</td>
+                                        <td className="px-6 py-5 text-right text-xl font-black italic text-slate-950 tracking-tighter uppercase">
+                                            Rp {(() => {
+                                                const hasReceivedItems = po.items?.some((i: any) => (i.receivedQty || 0) > 0);
+                                                if (hasReceivedItems) {
+                                                    return po.items?.reduce((sum: number, item: any) => sum + ((item.receivedQty || 0) * item.price), 0).toLocaleString('id-ID');
+                                                }
+                                                return po.totalAmount.toLocaleString('id-ID');
+                                            })()}
+                                        </td>
                                     </tr>
                                 </tfoot>
                             </table>
