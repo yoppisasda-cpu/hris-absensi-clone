@@ -17022,6 +17022,7 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     const tenantId = Number((req as any).tenantId);
     if (isNaN(tenantId)) return res.status(400).json({ error: 'Invalid Tenant ID' });
 
+    const companyTimezone = await getCompanyTimezone(tenantId);
     const filterRes = await buildPosWhereClause(req, tenantId, req.query);
 
     // 1. Core Summary Metrics
@@ -17045,7 +17046,7 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
     // 2. Hourly Distribution (Peak Hours)
     const hourlyData = await prisma.$queryRawUnsafe(`
       SELECT 
-        EXTRACT(HOUR FROM s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "hour",
+        EXTRACT(HOUR FROM s."date" AT TIME ZONE 'UTC' AT TIME ZONE '${companyTimezone}') as "hour",
         SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "revenue",
         COUNT(s.id) as "orders"
       FROM "Sale" s
@@ -17083,7 +17084,7 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
 
     // 4. Daily Trend
     const dailyTrend = await prisma.$queryRawUnsafe(`
-      SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') as "date", 
+      SELECT DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE '${companyTimezone}') as "date", 
              SUM(s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "total"
       FROM "Sale" s
       LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
@@ -17093,7 +17094,7 @@ app.get('/api/pos/analytics/comprehensive', tenantMiddleware, async (req: Reques
         GROUP BY "saleId"
       ) sr ON sr."saleId" = s.id
       WHERE ${filterRes.whereClause}
-      GROUP BY DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')
+      GROUP BY DATE_TRUNC('day', s."date" AT TIME ZONE 'UTC' AT TIME ZONE '${companyTimezone}')
       ORDER BY "date" ASC
     `, ...filterRes.queryParams);
 
@@ -17126,6 +17127,7 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
   try {
     const tenantId = Number((req as any).tenantId);
     const { branchId, startDate, endDate, checkOnly } = req.query;
+    const companyTimezone = await getCompanyTimezone(tenantId);
 
     // 1. Support checkOnly to query current daily usage without running AI or consuming limit
     if (checkOnly === 'true') {
@@ -17182,8 +17184,13 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
     const hourlyDistribution: Record<number, number> = {};
 
     sales.forEach((s: any) => {
-      // Adjust to WIB (UTC+7) to ensure AI receives the correct local hour
-      const hour = (new Date(s.date).getUTCHours() + 7) % 24;
+      const hourStr = new Intl.DateTimeFormat('en-US', {
+        timeZone: companyTimezone,
+        hour: 'numeric',
+        hour12: false
+      }).format(new Date(s.date));
+      const hour = parseInt(hourStr, 10) === 24 ? 0 : parseInt(hourStr, 10);
+      
       hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
       
       s.SaleItem.forEach((item: any) => {
