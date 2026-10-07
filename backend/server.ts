@@ -3696,21 +3696,36 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
           category = { id: catResult[0].id };
         }
 
-        const finalReceivedDate = receivedDate ? new Date(receivedDate) : new Date();
-        const dueDate = new Date(finalReceivedDate.getTime() + 7 * 24 * 60 * 60 * 1000); 
-        await tx.expense.create({
-          data: {
-            companyId: tenantId,
-            categoryId: category.id,
-            supplierId: poData.supplierId,
-            amount: totalExpenseAmount,
-            date: finalReceivedDate,
-            dueDate: dueDate,
-            description: `Hutang otomatis dari PO #${poData.orderNumber} (Penerimaan Barang)`,
-            status: 'PENDING',
-            paidTo: poData.supplier_name
+        const existingExpense = await tx.expense.findFirst({
+          where: { 
+            companyId: tenantId, 
+            description: { startsWith: `Hutang otomatis dari PO #${poData.orderNumber}` },
+            status: 'PENDING' 
           }
         });
+
+        if (existingExpense) {
+          await tx.expense.update({
+            where: { id: existingExpense.id },
+            data: { amount: { increment: totalExpenseAmount } }
+          });
+        } else {
+          const finalReceivedDate = receivedDate ? new Date(receivedDate) : new Date();
+          const dueDate = new Date(finalReceivedDate.getTime() + 7 * 24 * 60 * 60 * 1000); 
+          await tx.expense.create({
+            data: {
+              companyId: tenantId,
+              categoryId: category.id,
+              supplierId: poData.supplierId,
+              amount: totalExpenseAmount,
+              date: finalReceivedDate,
+              dueDate: dueDate,
+              description: `Hutang otomatis dari PO #${poData.orderNumber} (Penerimaan Barang)`,
+              status: 'PENDING',
+              paidTo: poData.supplier_name
+            }
+          });
+        }
       }
 
       // Check if there are ANY unreceived items left across the entire PO
