@@ -3382,7 +3382,23 @@ app.get('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request,
       },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(pos);
+    const posWithPayment = await Promise.all(pos.map(async (po: any) => {
+      const expense = await prisma.expense.findFirst({
+        where: {
+          companyId: tenantId,
+          description: { startsWith: `Hutang otomatis dari PO #${po.orderNumber}` }
+        },
+        select: { status: true, paidAmount: true, amount: true }
+      });
+      return {
+        ...po,
+        paymentStatus: expense ? expense.status : 'UNBILLED',
+        paidAmount: expense ? (expense.paidAmount || 0) : 0,
+        expenseAmount: expense ? expense.amount : 0
+      };
+    }));
+
+    res.json(posWithPayment);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil data PO: ' + error.message });
   }
