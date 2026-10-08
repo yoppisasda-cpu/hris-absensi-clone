@@ -88,6 +88,7 @@ export default function ReceivablesPage() {
             paymentAmount: remaining.toFixed(0),
             remainingAmount: remaining
         });
+        fetchAccounts(); // Fetch latest balance before opening
         setIsPayModalOpen(true);
     };
 
@@ -104,6 +105,7 @@ export default function ReceivablesPage() {
                 paymentAmount: parseFloat(payData.paymentAmount)
             });
             await fetchReceivables();
+            await fetchAccounts(); // Refresh account balances after payment
             setIsPayModalOpen(false);
         } catch (error: any) {
             alert(error.response?.data?.error || "Gagal mencatat pembayaran piutang");

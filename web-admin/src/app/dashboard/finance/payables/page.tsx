@@ -50,6 +50,7 @@ export default function PayablesPage() {
             alert("Pembayaran berhasil dicatat!");
             setIsPayModalOpen(false);
             fetchPayables(); // Refresh list
+            fetchAccounts(); // Refresh account balances
         } catch (error: any) {
             alert(error.response?.data?.error || "Gagal mencatat pembayaran");
         } finally {
@@ -199,6 +200,7 @@ export default function PayablesPage() {
                                                 <button 
                                                     onClick={() => {
                                                         setSelectedExpense(p);
+                                                        fetchAccounts(); // Fetch latest balance before opening
                                                         setIsPayModalOpen(true);
                                                     }}
                                                     className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95 shadow-lg shadow-emerald-100 flex items-center gap-2 mx-auto"
