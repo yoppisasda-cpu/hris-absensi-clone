@@ -444,7 +444,7 @@ export default function PurchaseOrdersPage() {
                                         <td className="px-8 py-6 text-right">
                                             <p className="font-black text-white text-base tracking-tighter text-glow-sm italic">Rp {((po.items?.some((i: any) => (i.receivedQty || 0) > 0) ? po.items.reduce((sum: number, item: any) => sum + ((item.receivedQty || 0) * item.price), 0) : po.totalAmount) || 0).toLocaleString('id-ID')}</p>
                                         </td>
-                                         <td className="px-8 py-6 text-center">
+                                        <td className="px-8 py-6 text-center">
                                             <div className="flex flex-col items-center gap-1.5">
                                                 {po.status === 'PENDING' && (
                                                     <span className="inline-flex items-center gap-2 rounded-xl bg-amber-500/10 px-4 py-1.5 text-[9px] font-black text-amber-500 border border-amber-500/20 uppercase tracking-[0.2em] italic">
@@ -461,8 +461,18 @@ export default function PurchaseOrdersPage() {
                                                         <div className="h-1.5 w-1.5 rounded-full bg-red-500"></div> AUTH_DENIED
                                                     </span>
                                                 )}
+                                                {po.status === 'COMPLETED' && (
+                                                    <span className="inline-flex items-center gap-2 rounded-xl bg-blue-500/10 px-4 py-1.5 text-[9px] font-black text-blue-400 border border-blue-500/20 uppercase tracking-[0.2em] italic">
+                                                        <div className="h-1.5 w-1.5 rounded-full bg-blue-400"></div> FULFILLED
+                                                    </span>
+                                                )}
+                                                {po.status === 'PARTIAL' && (
+                                                    <span className="inline-flex items-center gap-2 rounded-xl bg-fuchsia-500/10 px-4 py-1.5 text-[9px] font-black text-fuchsia-400 border border-fuchsia-500/20 uppercase tracking-[0.2em] italic">
+                                                        <div className="h-1.5 w-1.5 rounded-full bg-fuchsia-400"></div> PARTIAL_RX
+                                                    </span>
+                                                )}
                                                 
-                                                {po.status === 'APPROVED' && po.paymentStatus && po.paymentStatus !== 'UNBILLED' && (
+                                                {po.paymentStatus && po.paymentStatus !== 'UNBILLED' && (
                                                     <span className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.2em] italic border ${
                                                         po.paymentStatus === 'PAID' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' : 
                                                         po.paymentStatus === 'PARTIAL' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
