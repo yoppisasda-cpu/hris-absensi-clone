@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowDownCircle, Search, Filter, Calendar, AlertCircle, ChevronRight, Wallet, User, CheckCircle } from 'lucide-react';
+import { ArrowDownCircle, Search, Filter, Calendar, AlertCircle, ChevronRight, Wallet, User, CheckCircle, PackageCheck } from 'lucide-react';
 import api from '@/lib/api';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PayDebtModal from "@/components/finance/PayDebtModal";
@@ -113,7 +113,7 @@ export default function PayablesPage() {
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier / Penerima</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Jatuh Tempo</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal & Tempo</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kategori</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Hutang</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Telah Dibayar</th>
@@ -158,11 +158,19 @@ export default function PayablesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className={`h-4 w-4 ${isOverdue ? 'text-red-500' : 'text-slate-400'}`} />
-                                                    <span className={`text-sm font-bold ${isOverdue ? 'text-red-600' : 'text-slate-600'}`}>
-                                                        {p.dueDate ? new Date(p.dueDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
-                                                    </span>
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex items-center gap-2" title="Tanggal Terima Barang / Transaksi">
+                                                        <PackageCheck className="h-4 w-4 text-emerald-500" />
+                                                        <span className="text-sm font-bold text-slate-600">
+                                                            {p.date ? new Date(p.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2" title="Jatuh Tempo Pembayaran">
+                                                        <Calendar className={`h-4 w-4 ${isOverdue ? 'text-red-500' : 'text-slate-400'}`} />
+                                                        <span className={`text-sm font-bold ${isOverdue ? 'text-red-600' : 'text-slate-600'}`}>
+                                                            {p.dueDate ? new Date(p.dueDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
