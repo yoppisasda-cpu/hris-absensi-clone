@@ -15,6 +15,7 @@ import ReceiveGoodsModal from "@/components/inventory/ReceiveGoodsModal";
 import AiPoModal from "@/components/inventory/AiPoModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 export default function PurchaseOrdersPage() {
     const [pos, setPos] = useState<any[]>([]);
@@ -241,6 +242,39 @@ export default function PurchaseOrdersPage() {
         toast.success("Membuka Draft Email... silakan lampirkan file PDF yang baru saja terunduh.");
     };
 
+    const handleExportExcel = () => {
+        try {
+            if (filteredPos.length === 0) {
+                return toast.error("Tidak ada data untuk diekspor");
+            }
+            
+            const exportData = filteredPos.map(po => {
+                const totalVal = (po.items?.some((i: any) => (i.receivedQty || 0) > 0) ? po.items.reduce((sum: number, item: any) => sum + ((item.receivedQty || 0) * item.price), 0) : po.totalAmount) || 0;
+                return {
+                    "No. Referensi (PO)": po.orderNumber,
+                    "Tanggal": new Date(po.date).toLocaleDateString('id-ID'),
+                    "Supplier": po.supplier?.name || "-",
+                    "Total Barang (Unit)": po.items?.length || 0,
+                    "Total Nilai (Rp)": totalVal,
+                    "Status Persetujuan": po.status,
+                    "Status Pembayaran": po.paymentStatus || 'UNBILLED',
+                    "Dibuat Oleh": po.createdBy?.name || "-",
+                    "Disetujui Oleh": po.approvedBy?.name || "-"
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Purchase_Orders");
+            
+            XLSX.writeFile(workbook, `Data_PO_BahanBaku_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast.success("Berhasil mengekspor data ke Excel!");
+        } catch (error) {
+            console.error("Gagal export excel", error);
+            toast.error("Gagal mengekspor data ke Excel");
+        }
+    };
+
     const filteredPos = pos.filter(po => {
         const matchesSearch = po.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             po.supplier?.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -383,7 +417,7 @@ export default function PurchaseOrdersPage() {
                                 <option value="REJECTED">VEND_REJECTED</option>
                             </select>
                         </div>
-                        <button className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-600 hover:text-white hover:bg-slate-800 transition-all">
+                        <button onClick={handleExportExcel} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-600 hover:text-white hover:bg-slate-800 transition-all" title="Export ke Excel">
                             <Download className="h-4 w-4" />
                         </button>
                     </div>
