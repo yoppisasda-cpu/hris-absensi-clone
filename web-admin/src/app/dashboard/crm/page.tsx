@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MessageSquare, User, Bot, History, Search, MessageCircle } from 'lucide-react';
+import { MessageSquare, User, Bot, History, Search, MessageCircle, Play, Pause } from 'lucide-react';
 import api from '@/lib/api';
 
 interface ChatMessage {
@@ -26,12 +26,16 @@ export default function CRMPage() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPolling, setIsPolling] = useState(false);
 
   useEffect(() => {
     fetchSessions();
-    const interval = setInterval(fetchSessions, 10000); // Polling every 10s
+    let interval: any;
+    if (isPolling) {
+        interval = setInterval(fetchSessions, 10000); // Polling every 10s
+    }
     return () => clearInterval(interval);
-  }, []);
+  }, [isPolling]);
 
   useEffect(() => {
     if (selectedSessionId) {
@@ -62,11 +66,23 @@ export default function CRMPage() {
     <div className="flex h-[calc(100vh-120px)] gap-6 p-4">
       {/* Session List */}
       <div className="w-1/3 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <History className="w-5 h-5 text-blue-600" />
             Riwayat Chat
           </h2>
+          <button
+              onClick={() => setIsPolling(!isPolling)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  isPolling 
+                  ? 'bg-blue-100 text-blue-600 border border-blue-200' 
+                  : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'
+              }`}
+              title={isPolling ? "Auto-Refresh Aktif" : "Auto-Refresh Mati"}
+          >
+              {isPolling ? <Pause size={14} /> : <Play size={14} />}
+              {isPolling ? 'LIVE' : 'PAUSED'}
+          </button>
         </div>
         
         <div className="flex-1 overflow-y-auto">

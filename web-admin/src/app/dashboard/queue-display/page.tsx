@@ -1,11 +1,12 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Utensils, CheckCircle, Volume2, VolumeX } from 'lucide-react';
+import { Utensils, CheckCircle, Volume2, VolumeX, Play, Pause } from 'lucide-react';
 
 export default function QueueDisplay() {
     const [orders, setOrders] = useState<any[]>([]);
     const [soundEnabled, setSoundEnabled] = useState(false);
+    const [isPolling, setIsPolling] = useState(false); // Default to false to save railway usage
     const soundEnabledRef = useRef(false);
     const announcedOrdersRef = useRef<Set<string>>(new Set());
     const isFirstLoad = useRef(true);
@@ -64,9 +65,12 @@ export default function QueueDisplay() {
 
     useEffect(() => {
         fetchOrders();
-        const interval = setInterval(fetchOrders, 5000); // Polling faster for TV (every 5 seconds)
+        let interval: any;
+        if (isPolling) {
+            interval = setInterval(fetchOrders, 5000); // Polling faster for TV (every 5 seconds)
+        }
         return () => clearInterval(interval);
-    }, []);
+    }, [isPolling]);
 
     const preparingOrders = orders.filter(o => o.status === 'PREPARING').sort((a, b) => b.id - a.id);
     const readyOrders = orders.filter(o => o.status === 'READY').sort((a, b) => b.id - a.id);
@@ -79,32 +83,45 @@ export default function QueueDisplay() {
                     <h1 className="text-4xl font-black tracking-widest text-emerald-400">ORDER STATUS</h1>
                     <p className="text-white/50 text-lg tracking-wider mt-2">Silakan tunggu nomor pesanan Anda dipanggil</p>
                 </div>
-                <button
-                    onClick={() => {
-                        const nextState = !soundEnabled;
-                        setSoundEnabled(nextState);
-                        soundEnabledRef.current = nextState;
-                        
-                        if (nextState) {
-                            // Mainkan suara tes agar user yakin suaranya nyala
-                            window.speechSynthesis.cancel(); // Hentikan suara lain
-                            const u = new SpeechSynthesisUtterance("Sistem suara antrean diaktifkan");
-                            u.lang = 'id-ID';
-                            u.rate = 1;
-                            window.speechSynthesis.speak(u);
-                        } else {
-                            window.speechSynthesis.cancel(); // Matikan suara kalau lagi ngomong
-                        }
-                    }}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all ${
-                        soundEnabled 
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    }`}
-                >
-                    {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
-                    {soundEnabled ? 'SUARA AKTIF' : 'SUARA MATI'}
-                </button>
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => setIsPolling(!isPolling)}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all ${
+                            isPolling 
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
+                    >
+                        {isPolling ? <Pause size={24} /> : <Play size={24} />}
+                        {isPolling ? 'AUTO-REFRESH AKTIF' : 'AUTO-REFRESH MATI'}
+                    </button>
+                    <button
+                        onClick={() => {
+                            const nextState = !soundEnabled;
+                            setSoundEnabled(nextState);
+                            soundEnabledRef.current = nextState;
+                            
+                            if (nextState) {
+                                // Mainkan suara tes agar user yakin suaranya nyala
+                                window.speechSynthesis.cancel(); // Hentikan suara lain
+                                const u = new SpeechSynthesisUtterance("Sistem suara antrean diaktifkan");
+                                u.lang = 'id-ID';
+                                u.rate = 1;
+                                window.speechSynthesis.speak(u);
+                            } else {
+                                window.speechSynthesis.cancel(); // Matikan suara kalau lagi ngomong
+                            }
+                        }}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all ${
+                            soundEnabled 
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                            : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        }`}
+                    >
+                        {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
+                        {soundEnabled ? 'SUARA AKTIF' : 'SUARA MATI'}
+                    </button>
+                </div>
             </div>
 
             {/* CONTENT */}

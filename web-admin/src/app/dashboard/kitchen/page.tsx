@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { ChefHat, Check, Clock, UtensilsCrossed, AlertCircle, BarChart3 } from 'lucide-react';
+import { ChefHat, Check, Clock, UtensilsCrossed, AlertCircle, BarChart3, Play, Pause } from 'lucide-react';
 import Link from 'next/link';
 
 export default function KitchenDisplay() {
@@ -11,6 +11,7 @@ export default function KitchenDisplay() {
     const [staffs, setStaffs] = useState<any[]>([]);
     const [selectedStaffs, setSelectedStaffs] = useState<Record<string, string>>({});
     const [kdsFilter, setKdsFilter] = useState<'ALL' | 'FOOD' | 'BEVERAGE'>('ALL');
+    const [isPolling, setIsPolling] = useState(false);
 
     const fetchOrders = async () => {
         try {
@@ -48,9 +49,12 @@ export default function KitchenDisplay() {
     useEffect(() => {
         fetchOrders();
         fetchStaffs();
-        const interval = setInterval(fetchOrders, 10000); // Polling every 10 seconds
+        let interval: any;
+        if (isPolling) {
+            interval = setInterval(fetchOrders, 10000); // Polling every 10 seconds
+        }
         return () => clearInterval(interval);
-    }, []);
+    }, [isPolling]);
 
     const markAsReady = async (type: string, id: number) => {
         try {
@@ -156,6 +160,17 @@ export default function KitchenDisplay() {
                         <BarChart3 size={18} />
                         Laporan Produksi
                     </Link>
+                    <button
+                        onClick={() => setIsPolling(!isPolling)}
+                        className={`flex items-center justify-center w-10 h-10 rounded-xl font-bold transition-all ${
+                            isPolling 
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
+                        title={isPolling ? "Auto-Refresh Aktif" : "Auto-Refresh Mati"}
+                    >
+                        {isPolling ? <Pause size={18} /> : <Play size={18} />}
+                    </button>
                 </div>
             </div>
 
