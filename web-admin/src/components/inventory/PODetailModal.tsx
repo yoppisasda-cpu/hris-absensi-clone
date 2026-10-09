@@ -27,23 +27,57 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
     const handleExportExcel = () => {
         if (!po || !po.items) return;
         
-        const exportData = po.items.map((item: any) => {
-            const hasReceivedItems = po.items.some((i: any) => (i.receivedQty || 0) > 0);
-            const qtyToCalculate = hasReceivedItems ? (item.receivedQty || 0) : item.quantity;
-            return {
-                "SKU": item.product?.sku || "-",
-                "Nama Barang": item.product?.name || "-",
-                "Dipesan": item.quantity,
-                "Diterima": item.receivedQty || 0,
-                "Satuan": (item.product?.purchaseUnit || item.product?.unit || 'PCS').toUpperCase(),
-                "Harga Satuan (Rp)": item.price,
-                "Total (Rp)": qtyToCalculate * item.price
-            };
-        });
+        const hasReceivedItems = po.items.some((i: any) => (i.receivedQty || 0) > 0);
+        
+        const aoaData: any[][] = [
+            ["ANALISIS MANIFEST PO"],
+            [],
+            ["ID MANIFES", `#${po.orderNumber?.toUpperCase()}`],
+            ["TANGGAL TERBIT", new Date(po.date).toLocaleDateString('id-ID')],
+            ["INFORMASI PEMASOK", po.supplier?.name || "-"],
+            ["STATUS VALIDASI", getStatusLabel(po.status)],
+            ["DIBUAT OLEH", po.createdBy?.name || "-"],
+            ["DISETUJUI OLEH", po.approvedBy?.name || "-"],
+            [],
+            ["RINCIAN BARANG"],
+            ["SKU", "Nama Barang", "Dipesan", "Diterima", "Satuan", "Harga Satuan (Rp)", "Total (Rp)"]
+        ];
 
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        let totalBersih = 0;
+
+        po.items.forEach((item: any) => {
+            const qtyToCalculate = hasReceivedItems ? (item.receivedQty || 0) : item.quantity;
+            const itemTotal = qtyToCalculate * item.price;
+            totalBersih += itemTotal;
+            
+            aoaData.push([
+                item.product?.sku || "-",
+                item.product?.name || "-",
+                item.quantity,
+                item.receivedQty || 0,
+                (item.product?.purchaseUnit || item.product?.unit || 'PCS').toUpperCase(),
+                item.price,
+                itemTotal
+            ]);
+        });
+        
+        aoaData.push([]);
+        aoaData.push(["", "", "", "", "", "TOTAL BERSIH PO", totalBersih]);
+
+        const worksheet = XLSX.utils.aoa_to_sheet(aoaData);
+        
+        worksheet['!cols'] = [
+            { wch: 15 },
+            { wch: 35 },
+            { wch: 10 },
+            { wch: 10 },
+            { wch: 10 },
+            { wch: 20 },
+            { wch: 20 }
+        ];
+
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, `Detail_PO_${po.orderNumber}`);
+        XLSX.utils.book_append_sheet(workbook, worksheet, `PO_${po.orderNumber}`);
         
         XLSX.writeFile(workbook, `Detail_PO_${po.orderNumber}.xlsx`);
     };
