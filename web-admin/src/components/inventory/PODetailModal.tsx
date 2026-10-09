@@ -1,6 +1,7 @@
 'use client';
 
-import { X, Truck, Package, Clock, User, CheckCircle2, XCircle, FileText, ShoppingBag, Printer } from "lucide-react";
+import { X, Truck, Package, Clock, User, CheckCircle2, XCircle, FileText, ShoppingBag, Printer, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject, onCancel }: any) {
     if (!isOpen || !po) return null;
@@ -23,6 +24,30 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
         }
     };
 
+    const handleExportExcel = () => {
+        if (!po || !po.items) return;
+        
+        const exportData = po.items.map((item: any) => {
+            const hasReceivedItems = po.items.some((i: any) => (i.receivedQty || 0) > 0);
+            const qtyToCalculate = hasReceivedItems ? (item.receivedQty || 0) : item.quantity;
+            return {
+                "SKU": item.product?.sku || "-",
+                "Nama Barang": item.product?.name || "-",
+                "Dipesan": item.quantity,
+                "Diterima": item.receivedQty || 0,
+                "Satuan": (item.product?.purchaseUnit || item.product?.unit || 'PCS').toUpperCase(),
+                "Harga Satuan (Rp)": item.price,
+                "Total (Rp)": qtyToCalculate * item.price
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `Detail_PO_${po.orderNumber}`);
+        
+        XLSX.writeFile(workbook, `Detail_PO_${po.orderNumber}.xlsx`);
+    };
+
     return (
         <div id="po-printable-area" className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 print:p-0 print:bg-white print:static animate-in fade-in duration-300">
             <div className="bg-white w-full max-w-3xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:shadow-none print:border-none print:max-w-none print:rounded-none print:max-h-none print:h-auto">
@@ -39,6 +64,12 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <button 
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border border-emerald-600 active:scale-95 shadow-sm italic"
+                        >
+                            <Download className="h-3.5 w-3.5 stroke-[2px]" /> Excel
+                        </button>
                         <button 
                             onClick={() => window.print()}
                             className="flex items-center gap-2 bg-slate-950 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border border-slate-950 active:scale-95 shadow-sm italic"
@@ -103,6 +134,7 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                                 <thead className="bg-slate-50 text-[9px] font-black uppercase text-slate-950 tracking-[0.15em] border-b border-slate-200 italic print:bg-white print:text-black">
                                     <tr>
                                         <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 w-1/4">Nama Barang</th>
+                                        <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 w-1/5">SKU</th>
                                         <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 text-center">Dipesan</th>
                                         <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 text-center">Diterima</th>
                                         <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-slate-500 text-right">Harga Satuan</th>
@@ -116,6 +148,7 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                                         return (
                                         <tr key={item.id} className="group hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4 font-black text-slate-950 text-[11px] uppercase tracking-tighter">{item.product?.name}</td>
+                                            <td className="px-6 py-4 font-bold text-slate-500 text-[10px] uppercase tracking-widest">{item.product?.sku || '-'}</td>
                                             <td className="px-6 py-4 text-center font-black text-slate-950 text-[11px] uppercase">{item.quantity} <span className="text-[9px] text-slate-500">{(item.product?.purchaseUnit || item.product?.unit || 'PCS').toUpperCase()}</span></td>
                                             <td className="px-6 py-4 text-center font-black text-emerald-600 text-[11px] uppercase">{item.receivedQty || 0}</td>
                                             <td className="px-6 py-4 text-right font-black text-slate-500 text-[11px] tracking-widest">{item.price.toLocaleString('id-ID')}</td>
@@ -126,7 +159,7 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                                 </tbody>
                                 <tfoot className="bg-slate-50 border-t-2 border-slate-950 print:bg-white print:border-t-2">
                                     <tr>
-                                        <td colSpan={4} className="px-6 py-5 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Total Bersih PO</td>
+                                        <td colSpan={5} className="px-6 py-5 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Total Bersih PO</td>
                                         <td className="px-6 py-5 text-right text-xl font-black italic text-slate-950 tracking-tighter uppercase">
                                             Rp {(() => {
                                                 const hasReceivedItems = po.items?.some((i: any) => (i.receivedQty || 0) > 0);
