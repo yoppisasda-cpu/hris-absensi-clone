@@ -4002,7 +4002,10 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         paymentInstructions: paymentInstructions !== undefined ? paymentInstructions : undefined,
         openTime: req.body.openTime !== undefined ? req.body.openTime : undefined,
         closeTime: req.body.closeTime !== undefined ? req.body.closeTime : undefined,
-        isOpenManual: req.body.isOpenManual !== undefined ? !!req.body.isOpenManual : undefined
+        isOpenManual: req.body.isOpenManual !== undefined ? !!req.body.isOpenManual : undefined,
+        xenditMode: req.body.xenditMode !== undefined ? req.body.xenditMode : undefined,
+        xenditSecretKey: req.body.xenditSecretKey !== undefined ? (req.body.xenditSecretKey ? req.body.xenditSecretKey.trim() : null) : undefined,
+        xenditWebhookToken: req.body.xenditWebhookToken !== undefined ? (req.body.xenditWebhookToken ? req.body.xenditWebhookToken.trim() : null) : undefined
       }
     });
 
@@ -16454,29 +16457,45 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       timeout: 30000
     });
 
-    // Fetch Static QR & Payment Instructions from Company profile
-    const companyInfo = await prisma.company.findUnique({ where: { id: tenantId }, select: { qrisUrl: true, paymentInstructions: true } });
+    // Fetch Payment Settings & Static QR from Company profile
+    const companyInfo = await prisma.company.findUnique({ 
+      where: { id: tenantId }, 
+      select: { 
+        qrisUrl: true, 
+        paymentInstructions: true,
+        xenditMode: true,
+        xenditSecretKey: true
+      } 
+    });
     const qrisUrl = companyInfo?.qrisUrl || null;
     const paymentInstructions = companyInfo?.paymentInstructions || null;
 
     let invoiceUrl = null;
     
-    // --- TEMPORARY BYPASS XENDIT (Using Static QR Instead) ---
-    /*
+    // --- DYNAMIC XENDIT PAYMENT GATEWAY (Aivola Default vs Client Custom) ---
     if (result.paymentMethod.includes('Online Payment')) {
-      const axios = require('axios');
-      const XENDIT_SECRET = process.env.XENDIT_SECRET_KEY || '';
-      if (XENDIT_SECRET) {
+      // Tentukan Secret Key berdasarkan mode
+      let activeXenditSecret = '';
+      if (companyInfo?.xenditMode === 'CUSTOM' && companyInfo.xenditSecretKey) {
+        activeXenditSecret = companyInfo.xenditSecretKey;
+        console.log(`[XENDIT] Using CLIENT CUSTOM Xendit Account for Tenant: ${tenantId}`);
+      } else if (process.env.XENDIT_SECRET_KEY) {
+        activeXenditSecret = process.env.XENDIT_SECRET_KEY;
+        console.log(`[XENDIT] Using AIVOLA DEFAULT Xendit Account for Tenant: ${tenantId}`);
+      }
+
+      if (activeXenditSecret) {
         try {
+          const axios = require('axios');
           const xenditRes = await axios.post('https://api.xendit.co/v2/invoices', {
             external_id: result.invoiceNumber,
             amount: result.totalAmount,
             payer_email: result.customerEmail || 'customer@aivola.id',
             description: `Pembayaran Pesanan Aivola GO: ${result.invoiceNumber}`,
-            success_redirect_url: 'https://aivolago.vercel.app/' // Atau order.aivola.id
+            success_redirect_url: 'https://aivolago.vercel.app/'
           }, {
             headers: {
-              'Authorization': `Basic ${Buffer.from(XENDIT_SECRET + ':').toString('base64')}`
+              'Authorization': `Basic ${Buffer.from(activeXenditSecret + ':').toString('base64')}`
             }
           });
 
@@ -16491,10 +16510,9 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           console.error("[XENDIT ERROR]:", err.response?.data || err.message);
         }
       } else {
-        console.warn("[XENDIT WARNING]: XENDIT_SECRET_KEY belum di-set di .env");
+        console.warn(`[XENDIT WARNING]: Xendit key tidak tersedia untuk Tenant ${tenantId} (Mode: ${companyInfo?.xenditMode || 'AIVOLA'})`);
       }
     }
-    */
 
     res.status(201).json({
       ...result,
@@ -20074,32 +20092,64 @@ app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response
 // Webhook dari Xendit saat pembayaran berhasil
 app.post('/api/payments/xendit/webhook', async (req: Request, res: Response) => {
   try {
+    const callbackToken = req.headers['x-callback-token'] as string;
     const { external_id, status } = req.body;
     
     // Log the incoming webhook for debugging
     console.log(`[XENDIT WEBHOOK] Received for invoice: ${external_id}, status: ${status}`);
 
-    if (status === 'PAID' && external_id) {
+    if (external_id) {
       // Find the sale record by invoice number
       const sale = await prisma.sale.findUnique({
-        where: { invoiceNumber: external_id }
+        where: { invoiceNumber: external_id },
+        include: { company: true }
       });
 
-      if (sale && sale.status !== 'PAID') {
+      if (!sale) {
+        console.warn(`[XENDIT WEBHOOK] Sale not found for external_id: ${external_id}`);
+        return res.status(200).json({ message: 'Sale not found but acknowledged' });
+      }
+
+      // Security check: verify callback token if configured
+      const company = sale.company;
+      if (company?.xenditMode === 'CUSTOM' && company.xenditWebhookToken) {
+        if (callbackToken && callbackToken !== company.xenditWebhookToken) {
+          console.error(`[XENDIT WEBHOOK] Invalid callback token for tenant ${company.id}`);
+          return res.status(403).json({ error: 'Invalid callback token' });
+        }
+      } else if (process.env.XENDIT_CALLBACK_TOKEN) {
+        if (callbackToken && callbackToken !== process.env.XENDIT_CALLBACK_TOKEN) {
+          console.error(`[XENDIT WEBHOOK] Invalid default callback token`);
+          return res.status(403).json({ error: 'Invalid callback token' });
+        }
+      }
+
+      if (status === 'PAID' && sale.status !== 'PAID') {
         // Update sale status to PAID
         await prisma.sale.update({
           where: { id: sale.id },
           data: { status: 'PAID' }
         });
 
-        // Optional: Trigger finance integration or socket update here if needed
+        // Trigger socket alert to branch if available
+        if (sale.branchId) {
+          const bKey = sale.branchId.toString();
+          const socketId = branchSockets.get(bKey);
+          if (socketId) {
+            io.to(socketId).emit('order_status_updated', {
+              saleId: sale.id,
+              invoiceNumber: sale.invoiceNumber,
+              status: 'PAID'
+            });
+          }
+        }
 
-        console.log(`[XENDIT WEBHOOK] Sale ${external_id} marked as PAID.`);
+        console.log(`[XENDIT WEBHOOK] Sale ${external_id} successfully marked as PAID.`);
       }
     }
     
     // Xendit expects a 200 OK response quickly
-    res.status(200).json({ message: 'Webhook received' });
+    res.status(200).json({ message: 'Webhook received successfully' });
   } catch (error: any) {
     console.error("[XENDIT WEBHOOK ERROR]:", error.message);
     res.status(500).json({ error: 'Internal Server Error' });

@@ -678,7 +678,11 @@ class _CartScreenState extends State<CartScreen> {
 
     if (response['success'] == true) {
       cartProvider.clearCart();
-      if (_paymentMethod != "Bayar di Kasir" && response['qrisUrl'] != null && response['qrisUrl'].toString().isNotEmpty) {
+      final invoiceUrl = response['invoiceUrl'];
+      if (invoiceUrl != null && invoiceUrl.toString().isNotEmpty) {
+        // Pelanggan diarahkan ke Invoice Xendit (baik Xendit Aivola maupun Xendit Klien)
+        _showOnlinePaymentDialog(primaryColor, invoiceUrl.toString());
+      } else if (_paymentMethod != "Bayar di Kasir" && response['qrisUrl'] != null && response['qrisUrl'].toString().isNotEmpty) {
         _showPaymentDialog(
           primaryColor, 
           response['qrisUrl'], 
@@ -690,6 +694,64 @@ class _CartScreenState extends State<CartScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal memproses pesanan: ${response['message'] ?? ''}"), backgroundColor: Colors.redAccent));
     }
+  }
+
+  void _showOnlinePaymentDialog(Color primaryColor, String invoiceUrl) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: Text("Pembayaran Online", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.payment_rounded, color: primaryColor, size: 50),
+            ),
+            SizedBox(height: 15),
+            Text("Silakan klik tombol di bawah untuk melanjutkan pembayaran via QRIS, Virtual Account, atau E-Wallet.", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+            SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.parse(invoiceUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                icon: Icon(Icons.open_in_new_rounded, color: Colors.white, size: 18),
+                label: Text("BAYAR SEKARANG", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Center(
+            child: TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+              child: Text("SAYA SUDAH BAYAR", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 15)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showPaymentDialog(Color primaryColor, String qrisUrl, String instructions) {

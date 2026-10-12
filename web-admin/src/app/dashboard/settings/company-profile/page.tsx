@@ -74,7 +74,10 @@ export default function CompanyProfilePage() {
         allowPreOrder: false,
         allowCashPayment: true,
         allowBankTransfer: true,
-        allowQrisPayment: true
+        allowQrisPayment: true,
+        xenditMode: 'AIVOLA',
+        xenditSecretKey: '',
+        xenditWebhookToken: ''
     });
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
@@ -133,6 +136,9 @@ export default function CompanyProfilePage() {
                 allowCashPayment: response.data.allowCashPayment ?? true,
                 allowBankTransfer: response.data.allowBankTransfer ?? true,
                 allowQrisPayment: response.data.allowQrisPayment ?? true,
+                xenditMode: response.data.xenditMode || 'AIVOLA',
+                xenditSecretKey: response.data.xenditSecretKey || '',
+                xenditWebhookToken: response.data.xenditWebhookToken || '',
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -192,6 +198,9 @@ export default function CompanyProfilePage() {
                 allowCashPayment: formData.allowCashPayment,
                 allowBankTransfer: formData.allowBankTransfer,
                 allowQrisPayment: formData.allowQrisPayment,
+                xenditMode: formData.xenditMode,
+                xenditSecretKey: formData.xenditSecretKey,
+                xenditWebhookToken: formData.xenditWebhookToken,
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
@@ -873,8 +882,8 @@ export default function CompanyProfilePage() {
                                             <div className="flex items-center gap-3">
                                                 <div className="h-8 w-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">📱</div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-slate-800">QRIS</h4>
-                                                    <p className="text-[10px] text-slate-500 mt-0.5">Tampilkan QR Code statis dari pengaturan QRIS di atas</p>
+                                                    <h4 className="text-sm font-bold text-slate-800">QRIS / Online Payment (Xendit)</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-0.5">Aktifkan pembayaran otomatis via Xendit / QRIS dinamis</p>
                                                 </div>
                                             </div>
                                             <button
@@ -886,6 +895,132 @@ export default function CompanyProfilePage() {
                                             </button>
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* PENGATURAN PAYMENT GATEWAY (XENDIT INTEGRATION) */}
+                                <div className="pt-8 border-t border-slate-100">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-6 w-1 bg-indigo-600 rounded-full"></div>
+                                            <div>
+                                                <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Integrasi Payment Gateway (Xendit)</h3>
+                                                <p className="text-xs text-slate-500 mt-0.5">Pilih apakah pembayaran online diproses lewat akun Xendit Aivola atau akun Xendit Anda sendiri.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                        {/* Opsi 1: Xendit Aivola */}
+                                        <div 
+                                            onClick={() => setFormData({ ...formData, xenditMode: 'AIVOLA' })}
+                                            className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                                                formData.xenditMode === 'AIVOLA' 
+                                                    ? 'border-indigo-600 bg-indigo-50/40 shadow-sm' 
+                                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                            }`}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="text-xl">⚡</span>
+                                                    <div>
+                                                        <h4 className="font-bold text-slate-800 text-sm">Akun Xendit Aivola (Default)</h4>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5">Otomatis aktif & siap pakai tanpa registrasi akun Xendit.</p>
+                                                    </div>
+                                                </div>
+                                                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${formData.xenditMode === 'AIVOLA' ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'}`}>
+                                                    {formData.xenditMode === 'AIVOLA' && <span className="h-2 w-2 rounded-full bg-white"></span>}
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 pt-3 border-t border-slate-200/60 text-[10px] text-slate-500 flex items-center gap-1.5">
+                                                <span className="text-emerald-600 font-bold">✓ Rekomendasi UMKM</span>
+                                                <span>• Settlement dikelola bersama Aivola</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Opsi 2: Custom Xendit Klien */}
+                                        <div 
+                                            onClick={() => setFormData({ ...formData, xenditMode: 'CUSTOM' })}
+                                            className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                                                formData.xenditMode === 'CUSTOM' 
+                                                    ? 'border-indigo-600 bg-indigo-50/40 shadow-sm' 
+                                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                            }`}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="text-xl">🏢</span>
+                                                    <div>
+                                                        <h4 className="font-bold text-slate-800 text-sm">Akun Xendit Milik Sendiri (Custom)</h4>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5">Uang penjualan 100% langsung masuk ke dashboard & rekening Xendit Anda.</p>
+                                                    </div>
+                                                </div>
+                                                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${formData.xenditMode === 'CUSTOM' ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'}`}>
+                                                    {formData.xenditMode === 'CUSTOM' && <span className="h-2 w-2 rounded-full bg-white"></span>}
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 pt-3 border-t border-slate-200/60 text-[10px] text-slate-500 flex items-center gap-1.5">
+                                                <span className="text-indigo-600 font-bold">✓ Enterprise / Franchise</span>
+                                                <span>• Settlement langsung H+0/H+1</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Form Kunci API jika memilih Custom */}
+                                    {formData.xenditMode === 'CUSTOM' && (
+                                        <div className="bg-slate-50 border border-indigo-200/80 rounded-2xl p-5 space-y-4 animate-in fade-in duration-300">
+                                            <div className="flex items-center gap-2 text-indigo-700">
+                                                <span className="text-sm font-black">⚙️ Konfigurasi API Xendit Anda</span>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5 ml-1">
+                                                    Xendit Secret API Key
+                                                </label>
+                                                <input
+                                                    type="password"
+                                                    value={formData.xenditSecretKey}
+                                                    onChange={e => setFormData({ ...formData, xenditSecretKey: e.target.value })}
+                                                    className="w-full rounded-xl border border-slate-200 py-2.5 px-4 text-xs font-mono text-slate-700 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
+                                                    placeholder="xnd_development_... atau xnd_production_..."
+                                                />
+                                                <p className="mt-1 text-[10px] text-slate-400 ml-1">Ambil Secret Key dari Dashboard Xendit &gt; Settings &gt; Developers &gt; API Keys.</p>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5 ml-1">
+                                                    Webhook Verification Token (Opsional tapi Direkomendasikan)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.xenditWebhookToken}
+                                                    onChange={e => setFormData({ ...formData, xenditWebhookToken: e.target.value })}
+                                                    className="w-full rounded-xl border border-slate-200 py-2.5 px-4 text-xs font-mono text-slate-700 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
+                                                    placeholder="Contoh: v_WkX12345678..."
+                                                />
+                                                <p className="mt-1 text-[10px] text-slate-400 ml-1">Verifikasi tanda tangan webhook agar aman dari fake callback.</p>
+                                            </div>
+
+                                            <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">URL Webhook Xendit Anda</span>
+                                                        <span className="text-xs font-mono font-bold text-slate-700 select-all">https://api.aivola.id/api/payments/xendit/webhook</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText('https://api.aivola.id/api/payments/xendit/webhook');
+                                                            alert('URL Webhook berhasil disalin!');
+                                                        }}
+                                                        className="px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+                                                    >
+                                                        Salin URL
+                                                    </button>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 mt-2">Paste URL ini di Dashboard Xendit &gt; Settings &gt; Callbacks &gt; Invoice (Invoices Paid).</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </>
                         )}

@@ -37,6 +37,9 @@ model Company {
   logoUrl                 String?
   qrisUrl                 String?
   paymentInstructions     String?                   @db.Text
+  xenditMode              String?                   @default("AIVOLA") // "AIVOLA" (default platform) or "CUSTOM" (client's own Xendit)
+  xenditSecretKey         String?                   // Client's Xendit Secret Key (if CUSTOM)
+  xenditWebhookToken      String?                   // Client's Xendit Webhook Verification Token (if CUSTOM)
   deliveryNoteTerms       String?                   @db.Text
   primaryColor            String?                   @default("#3B82F6")
   secondaryColor          String?                   @default("#1E293B")
