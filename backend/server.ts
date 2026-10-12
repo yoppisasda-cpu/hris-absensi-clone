@@ -20101,8 +20101,7 @@ app.post('/api/payments/xendit/webhook', async (req: Request, res: Response) => 
     if (external_id) {
       // Find the sale record by invoice number
       const sale = await prisma.sale.findUnique({
-        where: { invoiceNumber: external_id },
-        include: { company: true }
+        where: { invoiceNumber: external_id }
       });
 
       if (!sale) {
@@ -20111,14 +20110,17 @@ app.post('/api/payments/xendit/webhook', async (req: Request, res: Response) => 
       }
 
       // Security check: verify callback token if configured
-      const company = sale.company;
+      const company = await prisma.company.findUnique({
+        where: { id: sale.companyId },
+        select: { id: true, xenditMode: true, xenditWebhookToken: true }
+      });
       if (company?.xenditMode === 'CUSTOM' && company.xenditWebhookToken) {
-        if (callbackToken && callbackToken !== company.xenditWebhookToken) {
+        if (callbackToken !== company.xenditWebhookToken) {
           console.error(`[XENDIT WEBHOOK] Invalid callback token for tenant ${company.id}`);
           return res.status(403).json({ error: 'Invalid callback token' });
         }
       } else if (process.env.XENDIT_CALLBACK_TOKEN) {
-        if (callbackToken && callbackToken !== process.env.XENDIT_CALLBACK_TOKEN) {
+        if (callbackToken !== process.env.XENDIT_CALLBACK_TOKEN) {
           console.error(`[XENDIT WEBHOOK] Invalid default callback token`);
           return res.status(403).json({ error: 'Invalid callback token' });
         }
