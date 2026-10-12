@@ -38,6 +38,12 @@ interface Company {
     openTime: string | null;
     closeTime: string | null;
     isOpenManual: boolean;
+    xenditMode?: string | null;
+    hasXenditSecretKey?: boolean;
+    xenditSecretKeyMasked?: string | null;
+    hasXenditWebhookToken?: boolean;
+    xenditWebhookTokenMasked?: string | null;
+    xenditPlatformAvailable?: boolean;
 }
 
 export default function CompanyProfilePage() {
@@ -137,8 +143,9 @@ export default function CompanyProfilePage() {
                 allowBankTransfer: response.data.allowBankTransfer ?? true,
                 allowQrisPayment: response.data.allowQrisPayment ?? true,
                 xenditMode: response.data.xenditMode || 'AIVOLA',
-                xenditSecretKey: response.data.xenditSecretKey || '',
-                xenditWebhookToken: response.data.xenditWebhookToken || '',
+                // Secret tidak pernah dikirim utuh dari server; input dikosongkan = pertahankan key lama
+                xenditSecretKey: '',
+                xenditWebhookToken: '',
             });
             setPayrollData({
                 lateDeductionRate: response.data.lateDeductionRate?.toString() || '50000',
@@ -164,8 +171,15 @@ export default function CompanyProfilePage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsSaving(true);
         setMessage({ type: '', text: '' });
+
+        if (formData.xenditMode === 'CUSTOM' && !formData.xenditSecretKey.trim() && !company?.hasXenditSecretKey) {
+            setMessage({ type: 'error', text: 'Mode Xendit Custom membutuhkan Secret API Key. Isi Secret Key atau pilih Akun Xendit Aivola.' });
+            alert('Mode Xendit Custom membutuhkan Secret API Key.');
+            return;
+        }
+
+        setIsSaving(true);
 
         try {
             await api.patch('/companies/my', {
@@ -204,9 +218,11 @@ export default function CompanyProfilePage() {
             });
             setMessage({ type: 'success', text: 'Profil perusahaan berhasil diperbarui!' });
             fetchCompany();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setMessage({ type: 'error', text: 'Gagal memperbarui profil perusahaan.' });
+            const serverMsg = err?.response?.data?.error;
+            setMessage({ type: 'error', text: serverMsg || 'Gagal memperbarui profil perusahaan.' });
+            if (serverMsg) alert(serverMsg);
         } finally {
             setIsSaving(false);
         }
@@ -882,8 +898,8 @@ export default function CompanyProfilePage() {
                                             <div className="flex items-center gap-3">
                                                 <div className="h-8 w-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">📱</div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-slate-800">QRIS / Online Payment (Xendit)</h4>
-                                                    <p className="text-[10px] text-slate-500 mt-0.5">Aktifkan pembayaran otomatis via Xendit / QRIS dinamis</p>
+                                                    <h4 className="text-sm font-bold text-slate-800">QRIS</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-0.5">Jika Xendit aktif: QRIS dinamis otomatis (QRIS statis disembunyikan). Jika tidak: tampilkan QRIS statis.</p>
                                                 </div>
                                             </div>
                                             <button
@@ -965,6 +981,24 @@ export default function CompanyProfilePage() {
                                         </div>
                                     </div>
 
+                                    {/* Status: QRIS mana yang dilihat pelanggan */}
+                                    {(() => {
+                                        const customReady = formData.xenditMode === 'CUSTOM' && (!!formData.xenditSecretKey.trim() || !!company?.hasXenditSecretKey);
+                                        const aivolaReady = formData.xenditMode !== 'CUSTOM' && !!company?.xenditPlatformAvailable;
+                                        const active = customReady || aivolaReady;
+                                        return (
+                                            <div className={`mb-4 p-3 rounded-xl border text-xs ${active ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                                                {active ? (
+                                                    <span><b>✓ Xendit aktif.</b> Pelanggan Aivola GO membayar lewat halaman Xendit (QRIS dinamis / VA / E-Wallet) dan pesanan otomatis lunas. QRIS statis disembunyikan.</span>
+                                                ) : formData.xenditMode === 'CUSTOM' ? (
+                                                    <span><b>⚠ Xendit belum aktif.</b> Isi Secret API Key di bawah. Sampai diisi, pelanggan tetap melihat QRIS statis.</span>
+                                                ) : (
+                                                    <span><b>⚠ Xendit Aivola belum tersedia.</b> Pelanggan tetap melihat QRIS statis dan pembayaran perlu dicek manual.</span>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+
                                     {/* Form Kunci API jika memilih Custom */}
                                     {formData.xenditMode === 'CUSTOM' && (
                                         <div className="bg-slate-50 border border-indigo-200/80 rounded-2xl p-5 space-y-4 animate-in fade-in duration-300">
@@ -981,9 +1015,12 @@ export default function CompanyProfilePage() {
                                                     value={formData.xenditSecretKey}
                                                     onChange={e => setFormData({ ...formData, xenditSecretKey: e.target.value })}
                                                     className="w-full rounded-xl border border-slate-200 py-2.5 px-4 text-xs font-mono text-slate-700 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
-                                                    placeholder="xnd_development_... atau xnd_production_..."
+                                                    placeholder={company?.hasXenditSecretKey ? `Tersimpan: ${company.xenditSecretKeyMasked} (kosongkan jika tidak diganti)` : "xnd_development_... atau xnd_production_..."}
                                                 />
-                                                <p className="mt-1 text-[10px] text-slate-400 ml-1">Ambil Secret Key dari Dashboard Xendit &gt; Settings &gt; Developers &gt; API Keys.</p>
+                                                <p className="mt-1 text-[10px] text-slate-400 ml-1">
+                                                    {company?.hasXenditSecretKey && <span className="text-emerald-600 font-bold">✓ Key sudah tersimpan. </span>}
+                                                    Ambil Secret Key dari Dashboard Xendit &gt; Settings &gt; Developers &gt; API Keys.
+                                                </p>
                                             </div>
 
                                             <div>
@@ -991,11 +1028,11 @@ export default function CompanyProfilePage() {
                                                     Webhook Verification Token (Opsional tapi Direkomendasikan)
                                                 </label>
                                                 <input
-                                                    type="text"
+                                                    type="password"
                                                     value={formData.xenditWebhookToken}
                                                     onChange={e => setFormData({ ...formData, xenditWebhookToken: e.target.value })}
                                                     className="w-full rounded-xl border border-slate-200 py-2.5 px-4 text-xs font-mono text-slate-700 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
-                                                    placeholder="Contoh: v_WkX12345678..."
+                                                    placeholder={company?.hasXenditWebhookToken ? `Tersimpan: ${company.xenditWebhookTokenMasked} (kosongkan jika tidak diganti)` : "Contoh: v_WkX12345678..."}
                                                 />
                                                 <p className="mt-1 text-[10px] text-slate-400 ml-1">Verifikasi tanda tangan webhook agar aman dari fake callback.</p>
                                             </div>

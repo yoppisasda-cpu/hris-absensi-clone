@@ -877,23 +877,44 @@ class _CartScreenState extends State<CartScreen> {
           Icons.qr_code_scanner_rounded, 
           primaryColor,
           expandedChild: Column(
-                children: [
-                  SizedBox(height: 15),
-                  if (qrisUrl != null) ...[
-                    if ((paymentInstructions ?? '').isNotEmpty)
-                      Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
-                    SizedBox(height: 15),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(qrisUrl, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
-                    )
-                  ] else ...[
-                    Text("QR Code belum diunggah oleh toko.", textAlign: TextAlign.center, style: TextStyle(color: Colors.redAccent, fontSize: 12)),
-                    SizedBox(height: 10),
-                    Icon(Icons.qr_code_scanner, size: 50, color: Colors.white24),
-                  ]
-                ],
-              ),
+            children: [
+              SizedBox(height: 15),
+              if (brandingProvider.xenditEnabled) ...[
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: primaryColor.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.bolt_rounded, color: primaryColor, size: 24),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "QRIS dinamis otomatis akan muncul saat Anda menekan tombol BAYAR SEKARANG.",
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (qrisUrl != null) ...[
+                if ((paymentInstructions ?? '').isNotEmpty)
+                  Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(qrisUrl, height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => Icon(Icons.qr_code, size: 100, color: Colors.white54)),
+                )
+              ] else ...[
+                Text("QR Code belum diunggah oleh toko.", textAlign: TextAlign.center, style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                SizedBox(height: 10),
+                Icon(Icons.qr_code_scanner, size: 50, color: Colors.white24),
+              ]
+            ],
+          ),
         ));
       }
       if (items.isNotEmpty && items.last is SizedBox) items.removeLast();
@@ -902,14 +923,35 @@ class _CartScreenState extends State<CartScreen> {
       final List<Widget> items = [];
       if (brandingProvider.allowQrisPayment || brandingProvider.allowBankTransfer) {
         items.add(_buildPaymentItem(
-          "QRIS / Transfer (Online Payment)", 
+          brandingProvider.xenditEnabled ? "Online Payment (QRIS / VA / E-Wallet)" : "QRIS / Transfer (Online Payment)", 
           Icons.language_rounded, 
           primaryColor,
           expandedChild: Column(
             children: [
               if (brandingProvider.allowQrisPayment) ...[
                 SizedBox(height: 15),
-                if (qrisUrl != null) ...[
+                if (brandingProvider.xenditEnabled) ...[
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: primaryColor.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.verified_rounded, color: primaryColor, size: 24),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "Pembayaran otomatis terverifikasi via QRIS, Virtual Account, & E-Wallet. Invoice akan otomatis terbuka setelah Anda klik tombol Bayar.",
+                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (qrisUrl != null) ...[
                   if ((paymentInstructions ?? '').isNotEmpty)
                     Text(paymentInstructions!, textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
                   SizedBox(height: 10),

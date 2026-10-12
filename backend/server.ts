@@ -2480,6 +2480,24 @@ app.get('/api/companies/public', async (req: Request, res: Response) => {
   }
 });
 
+// --- XENDIT KEY RESOLVER ---
+// CUSTOM  -> hanya pakai key milik klien. Jika kosong, Xendit NONAKTIF (tidak fallback ke akun Aivola,
+//            supaya uang klien tidak pernah masuk ke rekening Aivola).
+// AIVOLA  -> pakai key platform dari env XENDIT_SECRET_KEY.
+const resolveXenditSecret = (company: { xenditMode?: string | null; xenditSecretKey?: string | null } | null): string | null => {
+  if (!company) return null;
+  if (company.xenditMode === 'CUSTOM') {
+    return company.xenditSecretKey?.trim() || null;
+  }
+  return process.env.XENDIT_SECRET_KEY?.trim() || null;
+};
+
+const maskSecret = (value?: string | null): string | null => {
+  if (!value) return null;
+  if (value.length <= 8) return '****';
+  return `${value.slice(0, 8)}****${value.slice(-4)}`;
+};
+
 // A1.1.2 Endpoint List Perusahaan Publik (Single)
 app.get('/api/companies/public/:id', async (req: Request, res: Response) => {
   try {
@@ -2505,13 +2523,20 @@ app.get('/api/companies/public/:id', async (req: Request, res: Response) => {
         paymentInstructions: true,
         allowCashPayment: true,
         allowBankTransfer: true,
-        allowQrisPayment: true
+        allowQrisPayment: true,
+        xenditMode: true,
+        xenditSecretKey: true
       }
     });
     if (!company) {
       return res.status(404).json({ error: 'Perusahaan tidak ditemukan' });
     }
-    res.json(company);
+    // Jangan pernah kirim secret key ke publik — cukup flag apakah Xendit aktif
+    const { xenditSecretKey, xenditMode, ...publicCompany } = company;
+    res.json({
+      ...publicCompany,
+      xenditEnabled: !!resolveXenditSecret({ xenditMode, xenditSecretKey })
+    });
   } catch (error) {
     console.error('[ERROR] Gagal mengambil data perusahaan publik:', error);
     res.status(500).json({ error: 'Gagal mengambil data perusahaan' });
@@ -3135,7 +3160,17 @@ app.get('/api/companies/my', tenantMiddleware, async (req: Request, res: Respons
     const expiryLevel = await getTenantExpiryLevel(tenantId);
     // Prevent 304 Not Modified caching issues that break module detection
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.json({ ...company, expiryLevel });
+    // Jangan kirim secret Xendit utuh ke browser
+    const { xenditSecretKey, xenditWebhookToken, ...safeCompany } = company;
+    res.json({
+      ...safeCompany,
+      expiryLevel,
+      hasXenditSecretKey: !!xenditSecretKey,
+      xenditSecretKeyMasked: maskSecret(xenditSecretKey),
+      hasXenditWebhookToken: !!xenditWebhookToken,
+      xenditWebhookTokenMasked: maskSecret(xenditWebhookToken),
+      xenditPlatformAvailable: !!process.env.XENDIT_SECRET_KEY
+    });
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil data perusahaan' });
   }
@@ -3962,6 +3997,24 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       return isNaN(num) ? undefined : num;
     };
 
+    // --- VALIDASI PENGATURAN XENDIT ---
+    // Browser hanya menerima key yang tersamar, jadi input kosong = "pertahankan key lama".
+    const xenditModeInput: string | undefined = req.body.xenditMode;
+    if (xenditModeInput !== undefined && xenditModeInput !== 'AIVOLA' && xenditModeInput !== 'CUSTOM') {
+      return res.status(400).json({ error: 'Mode Xendit tidak valid.' });
+    }
+    const newSecretKey = typeof req.body.xenditSecretKey === 'string' ? req.body.xenditSecretKey.trim() : '';
+    const newWebhookToken = typeof req.body.xenditWebhookToken === 'string' ? req.body.xenditWebhookToken.trim() : '';
+    if (newSecretKey && !newSecretKey.startsWith('xnd_')) {
+      return res.status(400).json({ error: 'Format Xendit Secret Key tidak valid (harus diawali "xnd_").' });
+    }
+    if (xenditModeInput === 'CUSTOM' && !newSecretKey) {
+      const existing = await prisma.company.findUnique({ where: { id: tenantId }, select: { xenditSecretKey: true } });
+      if (!existing?.xenditSecretKey) {
+        return res.status(400).json({ error: 'Mode Xendit Custom membutuhkan Secret API Key. Isi Secret Key atau pilih Akun Xendit Aivola.' });
+      }
+    }
+
     const updatedCompany = await prisma.company.update({
       where: { id: tenantId },
       data: {
@@ -4003,14 +4056,15 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         openTime: req.body.openTime !== undefined ? req.body.openTime : undefined,
         closeTime: req.body.closeTime !== undefined ? req.body.closeTime : undefined,
         isOpenManual: req.body.isOpenManual !== undefined ? !!req.body.isOpenManual : undefined,
-        xenditMode: req.body.xenditMode !== undefined ? req.body.xenditMode : undefined,
-        xenditSecretKey: req.body.xenditSecretKey !== undefined ? (req.body.xenditSecretKey ? req.body.xenditSecretKey.trim() : null) : undefined,
-        xenditWebhookToken: req.body.xenditWebhookToken !== undefined ? (req.body.xenditWebhookToken ? req.body.xenditWebhookToken.trim() : null) : undefined
+        xenditMode: xenditModeInput !== undefined ? xenditModeInput : undefined,
+        xenditSecretKey: newSecretKey ? newSecretKey : undefined,
+        xenditWebhookToken: newWebhookToken ? newWebhookToken : undefined
       }
     });
 
     console.log(`[SUCCESS] Company Profile Updated for Tenant: ${tenantId}`);
-    res.json({ message: 'Profil perusahaan berhasil diperbarui', company: updatedCompany });
+    const { xenditSecretKey: _sk, xenditWebhookToken: _wt, ...safeUpdatedCompany } = updatedCompany;
+    res.json({ message: 'Profil perusahaan berhasil diperbarui', company: safeUpdatedCompany });
   } catch (error) {
     console.error('[ERROR] Gagal memperbarui profil perusahaan:', error);
     res.status(500).json({ error: 'Gagal memperbarui data perusahaan di database' });
@@ -16473,18 +16527,13 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     let invoiceUrl = null;
     
     // --- DYNAMIC XENDIT PAYMENT GATEWAY (Aivola Default vs Client Custom) ---
-    if (result.paymentMethod.includes('Online Payment')) {
-      // Tentukan Secret Key berdasarkan mode
-      let activeXenditSecret = '';
-      if (companyInfo?.xenditMode === 'CUSTOM' && companyInfo.xenditSecretKey) {
-        activeXenditSecret = companyInfo.xenditSecretKey;
-        console.log(`[XENDIT] Using CLIENT CUSTOM Xendit Account for Tenant: ${tenantId}`);
-      } else if (process.env.XENDIT_SECRET_KEY) {
-        activeXenditSecret = process.env.XENDIT_SECRET_KEY;
-        console.log(`[XENDIT] Using AIVOLA DEFAULT Xendit Account for Tenant: ${tenantId}`);
-      }
+    // Berlaku untuk "QRIS / Transfer (Online Payment)" (Pick-up/Delivery) dan "QRIS" (Dine-in)
+    const isXenditEligibleMethod = result.paymentMethod.includes('Online Payment') || result.paymentMethod === 'QRIS';
+    if (isXenditEligibleMethod) {
+      const activeXenditSecret = resolveXenditSecret(companyInfo);
 
       if (activeXenditSecret) {
+        console.log(`[XENDIT] Using ${companyInfo?.xenditMode === 'CUSTOM' ? 'CLIENT CUSTOM' : 'AIVOLA DEFAULT'} Xendit Account for Tenant: ${tenantId}`);
         try {
           const axios = require('axios');
           const xenditRes = await axios.post('https://api.xendit.co/v2/invoices', {
@@ -16507,17 +16556,19 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
             data: { notes: notes ? `${notes}\n[XENDIT] ${invoiceUrl}` : `[XENDIT] ${invoiceUrl}` }
           });
         } catch (err: any) {
+          // Jika Xendit gagal, QRIS statis tetap dikirim sebagai cadangan
           console.error("[XENDIT ERROR]:", err.response?.data || err.message);
         }
       } else {
-        console.warn(`[XENDIT WARNING]: Xendit key tidak tersedia untuk Tenant ${tenantId} (Mode: ${companyInfo?.xenditMode || 'AIVOLA'})`);
+        console.warn(`[XENDIT] Nonaktif untuk Tenant ${tenantId} (Mode: ${companyInfo?.xenditMode || 'AIVOLA'}) — memakai QRIS statis`);
       }
     }
 
     res.status(201).json({
       ...result,
       invoiceUrl,
-      qrisUrl,
+      // QRIS statis hanya dikirim jika tidak ada invoice Xendit, supaya pelanggan tidak bayar dobel
+      qrisUrl: invoiceUrl ? null : qrisUrl,
       paymentInstructions
     });
 

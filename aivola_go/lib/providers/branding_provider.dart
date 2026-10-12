@@ -47,6 +47,7 @@ class BrandingProvider with ChangeNotifier {
   bool _allowCashPayment = true;
   bool _allowBankTransfer = true;
   bool _allowQrisPayment = true;
+  bool _xenditEnabled = false;
 
   Color get primaryColor => _primaryColor;
   Color get secondaryColor => _secondaryColor;
@@ -67,6 +68,7 @@ class BrandingProvider with ChangeNotifier {
   bool get allowCashPayment => _allowCashPayment;
   bool get allowBankTransfer => _allowBankTransfer;
   bool get allowQrisPayment => _allowQrisPayment;
+  bool get xenditEnabled => _xenditEnabled;
 
   bool get isStoreOpen {
     if (!_isOpenManual) return false;
@@ -126,6 +128,7 @@ class BrandingProvider with ChangeNotifier {
     _allowCashPayment = prefs.getBool('allowCashPayment') ?? true;
     _allowBankTransfer = prefs.getBool('allowBankTransfer') ?? true;
     _allowQrisPayment = prefs.getBool('allowQrisPayment') ?? true;
+    _xenditEnabled = prefs.getBool('xenditEnabled') ?? false;
 
     if (primary != null) {
       _primaryColor = Color(int.parse(primary.replaceFirst('#', '0xFF')));
@@ -172,8 +175,9 @@ class BrandingProvider with ChangeNotifier {
         _allowCashPayment = data['allowCashPayment'] ?? true;
         _allowBankTransfer = data['allowBankTransfer'] ?? true;
         _allowQrisPayment = data['allowQrisPayment'] ?? true;
+        _xenditEnabled = data['xenditEnabled'] ?? false;
         
-        print("DEBUG BrandingProvider: Fetched data for $merchantId. qrisUrl=${data['qrisUrl']}, allowDineIn=${data['allowDineIn']}");
+        print("DEBUG BrandingProvider: Fetched data for $merchantId. qrisUrl=${data['qrisUrl']}, xenditEnabled=$_xenditEnabled, allowDineIn=${data['allowDineIn']}");
         
         // Update SharedPreferences
         final prefs = await SharedPreferences.getInstance();
@@ -195,6 +199,7 @@ class BrandingProvider with ChangeNotifier {
         await prefs.setBool('allowCashPayment', _allowCashPayment);
         await prefs.setBool('allowBankTransfer', _allowBankTransfer);
         await prefs.setBool('allowQrisPayment', _allowQrisPayment);
+        await prefs.setBool('xenditEnabled', _xenditEnabled);
         
         notifyListeners();
       }
