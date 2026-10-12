@@ -56,6 +56,8 @@ export default function ImportProductModal({ isOpen, onClose, onSuccess }: Impor
             const res = await api.post('/products/import', {
                 sourceCompanyId,
                 productIds: selectedProductIds.length > 0 ? selectedProductIds : null
+            }, {
+                timeout: 120000 // 120 detik khusus import banyak produk
             });
             toast.success(res.data.message);
             if (res.data.skipped > 0) {

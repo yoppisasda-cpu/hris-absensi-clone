@@ -14391,6 +14391,29 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
     let importedCount = 0;
     let skippedCount = 0;
 
+    // Cache preloaded data to avoid hundreds of sequential roundtrip queries
+    const existingTargetProducts = await prisma.product.findMany({
+      where: { companyId: targetCompanyId },
+      select: { id: true, name: true, type: true, sku: true }
+    });
+    
+    // Map: name.toLowerCase() + '___' + type -> product id
+    const existingProductMap = new Map<string, number>();
+    const existingSkuSet = new Set<string>();
+    for (const p of existingTargetProducts) {
+      existingProductMap.set(`${p.name.trim().toLowerCase()}___${p.type}`, p.id);
+      if (p.sku) existingSkuSet.add(p.sku.trim().toLowerCase());
+    }
+
+    const existingCategories = await prisma.productCategory.findMany({
+      where: { companyId: targetCompanyId },
+      select: { id: true, name: true }
+    });
+    const categoryMap = new Map<string, number>();
+    for (const c of existingCategories) {
+      categoryMap.set(c.name.trim().toLowerCase(), c.id);
+    }
+
     // Mapping from source product ID to target product ID to avoid recreating and for linking recipes
     const idMap = new Map<number, number>();
 
@@ -14398,39 +14421,37 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
     const importOrFindProduct = async (sourceProd: any) => {
       if (idMap.has(sourceProd.id)) return idMap.get(sourceProd.id)!;
 
-      // Check if it already exists in target company by name and type
-      let existingTarget = await prisma.product.findFirst({
-        where: { companyId: targetCompanyId, name: sourceProd.name, type: sourceProd.type }
-      });
-
-      if (existingTarget) {
-        idMap.set(sourceProd.id, existingTarget.id);
-        return existingTarget.id;
+      const cacheKey = `${sourceProd.name.trim().toLowerCase()}___${sourceProd.type || 'FINISHED_GOOD'}`;
+      if (existingProductMap.has(cacheKey)) {
+        const foundId = existingProductMap.get(cacheKey)!;
+        idMap.set(sourceProd.id, foundId);
+        return foundId;
       }
 
       // Handle Category
-      let targetCategoryId = null;
-      if (sourceProd.category) {
-        let targetCategory = await prisma.productCategory.findFirst({
-          where: { companyId: targetCompanyId, name: sourceProd.category.name }
-        });
-
-        if (!targetCategory) {
-          targetCategory = await prisma.productCategory.create({
-            data: { companyId: targetCompanyId, name: sourceProd.category.name }
+      let targetCategoryId: number | null = null;
+      if (sourceProd.category?.name) {
+        const catKey = sourceProd.category.name.trim().toLowerCase();
+        if (categoryMap.has(catKey)) {
+          targetCategoryId = categoryMap.get(catKey)!;
+        } else {
+          const newCat = await prisma.productCategory.create({
+            data: { companyId: targetCompanyId, name: sourceProd.category.name.trim() }
           });
+          categoryMap.set(catKey, newCat.id);
+          targetCategoryId = newCat.id;
         }
-        targetCategoryId = targetCategory.id;
       }
 
       let finalSku = (sourceProd.sku && sourceProd.sku.trim() !== '') ? sourceProd.sku.trim() : null;
       // Check SKU uniqueness before creating
       if (finalSku) {
-        const existingSku = await prisma.product.findUnique({ where: { companyId_sku: { companyId: targetCompanyId, sku: finalSku } } });
-        if (existingSku) {
+        const lowerSku = finalSku.toLowerCase();
+        if (existingSkuSet.has(lowerSku)) {
           const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
           finalSku = `${finalSku}-COPY-${targetCompanyId}-${randomSuffix}`;
         }
+        existingSkuSet.add(finalSku.toLowerCase());
       }
 
       // Create new product
@@ -14462,6 +14483,7 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
         }
       });
 
+      existingProductMap.set(cacheKey, newProd.id);
       idMap.set(sourceProd.id, newProd.id);
       return newProd.id;
     };
