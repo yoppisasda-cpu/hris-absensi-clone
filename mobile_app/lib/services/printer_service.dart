@@ -338,6 +338,9 @@ class PrinterService {
         final double cashReceived = _parseNum(saleData['cashReceived']);
         final double finalCash = cashReceived > 0 ? cashReceived : totalAmount;
         bytes += generator.text('Bayar (${saleData['paymentMethod']}): ${finalCash.toStringAsFixed(0)}', styles: PosStyles(align: PosAlign.right));
+        if (saleData['paymentReference'] != null && saleData['paymentReference'].toString().trim().isNotEmpty) {
+          bytes += generator.text('Ref/EDC: ${saleData['paymentReference']}', styles: PosStyles(align: PosAlign.right, bold: true));
+        }
         final change = finalCash - totalAmount;
         if (change > 0) {
           bytes += generator.text('Kembali: ${change.toStringAsFixed(0)}', styles: PosStyles(align: PosAlign.right));
@@ -594,6 +597,11 @@ class PrinterService {
                   alignment: pw.Alignment.centerRight,
                   child: pw.Text('Bayar (${saleData['paymentMethod']}): ${(saleData['cashReceived'] ?? saleData['totalAmount']).toStringAsFixed(0)}', style: pw.TextStyle(fontSize: 8)),
                 ),
+                if (saleData['paymentReference'] != null && saleData['paymentReference'].toString().trim().isNotEmpty)
+                  pw.Align(
+                    alignment: pw.Alignment.centerRight,
+                    child: pw.Text('Ref/EDC: ${saleData['paymentReference']}', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                  ),
                 pw.Align(
                   alignment: pw.Alignment.centerRight,
                   child: pw.Text('Kembali: ${((saleData['cashReceived'] ?? 0) - (saleData['totalAmount'] ?? 0)).toStringAsFixed(0)}', style: pw.TextStyle(fontSize: 8)),

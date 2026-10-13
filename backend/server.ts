@@ -17716,6 +17716,8 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
       { header: 'Cabang', key: 'branchName', width: 20 },
       { header: 'Pelanggan', key: 'customerName', width: 25 },
       { header: 'Status', key: 'status', width: 15 },
+      { header: 'Metode Pembayaran', key: 'paymentMethod', width: 20 },
+      { header: 'No. Referensi / EDC', key: 'paymentReference', width: 22 },
       { header: 'Total Penjualan', key: 'totalAmount', width: 20 },
       { header: 'Catatan', key: 'notes', width: 30 }
     ];
@@ -17723,6 +17725,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     worksheet1.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
     sales.forEach(sale => {
+      const refVal = sale.paymentReference || (sale.notes && sale.notes.match(/\[Ref:\s*([^\]]+)\]/i)?.[1]) || '-';
       const row = worksheet1.addRow({
         date: new Date(sale.date).toLocaleDateString('id-ID'),
         invoiceNumber: sale.invoiceNumber,
@@ -17730,6 +17733,8 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
         customerName: sale.customerName || 'Umum',
         status: sale.status === 'PAID' ? 'Lunas' : 
                 sale.status === 'PARTIALLY_RETURNED' ? 'Retur Sebagian' : 'Belum Bayar',
+        paymentMethod: sale.accountName || sale.paymentMethod || 'TUNAI',
+        paymentReference: refVal,
         totalAmount: sale.netTotalAmount !== undefined ? sale.netTotalAmount : sale.totalAmount || 0,
         notes: sale.notes || '-'
       });
@@ -18650,7 +18655,14 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
 
       const account = finalAccountId ? await tx.financialAccount.findUnique({ where: { id: finalAccountId } }) : null;
       const paymentMethodTag = account ? `[Metode: ${account.name.toUpperCase()}]` : '';
-      const finalNotes = notes ? `${notes} ${paymentMethodTag}` : paymentMethodTag;
+      const refTag = paymentReference ? `[Ref: ${String(paymentReference).trim()}]` : '';
+      let finalNotes = notes ? notes.trim() : '';
+      if (paymentMethodTag && !finalNotes.toUpperCase().includes('[METODE:')) {
+        finalNotes = finalNotes ? `${finalNotes} ${paymentMethodTag}` : paymentMethodTag;
+      }
+      if (refTag && !finalNotes.toUpperCase().includes('[REF:')) {
+        finalNotes = finalNotes ? `${finalNotes} ${refTag}` : refTag;
+      }
 
       // 0. Sync Customer if phone provided
       let finalCustomerId = customerId ? Number(customerId) : null;
@@ -18724,8 +18736,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           notes: finalNotes,
           status: 'PAID',
           saleType,
-          paymentMethod: paymentMethod || 'Bayar di Kasir',
-          paymentReference: paymentReference || null,
+          paymentMethod: paymentMethod || (account ? account.name : 'Bayar di Kasir'),
+          paymentReference: paymentReference ? String(paymentReference).trim() : null,
           serviceFee: Number(serviceFee),
           markupPercentage: Number(markupPercentage),
           memberDiscountAmount: Number(memberDiscountAmount),

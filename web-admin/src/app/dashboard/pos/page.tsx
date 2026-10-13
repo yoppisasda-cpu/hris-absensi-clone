@@ -69,6 +69,7 @@ export default function POSPage() {
     const [saleType, setSaleType] = useState<string>('WALK_IN');
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
+    const [paymentReference, setPaymentReference] = useState("");
     const [voucherCode, setVoucherCode] = useState("");
     const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0);
 
@@ -251,6 +252,8 @@ export default function POSPage() {
                 taxRate,
                 taxAmount,
                 saleType,
+                paymentMethod: accounts.find(a => a.id === selectedAccount)?.name || 'Bayar di Kasir',
+                paymentReference: paymentReference.trim() || null,
                 customerName,
                 customerPhone,
                 voucherCode,
@@ -271,6 +274,7 @@ export default function POSPage() {
             }));
 
             setCustomerPhone("");
+            setPaymentReference("");
             setVoucherCode("");
             setVoucherDiscountAmount(0);
             setEmployeeDiscount(null);
@@ -629,6 +633,21 @@ export default function POSPage() {
                                             );
                                         })}
                                     </div>
+                                    {selectedAccount && (
+                                        <div className="pt-2 animate-in fade-in">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-between">
+                                                <span>Nomor Referensi / Approval EDC (Opsional)</span>
+                                                <span className="text-[9px] text-amber-400 font-bold">Contoh: 123456</span>
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                value={paymentReference}
+                                                onChange={(e) => setPaymentReference(e.target.value)}
+                                                placeholder="Masukkan nomor approval / EDC..."
+                                                className="w-full mt-1.5 px-3.5 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono transition-colors"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -908,6 +927,9 @@ export default function POSPage() {
                         <div className="border-t border-dashed border-black py-2 mt-4 text-center">
                             <p>Metode Pembayaran:</p>
                             <p className="font-bold">{accounts.find(a => a.id === selectedAccount)?.name}</p>
+                            {lastSale?.paymentReference && (
+                                <p className="text-[10px] mt-1 font-bold">REF/EDC: {lastSale.paymentReference}</p>
+                            )}
                         </div>
 
                         <div className="text-center mt-4">
@@ -941,6 +963,12 @@ export default function POSPage() {
                                 <span className="text-slate-500">Protocol Method</span>
                                 <span className="text-blue-400">{accounts.find(a => a.id === selectedAccount)?.name}</span>
                             </div>
+                            {lastSale?.paymentReference && (
+                                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest italic text-amber-400">
+                                    <span className="text-slate-500">Ref / Approval EDC</span>
+                                    <span className="font-mono">{lastSale.paymentReference}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest italic pb-6 border-b border-white/5">
                                 <span className="text-slate-500">Timestamp</span>
                                 <span className="text-slate-400 font-mono text-[9px]">

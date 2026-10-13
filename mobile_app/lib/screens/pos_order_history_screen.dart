@@ -46,6 +46,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
         'status': 'MENUNGGU SINKRON',
         'saleType': sale['saleType'] ?? 'WALK_IN',
         'paymentMethod': sale['paymentMethod'],
+        'paymentReference': sale['paymentReference'],
         'items': (sale['items'] as List).map((it) => {
             ...it,
             'product_name': it['name'] ?? it['productName'] ?? 'Produk',
@@ -286,6 +287,28 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
               Text('Waktu: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(detail['date']).toLocal())}'),
               Text('Tipe: ${detail['saleType']}'),
               Text('Metode Bayar: ${(detail['accountName'] ?? detail['paymentMethod'] ?? '-').toString().toUpperCase()}'),
+              if (detail['paymentReference'] != null && detail['paymentReference'].toString().trim().isNotEmpty) ...[
+                SizedBox(height: 4),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.amber.shade300),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.credit_card, size: 14, color: Colors.amber.shade900),
+                      SizedBox(width: 6),
+                      Text(
+                        'No. Ref / Approval EDC: ${detail['paymentReference']}',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               SizedBox(height: 16),
               Expanded(
                 child: ListView.builder(
@@ -647,6 +670,21 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                                     Text(DateFormat('dd MMM yyyy, HH:mm').format(date), style: TextStyle(fontSize: 12, color: Colors.blueGrey[600])),
                                     SizedBox(height: 4),
                                     Text('Metode Bayar: ${(order['accountName'] ?? order['paymentMethod'] ?? '-').toString().toUpperCase()}', style: TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.w500)),
+                                    if (order['paymentReference'] != null && order['paymentReference'].toString().trim().isNotEmpty) ...[
+                                      SizedBox(height: 3),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.shade50,
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: Colors.amber.shade200),
+                                        ),
+                                        child: Text(
+                                          'EDC REF: ${order['paymentReference']}',
+                                          style: TextStyle(fontSize: 10, color: Colors.amber.shade900, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                                 trailing: Column(

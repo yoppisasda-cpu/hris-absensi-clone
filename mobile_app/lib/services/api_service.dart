@@ -743,6 +743,8 @@ class ApiService {
     int? pendingBillId,
     String? date,
     int? salespersonId,
+    String? paymentMethod,
+    String? paymentReference,
   }) async {
     try {
       final response = await _dio.post('/pos/checkout', data: {
@@ -767,6 +769,8 @@ class ApiService {
         'taxAmount': taxAmount,
         'pendingBillId': pendingBillId,
         'salespersonId': salespersonId,
+        'paymentMethod': paymentMethod,
+        'paymentReference': paymentReference,
       });
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {

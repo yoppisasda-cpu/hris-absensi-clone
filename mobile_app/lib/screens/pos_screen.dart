@@ -1303,6 +1303,10 @@ class _POSScreenState extends State<POSScreen> {
         taxAmount: _taxAmount,
         pendingBillId: _activePendingBillId,
         salespersonId: _selectedSalespersonId,
+        paymentMethod: _selectedPaymentMethod,
+        paymentReference: _paymentReferenceController.text.trim().isNotEmpty
+            ? _paymentReferenceController.text.trim()
+            : null,
       );
 
       print("=== [DEBUG] CHECKOUT SUCCESS ===");
@@ -1614,6 +1618,7 @@ class _POSScreenState extends State<POSScreen> {
       _calculatedFinalTotal = 0;
       _cashReceived = 0;
       _cashReceivedController.clear();
+      _paymentReferenceController.clear();
     });
   }
 

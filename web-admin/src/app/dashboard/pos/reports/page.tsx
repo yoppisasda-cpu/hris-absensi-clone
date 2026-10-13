@@ -186,11 +186,18 @@ export default function POSReportsPage() {
         return { gross, commission, net, count: validSales.length, avgValue };
     }, [sales]);
 
-    const filteredSales = sales.filter(sale => 
-        sale.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredSales = sales.filter(sale => {
+        const query = searchTerm.toLowerCase();
+        const refNumber = (sale.paymentReference || sale.notes?.match(/\[Ref:\s*([^\]]+)\]/i)?.[1] || '').toLowerCase();
+        return (
+            sale.invoiceNumber?.toLowerCase().includes(query) ||
+            sale.notes?.toLowerCase().includes(query) ||
+            sale.customerName?.toLowerCase().includes(query) ||
+            sale.paymentMethod?.toLowerCase().includes(query) ||
+            sale.accountName?.toLowerCase().includes(query) ||
+            refNumber.includes(query)
+        );
+    });
 
     const handleViewInvoice = (id: number) => {
         setSelectedSaleId(id);
@@ -733,25 +740,30 @@ export default function POSReportsPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-1.5">
                                                 <div className={`w-fit px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                                                    (sale.accountName?.toUpperCase().includes('QRIS') || sale.notes?.includes('QRIS')) ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('QRIS') || sale.notes?.includes('QRIS') || sale.paymentMethod?.toUpperCase().includes('QRIS')) ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('GOFOOD') || sale.notes?.includes('GOFOOD')) ? 'bg-red-500/10 text-red-400 border-red-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('GRABFOOD') || sale.notes?.includes('GRABFOOD')) ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('SHOPEE') || sale.notes?.includes('SHOPEE')) ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                                                     (sale.accountName?.toUpperCase().includes('QPOON') || sale.notes?.includes('QPOON')) ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                                                    (sale.accountName?.toUpperCase().includes('TRANSFER') || sale.notes?.includes('TRANSFER')) ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                                                    (sale.accountName?.toUpperCase().includes('DEBIT') || sale.accountName?.toUpperCase().includes('EDC') || sale.notes?.includes('DEBIT')) ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('TRANSFER') || sale.notes?.includes('TRANSFER') || sale.paymentMethod?.toUpperCase().includes('TRANSFER')) ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                                                    (sale.accountName?.toUpperCase().includes('DEBIT') || sale.accountName?.toUpperCase().includes('EDC') || sale.notes?.includes('DEBIT') || sale.paymentMethod?.toUpperCase().includes('EDC') || sale.paymentMethod?.toUpperCase().includes('DEBIT') || sale.paymentReference) ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                                     'bg-slate-500/10 text-slate-400 border-slate-500/20'
                                                 }`}>
-                                                    {sale.accountName || sale.notes?.match(/\[Metode: (.*?)\]/)?.[1] || 'TUNAI'}
+                                                    {sale.paymentMethod && sale.paymentMethod !== 'Bayar di Kasir' ? sale.paymentMethod : (sale.accountName || sale.notes?.match(/\[Metode: (.*?)\]/)?.[1] || 'TUNAI')}
                                                 </div>
                                                 <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest pl-1">
                                                     {sale.saleType || 'Direct'}
                                                 </div>
-                                                {sale.paymentReference && (
-                                                    <div className="text-[9px] text-amber-500/80 font-bold tracking-widest pl-1 mt-1">
-                                                        REF: {sale.paymentReference}
-                                                    </div>
-                                                )}
+                                                {(() => {
+                                                    const ref = sale.paymentReference || sale.notes?.match(/\[Ref:\s*([^\]]+)\]/i)?.[1];
+                                                    if (!ref) return null;
+                                                    return (
+                                                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[9px] font-mono font-bold tracking-wider w-fit mt-0.5 shadow-sm">
+                                                            <CreditCard className="w-3 h-3 text-amber-400 shrink-0" />
+                                                            <span>REF EDC: {ref}</span>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-slate-300">

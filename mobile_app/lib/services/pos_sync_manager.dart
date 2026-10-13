@@ -50,6 +50,8 @@ class PosSyncManager {
           pointsEarned: ((sale['pointsEarned'] ?? 0) as num).toDouble(),
           offlineInvoiceNumber: sale['localInvoiceNumber'],
           date: sale['date'],
+          paymentMethod: sale['paymentMethod'],
+          paymentReference: sale['paymentReference'],
         );
 
         // Jika berhasil, hapus transaksi dari antrean lokal
