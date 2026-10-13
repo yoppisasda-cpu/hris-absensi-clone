@@ -99,6 +99,13 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                             />
                         </div>
 
+                        <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-start sm:items-center gap-2.5">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-400 mt-0.5 sm:mt-0" />
+                            <span>
+                                <strong>Tips Operasional:</strong> Masukkan jumlah barang yang diterima. Anda juga bisa memasukkan angka <strong>minus (-)</strong> jika ingin mengoreksi/mengurangi kesalahan input sebelumnya.
+                            </span>
+                        </div>
+
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-black text-white italic uppercase tracking-widest">Daftar Barang</h3>
                             <button
@@ -118,7 +125,7 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                                         <th className="px-4 py-3 font-black uppercase text-[10px] tracking-widest text-slate-400 italic text-center">Dipesan</th>
                                         <th className="px-4 py-3 font-black uppercase text-[10px] tracking-widest text-emerald-400 italic text-center">Sudah Diterima</th>
                                         <th className="px-4 py-3 font-black uppercase text-[10px] tracking-widest text-amber-400 italic text-center">Sisa</th>
-                                        <th className="px-4 py-3 font-black uppercase text-[10px] tracking-widest text-indigo-400 italic text-center w-40">Terima Sekarang</th>
+                                        <th className="px-4 py-3 font-black uppercase text-[10px] tracking-widest text-indigo-400 italic text-center w-40">Terima / Koreksi</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -126,7 +133,7 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                                         const remaining = Math.max(0, item.quantity - (item.receivedQty || 0));
                                         const isDone = remaining <= 0;
                                         return (
-                                            <tr key={item.id} className={isDone ? 'opacity-50' : ''}>
+                                            <tr key={item.id} className={isDone ? 'bg-emerald-500/[0.03]' : ''}>
                                                 <td className="px-4 py-3 text-white">
                                                     {item.product?.name}
                                                     <span className="ml-2 text-xs text-slate-500">({item.product?.unit})</span>
@@ -135,10 +142,10 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                                                 <td className="px-4 py-3 text-center text-emerald-400 font-bold">{item.receivedQty || 0}</td>
                                                 <td className="px-4 py-3 text-center text-amber-400 font-bold">{remaining}</td>
                                                 <td className="px-4 py-3">
-                                                    <div className="flex flex-col items-center gap-2">
+                                                    <div className="flex flex-col items-center gap-1.5">
                                                         {isDone && (
-                                                            <div className="flex items-center justify-center gap-1 text-emerald-500 text-[10px] font-bold italic">
-                                                                <CheckCircle2 className="h-3 w-3" /> SUDAH LENGKAP
+                                                            <div className="flex items-center justify-center gap-1 text-emerald-400 text-[10px] font-bold italic bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                                                <CheckCircle2 className="h-3 w-3" /> LENGKAP
                                                             </div>
                                                         )}
                                                         <input
@@ -152,7 +159,7 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                                                                 setItems(newItems);
                                                             }}
                                                             className="w-full bg-slate-900 border border-indigo-500/30 rounded-lg px-3 py-2 text-center text-white focus:border-indigo-500 outline-none"
-                                                            placeholder={isDone ? "+ Tambah lagi" : ""}
+                                                            placeholder={isDone ? "+ / - Koreksi" : "Input qty"}
                                                         />
                                                     </div>
                                                 </td>

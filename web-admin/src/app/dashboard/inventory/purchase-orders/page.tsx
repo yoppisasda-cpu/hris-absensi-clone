@@ -599,7 +599,7 @@ export default function PurchaseOrdersPage() {
                                                          >
                                                              <Printer className="h-5 w-5" />
                                                          </button>
-                                                        {(po.status === 'APPROVED' || po.status === 'PARTIAL') && canReceiveGoods && (
+                                                        {(po.status === 'APPROVED' || po.status === 'PARTIAL' || po.status === 'COMPLETED') && canReceiveGoods && (
                                                             <button 
                                                                 className="h-10 w-10 flex items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all shadow-lg border border-emerald-500/30 active:scale-95"
                                                                 title="TERIMA BARANG (GOODS RECEIPT)"

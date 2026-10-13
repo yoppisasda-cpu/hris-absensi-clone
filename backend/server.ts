@@ -3661,8 +3661,8 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
       if (!po || po.length === 0) throw new Error('PO tidak ditemukan.');
       const poData = po[0];
 
-      if (poData.status !== 'APPROVED' && poData.status !== 'PARTIAL') {
-        throw new Error('Hanya PO berstatus APPROVED atau PARTIAL yang bisa diterima barangnya.');
+      if (poData.status !== 'APPROVED' && poData.status !== 'PARTIAL' && poData.status !== 'COMPLETED') {
+        throw new Error('Hanya PO berstatus APPROVED, PARTIAL, atau COMPLETED yang bisa diterima barangnya.');
       }
 
       let totalExpenseAmount = 0;
@@ -3679,7 +3679,7 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
 
         if (!poItem || poItem.purchaseOrderId !== id) continue;
 
-        // Allow over-receiving (requested by user)
+        // Allow over-receiving or correction (requested by user)
         const remainingToReceive = poItem.quantity - poItem.receivedQty;
 
         // 1. Update receivedQty in PurchaseOrderItem
@@ -3711,9 +3711,9 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
           const incomingPrice = poItem.price / factor;
 
           const newTotalStock = currentStock + incomingQty;
-          const newAverageCost = newTotalStock > 0 
+          const newAverageCost = (newTotalStock > 0 && incomingQty > 0)
             ? ((currentStock * currentCost) + (incomingQty * incomingPrice)) / newTotalStock
-            : incomingPrice;
+            : currentCost;
 
           await tx.product.update({
             where: { id: poItem.productId },
