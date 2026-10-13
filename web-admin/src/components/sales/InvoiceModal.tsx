@@ -44,6 +44,7 @@ function formatTerbilang(num: number): string {
 export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: boolean, onClose: () => void, saleId: number }) {
     const [sale, setSale] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [customShippedDate, setCustomShippedDate] = useState<string>('');
 
     useEffect(() => {
         if (isOpen && saleId) {
@@ -56,10 +57,27 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
         try {
             const res = await api.get(`/sales/${saleId}`);
             setSale(res.data);
+            if (res.data.shippedAt) {
+                setCustomShippedDate(format(new Date(res.data.shippedAt), 'yyyy-MM-dd'));
+            } else if (res.data.date) {
+                setCustomShippedDate(format(new Date(res.data.date), 'yyyy-MM-dd'));
+            } else {
+                setCustomShippedDate(format(new Date(), 'yyyy-MM-dd'));
+            }
         } catch (error) {
             console.error("Gagal mengambil detail invoice", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleShippedDateChange = async (newDate: string) => {
+        setCustomShippedDate(newDate);
+        try {
+            await api.patch(`/sales/${saleId}/shipped-date`, { shippedAt: newDate });
+            setSale((prev: any) => prev ? { ...prev, shippedAt: newDate } : prev);
+        } catch (error) {
+            console.error("Gagal memperbarui tanggal kirim invoice", error);
         }
     };
 
@@ -132,9 +150,13 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                         tfoot {
                             display: table-footer-group;
                         }
-                        .print-hidden, .print\\:hidden, #do-controls, #invoice-controls, .print\\:hidden *, #invoice-controls * {
+                        .print-hidden, .print\\:hidden, #do-controls, #invoice-controls, .print\\:hidden *, #invoice-controls *, .screen-only, .screen-only * {
                             display: none !important;
                             visibility: hidden !important;
+                        }
+                        .print-only {
+                            display: inline !important;
+                            visibility: visible !important;
                         }
                     </style>
                 </head>
@@ -284,14 +306,26 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                             </span>
                                         </div>
                                     )}
-                                    {sale.shippedAt && (
-                                        <div className="grid grid-cols-4 gap-x-2 text-[10px] print:text-[9px] leading-tight">
-                                            <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">TANGGAL KIRIM:</span>
-                                            <span className="font-bold text-slate-950 col-span-2 print:text-black">
-                                                {format(new Date(sale.shippedAt), 'dd/MM/yyyy')}
+                                    <div className="grid grid-cols-4 gap-x-2 text-[10px] print:text-[9px] leading-tight items-center">
+                                        <span className="font-black text-slate-500 uppercase tracking-wider print:text-black/60 col-span-2">TANGGAL KIRIM:</span>
+                                        <div className="col-span-2 flex items-center">
+                                            {/* Edit on screen */}
+                                            <input 
+                                                type="date"
+                                                value={customShippedDate}
+                                                onChange={(e) => handleShippedDateChange(e.target.value)}
+                                                className="font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-500 screen-only text-[10px]"
+                                            />
+                                            {/* Display when printing */}
+                                            <span className="print-only font-bold text-slate-950 print:text-black">
+                                                {customShippedDate ? (() => {
+                                                    const [year, month, day] = customShippedDate.split('-').map(Number);
+                                                    const localDate = new Date(year, month - 1, day);
+                                                    return format(localDate, 'dd/MM/yyyy');
+                                                })() : '-'}
                                             </span>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -435,6 +469,13 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                     )}
                 </div>
             </div>
+            <style dangerouslySetInnerHTML={{__html: `
+                .print-only { display: none !important; }
+                @media print {
+                    .print-only { display: inline !important; }
+                    .screen-only { display: none !important; }
+                }
+            `}} />
         </div>
     );
 }

@@ -121,6 +121,7 @@ const runAutoMigration = async () => {
   const migrations = [
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "paidAmount" FLOAT DEFAULT 0`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "dueDate" TIMESTAMP`,
+    `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "shippedAt" TIMESTAMP`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "isTukarFaktur" BOOLEAN DEFAULT false`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "tukarFakturDate" TIMESTAMP`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "tukarFakturRef" TEXT`,
@@ -1316,7 +1317,7 @@ app.patch('/api/sales/orders/:id/status', tenantMiddleware, async (req: Request,
     if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan atau bukan milik Anda' });
 
     const updateData: any = { status };
-    if (status === 'SHIPPED') {
+    if (status === 'SHIPPED' && !order.shippedAt) {
       updateData.shippedAt = new Date();
     }
 
@@ -1330,7 +1331,7 @@ app.patch('/api/sales/orders/:id/status', tenantMiddleware, async (req: Request,
   }
 });
 
-// 3b. Update Shipped Date (Delivery Date)
+// 3b. Update Shipped Date (Delivery Date) from Sales Order / Delivery Note
 app.patch('/api/sales/orders/:id/shipped-date', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
@@ -1343,15 +1344,64 @@ app.patch('/api/sales/orders/:id/shipped-date', tenantMiddleware, async (req: Re
 
     if (!order) return res.status(404).json({ error: 'Pesanan tidak ditemukan atau bukan milik Anda' });
 
+    const newDate = shippedAt ? new Date(shippedAt) : null;
+
     const updated = await prisma.salesOrder.update({
       where: { id: orderId },
       data: {
-        shippedAt: shippedAt ? new Date(shippedAt) : null
+        shippedAt: newDate
       }
     });
+
+    // Also sync to Sale if order is already invoiced
+    if (order.saleId) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Sale" SET "shippedAt" = $1 WHERE id = $2 AND "companyId" = $3`,
+        newDate,
+        order.saleId,
+        tenantId
+      );
+    }
+
     res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengupdate tanggal kirim: ' + error.message });
+  }
+});
+
+// 3c. Update Shipped Date directly from Invoice Modal
+app.patch('/api/sales/:id/shipped-date', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const saleId = Number(req.params.id);
+    const { shippedAt } = req.body;
+
+    const sales: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Sale" WHERE id = $1 AND "companyId" = $2`, saleId, tenantId);
+    if (sales.length === 0) return res.status(404).json({ error: 'Penjualan tidak ditemukan' });
+
+    const newDate = shippedAt ? new Date(shippedAt) : null;
+
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Sale" SET "shippedAt" = $1 WHERE id = $2 AND "companyId" = $3`,
+      newDate,
+      saleId,
+      tenantId
+    );
+
+    // Also update associated SalesOrder if exists
+    const associatedOrder = await prisma.salesOrder.findFirst({
+      where: { saleId: saleId, companyId: tenantId }
+    });
+    if (associatedOrder) {
+      await prisma.salesOrder.update({
+        where: { id: associatedOrder.id },
+        data: { shippedAt: newDate }
+      });
+    }
+
+    res.json({ success: true, shippedAt: newDate });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengupdate tanggal kirim invoice: ' + error.message });
   }
 });
 
@@ -17812,7 +17862,7 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
     const associatedOrder = await prisma.salesOrder.findFirst({
       where: { saleId: sale.id, companyId: tenantId }
     });
-    const shippedAt = associatedOrder?.shippedAt || null;
+    const shippedAt = associatedOrder?.shippedAt || sale.shippedAt || null;
 
     if (company.length > 0) {
       const comp = company[0];
