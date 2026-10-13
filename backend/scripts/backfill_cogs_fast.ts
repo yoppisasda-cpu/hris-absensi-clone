@@ -3,75 +3,122 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function run() {
-  console.log('Starting fast COGS backfill...');
+  const t0 = Date.now();
+  console.log("Checking sales needing COGS backfill...");
   
-  // Ambil semua transaksi sale
-  const sales = await prisma.sale.findMany({
-    where: { totalCogs: 0, status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] } },
-    include: {
-      SaleItem: {
-        include: {
-          product: {
-             include: {
-                Recipes: { include: { Material: true } }
-             }
-          }
+  const companiesWithZeroCogs: any[] = await prisma.$queryRawUnsafe(`
+    SELECT DISTINCT "companyId" 
+    FROM "Sale" 
+    WHERE ("totalCogs" = 0 OR "totalCogs" IS NULL)
+    AND "status" NOT IN ('CANCELLED', 'PENDING', 'RETURNED', 'VOID')
+  `);
+
+  console.log(`Found ${companiesWithZeroCogs.length} companies with zero COGS sales.`);
+
+  let totalUpdated = 0;
+
+  for (const row of companiesWithZeroCogs) {
+    const companyId = row.companyId;
+    if (!companyId) continue;
+
+    const allProducts = await prisma.product.findMany({
+      where: { companyId },
+      include: {
+        Recipes: {
+          include: { Material: true }
         }
       }
+    });
+
+    const getProductCost = (product: any, visited = new Set<number>()): number => {
+      if (!product || visited.has(product.id)) return 0;
+      
+      if (!product.isAutoDeduct || !product.Recipes || product.Recipes.length === 0) {
+        return Number(product.costPrice) || 0;
+      }
+
+      visited.add(product.id);
+      let totalRecipeCost = 0;
+      const yieldFactor = Number(product.recipeYield) || 1;
+
+      for (const recipe of product.Recipes) {
+        const mat = recipe.Material;
+        if (mat) {
+          const matCost = getProductCost(mat, visited);
+          totalRecipeCost += (Number(recipe.quantity) * matCost);
+        }
+      }
+      visited.delete(product.id);
+      
+      return yieldFactor > 0 ? totalRecipeCost / yieldFactor : totalRecipeCost;
+    };
+
+    const productCostMap = new Map<number, number>();
+    for (const p of allProducts) {
+      productCostMap.set(p.id, getProductCost(p));
     }
-  });
 
-  console.log(`Ditemukan ${sales.length} transaksi yang perlu dihitung.`);
+    const sales = await prisma.sale.findMany({
+      where: {
+        companyId,
+        status: { notIn: ["CANCELLED", "PENDING", "RETURNED", "VOID"] },
+        totalCogs: 0
+      },
+      include: {
+        SaleItem: true
+      }
+    });
 
-  const updates: { id: number, cogs: number }[] = [];
+    if (sales.length === 0) continue;
 
-  for (const sale of sales) {
-    let saleCogs = 0;
+    const updates: { id: number; cogs: number }[] = [];
 
-    for (const item of sale.SaleItem) {
-       const product = item.product;
-       if (!product) continue;
-       
-       let unitCost = Number(product.costPrice) || 0;
-       
-       if (product.isAutoDeduct && product.Recipes && product.Recipes.length > 0) {
-          let recipeCost = 0;
-          for (const recipe of product.Recipes) {
-             const matCost = Number(recipe.Material?.costPrice) || 0;
-             recipeCost += (Number(recipe.quantity) * matCost);
-          }
-          const yieldFactor = Number(product.recipeYield) || 1;
-          unitCost = yieldFactor > 0 ? recipeCost / yieldFactor : recipeCost;
-       }
+    for (const s of sales) {
+      let sCogs = 0;
+      for (const item of s.SaleItem) {
+        if (!item.productId) continue;
+        const unitCost = productCostMap.get(item.productId) || 0;
+        let itemCogs = Number(item.quantity) * unitCost;
 
-       saleCogs += (Number(item.quantity) * unitCost);
+        if (item.modifiers) {
+          try {
+            const mods = typeof item.modifiers === "string" ? JSON.parse(item.modifiers) : item.modifiers;
+            Object.values(mods).forEach((val: any) => {
+              if (val && val.linkedProductId) {
+                const linkedProdId = Number(val.linkedProductId);
+                const linkedQty = Number(val.linkedQuantity) || 1;
+                const modUnitCost = productCostMap.get(linkedProdId) || 0;
+                itemCogs += Number(item.quantity) * linkedQty * modUnitCost;
+              }
+            });
+          } catch (e) {}
+        }
+
+        sCogs += itemCogs;
+      }
+
+      if (sCogs > 0) {
+        updates.push({ id: s.id, cogs: sCogs });
+      }
     }
 
-    if (saleCogs > 0) {
-       updates.push({ id: sale.id, cogs: saleCogs });
-    }
-  }
-
-  console.log(`Menyiapkan ${updates.length} updates secara paralel...`);
-  
-  // Batch updates in chunks of 100
-  const CHUNK_SIZE = 100;
-  let count = 0;
-  for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
       const chunk = updates.slice(i, i + CHUNK_SIZE);
-      await Promise.all(chunk.map(u => 
-          prisma.sale.update({
-             where: { id: u.id },
-             data: { totalCogs: u.cogs }
-          })
-      ));
-      count += chunk.length;
-      if (count % 1000 === 0) console.log(`Processed ${count} records...`);
+      const valuesClause = chunk.map(u => `(${u.id}, ${u.cogs.toFixed(4)})`).join(",");
+      await prisma.$executeRawUnsafe(`
+        UPDATE "Sale" AS s 
+        SET "totalCogs" = c.cogs 
+        FROM (VALUES ${valuesClause}) AS c(id, cogs)
+        WHERE s.id = c.id
+      `);
+    }
+
+    totalUpdated += updates.length;
+    console.log(`Company ${companyId}: updated ${updates.length} of ${sales.length} sales.`);
   }
 
-  console.log(`Selesai! Berhasil update ${count} transaksi dengan cepat.`);
+  console.log(`Done! Total updated sales: ${totalUpdated} in ${Date.now() - t0}ms`);
 }
 
-run()
-  .catch(e => console.error(e))
-  .finally(() => prisma.$disconnect());
+run().finally(() => prisma.$disconnect());

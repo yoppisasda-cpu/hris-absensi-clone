@@ -1465,6 +1465,20 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
         data: { status: 'INVOICED', saleId: newSale.id }
       });
 
+      // Calculate and persist real-time COGS for converted PO
+      try {
+        const calculatedCogs = await calculateSingleSaleCOGS(tenantId, newSale.id, tx);
+        if (calculatedCogs > 0) {
+          await tx.sale.update({
+            where: { id: newSale.id },
+            data: { totalCogs: calculatedCogs }
+          });
+          newSale.totalCogs = calculatedCogs;
+        }
+      } catch (cogsErr) {
+        console.error("Error calculating B2B PO conversion COGS:", cogsErr);
+      }
+
       return newSale;
     }, {
       maxWait: 15000,
@@ -12069,19 +12083,6 @@ app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, re
   }
 });
 
-// Helper function to calculate B2B / Retail Sales COGS in high performance batch queries (solves N+1 database round-trip timeout)
-async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Date, branchId?: number): Promise<number> {
-  const branchFilter = branchId ? `AND "branchId" = ${branchId}` : ``;
-  const sales: any[] = await prisma.$queryRawUnsafe(`
-    SELECT SUM("totalCogs") as "total" FROM "Sale" 
-    WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
-    AND "status" NOT IN ('CANCELLED', 'PENDING', 'RETURNED', 'VOID')
-    ${branchFilter}
-  `, tenantId, startDate, endDate);
-
-  return sales[0]?.total ? Number(sales[0].total) : 0;
-}
-
 // Helper to calculate COGS for a single sale
 async function calculateSingleSaleCOGS(tenantId: number, saleId: number, txClient: any = prisma): Promise<number> {
   const saleItems: any[] = await txClient.$queryRawUnsafe(`
@@ -12161,6 +12162,134 @@ async function calculateSingleSaleCOGS(tenantId: number, saleId: number, txClien
   }
 
   return calculatedCogsFromSales;
+}
+
+// Batch backfill sales COGS for a tenant within a date range if missing (self-healing for P&L)
+async function autoBackfillTenantSalesCOGS(tenantId: number, startDate: Date, endDate: Date, branchId?: number): Promise<void> {
+  const branchFilter = branchId ? `AND "branchId" = ${branchId}` : ``;
+  const zeroSales: any[] = await prisma.$queryRawUnsafe(`
+    SELECT s.id 
+    FROM "Sale" s
+    WHERE s."companyId" = $1 AND s."date" >= $2 AND s."date" <= $3
+    AND s."status" NOT IN ('CANCELLED', 'PENDING', 'RETURNED', 'VOID')
+    AND s."totalCogs" = 0
+    ${branchFilter}
+    LIMIT 2000
+  `, tenantId, startDate, endDate);
+
+  if (!zeroSales || zeroSales.length === 0) return;
+
+  const saleIds = zeroSales.map((s: any) => s.id);
+  const allProducts = await prisma.product.findMany({
+    where: { companyId: tenantId },
+    include: {
+      Recipes: {
+        include: { Material: true }
+      }
+    }
+  });
+
+  const getProductCost = (product: any, visited = new Set<number>()): number => {
+    if (!product || visited.has(product.id)) return 0;
+    if (!product.isAutoDeduct || !product.Recipes || product.Recipes.length === 0) {
+      return Number(product.costPrice) || 0;
+    }
+    visited.add(product.id);
+    let totalRecipeCost = 0;
+    const yieldFactor = Number(product.recipeYield) || 1;
+    for (const recipe of product.Recipes) {
+      const mat = recipe.Material;
+      if (mat) {
+        const matCost = getProductCost(mat, visited);
+        totalRecipeCost += (Number(recipe.quantity) * matCost);
+      }
+    }
+    visited.delete(product.id);
+    return yieldFactor > 0 ? totalRecipeCost / yieldFactor : totalRecipeCost;
+  };
+
+  const productCostMap = new Map<number, number>();
+  for (const p of allProducts) {
+    productCostMap.set(p.id, getProductCost(p));
+  }
+
+  const salesWithItems = await prisma.sale.findMany({
+    where: { id: { in: saleIds } },
+    include: { SaleItem: true }
+  });
+
+  const updates: { id: number; cogs: number }[] = [];
+  for (const s of salesWithItems) {
+    let sCogs = 0;
+    for (const item of s.SaleItem) {
+      if (!item.productId) continue;
+      const unitCost = productCostMap.get(item.productId) || 0;
+      let itemCogs = Number(item.quantity) * unitCost;
+      if (item.modifiers) {
+        try {
+          const mods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
+          Object.values(mods).forEach((val: any) => {
+            if (val && val.linkedProductId) {
+              const linkedProdId = Number(val.linkedProductId);
+              const linkedQty = Number(val.linkedQuantity) || 1;
+              const modUnitCost = productCostMap.get(linkedProdId) || 0;
+              itemCogs += Number(item.quantity) * linkedQty * modUnitCost;
+            }
+          });
+        } catch (e) {}
+      }
+      sCogs += itemCogs;
+    }
+    if (sCogs > 0) {
+      updates.push({ id: s.id, cogs: sCogs });
+    }
+  }
+
+  if (updates.length > 0) {
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + CHUNK_SIZE);
+      const valuesClause = chunk.map(u => `(${u.id}, ${u.cogs.toFixed(4)})`).join(",");
+      await prisma.$executeRawUnsafe(`
+        UPDATE "Sale" AS s 
+        SET "totalCogs" = c.cogs 
+        FROM (VALUES ${valuesClause}) AS c(id, cogs)
+        WHERE s.id = c.id
+      `);
+    }
+  }
+}
+
+// Helper function to calculate B2B / Retail Sales COGS in high performance batch queries (solves N+1 database round-trip timeout)
+async function calculateSalesCOGS(tenantId: number, startDate: Date, endDate: Date, branchId?: number): Promise<number> {
+  const branchFilter = branchId ? `AND "branchId" = ${branchId}` : ``;
+
+  // Self-heal: check if any sales in this period still have totalCogs = 0
+  try {
+    const zeroCogsCheck: any[] = await prisma.$queryRawUnsafe(`
+      SELECT 1 FROM "Sale" 
+      WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
+      AND "status" NOT IN ('CANCELLED', 'PENDING', 'RETURNED', 'VOID')
+      AND "totalCogs" = 0
+      ${branchFilter}
+      LIMIT 1
+    `, tenantId, startDate, endDate);
+
+    if (zeroCogsCheck && zeroCogsCheck.length > 0) {
+      await autoBackfillTenantSalesCOGS(tenantId, startDate, endDate, branchId);
+    }
+  } catch (healErr) {
+    console.error("Auto-backfill COGS error:", healErr);
+  }
+
+  const sales: any[] = await prisma.$queryRawUnsafe(`
+    SELECT SUM("totalCogs") as "total" FROM "Sale" 
+    WHERE "companyId" = $1 AND "date" >= $2 AND "date" <= $3
+    AND "status" NOT IN ('CANCELLED', 'PENDING', 'RETURNED', 'VOID')
+    ${branchFilter}
+  `, tenantId, startDate, endDate);
+
+  return sales[0]?.total ? Number(sales[0].total) : 0;
 }
 
 // Helper function to calculate Retained Earnings (Laba Ditahan) from all previous years
@@ -16522,6 +16651,18 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         });
       }
 
+      // Calculate and persist real-time COGS for this order
+      try {
+        const calculatedCogs = await calculateSingleSaleCOGS(tenantId, saleId, tx);
+        if (calculatedCogs > 0) {
+          await tx.$executeRawUnsafe(`
+            UPDATE "Sale" SET "totalCogs" = $1 WHERE "id" = $2
+          `, calculatedCogs, saleId);
+        }
+      } catch (cogsErr) {
+        console.error("Error calculating order sale COGS:", cogsErr);
+      }
+
       let customerEmail = null;
       if (finalCustomerId) {
         const cust = await tx.customer.findUnique({where: {id: finalCustomerId}});
@@ -18877,6 +19018,20 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             description: `POS #${invoiceNumber} (${saleType})`
           }
         });
+      }
+
+      // 5. Calculate and persist real-time COGS for this POS transaction
+      try {
+        const calculatedCogs = await calculateSingleSaleCOGS(tenantId, sale.id, tx);
+        if (calculatedCogs > 0) {
+          await tx.sale.update({
+            where: { id: sale.id },
+            data: { totalCogs: calculatedCogs }
+          });
+          sale.totalCogs = calculatedCogs;
+        }
+      } catch (cogsErr) {
+        console.error("Error calculating POS sale COGS:", cogsErr);
       }
 
       return sale;
