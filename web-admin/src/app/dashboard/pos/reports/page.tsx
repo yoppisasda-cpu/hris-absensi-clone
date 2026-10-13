@@ -50,6 +50,9 @@ export default function POSReportsPage() {
     const [activeTab, setActiveTab] = useState<'sales' | 'shifts' | 'pre_orders' | 'performance'>('sales');
     const [shiftClosings, setShiftClosings] = useState<any[]>([]);
     const [salespersonsPerformance, setSalespersonsPerformance] = useState<any[]>([]);
+    const [editingSale, setEditingSale] = useState<any | null>(null);
+    const [editReferenceInput, setEditReferenceInput] = useState("");
+    const [isSavingRef, setIsSavingRef] = useState(false);
 
     useEffect(() => {
         const role = localStorage.getItem('userRole');
@@ -213,6 +216,34 @@ export default function POSReportsPage() {
         } catch (error: any) {
             console.error("Gagal menghapus transaksi penjualan", error);
             toast.error(error.response?.data?.error || "Gagal menghapus transaksi penjualan");
+        }
+    };
+
+    const handleOpenEditRef = (sale: any) => {
+        setEditingSale(sale);
+        setEditReferenceInput(sale.paymentReference || sale.notes?.match(/\[Ref:\s*([^\]]+)\]/i)?.[1] || "");
+    };
+
+    const handleSavePaymentReference = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingSale) return;
+        setIsSavingRef(true);
+        try {
+            const res = await api.patch(`/sales/${editingSale.id}/payment-reference`, {
+                paymentReference: editReferenceInput.trim() || null
+            });
+            toast.success(`No. Referensi untuk ${editingSale.invoiceNumber} berhasil disimpan.`);
+            setSales(prev => prev.map(s => s.id === editingSale.id ? { 
+                ...s, 
+                paymentReference: editReferenceInput.trim() || null,
+                notes: res.data.notes 
+            } : s));
+            setEditingSale(null);
+        } catch (err: any) {
+            console.error("Gagal update referensi:", err);
+            toast.error(err.response?.data?.error || "Gagal memperbarui nomor referensi.");
+        } finally {
+            setIsSavingRef(false);
         }
     };
 
@@ -756,13 +787,40 @@ export default function POSReportsPage() {
                                                 </div>
                                                 {(() => {
                                                     const ref = sale.paymentReference || sale.notes?.match(/\[Ref:\s*([^\]]+)\]/i)?.[1];
-                                                    if (!ref) return null;
-                                                    return (
-                                                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[9px] font-mono font-bold tracking-wider w-fit mt-0.5 shadow-sm">
-                                                            <CreditCard className="w-3 h-3 text-amber-400 shrink-0" />
-                                                            <span>REF EDC: {ref}</span>
-                                                        </div>
-                                                    );
+                                                    if (ref) {
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenEditRef(sale)}
+                                                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/30 text-[9px] font-mono font-bold tracking-wider w-fit mt-0.5 shadow-sm transition-all text-left group/btn cursor-pointer"
+                                                                title="Klik untuk ubah No. Ref EDC"
+                                                            >
+                                                                <CreditCard className="w-3 h-3 text-amber-400 shrink-0" />
+                                                                <span>REF EDC: {ref}</span>
+                                                                <span className="text-[8px] text-amber-500/60 group-hover/btn:text-amber-300 ml-0.5">✏️</span>
+                                                            </button>
+                                                        );
+                                                    }
+                                                    const isCard = (sale.accountName?.toUpperCase().includes('DEBIT') || 
+                                                                   sale.accountName?.toUpperCase().includes('EDC') || 
+                                                                   sale.notes?.toUpperCase().includes('DEBIT') || 
+                                                                   sale.notes?.toUpperCase().includes('EDC') || 
+                                                                   sale.paymentMethod?.toUpperCase().includes('DEBIT') || 
+                                                                   sale.paymentMethod?.toUpperCase().includes('EDC'));
+                                                    if (isCard) {
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenEditRef(sale)}
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-dashed border-amber-500/40 text-[9px] font-bold tracking-wider w-fit mt-0.5 transition-all text-left cursor-pointer"
+                                                                title="Input Nomor Referensi EDC"
+                                                            >
+                                                                <CreditCard className="w-3 h-3 text-amber-400 shrink-0" />
+                                                                <span>+ Input No. Ref EDC</span>
+                                                            </button>
+                                                        );
+                                                    }
+                                                    return null;
                                                 })()}
                                             </div>
                                         </td>
@@ -783,6 +841,13 @@ export default function POSReportsPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-center gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all">
+                                                <button 
+                                                    onClick={() => handleOpenEditRef(sale)}
+                                                    className="p-2 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 transition-all shadow-xl active:scale-90"
+                                                    title="Input / Edit No. Referensi EDC"
+                                                >
+                                                    <CreditCard className="h-4 w-4" />
+                                                </button>
                                                 <button 
                                                     onClick={() => handleViewInvoice(sale.id)}
                                                     className="p-2 rounded-xl bg-slate-950 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 transition-all shadow-xl active:scale-90"
@@ -969,6 +1034,82 @@ export default function POSReportsPage() {
                 onClose={() => setIsInvoiceModalOpen(false)}
                 saleId={selectedSaleId!}
             />
+
+            {/* Modal Input/Edit No. Referensi EDC */}
+            {editingSale && (
+                <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                    <CreditCard className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-white text-base">Nomor Referensi EDC</h3>
+                                    <p className="text-[11px] text-slate-400 font-mono">{editingSale.invoiceNumber}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setEditingSale(null)}
+                                className="text-slate-500 hover:text-white p-1 rounded-lg"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSavePaymentReference} className="space-y-4">
+                            <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80 space-y-1.5 text-xs">
+                                <div className="flex justify-between text-slate-400">
+                                    <span>Pelanggan:</span>
+                                    <span className="font-bold text-white">{editingSale.customerName || 'Umum'}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-400">
+                                    <span>Total Transaksi:</span>
+                                    <span className="font-bold text-emerald-400">Rp {(editingSale.netTotalAmount !== undefined ? editingSale.netTotalAmount : editingSale.totalAmount).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-400">
+                                    <span>Metode Pembayaran:</span>
+                                    <span className="font-bold text-amber-400 uppercase">{editingSale.paymentMethod || editingSale.accountName || 'TUNAI'}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-xs font-bold text-slate-300">
+                                    Nomor Approval / Referensi EDC <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editReferenceInput}
+                                    onChange={(e) => setEditReferenceInput(e.target.value)}
+                                    placeholder="Contoh: 123456 atau 987654321"
+                                    autoFocus
+                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono text-sm placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                                />
+                                <p className="text-[11px] text-slate-500 italic">
+                                    Nomor ini akan langsung tampil di laporan kasir dan file export Excel.
+                                </p>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingSale(null)}
+                                    className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingRef}
+                                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 shadow-lg shadow-amber-500/20"
+                                >
+                                    {isSavingRef ? 'Menyimpan...' : 'Simpan Referensi'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }

@@ -16940,6 +16940,46 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
   }
 });
 
+// S3.1 Update Sale Payment Reference
+app.patch('/api/sales/:id/payment-reference', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const saleId = parseInt(req.params.id as string);
+    const { paymentReference, paymentMethod } = req.body;
+
+    const trimmedRef = paymentReference ? String(paymentReference).trim() : null;
+
+    const sale = await prisma.sale.findFirst({
+      where: { id: saleId, companyId: tenantId }
+    });
+    if (!sale) return res.status(404).json({ error: 'Penjualan tidak ditemukan' });
+
+    let finalNotes = sale.notes || '';
+    if (trimmedRef) {
+      if (finalNotes.match(/\[Ref:\s*[^\]]+\]/i)) {
+        finalNotes = finalNotes.replace(/\[Ref:\s*[^\]]+\]/i, `[Ref: ${trimmedRef}]`);
+      } else {
+        finalNotes = finalNotes ? `${finalNotes} [Ref: ${trimmedRef}]` : `[Ref: ${trimmedRef}]`;
+      }
+    } else {
+      finalNotes = finalNotes.replace(/\[Ref:\s*[^\]]+\]/i, '').trim();
+    }
+
+    const updated = await prisma.sale.update({
+      where: { id: saleId },
+      data: {
+        paymentReference: trimmedRef,
+        notes: finalNotes,
+        ...(paymentMethod ? { paymentMethod: String(paymentMethod).trim() } : {})
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal memperbarui nomor referensi: ' + error.message });
+  }
+});
+
 // S2. List Sales
 // S0. Get My Orders (For Customers/Aivola GO)
 app.get('/api/sales/my-orders', tenantMiddleware, async (req: Request, res: Response) => {
@@ -17726,6 +17766,11 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
 
     sales.forEach(sale => {
       const refVal = sale.paymentReference || (sale.notes && sale.notes.match(/\[Ref:\s*([^\]]+)\]/i)?.[1]) || '-';
+      const matchMetode = sale.notes && sale.notes.match(/\[Metode:\s*([^\]]+)\]/i)?.[1];
+      const detectedMethod = (sale.paymentMethod && sale.paymentMethod !== 'Bayar di Kasir')
+        ? sale.paymentMethod
+        : (matchMetode || sale.accountName || 'TUNAI');
+
       const row = worksheet1.addRow({
         date: new Date(sale.date).toLocaleDateString('id-ID'),
         invoiceNumber: sale.invoiceNumber,
@@ -17733,7 +17778,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
         customerName: sale.customerName || 'Umum',
         status: sale.status === 'PAID' ? 'Lunas' : 
                 sale.status === 'PARTIALLY_RETURNED' ? 'Retur Sebagian' : 'Belum Bayar',
-        paymentMethod: sale.accountName || sale.paymentMethod || 'TUNAI',
+        paymentMethod: detectedMethod,
         paymentReference: refVal,
         totalAmount: sale.netTotalAmount !== undefined ? sale.netTotalAmount : sale.totalAmount || 0,
         notes: sale.notes || '-'
