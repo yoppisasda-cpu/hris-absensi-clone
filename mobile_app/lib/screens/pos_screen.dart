@@ -408,7 +408,7 @@ class _POSScreenState extends State<POSScreen> {
     name = name.toLowerCase();
     if (name.contains('tunai') || name.contains('cash')) return Icons.payments_outlined;
     if (name.contains('qris')) return Icons.qr_code_scanner;
-    if (name.contains('debit') || name.contains('credit')) return Icons.credit_card_outlined;
+    if (name.contains('debit') || name.contains('credit') || name.contains('edc')) return Icons.credit_card_outlined;
     if (name.contains('transfer')) return Icons.account_balance_outlined;
     if (name.contains('gofood') || name.contains('grabfood') || name.contains('shopeefood') || name.contains('qpoon') || name.contains('tiktok')) return Icons.delivery_dining;
     return Icons.account_balance_wallet_outlined;
@@ -941,7 +941,7 @@ class _POSScreenState extends State<POSScreen> {
                     childAspectRatio: 2.5,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    children: ['Tunai', 'QRIS', 'Debit/Credit', 'Transfer'].map((method) {
+                    children: ['Tunai', 'QRIS', 'EDC', 'Transfer'].map((method) {
                       final bool isSelected = _selectedPaymentMethod == method;
                       return InkWell(
                         onTap: () {
@@ -1068,7 +1068,7 @@ class _POSScreenState extends State<POSScreen> {
                   if (!isNonCash) return <Widget>[];
 
                   return <Widget>[
-                    Text('Nomor Referensi/Approval (Opsional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
+                    Text(_selectedPaymentMethod == 'EDC' ? 'Nomor Referensi / Approval EDC (Opsional)' : 'Nomor Referensi/Approval (Opsional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
                     SizedBox(height: 10),
                     TextField(
                       controller: _paymentReferenceController,

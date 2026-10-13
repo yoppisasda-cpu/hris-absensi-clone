@@ -52,7 +52,51 @@ export default function POSReportsPage() {
     const [salespersonsPerformance, setSalespersonsPerformance] = useState<any[]>([]);
     const [editingSale, setEditingSale] = useState<any | null>(null);
     const [editReferenceInput, setEditReferenceInput] = useState("");
+    const [editPaymentMethod, setEditPaymentMethod] = useState<'TUNAI' | 'QRIS' | 'EDC' | 'TRANSFER'>('EDC');
     const [isSavingRef, setIsSavingRef] = useState(false);
+
+    const getPaymentMethodInfo = (sale: any): {
+        method: 'TUNAI' | 'QRIS' | 'EDC' | 'TRANSFER';
+        label: string;
+        badgeClass: string;
+    } => {
+        const notes = (sale.notes || '').toUpperCase();
+        const pm = (sale.paymentMethod || '').toUpperCase();
+        const acc = (sale.accountName || '').toUpperCase();
+        const ref = (sale.paymentReference || sale.notes?.match(/\[Ref:\s*([^\]]+)\]/i)?.[1] || '').trim();
+
+        if (pm === 'QRIS' || pm.includes('QRIS') || notes.includes('QRIS') || acc.includes('QRIS')) {
+            return {
+                method: 'QRIS',
+                label: 'QRIS',
+                badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+            };
+        }
+        if (
+            pm === 'EDC' || ref !== '' ||
+            pm.includes('DEBIT') || pm.includes('EDC') || pm.includes('KREDIT') || pm.includes('CREDIT') ||
+            notes.includes('DEBIT') || notes.includes('EDC') || notes.includes('KREDIT') || notes.includes('CREDIT') ||
+            acc.includes('DEBIT') || acc.includes('EDC')
+        ) {
+            return {
+                method: 'EDC',
+                label: 'EDC',
+                badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+            };
+        }
+        if (pm === 'TRANSFER' || pm.includes('TRANSFER') || notes.includes('TRANSFER') || acc.includes('TRANSFER') || acc.includes('BANK')) {
+            return {
+                method: 'TRANSFER',
+                label: 'TRANSFER',
+                badgeClass: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+            };
+        }
+        return {
+            method: 'TUNAI',
+            label: 'TUNAI',
+            badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+        };
+    };
 
     useEffect(() => {
         const role = localStorage.getItem('userRole');
@@ -221,6 +265,8 @@ export default function POSReportsPage() {
 
     const handleOpenEditRef = (sale: any) => {
         setEditingSale(sale);
+        const info = getPaymentMethodInfo(sale);
+        setEditPaymentMethod(info.method);
         setEditReferenceInput(sale.paymentReference || sale.notes?.match(/\[Ref:\s*([^\]]+)\]/i)?.[1] || "");
     };
 
@@ -230,11 +276,13 @@ export default function POSReportsPage() {
         setIsSavingRef(true);
         try {
             const res = await api.patch(`/sales/${editingSale.id}/payment-reference`, {
-                paymentReference: editReferenceInput.trim() || null
+                paymentReference: editReferenceInput.trim() || null,
+                paymentMethod: editPaymentMethod
             });
-            toast.success(`No. Referensi untuk ${editingSale.invoiceNumber} berhasil disimpan.`);
+            toast.success(`Metode & No. Referensi untuk ${editingSale.invoiceNumber} berhasil disimpan.`);
             setSales(prev => prev.map(s => s.id === editingSale.id ? { 
                 ...s, 
+                paymentMethod: editPaymentMethod,
                 paymentReference: editReferenceInput.trim() || null,
                 notes: res.data.notes 
             } : s));
@@ -677,35 +725,35 @@ export default function POSReportsPage() {
                             </select>
                         </div>
 
-                        {/* Sale Type Filter */}
-                        <div className="relative w-full sm:w-48 group">
+                        {/* Channel / Sale Type Filter */}
+                        <div className="relative w-full sm:w-52 group">
                             <ShoppingCart className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors pointer-events-none z-10" />
                             <select
                                 value={saleTypeFilter}
                                 onChange={(e) => setSaleTypeFilter(e.target.value)}
                                 className="w-full appearance-none rounded-xl border border-slate-800 bg-slate-950/50 py-2.5 pl-10 pr-10 text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all font-bold cursor-pointer hover:bg-slate-800"
                             >
-                                <option value="all">Semua Tipe Jual</option>
-                                <option value="WALK_IN">WALK-IN</option>
-                                <option value="GOFOOD">GOFOOD</option>
-                                <option value="GRABFOOD">GRABFOOD</option>
-                                <option value="SHOPEEFOOD">SHOPEEFOOD</option>
-                                <option value="QPOON">QPOON</option>
+                                <option value="all">Semua Channel</option>
+                                <option value="WALK_IN">Walk-In (Kasir Langsung)</option>
+                                <option value="GOFOOD">GoFood</option>
+                                <option value="GRABFOOD">GrabFood</option>
+                                <option value="SHOPEEFOOD">ShopeeFood</option>
+                                <option value="QPOON">QPoon</option>
                             </select>
                         </div>
 
                         {/* Payment Filter */}
-                        <div className="relative w-full sm:w-48 group">
+                        <div className="relative w-full sm:w-52 group">
                             <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors pointer-events-none z-10" />
                             <select
                                 value={paymentFilter}
                                 onChange={(e) => setPaymentFilter(e.target.value)}
                                 className="w-full appearance-none rounded-xl border border-slate-800 bg-slate-950/50 py-2.5 pl-10 pr-10 text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all font-bold cursor-pointer hover:bg-slate-800"
                             >
-                                <option value="all">Semua Bayar</option>
+                                <option value="all">Semua Metode Bayar</option>
                                 <option value="TUNAI">TUNAI</option>
                                 <option value="QRIS">QRIS</option>
-                                <option value="DEBIT">DEBIT / KREDIT</option>
+                                <option value="EDC">EDC (DEBIT / KREDIT)</option>
                                 <option value="TRANSFER">TRANSFER BANK</option>
                             </select>
                         </div>
@@ -739,7 +787,7 @@ export default function POSReportsPage() {
                             <tr className="bg-slate-950/40">
                                 <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Waktu & Tanggal</th>
                                 <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Detail Transaksi</th>
-                                <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Metode & Sumber</th>
+                                <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Metode Bayar</th>
                                 <th className="px-6 py-4 text-right font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Gross</th>
                                 <th className="px-6 py-4 text-right font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Potongan</th>
                                 <th className="px-6 py-4 text-right font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Net Cair</th>
@@ -754,76 +802,64 @@ export default function POSReportsPage() {
                                     </tr>
                                 ))
                             ) : filteredSales.length > 0 ? (
-                                filteredSales.map((sale) => (
-                                    <tr key={sale.id} className="hover:bg-slate-800/20 transition-all group">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-200">{format(new Date(sale.date), 'dd/MM/yyyy')}</div>
-                                            <div className="text-[10px] text-slate-500 font-medium">{format(new Date(sale.createdAt), 'HH:mm:ss')}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-black text-emerald-500 font-mono tracking-tighter text-sm">{sale.invoiceNumber}</div>
-                                            <div className="text-[10px] text-slate-400 font-medium flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
-                                                <span>ID: #{sale.id}</span>
-                                                {sale.customerName && <span className="text-slate-600">• {sale.customerName}</span>}
-                                                {sale.salespersonName && <span className="text-blue-500 font-bold">• 🤵 {sale.salespersonName}</span>}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1.5">
-                                                <div className={`w-fit px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                                                    (sale.accountName?.toUpperCase().includes('QRIS') || sale.notes?.includes('QRIS') || sale.paymentMethod?.toUpperCase().includes('QRIS')) ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                    (sale.accountName?.toUpperCase().includes('GOFOOD') || sale.notes?.includes('GOFOOD')) ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                    (sale.accountName?.toUpperCase().includes('GRABFOOD') || sale.notes?.includes('GRABFOOD')) ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                    (sale.accountName?.toUpperCase().includes('SHOPEE') || sale.notes?.includes('SHOPEE')) ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                                    (sale.accountName?.toUpperCase().includes('QPOON') || sale.notes?.includes('QPOON')) ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                                                    (sale.accountName?.toUpperCase().includes('TRANSFER') || sale.notes?.includes('TRANSFER') || sale.paymentMethod?.toUpperCase().includes('TRANSFER')) ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                                                    (sale.accountName?.toUpperCase().includes('DEBIT') || sale.accountName?.toUpperCase().includes('EDC') || sale.notes?.includes('DEBIT') || sale.paymentMethod?.toUpperCase().includes('EDC') || sale.paymentMethod?.toUpperCase().includes('DEBIT') || sale.paymentReference) ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                                    'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                                                }`}>
-                                                    {sale.paymentMethod && sale.paymentMethod !== 'Bayar di Kasir' ? sale.paymentMethod : (sale.accountName || sale.notes?.match(/\[Metode: (.*?)\]/)?.[1] || 'TUNAI')}
+                                filteredSales.map((sale) => {
+                                    const pmInfo = getPaymentMethodInfo(sale);
+                                    const ref = sale.paymentReference || sale.notes?.match(/\[Ref:\s*([^\]]+)\]/i)?.[1];
+
+                                    return (
+                                        <tr key={sale.id} className="hover:bg-slate-800/20 transition-all group">
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold text-slate-200">{format(new Date(sale.date), 'dd/MM/yyyy')}</div>
+                                                <div className="text-[10px] text-slate-500 font-medium">{format(new Date(sale.createdAt), 'HH:mm:ss')}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-black text-emerald-500 font-mono tracking-tighter text-sm">{sale.invoiceNumber}</div>
+                                                <div className="text-[10px] text-slate-400 font-medium flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                                                    <span>ID: #{sale.id}</span>
+                                                    {sale.customerName && <span className="text-slate-400">• {sale.customerName}</span>}
+                                                    {sale.salespersonName && <span className="text-blue-400 font-bold">• 🤵 {sale.salespersonName}</span>}
+                                                    {sale.saleType && (
+                                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${
+                                                            sale.saleType === 'GOFOOD' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                            sale.saleType === 'GRABFOOD' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                            sale.saleType === 'SHOPEEFOOD' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                                            sale.saleType === 'QPOON' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
+                                                            'bg-slate-800/80 text-slate-400 border-slate-700/60'
+                                                        }`}>
+                                                            {sale.saleType.replace('_', ' ')}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest pl-1">
-                                                    {sale.saleType || 'Direct'}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col gap-1.5">
+                                                    <div className={`w-fit px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${pmInfo.badgeClass}`}>
+                                                        {pmInfo.label}
+                                                    </div>
+                                                    {ref ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenEditRef(sale)}
+                                                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/30 text-[9px] font-mono font-bold tracking-wider w-fit mt-0.5 shadow-sm transition-all text-left group/btn cursor-pointer"
+                                                            title="Klik untuk ubah No. Ref EDC / Metode Bayar"
+                                                        >
+                                                            <CreditCard className="w-3 h-3 text-amber-400 shrink-0" />
+                                                            <span>REF EDC: {ref}</span>
+                                                            <span className="text-[8px] text-amber-500/60 group-hover/btn:text-amber-300 ml-0.5">✏️</span>
+                                                        </button>
+                                                    ) : pmInfo.method === 'EDC' ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenEditRef(sale)}
+                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-dashed border-amber-500/40 text-[9px] font-bold tracking-wider w-fit mt-0.5 transition-all text-left cursor-pointer"
+                                                            title="Input Nomor Referensi EDC"
+                                                        >
+                                                            <CreditCard className="w-3 h-3 text-amber-400 shrink-0" />
+                                                            <span>+ Input No. Ref EDC</span>
+                                                        </button>
+                                                    ) : null}
                                                 </div>
-                                                {(() => {
-                                                    const ref = sale.paymentReference || sale.notes?.match(/\[Ref:\s*([^\]]+)\]/i)?.[1];
-                                                    if (ref) {
-                                                        return (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleOpenEditRef(sale)}
-                                                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/30 text-[9px] font-mono font-bold tracking-wider w-fit mt-0.5 shadow-sm transition-all text-left group/btn cursor-pointer"
-                                                                title="Klik untuk ubah No. Ref EDC"
-                                                            >
-                                                                <CreditCard className="w-3 h-3 text-amber-400 shrink-0" />
-                                                                <span>REF EDC: {ref}</span>
-                                                                <span className="text-[8px] text-amber-500/60 group-hover/btn:text-amber-300 ml-0.5">✏️</span>
-                                                            </button>
-                                                        );
-                                                    }
-                                                    const isCard = (sale.accountName?.toUpperCase().includes('DEBIT') || 
-                                                                   sale.accountName?.toUpperCase().includes('EDC') || 
-                                                                   sale.notes?.toUpperCase().includes('DEBIT') || 
-                                                                   sale.notes?.toUpperCase().includes('EDC') || 
-                                                                   sale.paymentMethod?.toUpperCase().includes('DEBIT') || 
-                                                                   sale.paymentMethod?.toUpperCase().includes('EDC'));
-                                                    if (isCard) {
-                                                        return (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleOpenEditRef(sale)}
-                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-dashed border-amber-500/40 text-[9px] font-bold tracking-wider w-fit mt-0.5 transition-all text-left cursor-pointer"
-                                                                title="Input Nomor Referensi EDC"
-                                                            >
-                                                                <CreditCard className="w-3 h-3 text-amber-400 shrink-0" />
-                                                                <span>+ Input No. Ref EDC</span>
-                                                            </button>
-                                                        );
-                                                    }
-                                                    return null;
-                                                })()}
-                                            </div>
-                                        </td>
+                                            </td>
                                         <td className="px-6 py-4 text-right font-bold text-slate-300">
                                             Rp {(sale.netTotalAmount !== undefined ? sale.netTotalAmount : sale.totalAmount).toLocaleString()}
                                         </td>
@@ -872,7 +908,8 @@ export default function POSReportsPage() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))
+                                );
+                            })
                             ) : (
                                 <tr>
                                     <td colSpan={7} className="px-6 py-24 text-center">
@@ -1067,26 +1104,40 @@ export default function POSReportsPage() {
                                     <span>Total Transaksi:</span>
                                     <span className="font-bold text-emerald-400">Rp {(editingSale.netTotalAmount !== undefined ? editingSale.netTotalAmount : editingSale.totalAmount).toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between text-slate-400">
-                                    <span>Metode Pembayaran:</span>
-                                    <span className="font-bold text-amber-400 uppercase">{editingSale.paymentMethod || editingSale.accountName || 'TUNAI'}</span>
-                                </div>
                             </div>
 
                             <div className="space-y-2">
                                 <label className="block text-xs font-bold text-slate-300">
-                                    Nomor Approval / Referensi EDC <span className="text-rose-500">*</span>
+                                    Metode Pembayaran <span className="text-emerald-500">*</span>
+                                </label>
+                                <select
+                                    value={editPaymentMethod}
+                                    onChange={(e) => setEditPaymentMethod(e.target.value as any)}
+                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
+                                >
+                                    <option value="TUNAI">TUNAI (CASH)</option>
+                                    <option value="QRIS">QRIS</option>
+                                    <option value="EDC">EDC (DEBIT / KREDIT)</option>
+                                    <option value="TRANSFER">TRANSFER BANK</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-xs font-bold text-slate-300">
+                                    Nomor Approval / Referensi EDC {editPaymentMethod === 'EDC' && <span className="text-amber-500">*</span>}
                                 </label>
                                 <input
                                     type="text"
                                     value={editReferenceInput}
                                     onChange={(e) => setEditReferenceInput(e.target.value)}
-                                    placeholder="Contoh: 123456 atau 987654321"
-                                    autoFocus
+                                    placeholder={editPaymentMethod === 'EDC' ? "Contoh: 123456 atau 987654321" : "Opsional (No. Ref / Trace)"}
+                                    autoFocus={editPaymentMethod === 'EDC'}
                                     className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono text-sm placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
                                 />
                                 <p className="text-[11px] text-slate-500 italic">
-                                    Nomor ini akan langsung tampil di laporan kasir dan file export Excel.
+                                    {editPaymentMethod === 'EDC'
+                                        ? "Nomor approval EDC akan langsung tampil di laporan kasir dan file export Excel."
+                                        : "Nomor referensi atau catatan pembayaran (opsional)."}
                                 </p>
                             </div>
 

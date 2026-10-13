@@ -16965,12 +16965,30 @@ app.patch('/api/sales/:id/payment-reference', tenantMiddleware, async (req: Requ
       finalNotes = finalNotes.replace(/\[Ref:\s*[^\]]+\]/i, '').trim();
     }
 
+    let finalPaymentMethod = sale.paymentMethod;
+    if (paymentMethod) {
+      const pmStr = String(paymentMethod).trim().toUpperCase();
+      let normalized = 'TUNAI';
+      if (pmStr.includes('QRIS')) normalized = 'QRIS';
+      else if (pmStr.includes('EDC') || pmStr.includes('DEBIT') || pmStr.includes('KREDIT') || pmStr.includes('CREDIT')) normalized = 'EDC';
+      else if (pmStr.includes('TRANSFER')) normalized = 'TRANSFER';
+      else normalized = 'TUNAI';
+
+      finalPaymentMethod = normalized;
+
+      if (finalNotes.match(/\[Metode:\s*[^\]]+\]/i)) {
+        finalNotes = finalNotes.replace(/\[Metode:\s*[^\]]+\]/i, `[Metode: ${normalized}]`);
+      } else {
+        finalNotes = finalNotes ? `${finalNotes} [Metode: ${normalized}]` : `[Metode: ${normalized}]`;
+      }
+    }
+
     const updated = await prisma.sale.update({
       where: { id: saleId },
       data: {
         paymentReference: trimmedRef,
         notes: finalNotes,
-        ...(paymentMethod ? { paymentMethod: String(paymentMethod).trim() } : {})
+        ...(finalPaymentMethod ? { paymentMethod: finalPaymentMethod } : {})
       }
     });
 
@@ -17185,18 +17203,35 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
     queryParams.push(new Date(`${nextDayStr}T00:00:00+07:00`));
   }
 
-  // Payment Method Filter
+  // Payment Method Filter (Strictly: TUNAI, QRIS, EDC, TRANSFER)
   if (paymentMethod && paymentMethod !== 'all') {
-    if (paymentMethod === 'TUNAI') {
-      whereConditions.push(`(s."notes" ILIKE '%TUNAI%' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%' OR fa."type" = 'CASH')`);
-    } else if (paymentMethod === 'TRANSFER') {
-      whereConditions.push(`(s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')`);
-    } else if (paymentMethod === 'QRIS') {
-      whereConditions.push(`(s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
-    } else if (paymentMethod === 'DEBIT') {
-      whereConditions.push(`(s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR fa."name" ILIKE '%MANDIRI%' OR fa."name" ILIKE '%BCA%')`);
+    const pmUpper = String(paymentMethod).toUpperCase();
+    if (pmUpper === 'TUNAI' || pmUpper === 'CASH') {
+      whereConditions.push(`(
+        (s."paymentMethod" = 'TUNAI' OR s."paymentMethod" = 'Bayar di Kasir' OR s."notes" ILIKE '%TUNAI%' OR s."notes" ILIKE '%CASH%' OR fa."type" = 'CASH' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%')
+        AND NOT (
+          s."paymentMethod" = 'QRIS' OR s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%' OR
+          s."paymentMethod" = 'EDC' OR s."paymentMethod" ILIKE '%DEBIT%' OR s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR s."notes" ILIKE '%CREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR (s."paymentReference" IS NOT NULL AND s."paymentReference" != '') OR
+          s."paymentMethod" = 'TRANSFER' OR s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%'
+        )
+      )`);
+    } else if (pmUpper === 'QRIS') {
+      whereConditions.push(`(s."paymentMethod" = 'QRIS' OR s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
+    } else if (pmUpper === 'EDC' || pmUpper === 'DEBIT' || pmUpper === 'CREDIT' || pmUpper === 'KREDIT') {
+      whereConditions.push(`(
+        s."paymentMethod" = 'EDC' OR s."paymentMethod" ILIKE '%DEBIT%' OR s."paymentMethod" ILIKE '%EDC%' OR s."paymentMethod" ILIKE '%KREDIT%' OR s."paymentMethod" ILIKE '%CREDIT%' OR
+        s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR s."notes" ILIKE '%CREDIT%' OR
+        fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR fa."name" ILIKE '%MANDIRI%' OR fa."name" ILIKE '%BCA%' OR
+        (s."paymentReference" IS NOT NULL AND s."paymentReference" != '')
+      )`);
+    } else if (pmUpper === 'TRANSFER') {
+      whereConditions.push(`(
+        (s."paymentMethod" = 'TRANSFER' OR s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')
+        AND NOT (s."paymentMethod" = 'QRIS' OR s."notes" ILIKE '%QRIS%' OR s."paymentMethod" = 'EDC' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%DEBIT%')
+      )`);
     } else {
-      whereConditions.push(`(s."notes" ILIKE $${paramIndex++} OR fa."name" ILIKE $${paramIndex++})`);
+      whereConditions.push(`(s."paymentMethod" ILIKE $${paramIndex++} OR s."notes" ILIKE $${paramIndex++} OR fa."name" ILIKE $${paramIndex++})`);
+      queryParams.push(`%${paymentMethod}%`);
       queryParams.push(`%${paymentMethod}%`);
       queryParams.push(`%${paymentMethod}%`);
     }
@@ -17324,18 +17359,15 @@ app.get('/api/pos/analytics/summary', tenantMiddleware, async (req: Request, res
       ORDER BY "date" ASC
     `, ...filterRes.queryParams);
 
-    // 3. Payment Method Distribution
+    // 3. Payment Method Distribution (Strictly: TUNAI, QRIS, EDC, TRANSFER)
     const paymentMethods = await prisma.$queryRawUnsafe(`
       SELECT method, SUM(totalAmount) as total
       FROM (
         SELECT 
           CASE 
-            WHEN s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%' THEN 'QRIS'
-            WHEN s."notes" ILIKE '%GOFOOD%' OR fa."name" ILIKE '%GOFOOD%' THEN 'GOFOOD'
-            WHEN s."notes" ILIKE '%GRABFOOD%' OR fa."name" ILIKE '%GRABFOOD%' THEN 'GRABFOOD'
-            WHEN s."notes" ILIKE '%SHOPEEFOOD%' OR fa."name" ILIKE '%SHOPEEFOOD%' THEN 'SHOPEEFOOD'
-            WHEN s."notes" ILIKE '%QPOON%' OR fa."name" ILIKE '%QPOON%' THEN 'QPOON'
-            WHEN s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' THEN 'TRANSFER'
+            WHEN s."paymentMethod" = 'QRIS' OR s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%' THEN 'QRIS'
+            WHEN s."paymentMethod" = 'EDC' OR s."paymentMethod" ILIKE '%DEBIT%' OR s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR s."notes" ILIKE '%CREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR (s."paymentReference" IS NOT NULL AND s."paymentReference" != '') THEN 'EDC'
+            WHEN s."paymentMethod" = 'TRANSFER' OR s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' THEN 'TRANSFER'
             ELSE 'TUNAI'
           END as method,
           s."totalAmount" - COALESCE(sr."totalRefund", 0) as totalAmount
@@ -17639,18 +17671,34 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
       whereConditions.push(`s."date" < '${nextDayStr} 00:00:00+07:00'`);
     }
 
-    // Payment Filter (Smart Categorization)
+    // Payment Filter (Strictly: TUNAI, QRIS, EDC, TRANSFER)
     if (paymentMethod && paymentMethod !== 'all') {
-      if (paymentMethod === 'TUNAI') {
-        whereConditions.push(`(s."notes" ILIKE '%TUNAI%' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%' OR fa."type" = 'CASH')`);
-      } else if (paymentMethod === 'TRANSFER') {
-        whereConditions.push(`(s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')`);
-      } else if (paymentMethod === 'QRIS') {
-        whereConditions.push(`(s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
-      } else if (paymentMethod === 'DEBIT') {
-        whereConditions.push(`(s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR fa."name" ILIKE '%MANDIRI%' OR fa."name" ILIKE '%BCA%')`);
+      const pmUpper = String(paymentMethod).toUpperCase();
+      if (pmUpper === 'TUNAI' || pmUpper === 'CASH') {
+        whereConditions.push(`(
+          (s."paymentMethod" = 'TUNAI' OR s."paymentMethod" = 'Bayar di Kasir' OR s."notes" ILIKE '%TUNAI%' OR s."notes" ILIKE '%CASH%' OR fa."type" = 'CASH' OR fa."name" ILIKE '%TUNAI%' OR fa."name" ILIKE '%KAS%')
+          AND NOT (
+            s."paymentMethod" = 'QRIS' OR s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%' OR
+            s."paymentMethod" = 'EDC' OR s."paymentMethod" ILIKE '%DEBIT%' OR s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR s."notes" ILIKE '%CREDIT%' OR fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR (s."paymentReference" IS NOT NULL AND s."paymentReference" != '') OR
+            s."paymentMethod" = 'TRANSFER' OR s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%'
+          )
+        )`);
+      } else if (pmUpper === 'QRIS') {
+        whereConditions.push(`(s."paymentMethod" = 'QRIS' OR s."notes" ILIKE '%QRIS%' OR fa."name" ILIKE '%QRIS%')`);
+      } else if (pmUpper === 'EDC' || pmUpper === 'DEBIT' || pmUpper === 'CREDIT' || pmUpper === 'KREDIT') {
+        whereConditions.push(`(
+          s."paymentMethod" = 'EDC' OR s."paymentMethod" ILIKE '%DEBIT%' OR s."paymentMethod" ILIKE '%EDC%' OR s."paymentMethod" ILIKE '%KREDIT%' OR s."paymentMethod" ILIKE '%CREDIT%' OR
+          s."notes" ILIKE '%DEBIT%' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%KREDIT%' OR s."notes" ILIKE '%CREDIT%' OR
+          fa."name" ILIKE '%DEBIT%' OR fa."name" ILIKE '%EDC%' OR fa."name" ILIKE '%MANDIRI%' OR fa."name" ILIKE '%BCA%' OR
+          (s."paymentReference" IS NOT NULL AND s."paymentReference" != '')
+        )`);
+      } else if (pmUpper === 'TRANSFER') {
+        whereConditions.push(`(
+          (s."paymentMethod" = 'TRANSFER' OR s."notes" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%TRANSFER%' OR fa."name" ILIKE '%BANK%' OR fa."name" ILIKE '%REK%')
+          AND NOT (s."paymentMethod" = 'QRIS' OR s."notes" ILIKE '%QRIS%' OR s."paymentMethod" = 'EDC' OR s."notes" ILIKE '%EDC%' OR s."notes" ILIKE '%DEBIT%')
+        )`);
       } else {
-        whereConditions.push(`(s."notes" ILIKE '%${paymentMethod}%' OR fa."name" ILIKE '%${paymentMethod}%')`);
+        whereConditions.push(`(s."paymentMethod" ILIKE '%${paymentMethod}%' OR s."notes" ILIKE '%${paymentMethod}%' OR fa."name" ILIKE '%${paymentMethod}%')`);
       }
     }
 
@@ -17766,10 +17814,25 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
 
     sales.forEach(sale => {
       const refVal = sale.paymentReference || (sale.notes && sale.notes.match(/\[Ref:\s*([^\]]+)\]/i)?.[1]) || '-';
-      const matchMetode = sale.notes && sale.notes.match(/\[Metode:\s*([^\]]+)\]/i)?.[1];
-      const detectedMethod = (sale.paymentMethod && sale.paymentMethod !== 'Bayar di Kasir')
-        ? sale.paymentMethod
-        : (matchMetode || sale.accountName || 'TUNAI');
+      const notes = (sale.notes || '').toUpperCase();
+      const pm = (sale.paymentMethod || '').toUpperCase();
+      const acc = (sale.accountName || '').toUpperCase();
+
+      let detectedMethod = 'TUNAI';
+      if (pm === 'QRIS' || pm.includes('QRIS') || notes.includes('QRIS') || acc.includes('QRIS')) {
+        detectedMethod = 'QRIS';
+      } else if (
+        pm === 'EDC' || refVal !== '-' ||
+        pm.includes('EDC') || pm.includes('DEBIT') || pm.includes('KREDIT') || pm.includes('CREDIT') ||
+        notes.includes('EDC') || notes.includes('DEBIT') || notes.includes('KREDIT') || notes.includes('CREDIT') ||
+        acc.includes('EDC') || acc.includes('DEBIT')
+      ) {
+        detectedMethod = 'EDC';
+      } else if (pm === 'TRANSFER' || pm.includes('TRANSFER') || notes.includes('TRANSFER') || acc.includes('TRANSFER') || acc.includes('BANK')) {
+        detectedMethod = 'TRANSFER';
+      } else {
+        detectedMethod = 'TUNAI';
+      }
 
       const row = worksheet1.addRow({
         date: new Date(sale.date).toLocaleDateString('id-ID'),
@@ -18699,10 +18762,25 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       }
 
       const account = finalAccountId ? await tx.financialAccount.findUnique({ where: { id: finalAccountId } }) : null;
-      const paymentMethodTag = account ? `[Metode: ${account.name.toUpperCase()}]` : '';
+      let detectedNormalizedMethod = 'TUNAI';
+      const rawPm = (paymentMethod || '').toString().trim().toUpperCase();
+      const rawNotes = (notes || '').toString().toUpperCase();
+      const rawAcc = (account?.name || '').toString().toUpperCase();
+
+      if (rawPm.includes('QRIS') || rawNotes.includes('QRIS') || rawAcc.includes('QRIS')) {
+        detectedNormalizedMethod = 'QRIS';
+      } else if (paymentReference || rawPm.includes('EDC') || rawPm.includes('DEBIT') || rawPm.includes('KREDIT') || rawPm.includes('CREDIT') || rawNotes.includes('EDC') || rawNotes.includes('DEBIT') || rawNotes.includes('KREDIT') || rawNotes.includes('CREDIT') || rawAcc.includes('EDC') || rawAcc.includes('DEBIT')) {
+        detectedNormalizedMethod = 'EDC';
+      } else if (rawPm.includes('TRANSFER') || rawNotes.includes('TRANSFER') || rawAcc.includes('TRANSFER')) {
+        detectedNormalizedMethod = 'TRANSFER';
+      } else {
+        detectedNormalizedMethod = 'TUNAI';
+      }
+
+      const paymentMethodTag = `[Metode: ${detectedNormalizedMethod}]`;
       const refTag = paymentReference ? `[Ref: ${String(paymentReference).trim()}]` : '';
       let finalNotes = notes ? notes.trim() : '';
-      if (paymentMethodTag && !finalNotes.toUpperCase().includes('[METODE:')) {
+      if (!finalNotes.toUpperCase().includes('[METODE:')) {
         finalNotes = finalNotes ? `${finalNotes} ${paymentMethodTag}` : paymentMethodTag;
       }
       if (refTag && !finalNotes.toUpperCase().includes('[REF:')) {
@@ -18781,7 +18859,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           notes: finalNotes,
           status: 'PAID',
           saleType,
-          paymentMethod: paymentMethod || (account ? account.name : 'Bayar di Kasir'),
+          paymentMethod: detectedNormalizedMethod,
           paymentReference: paymentReference ? String(paymentReference).trim() : null,
           serviceFee: Number(serviceFee),
           markupPercentage: Number(markupPercentage),
