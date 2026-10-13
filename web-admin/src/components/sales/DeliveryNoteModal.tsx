@@ -78,14 +78,26 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                     <title>Surat Jalan - ${sale.orderNumber || sale.invoiceNumber}</title>
                     ${styles}
                     <style>
+                        @page {
+                            size: A4 portrait;
+                            margin: 8mm 10mm;
+                        }
+                        @media print {
+                            body {
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                            }
+                        }
                         body {
                             background: white !important;
                             color: black !important;
-                            padding: 2cm !important;
+                            padding: 0 !important;
                             margin: 0 !important;
                             height: auto !important;
                             overflow: visible !important;
                             visibility: visible !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
                         }
                         body * {
                             visibility: visible !important;
@@ -101,6 +113,19 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                             position: static !important;
                             margin: 0 !important;
                             padding: 0 !important;
+                        }
+                        table {
+                            page-break-inside: auto;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        thead {
+                            display: table-header-group;
+                        }
+                        tfoot {
+                            display: table-footer-group;
                         }
                         .print-hidden, .print\\:hidden, #do-controls, #invoice-controls, .print\\:hidden *, #do-controls *, .screen-only, .screen-only * {
                             display: none !important;
@@ -135,7 +160,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 print:static print:p-0 print:block print:w-full print:h-auto print:overflow-visible">
             {/* Backdrop - never printed */}
-            <div className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl print:hidden" onClick={onClose} />
+            <div className="fixed inset-0 bg-[#050505]/95 backdrop-blur-xl print:hidden" onClick={onClose} />
 
             {/* Control Buttons - OUTSIDE printable area */}
             <div id="do-controls" className="absolute top-8 right-8 flex items-center gap-3 z-[200] print:hidden">
@@ -156,63 +181,63 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
 
             {/* Printable DO Card */}
             <div id="printable-do" className="printable-content bg-white w-full max-w-4xl rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh] print:max-h-none print:shadow-none print:rounded-none print:border-none print:block print:overflow-visible">
-                <div className="overflow-y-auto p-12 print:overflow-visible print:p-0 no-scrollbar print:block">
+                <div className="overflow-y-auto p-6 md:p-8 print:p-0 print:overflow-visible no-scrollbar print:block">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 animate-pulse">
                             <div className="h-16 w-16 border-4 border-slate-200 border-t-emerald-600 rounded-full animate-spin mb-6"></div>
                             <p className="text-slate-500 font-black italic uppercase tracking-widest text-[10px]">Memuat Surat Jalan...</p>
                         </div>
                     ) : sale ? (
-                        <div className="flex flex-col gap-6 text-slate-950">
+                        <div className="flex flex-col gap-3 print:gap-2 text-slate-950">
                             
                             {/* Branding & Title */}
-                            <div className="flex justify-between items-start gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-14 w-14 border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden bg-white print:border-black/20">
+                            <div className="flex justify-between items-start gap-4 print:gap-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 md:h-12 md:w-12 print:h-10 print:w-10 border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden bg-white print:border-black/20 shrink-0">
                                         {sale.company?.logoUrl ? (
                                             <img src={sale.company.logoUrl} alt="Logo" className="h-full w-full object-contain" />
                                         ) : (
-                                            <Package className="h-6 w-6 text-slate-900 print:text-black" />
+                                            <Package className="h-5 w-5 text-slate-900 print:text-black" />
                                         )}
                                     </div>
                                     <div>
-                                        <h1 className="text-xl font-black text-slate-950 uppercase print:text-black">{sale.company?.name || 'Aivola Merchant'}</h1>
-                                        <div className="flex items-center gap-2 text-slate-500 text-[9px] font-bold uppercase mt-1 print:text-black/70">
-                                            <MapPin className="h-3 w-3" /> {sale.company?.address || 'Alamat tidak tersedia'}
+                                        <h1 className="text-lg md:text-xl print:text-lg font-black text-slate-950 uppercase print:text-black leading-none">{sale.company?.name || 'Aivola Merchant'}</h1>
+                                        <div className="flex items-center gap-1.5 text-slate-500 text-[9px] print:text-[8px] font-bold uppercase mt-1 print:text-black/70">
+                                            <MapPin className="h-3 w-3 shrink-0" /> {sale.company?.address || 'Alamat tidak tersedia'}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase print:text-black">Surat Jalan</h2>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1 print:text-black/50">Delivery Order</p>
+                                    <h2 className="text-2xl print:text-xl font-black text-slate-950 tracking-tighter uppercase print:text-black leading-none">Surat Jalan</h2>
+                                    <p className="text-[9px] print:text-[8px] font-black uppercase tracking-[0.2em] text-slate-400 mt-0.5 print:text-black/50">Delivery Order</p>
                                 </div>
                             </div>
 
                             {/* Header Section */}
-                            <div className="border-t border-b border-slate-200 py-4 grid grid-cols-2 gap-8 print:border-black print:py-4 mt-2">
+                            <div className="border-t border-b border-slate-200 py-2.5 print:py-1.5 grid grid-cols-2 gap-4 md:gap-6 print:gap-3 print:border-black mt-1 print:mt-0">
                                 {/* Penerima Info */}
-                                <div className="space-y-3">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 bg-slate-50 p-2 rounded-lg print:bg-transparent print:p-0 print:text-black/50">Dikirim Kepada (Penerima):</h3>
-                                    <div className="pl-2">
-                                        <div className="font-extrabold text-lg text-slate-950 uppercase print:text-black">{sale.customer?.name || sale.customerName || 'UMUM / GUEST'}</div>
-                                        <div className="text-[11px] text-slate-600 mt-1 leading-relaxed print:text-black">
+                                <div className="space-y-1 print:space-y-0.5">
+                                    <h3 className="text-[9px] print:text-[8px] font-black uppercase tracking-[0.25em] text-slate-400 bg-slate-50 p-1.5 rounded-lg print:bg-transparent print:p-0 print:text-black/50">Dikirim Kepada (Penerima):</h3>
+                                    <div className="pl-1">
+                                        <div className="font-extrabold text-base print:text-sm text-slate-950 uppercase print:text-black leading-tight">{sale.customer?.name || sale.customerName || 'UMUM / GUEST'}</div>
+                                        <div className="text-[10px] print:text-[9px] text-slate-600 mt-0.5 leading-snug print:text-black">
                                             {sale.customer?.address || 'Alamat Outlet / Pelanggan tidak terdaftar'}
                                         </div>
-                                        <div className="text-[11px] font-bold text-slate-700 mt-2 flex items-center gap-1.5 print:text-black">
-                                            <Phone className="h-3 w-3" /> {sale.customer?.phone || sale.customerPhone || '-'}
+                                        <div className="text-[10px] print:text-[9px] font-bold text-slate-700 mt-1 flex items-center gap-1.5 print:text-black">
+                                            <Phone className="h-3 w-3 shrink-0" /> {sale.customer?.phone || sale.customerPhone || '-'}
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* DO Meta Info */}
-                                <div className="space-y-3 border-l border-slate-100 pl-8 print:border-black/20">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 bg-slate-50 p-2 rounded-lg print:bg-transparent print:p-0 print:text-black/50">Informasi Pengiriman:</h3>
-                                    <div className="pl-2 space-y-2">
-                                        <div className="grid grid-cols-3 gap-2 text-[11px]">
+                                <div className="space-y-1 print:space-y-0.5 border-l border-slate-100 pl-4 md:pl-6 print:pl-3 print:border-black/20">
+                                    <h3 className="text-[9px] print:text-[8px] font-black uppercase tracking-[0.25em] text-slate-400 bg-slate-50 p-1.5 rounded-lg print:bg-transparent print:p-0 print:text-black/50">Informasi Pengiriman:</h3>
+                                    <div className="pl-1 space-y-1 print:space-y-0.5">
+                                        <div className="grid grid-cols-3 gap-1.5 text-[10px] print:text-[9px] leading-tight">
                                             <span className="font-black text-slate-500 uppercase print:text-black/60">No. Surat:</span>
                                             <span className="font-black text-slate-950 col-span-2 print:text-black">DO-{sale.orderNumber || sale.invoiceNumber}</span>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-2 text-[11px] items-center">
+                                        <div className="grid grid-cols-3 gap-1.5 text-[10px] print:text-[9px] items-center leading-tight">
                                             <span className="font-black text-slate-500 uppercase print:text-black/60">Tgl Kirim:</span>
                                             <div className="col-span-2 flex items-center">
                                                 {/* Edit on screen */}
@@ -220,7 +245,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                                                     type="date"
                                                     value={customShippedDate}
                                                     onChange={(e) => handleShippedDateChange(e.target.value)}
-                                                    className="font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded px-2 py-0.5 focus:outline-none focus:border-blue-500 screen-only text-[11px]"
+                                                    className="font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-500 screen-only text-[10px]"
                                                 />
                                                 {/* Display when printing */}
                                                 <span className="print-only font-bold text-slate-950 print:text-black">
@@ -232,7 +257,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-2 text-[11px]">
+                                        <div className="grid grid-cols-3 gap-1.5 text-[10px] print:text-[9px] leading-tight">
                                             <span className="font-black text-slate-500 uppercase print:text-black/60">No. Polisi:</span>
                                             <span className="border-b border-dashed border-slate-300 col-span-2 print:border-black/30 text-slate-400">.......................</span>
                                         </div>
@@ -241,33 +266,33 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                             </div>
 
                             {/* Manifest Table - NO PRICES */}
-                            <div className="border border-slate-200 rounded-2xl overflow-hidden print:border-black print:rounded-none mt-2">
+                            <div className="border border-slate-200 rounded-xl overflow-hidden print:border-black print:rounded-none mt-1 print:mt-0.5">
                                 <table className="w-full text-left">
-                                    <thead className="bg-slate-100 text-[10px] font-black uppercase text-slate-950 tracking-wider border-b border-slate-200 print:bg-white print:text-black print:border-black">
+                                    <thead className="bg-slate-100 text-[8.5px] print:text-[8px] font-black uppercase text-slate-950 tracking-wider border-b border-slate-200 print:bg-white print:text-black print:border-black">
                                         <tr>
-                                            <th className="px-6 py-4 w-12 text-center">No</th>
-                                            <th className="px-6 py-4">Nama Produk / Barang</th>
-                                            <th className="px-6 py-4 text-center">Jumlah</th>
-                                            <th className="px-6 py-4 text-center">Satuan</th>
-                                            <th className="px-6 py-4 text-center w-32">Production Date</th>
+                                            <th className="px-3 py-1.5 print:px-2 print:py-1 w-10 text-center">No</th>
+                                            <th className="px-3 py-1.5 print:px-2 print:py-1">Nama Produk / Barang</th>
+                                            <th className="px-3 py-1.5 print:px-2 print:py-1 text-center">Jumlah</th>
+                                            <th className="px-3 py-1.5 print:px-2 print:py-1 text-center">Satuan</th>
+                                            <th className="px-3 py-1.5 print:px-2 print:py-1 text-center w-28">Production Date</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 print:divide-black/20 text-slate-950">
                                         {sale.items.map((item: any, idx: number) => (
                                             <tr key={idx} className="print:text-black">
-                                                <td className="px-6 py-4 text-center font-bold text-[11px]">{idx + 1}</td>
-                                                <td className="px-6 py-4">
-                                                    <p className="font-black text-slate-950 text-[12px] uppercase print:text-black">{item.product_name}</p>
-                                                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 print:text-black/60">SKU: {item.product_sku || '-'}</p>
+                                                <td className="px-3 py-1.5 print:px-2 print:py-0.5 text-center font-bold text-[10px] print:text-[9px]">{idx + 1}</td>
+                                                <td className="px-3 py-1.5 print:px-2 print:py-0.5">
+                                                    <p className="font-black text-slate-950 text-[10.5px] print:text-[9.5px] uppercase print:text-black leading-tight">{item.product_name}</p>
+                                                    <p className="text-[8px] print:text-[7.5px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 print:text-black/60 leading-tight">SKU: {item.product_sku || '-'}</p>
                                                 </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className="font-black text-slate-950 text-[14px] print:text-black">{item.quantity}</span>
+                                                <td className="px-3 py-1.5 print:px-2 print:py-0.5 text-center">
+                                                    <span className="font-black text-slate-950 text-[11px] print:text-[10px] print:text-black leading-tight">{item.quantity}</span>
                                                 </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest print:text-black">{item.product_unit}</span>
+                                                <td className="px-3 py-1.5 print:px-2 print:py-0.5 text-center">
+                                                    <span className="text-[9px] print:text-[8px] text-slate-500 font-black uppercase tracking-widest print:text-black leading-tight">{item.product_unit}</span>
                                                 </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="border-b border-dashed border-slate-300 w-full h-4 mt-1 print:border-black/40"></div>
+                                                <td className="px-3 py-1.5 print:px-2 print:py-0.5 text-center">
+                                                    <div className="border-b border-dashed border-slate-300 w-full h-3 mt-0.5 print:border-black/40"></div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -276,26 +301,26 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                             </div>
 
                             {/* Terms and Conditions (Note) */}
-                            <div className="mt-4">
+                            <div className="mt-2 print:mt-1">
                                 {sale.company?.deliveryNoteTerms ? (
-                                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl print:bg-white print:border-black/20 print:rounded-none">
-                                        <h4 className="text-[10px] font-black text-slate-950 uppercase tracking-widest mb-2 print:text-black">Catatan & Ketentuan:</h4>
-                                        <p className="text-[10px] font-medium text-slate-700 leading-relaxed whitespace-pre-wrap print:text-black">
+                                    <div className="p-2.5 px-3 print:p-1.5 print:px-2 bg-slate-50 border border-slate-200 rounded-xl print:bg-white print:border-black/20 print:rounded-none">
+                                        <h4 className="text-[9px] print:text-[8px] font-black text-slate-950 uppercase tracking-widest mb-1 print:text-black">Catatan & Ketentuan:</h4>
+                                        <p className="text-[9px] print:text-[8px] font-medium text-slate-700 leading-snug whitespace-pre-wrap print:text-black">
                                             {sale.company.deliveryNoteTerms}
                                         </p>
                                     </div>
                                 ) : (
-                                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl print:bg-white print:border-black/20 print:rounded-none">
-                                        <h4 className="text-[10px] font-black text-slate-950 uppercase tracking-widest mb-1 print:text-black">Catatan:</h4>
-                                        <p className="text-[10px] font-medium text-slate-500 italic print:text-black">Barang sudah diperiksa dan diterima dalam kondisi baik.</p>
+                                    <div className="p-2.5 px-3 print:p-1.5 print:px-2 bg-slate-50 border border-slate-200 rounded-xl print:bg-white print:border-black/20 print:rounded-none">
+                                        <h4 className="text-[9px] print:text-[8px] font-black text-slate-950 uppercase tracking-widest mb-0.5 print:text-black">Catatan:</h4>
+                                        <p className="text-[9px] print:text-[8px] font-medium text-slate-500 italic print:text-black">Barang sudah diperiksa dan diterima dalam kondisi baik.</p>
                                     </div>
                                 )}
                             </div>
 
                             {/* Vehicle Checklist */}
-                            <div className="mt-4 p-4 border border-slate-200 rounded-xl print:border-black/20 print:rounded-none">
-                                <h4 className="text-[10px] font-black text-slate-950 uppercase tracking-widest mb-3 print:text-black">Checklist Kendaraan (Wajib Diisi oleh Staff Gudang):</h4>
-                                <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                            <div className="mt-2 p-2.5 px-3 print:mt-1 print:p-1.5 print:px-2 border border-slate-200 rounded-xl print:border-black/20 print:rounded-none">
+                                <h4 className="text-[9px] print:text-[8px] font-black text-slate-950 uppercase tracking-widest mb-1.5 print:text-black">Checklist Kendaraan (Wajib Diisi oleh Staff Gudang):</h4>
+                                <div className="grid grid-cols-2 gap-y-1.5 gap-x-3 print:gap-y-1">
                                     {[
                                         "Kabin & Box dalam keadaan bersih / tidak berbau",
                                         "Box kendaraan dalam kondisi terkunci aman",
@@ -304,33 +329,33 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                                         "Tidak membawa produk/barang pihak lain",
                                         "Palet / alas barang dalam kondisi baik"
                                     ].map((item, i) => (
-                                        <div key={i} className="flex items-start gap-3">
-                                            <div className="w-4 h-4 border border-slate-400 mt-0.5 rounded-[2px] print:border-black shrink-0"></div>
-                                            <span className="text-[10px] font-bold text-slate-700 print:text-black leading-tight">{item}</span>
+                                        <div key={i} className="flex items-start gap-2">
+                                            <div className="w-3.5 h-3.5 border border-slate-400 mt-0.5 rounded-[2px] print:border-black shrink-0"></div>
+                                            <span className="text-[8.5px] print:text-[7.5px] font-bold text-slate-700 print:text-black leading-tight">{item}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
                             {/* Signatures */}
-                            <div className="grid grid-cols-3 gap-4 pt-8 mt-4 print:pt-4">
+                            <div className="grid grid-cols-3 gap-4 pt-3 mt-2 print:pt-1.5 print:mt-1">
                                 <div className="text-center">
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest print:text-black">Disiapkan Oleh (Logistik)</p>
-                                    <div className="h-20"></div>
+                                    <p className="text-[9px] print:text-[8px] font-black text-slate-500 uppercase tracking-widest print:text-black">Disiapkan Oleh (Logistik)</p>
+                                    <div className="h-10 print:h-7"></div>
                                     <div className="w-3/4 h-[1px] bg-slate-300 mx-auto print:bg-black"></div>
-                                    <p className="text-[9px] mt-1 text-slate-400 print:text-black">Nama Terang & Tanda Tangan</p>
+                                    <p className="text-[8px] print:text-[7px] mt-0.5 text-slate-400 print:text-black">Nama Terang & Tanda Tangan</p>
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest print:text-black">Dibawa Oleh (Driver)</p>
-                                    <div className="h-20"></div>
+                                    <p className="text-[9px] print:text-[8px] font-black text-slate-500 uppercase tracking-widest print:text-black">Dibawa Oleh (Driver)</p>
+                                    <div className="h-10 print:h-7"></div>
                                     <div className="w-3/4 h-[1px] bg-slate-300 mx-auto print:bg-black"></div>
-                                    <p className="text-[9px] mt-1 text-slate-400 print:text-black">Nama Terang & Tanda Tangan</p>
+                                    <p className="text-[8px] print:text-[7px] mt-0.5 text-slate-400 print:text-black">Nama Terang & Tanda Tangan</p>
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest print:text-black">Diterima Oleh (Outlet)</p>
-                                    <div className="h-20"></div>
+                                    <p className="text-[9px] print:text-[8px] font-black text-slate-500 uppercase tracking-widest print:text-black">Diterima Oleh (Outlet)</p>
+                                    <div className="h-10 print:h-7"></div>
                                     <div className="w-3/4 h-[1px] bg-slate-300 mx-auto print:bg-black"></div>
-                                    <p className="text-[9px] mt-1 text-slate-400 print:text-black">Stempel, Nama Terang & Tanda Tangan</p>
+                                    <p className="text-[8px] print:text-[7px] mt-0.5 text-slate-400 print:text-black">Stempel, Nama Terang & Tanda Tangan</p>
                                 </div>
                             </div>
                             
