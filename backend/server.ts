@@ -1215,7 +1215,7 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
     
     if (userRole === 'CUSTOMER' && userId) {
       finalCustomerId = userId;
-    } else if (userId) {
+    } else if (!finalCustomerId && userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
         let linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
@@ -3461,9 +3461,8 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
     const { supplierId, date, items, notes, warehouseId, customerId, taxAmount } = req.body;
     let finalCustomerId = customerId ? parseInt(customerId) : null;
 
-    // --- SECURITY & SYNC FIX ---
-    // If we have a userId (from token), always override customerId with the one linked to user email
-    if (userId) {
+    // Fallback: If no customerId provided, link to user if exists
+    if (!finalCustomerId && userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
         const linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
@@ -16353,7 +16352,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     
     if (userRole === 'CUSTOMER' && userId) {
       finalCustomerId = userId;
-    } else if (userId) {
+    } else if (!finalCustomerId && userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user) {
         let linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
