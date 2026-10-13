@@ -17076,7 +17076,10 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
       }
 
       // 3.5. Kembalikan Stok Barang & Bahan Baku (BOM)
-      const saleItems = await tx.saleItem.findMany({ where: { saleId } });
+      const saleItems = await tx.saleItem.findMany({ 
+        where: { saleId },
+        include: { product: { select: { name: true, sku: true } } }
+      });
       for (const item of saleItems) {
         const qty = parseFloat(item.quantity as any);
         
@@ -17131,7 +17134,19 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
           action: 'DELETE_SALE',
           entity: 'Sale',
           entityId: sale.invoiceNumber,
-          details: JSON.stringify({ totalAmount: sale.totalAmount, date: sale.date }),
+          details: JSON.stringify({ 
+            totalAmount: sale.totalAmount, 
+            date: sale.date,
+            customerName: sale.customerName,
+            items: saleItems.map(it => ({
+              productId: it.productId,
+              name: it.product?.name || `Produk #${it.productId}`,
+              sku: it.product?.sku || '',
+              quantity: Number(it.quantity) || 1,
+              price: Number(it.price) || 0,
+              subtotal: (Number(it.quantity) || 1) * (Number(it.price) || 0)
+            }))
+          }),
         }
       });
     });
@@ -18144,14 +18159,39 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
 
       await tx.$executeRawUnsafe(`UPDATE "Sale" SET "status" = $1, "updatedAt" = NOW() WHERE id = $2`, newStatus, saleId);
 
+      const productIds = returnItemsData.map(ri => ri.productId);
+      const productList = await tx.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, name: true, sku: true }
+      });
+      const productMap = new Map(productList.map(p => [p.id, p]));
+
+      const refundUser = await tx.user.findUnique({ where: { id: userId }, select: { name: true } });
+
       await tx.auditLog.create({
         data: {
           companyId: tenantId,
           userId: userId,
+          userName: refundUser?.name || null,
           action: 'REFUND_SALE',
           entity: 'Sale',
           entityId: originalSale.invoiceNumber,
-          details: `Memproses Refund/Retur dengan nomor ${returnNumber} senilai ${totalRefundAmount}`,
+          details: JSON.stringify({
+            returnNumber,
+            totalRefundAmount,
+            reason: notes || '',
+            items: returnItemsData.map(ri => {
+              const p = productMap.get(ri.productId);
+              return {
+                productId: ri.productId,
+                name: p?.name || `Produk #${ri.productId}`,
+                sku: p?.sku || '',
+                quantity: ri.quantity,
+                price: ri.price,
+                total: ri.total
+              };
+            })
+          }),
         }
       });
 
@@ -19408,14 +19448,41 @@ app.delete('/api/pos/pending/:id', tenantMiddleware, async (req: Request, res: R
         });
 
         const userId = Number((req as any).userId) || pendingBill.cashierId;
+        const cashierUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+
+        let parsedItems: any[] = [];
+        try {
+          if (typeof pendingBill.items === 'string') {
+            parsedItems = JSON.parse(pendingBill.items);
+          } else if (Array.isArray(pendingBill.items)) {
+            parsedItems = pendingBill.items;
+          }
+        } catch (e) {}
+
+        const totalAmount = parsedItems.reduce((acc: number, it: any) => acc + ((Number(it.price) || 0) * (Number(it.quantity || it.qty) || 1)), 0);
+
         await prisma.auditLog.create({
           data: {
             companyId: tenantId,
             userId: userId,
+            userName: cashierUser?.name || null,
             action: 'DELETE_PENDING_BILL',
             entity: 'PendingBill',
             entityId: String(id),
-            details: `Menghapus pending bill (Hold Bill) ${pendingBill.label || id}`,
+            details: JSON.stringify({
+              label: pendingBill.label || `Bill #${id}`,
+              totalAmount,
+              queueNumber: pendingBill.queueNumber,
+              saleType: pendingBill.saleType,
+              items: parsedItems.map((it: any) => ({
+                id: it.id || it.productId,
+                name: it.name || it.productName || 'Produk',
+                quantity: Number(it.quantity || it.qty) || 1,
+                price: Number(it.price) || 0,
+                subtotal: (Number(it.price) || 0) * (Number(it.quantity || it.qty) || 1),
+                notes: it.notes || it.note || ''
+              }))
+            }),
           }
         });
     }
@@ -20635,14 +20702,192 @@ app.get('/api/audit-logs', tenantMiddleware, async (req: Request, res: Response)
       }
     });
     
-    const formattedLogs = logs.map(log => ({
-      ...log,
-      userName: log.userName || log.user?.name || 'Unknown'
-    }));
+    const formattedLogs = logs.map(log => {
+      let parsedDetails: any = null;
+      let totalAmount: number | null = null;
+      let label: string | null = null;
+      let itemCount: number | null = null;
+      let summaryText: string = '';
+
+      if (log.details) {
+        const trimmed = log.details.trim();
+        if (trimmed.startsWith('{')) {
+          try {
+            parsedDetails = JSON.parse(trimmed);
+            if (parsedDetails.totalAmount !== undefined) totalAmount = Number(parsedDetails.totalAmount);
+            if (parsedDetails.totalRefundAmount !== undefined) totalAmount = Number(parsedDetails.totalRefundAmount);
+            if (parsedDetails.label) label = parsedDetails.label;
+            if (Array.isArray(parsedDetails.items)) itemCount = parsedDetails.items.length;
+          } catch (e) {}
+        } else {
+          const senilaiMatch = log.details.match(/senilai\s+([0-9.]+)/i);
+          if (senilaiMatch) {
+            totalAmount = parseFloat(senilaiMatch[1]);
+          }
+          const holdBillMatch = log.details.match(/Hold Bill\)\s*(.+)/i);
+          if (holdBillMatch) {
+            label = holdBillMatch[1].trim();
+          }
+        }
+      }
+
+      if (totalAmount !== null && totalAmount > 0) {
+        summaryText = log.action.includes('REFUND') 
+          ? `Refund: Rp ${totalAmount.toLocaleString('id-ID')}` 
+          : `Total: Rp ${totalAmount.toLocaleString('id-ID')}`;
+      } else if (label) {
+        summaryText = `Hold: "${label}"`;
+      } else if (log.details) {
+        summaryText = log.details.length > 60 ? log.details.substring(0, 57) + '...' : log.details;
+      }
+
+      return {
+        ...log,
+        userName: log.userName || log.user?.name || 'Unknown',
+        parsedDetails,
+        totalAmount,
+        label,
+        itemCount,
+        summaryText,
+        hasDetail: Boolean(
+          log.action.includes('REFUND') ||
+          log.action.includes('DELETE') ||
+          (parsedDetails && Array.isArray(parsedDetails.items) && parsedDetails.items.length > 0) ||
+          log.entity === 'Sale' ||
+          log.entity === 'PendingBill'
+        )
+      };
+    });
 
     res.json(formattedLogs);
   } catch (error: any) {
     res.status(500).json({ error: 'Terjadi kesalahan saat mengambil log audit' });
+  }
+});
+
+app.get('/api/audit-logs/:id/detail', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userRole = (req as any).userRole;
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(userRole)) {
+      return res.status(403).json({ error: 'Akses Ditolak.' });
+    }
+    const id = Number(req.params.id);
+    const log = await prisma.auditLog.findFirst({
+      where: { id, companyId: tenantId },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } }
+      }
+    });
+
+    if (!log) {
+      return res.status(404).json({ error: 'Log audit tidak ditemukan' });
+    }
+
+    let parsedDetails: any = null;
+    let items: any[] = [];
+    let summaryInfo: any = {};
+
+    if (log.details && log.details.trim().startsWith('{')) {
+      try {
+        parsedDetails = JSON.parse(log.details);
+        if (Array.isArray(parsedDetails.items)) {
+          items = parsedDetails.items;
+        }
+      } catch (e) {}
+    }
+
+    // 1. REFUND_SALE handling (lookup SaleReturn if items not present)
+    if (log.action.includes('REFUND') || log.entity === 'Sale') {
+      const retNumberMatch = log.details?.match(/(RET\/[^\s,]+)/);
+      const returnNumber = parsedDetails?.returnNumber || (retNumberMatch ? retNumberMatch[1] : null);
+
+      let saleReturn: any = null;
+      if (returnNumber) {
+        saleReturn = await prisma.saleReturn.findFirst({
+          where: { companyId: tenantId, returnNumber },
+          include: { Sale: true }
+        });
+      }
+      if (!saleReturn && log.entityId) {
+        saleReturn = await prisma.saleReturn.findFirst({
+          where: { companyId: tenantId, Sale: { invoiceNumber: log.entityId } },
+          include: { Sale: true },
+          orderBy: { createdAt: 'desc' }
+        });
+      }
+
+      if (saleReturn) {
+        summaryInfo.returnNumber = saleReturn.returnNumber;
+        summaryInfo.totalRefundAmount = saleReturn.totalRefundAmount;
+        summaryInfo.date = saleReturn.date;
+        summaryInfo.notes = saleReturn.notes;
+        if (saleReturn.Sale) {
+          summaryInfo.invoiceNumber = saleReturn.Sale.invoiceNumber;
+          summaryInfo.customerName = saleReturn.Sale.customerName;
+          summaryInfo.originalSaleAmount = saleReturn.Sale.totalAmount;
+          summaryInfo.paymentMethod = saleReturn.Sale.paymentMethod;
+        }
+
+        if (items.length === 0) {
+          const returnItems: any[] = await prisma.$queryRawUnsafe(`
+            SELECT sri.id, sri."productId", sri.quantity, sri.price, sri.total,
+                   COALESCE(p.name, 'Produk #' || sri."productId") as name,
+                   p.sku, pc.name as "categoryName"
+            FROM "SaleReturnItem" sri
+            LEFT JOIN "Product" p ON p.id = sri."productId"
+            LEFT JOIN "ProductCategory" pc ON pc.id = p."categoryId"
+            WHERE sri."returnId" = $1
+          `, saleReturn.id);
+
+          items = returnItems.map(ri => ({
+            id: ri.id,
+            productId: ri.productId,
+            name: ri.name,
+            sku: ri.sku,
+            category: ri.categoryName,
+            quantity: Number(ri.quantity),
+            price: Number(ri.price),
+            subtotal: Number(ri.total)
+          }));
+        }
+      }
+    }
+
+    // 2. Pending Bill handling
+    if (log.action === 'DELETE_PENDING_BILL') {
+      if (parsedDetails) {
+        summaryInfo.label = parsedDetails.label;
+        summaryInfo.totalAmount = parsedDetails.totalAmount;
+        summaryInfo.queueNumber = parsedDetails.queueNumber;
+        summaryInfo.saleType = parsedDetails.saleType;
+      } else if (log.details) {
+        const holdBillMatch = log.details.match(/Hold Bill\)\s*(.+)/i);
+        summaryInfo.label = holdBillMatch ? holdBillMatch[1].trim() : log.details;
+      }
+    }
+
+    // 3. DELETE_SALE handling
+    if (log.action === 'DELETE_SALE') {
+      if (parsedDetails) {
+        summaryInfo.totalAmount = parsedDetails.totalAmount;
+        summaryInfo.date = parsedDetails.date;
+        summaryInfo.customerName = parsedDetails.customerName;
+      }
+    }
+
+    res.json({
+      log: {
+        ...log,
+        userName: log.userName || log.user?.name || 'Unknown'
+      },
+      summaryInfo,
+      parsedDetails,
+      items
+    });
+  } catch (error: any) {
+    console.error("Audit Log Detail Error:", error);
+    res.status(500).json({ error: 'Gagal mengambil detail log audit' });
   }
 });
 
