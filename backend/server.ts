@@ -17416,6 +17416,20 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
     queryParams.push(new Date(`${nextDayStr}T00:00:00+07:00`));
   }
 
+  // Month & Year Filter Fallback (if startDate and endDate are not provided)
+  if (!startDate && !endDate && (query.month || query.year)) {
+    const yr = Number(query.year) || new Date().getFullYear();
+    const mo = Number(query.month) || (new Date().getMonth() + 1);
+    const sDateStr = `${yr}-${String(mo).padStart(2, '0')}-01`;
+    const nextMo = mo === 12 ? 1 : mo + 1;
+    const nextYr = mo === 12 ? yr + 1 : yr;
+    const nextMoDateStr = `${nextYr}-${String(nextMo).padStart(2, '0')}-01`;
+    whereConditions.push(`s."date" >= $${paramIndex++}`);
+    queryParams.push(new Date(`${sDateStr}T00:00:00+07:00`));
+    whereConditions.push(`s."date" < $${paramIndex++}`);
+    queryParams.push(new Date(`${nextMoDateStr}T00:00:00+07:00`));
+  }
+
   // Payment Method Filter (Strictly: TUNAI, QRIS, EDC, TRANSFER)
   if (paymentMethod && paymentMethod !== 'all') {
     const pmUpper = String(paymentMethod).toUpperCase();
@@ -18356,6 +18370,32 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
       }
 
       await tx.$executeRawUnsafe(`UPDATE "Sale" SET "status" = $1, "updatedAt" = NOW() WHERE id = $2`, newStatus, saleId);
+
+      // 6.1 Update any Historical PosClosing covering this sale
+      try {
+        const saleTime = originalSale.date ? new Date(originalSale.date) : new Date(originalSale.createdAt);
+        const relatedClosings = await tx.posClosing.findMany({
+          where: {
+            companyId: tenantId,
+            startTime: { lte: saleTime },
+            endTime: { gte: saleTime }
+          }
+        });
+
+        for (const closing of relatedClosings) {
+          const isFullReturn = newStatus === 'RETURNED';
+          await tx.posClosing.update({
+            where: { id: closing.id },
+            data: {
+              totalGrossSales: Math.max(0, closing.totalGrossSales - totalRefundAmount),
+              totalNetSales: Math.max(0, closing.totalNetSales - totalRefundAmount),
+              ...(isFullReturn ? { totalTransactions: Math.max(0, closing.totalTransactions - 1) } : {})
+            }
+          });
+        }
+      } catch (closingErr) {
+        console.error('Failed to adjust PosClosing during return:', closingErr);
+      }
 
       const productIds = returnItemsData.map(ri => ri.productId);
       const productList = await tx.product.findMany({

@@ -513,7 +513,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
       return inv.contains(q) || cust.contains(q);
     }).toList();
 
-    final double totalSum = filteredOrders.fold(0.0, (sum, o) => sum + (double.tryParse(o['totalAmount'].toString()) ?? 0));
+    final double totalSum = filteredOrders.fold(0.0, (sum, o) => sum + (double.tryParse((o['netTotalAmount'] ?? o['totalAmount']).toString()) ?? 0));
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
