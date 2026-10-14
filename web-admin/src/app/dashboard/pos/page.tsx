@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 import { 
@@ -98,6 +98,8 @@ export default function POSPage() {
     const [showPendingBillsModal, setShowPendingBillsModal] = useState(false);
     const [holdLabel, setHoldLabel] = useState('');
     const [holdLoading, setHoldLoading] = useState(false);
+    const isFirstPendingFetch = useRef(true);
+    const prevPendingCountRef = useRef(0);
 
     // NEW EMPLOYEE DISCOUNT FIELDS
     const [employeeDiscount, setEmployeeDiscount] = useState<{value: number, label: string} | null>(null);
@@ -210,14 +212,56 @@ export default function POSPage() {
         }
     };
 
-    const fetchPendingBills = async () => {
+    const playChime = () => {
         try {
-            const res = await api.get('/pos/pending');
-            setPendingBills(res.data || []);
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.4);
+        } catch (e) {}
+    };
+
+    const fetchPendingBills = async (isSilent = false) => {
+        try {
+            const userBranchId = typeof window !== 'undefined' ? localStorage.getItem('userBranchId') : null;
+            const endpoint = '/pos/pending' + (userBranchId ? `?branchId=${userBranchId}` : '');
+            const res = await api.get(endpoint);
+            const data = res.data || [];
+
+            if (isSilent && !isFirstPendingFetch.current && data.length > prevPendingCountRef.current) {
+                const diff = data.length - prevPendingCountRef.current;
+                playChime();
+                toast.success(`Ada ${diff} pesanan baru dari Tablet Satelit / Meja!`, {
+                    icon: '🛎️',
+                    duration: 4000
+                });
+            }
+
+            isFirstPendingFetch.current = false;
+            prevPendingCountRef.current = data.length;
+            setPendingBills(data);
         } catch (e) {
-            console.error("Gagal mengambil pending bills:", e);
+            if (!isSilent) console.error("Gagal mengambil pending bills:", e);
         }
     };
+
+    // Auto-sync polling every 8 detik dari tablet satelit / perangkat kasir lainnya
+    useEffect(() => {
+        const timer = setInterval(() => {
+            fetchPendingBills(true);
+        }, 8000);
+        return () => clearInterval(timer);
+    }, []);
 
     const handleHoldBill = async () => {
         if (cart.length === 0) {
@@ -235,6 +279,7 @@ export default function POSPage() {
                 } catch (e) {}
             }
 
+            const userBranchId = typeof window !== 'undefined' ? localStorage.getItem('userBranchId') : null;
             const res = await api.post('/pos/hold', {
                 label: finalLabel,
                 items: cart.map(item => ({
@@ -248,7 +293,8 @@ export default function POSPage() {
                     modifiers: item.modifiers,
                     cartId: item.cartId
                 })),
-                saleType
+                saleType,
+                branchId: userBranchId ? Number(userBranchId) : undefined
             });
 
             toast.success(`Pesanan "${finalLabel}" berhasil ditahan! Antrean #${res.data?.queueNumber || '-'}`);

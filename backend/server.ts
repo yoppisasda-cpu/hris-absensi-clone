@@ -19471,9 +19471,10 @@ app.post('/api/pos/hold', tenantMiddleware, async (req: Request, res: Response) 
   try {
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
-    const { label, items, saleType } = req.body;
+    const { label, items, saleType, branchId } = req.body;
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
+    const resolvedBranchId = (branchId !== undefined && branchId !== null && branchId !== '') ? Number(branchId) : (user?.branchId || 0);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -19492,7 +19493,7 @@ app.post('/api/pos/hold', tenantMiddleware, async (req: Request, res: Response) 
     const pendingBill = await prisma.pendingBill.create({
       data: {
         companyId: tenantId,
-        branchId: user?.branchId || 0,
+        branchId: resolvedBranchId,
         cashierId: userId,
         label: label || 'Pesanan',
         items: items, // JSON
@@ -19528,7 +19529,7 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
     const pendingBills = await prisma.pendingBill.findMany({
       where: {
         companyId: tenantId,
-        ...(targetBranchId ? { branchId: targetBranchId } : {}),
+        ...(targetBranchId ? { branchId: { in: [targetBranchId, 0] } } : {}),
         ...(saleType ? { saleType: saleType as string } : {})
       },
       orderBy: { createdAt: 'desc' },
