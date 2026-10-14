@@ -20,7 +20,13 @@ import {
     X,
     ShieldCheck,
     Tv,
-    ExternalLink
+    ExternalLink,
+    Maximize,
+    Minimize,
+    ArrowRight,
+    ArrowLeft,
+    Banknote,
+    Check
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -75,6 +81,12 @@ export default function POSPage() {
     const [voucherCode, setVoucherCode] = useState("");
     const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0);
 
+    // MODAL & TAB STATES FOR TOUCH/POS SCREEN
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+    const [activeTab, setActiveTab] = useState<'cart' | 'payment'>('cart');
+    const [isPosFullscreen, setIsPosFullscreen] = useState(false);
+    const [cashReceived, setCashReceived] = useState<number | ''>('');
+
     // NEW EMPLOYEE DISCOUNT FIELDS
     const [employeeDiscount, setEmployeeDiscount] = useState<{value: number, label: string} | null>(null);
     const [scannedQRToken, setScannedQRToken] = useState("");
@@ -84,6 +96,53 @@ export default function POSPage() {
     const [selectedSalesperson, setSelectedSalesperson] = useState<string>("");
     const [companyName, setCompanyName] = useState<string>('');
     const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+    const togglePosFullscreen = () => {
+        const nextState = !isPosFullscreen;
+        setIsPosFullscreen(nextState);
+        try {
+            if (nextState) {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                }
+            } else {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                }
+            }
+        } catch (err) {}
+    };
+
+    // Effect for Fullscreen POS mode - hides sidebar and dashboard header
+    useEffect(() => {
+        const sidebar = document.getElementById('main-sidebar');
+        const header = document.getElementById('main-header');
+        const mainEl = document.querySelector('main');
+
+        if (isPosFullscreen) {
+            if (sidebar) sidebar.style.display = 'none';
+            if (header) header.style.display = 'none';
+            if (mainEl) {
+                mainEl.style.padding = '8px';
+                mainEl.style.maxWidth = '100%';
+            }
+        } else {
+            if (sidebar) sidebar.style.display = '';
+            if (header) header.style.display = '';
+            if (mainEl) {
+                mainEl.style.padding = '';
+                mainEl.style.maxWidth = '';
+            }
+        }
+        return () => {
+            if (sidebar) sidebar.style.display = '';
+            if (header) header.style.display = '';
+            if (mainEl) {
+                mainEl.style.padding = '';
+                mainEl.style.maxWidth = '';
+            }
+        };
+    }, [isPosFullscreen]);
 
     const openCustomerDisplay = () => {
         const width = 1024;
@@ -218,6 +277,31 @@ export default function POSPage() {
         return subtotalAfterDiscount + taxAmount;
     }, [subtotalAfterDiscount, taxAmount]);
 
+    const cashChange = useMemo(() => {
+        if (typeof cashReceived !== 'number' || cashReceived < finalTotalAmount) return 0;
+        return cashReceived - finalTotalAmount;
+    }, [cashReceived, finalTotalAmount]);
+
+    const cashShortcuts = useMemo(() => {
+        if (finalTotalAmount <= 0) return [];
+        const suggestions = new Set<number>();
+        suggestions.add(finalTotalAmount); // Uang Pas
+        
+        const denominations = [10000, 20000, 50000, 100000, 200000, 500000];
+        for (const d of denominations) {
+            if (d > finalTotalAmount && suggestions.size < 5) {
+                suggestions.add(d);
+            }
+        }
+        if (finalTotalAmount > 50000) {
+            const nextFifty = Math.ceil(finalTotalAmount / 50000) * 50000;
+            const nextHundred = Math.ceil(finalTotalAmount / 100000) * 100000;
+            suggestions.add(nextFifty);
+            suggestions.add(nextHundred);
+        }
+        return Array.from(suggestions).filter(v => v >= finalTotalAmount).sort((a, b) => a - b).slice(0, 5);
+    }, [finalTotalAmount]);
+
     // Customer Display Broadcaster
     const broadcastToCustomerDisplay = (overridePayload?: any) => {
         const payload = overridePayload || {
@@ -346,9 +430,14 @@ export default function POSPage() {
     const handleCheckout = async () => {
         if (cart.length === 0) return;
         if (!selectedAccount) {
-            toast.error("Pilih metode pembayaran");
+            toast.error("Pilih metode pembayaran terlebih dahulu!");
+            setShowCheckoutModal(true);
             return;
         }
+
+        const paid = typeof cashReceived === 'number' && cashReceived >= finalTotalAmount ? cashReceived : finalTotalAmount;
+        const change = typeof cashReceived === 'number' && cashReceived >= finalTotalAmount ? cashReceived - finalTotalAmount : 0;
+        const finalCustName = customerName.trim() || 'Pelanggan Walk-in';
 
         setCheckoutLoading(true);
         try {
@@ -366,8 +455,8 @@ export default function POSPage() {
                 saleType,
                 paymentMethod: accounts.find(a => a.id === selectedAccount)?.name || 'Bayar di Kasir',
                 paymentReference: paymentReference.trim() || null,
-                customerName,
-                customerPhone,
+                customerName: finalCustName,
+                customerPhone: customerPhone.trim() || null,
                 voucherCode,
                 voucherDiscountAmount,
                 memberDiscountAmount: discountAmount,
@@ -375,7 +464,11 @@ export default function POSPage() {
             };
 
             const res = await api.post('/pos/checkout', payload);
-            setLastSale(res.data);
+            setLastSale({
+                ...res.data,
+                paidAmount: paid,
+                changeAmount: change
+            });
             toast.success("Transaksi Berhasil!");
 
             // Broadcast Success to Customer Display
@@ -384,7 +477,7 @@ export default function POSPage() {
                 tenantName: companyName,
                 logoUrl: companyLogo,
                 saleType,
-                customerName,
+                customerName: finalCustName,
                 items: cart.map(item => ({
                     id: item.id,
                     cartId: item.cartId,
@@ -404,8 +497,8 @@ export default function POSPage() {
                     invoiceNumber: res.data?.invoiceNumber,
                     queueNumber: res.data?.queueNumber,
                     totalAmount: res.data?.totalAmount || finalTotalAmount,
-                    paidAmount: res.data?.paidAmount || finalTotalAmount,
-                    changeAmount: res.data?.changeAmount || 0,
+                    paidAmount: paid,
+                    changeAmount: change,
                     paymentMethod: res.data?.paymentMethod || accounts.find(a => a.id === selectedAccount)?.name
                 }
             });
@@ -422,6 +515,8 @@ export default function POSPage() {
             setVoucherCode("");
             setVoucherDiscountAmount(0);
             setEmployeeDiscount(null);
+            setCashReceived('');
+            setShowCheckoutModal(false);
             setLastCart([...cart]);
             setCart([]);
             setShowReceipt(true);
@@ -466,6 +561,18 @@ export default function POSPage() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 w-full xl:w-auto">
+                                <button
+                                    onClick={togglePosFullscreen}
+                                    title={isPosFullscreen ? "Keluar Layar Penuh (Tampilkan Menu Admin)" : "Mode POS Layar Penuh (Sembunyikan Menu Admin)"}
+                                    className={`flex items-center gap-2 px-4 py-4 border rounded-2xl text-[10px] font-black uppercase tracking-wider italic transition-all active:scale-95 whitespace-nowrap shadow-lg ${
+                                        isPosFullscreen
+                                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25 shadow-amber-500/10'
+                                        : 'bg-slate-800/80 hover:bg-slate-700/80 border-white/10 text-slate-300'
+                                    }`}
+                                >
+                                    {isPosFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                                    <span className="hidden sm:inline">{isPosFullscreen ? "Kecilkan" : "Layar Penuh POS"}</span>
+                                </button>
                                 <button
                                     onClick={openCustomerDisplay}
                                     title="Buka Layar Pelanggan (Dual-Screen Display)"
@@ -584,98 +691,131 @@ export default function POSPage() {
                     </div>
                 </div>
 
-                {/* RIGHT: Cart Section */}
-                <div className="w-full lg:w-[450px] flex flex-col bg-slate-900 border border-white/5 rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden text-white backdrop-blur-3xl relative">
-                    <div className="p-8 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
-                        <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center text-blue-500">
-                                <ShoppingCart className="h-5 w-5 stroke-[2.5px]" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-black italic tracking-tighter uppercase text-glow-sm">
-                                    Current <span className="text-blue-500">Manifest</span>
-                                </h2>
-                                <p className="text-[8px] font-black text-slate-600 tracking-[0.2em] uppercase italic">Order Validation Node</p>
-                            </div>
+                {/* RIGHT: Cart & Checkout Section */}
+                <div className="w-full lg:w-[460px] xl:w-[500px] flex flex-col bg-slate-900 border border-white/5 rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden text-white backdrop-blur-3xl relative shrink-0">
+                    {/* Header with Tabs */}
+                    <div className="p-4 px-6 border-b border-white/5 bg-slate-950/70 flex items-center justify-between gap-3">
+                        <div className="flex bg-slate-900 p-1 rounded-2xl border border-white/10 gap-1 flex-1">
+                            <button
+                                onClick={() => setActiveTab('cart')}
+                                className={`flex-1 py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                                    activeTab === 'cart'
+                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                }`}
+                            >
+                                <ShoppingCart className="h-3.5 w-3.5" />
+                                <span>Pesanan ({cart.reduce((s, c) => s + c.qty, 0)})</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('payment')}
+                                className={`flex-1 py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                                    activeTab === 'payment'
+                                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                }`}
+                            >
+                                <Wallet className="h-3.5 w-3.5" />
+                                <span>Bayar & Tamu</span>
+                            </button>
                         </div>
                         <button 
                             onClick={() => setCart([])}
-                            className="h-10 w-10 flex items-center justify-center bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded-xl border border-white/5 transition-all active:scale-95"
+                            title="Kosongkan Pesanan"
+                            className="h-10 w-10 flex items-center justify-center bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded-xl border border-white/5 transition-all active:scale-95 shrink-0"
                         >
-                            <Trash2 className="h-5 w-5" />
+                            <Trash2 className="h-4 w-4" />
                         </button>
                     </div>
 
-                    {/* Checkout Details Area */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide bg-slate-950/20">
-                        {cart.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-800 uppercase tracking-[0.3em] font-black italic text-[10px] text-center gap-6">
-                                <div className="h-24 w-24 rounded-[40px] bg-slate-900 border border-white/5 flex items-center justify-center shadow-inner">
-                                    <ShoppingCart className="h-10 w-10 opacity-30" />
+                    {/* Middle Scrollable Area */}
+                    <div className="flex-1 overflow-y-auto p-4 pos-touch-scrollbar bg-slate-950/20 space-y-4">
+                        {activeTab === 'cart' ? (
+                            /* TAB 1: DAFTAR KERANJANG */
+                            <>
+                                {/* Quick Customer Bar */}
+                                <div className="flex items-center justify-between p-3 bg-slate-900/80 rounded-2xl border border-white/5 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <User className="h-4 w-4 text-blue-400" />
+                                        <span className="text-slate-400">Pelanggan:</span>
+                                        <span className="font-bold text-white truncate max-w-[140px]">{customerName || 'Walk-in / Umum'}</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => setActiveTab('payment')}
+                                        className="text-[10px] font-black uppercase text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20"
+                                    >
+                                        Ubah
+                                    </button>
                                 </div>
-                                <p>MANIFEST_EMPTY: Waiting for Product Input</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                {/* CART ITEMS */}
-                                <div className="space-y-4">
-                                    {cart.map(item => (
-                                        <div key={item.cartId} className="flex items-center gap-4 group animate-in slide-in-from-right-8 duration-500 bg-slate-900/50 p-3 rounded-2xl border border-white/5">
-                                            <div className="h-12 w-12 rounded-xl bg-slate-950 border border-white/5 flex items-center justify-center text-blue-500 font-black text-xs group-hover:bg-blue-600 group-hover:text-white transition-all shadow-inner relative overflow-hidden shrink-0">
-                                                {item.image ? (
-                                                    <img src={item.image} className="w-full h-full object-cover opacity-60" />
-                                                ) : (
-                                                    item.name.substring(0, 2).toUpperCase()
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-black text-[11px] tracking-tight text-white uppercase truncate">{item.name}</h4>
-                                                {item.modifiers && Object.keys(item.modifiers).length > 0 && (
-                                                    <div className="text-[8px] text-slate-400 font-black uppercase tracking-wider mt-1 flex flex-wrap gap-1">
-                                                        {Object.values(item.modifiers).map((mod: any, idx) => (
-                                                            <span key={idx} className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
-                                                                {mod.name} {mod.price > 0 && `(+${mod.price})`}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                <p className="text-[10px] text-blue-400 font-black uppercase mt-1">
-                                                    Rp {item.price.toLocaleString()}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center bg-slate-900 rounded-xl p-1 gap-1 border border-white/10 shrink-0">
-                                                <button 
-                                                    onClick={() => updateQty(item.cartId, -1)}
-                                                    className="h-6 w-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
-                                                >
-                                                    <Minus className="h-3 w-3" />
-                                                </button>
-                                                <span className="w-6 text-center text-[10px] font-black text-white">{item.qty}</span>
-                                                <button 
-                                                    onClick={() => updateQty(item.cartId, 1)}
-                                                    className="h-6 w-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
-                                                >
-                                                    <Plus className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                            <button 
-                                                onClick={() => removeFromCart(item.cartId)}
-                                                className="h-8 w-8 flex items-center justify-center text-slate-600 hover:text-red-500 transition-all hover:bg-red-500/10 rounded-lg shrink-0"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
+
+                                {cart.length === 0 ? (
+                                    <div className="h-64 flex flex-col items-center justify-center text-slate-600 uppercase tracking-widest font-black text-[10px] text-center gap-4">
+                                        <div className="h-20 w-20 rounded-3xl bg-slate-900 border border-white/5 flex items-center justify-center">
+                                            <ShoppingCart className="h-8 w-8 opacity-30 text-slate-500" />
                                         </div>
-                                    ))}
-                                </div>
-
-                                <hr className="border-white/5" />
-
+                                        <p>Keranjang Kosong<br/><span className="text-[9px] text-slate-700">Pilih menu dari katalog di sebelah kiri</span></p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {cart.map(item => (
+                                            <div key={item.cartId} className="flex items-center gap-3 bg-slate-900/60 p-3 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                                                <div className="h-11 w-11 rounded-xl bg-slate-950 border border-white/5 flex items-center justify-center text-blue-500 font-black text-xs shrink-0 overflow-hidden">
+                                                    {item.image ? (
+                                                        <img src={item.image} className="w-full h-full object-cover opacity-70" />
+                                                    ) : (
+                                                        item.name.substring(0, 2).toUpperCase()
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-black text-xs text-white uppercase truncate">{item.name}</h4>
+                                                    {item.modifiers && Object.keys(item.modifiers).length > 0 && (
+                                                        <div className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 flex flex-wrap gap-1">
+                                                            {Object.values(item.modifiers).map((mod: any, idx) => (
+                                                                <span key={idx} className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
+                                                                    {mod.name} {mod.price > 0 && `(+${mod.price.toLocaleString()})`}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <p className="text-[11px] text-blue-400 font-black mt-0.5">
+                                                        Rp {item.price.toLocaleString('id-ID')}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center bg-slate-950 rounded-xl p-1 gap-1 border border-white/10 shrink-0">
+                                                    <button 
+                                                        onClick={() => updateQty(item.cartId, -1)}
+                                                        className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 active:scale-95"
+                                                    >
+                                                        <Minus className="h-3 w-3" />
+                                                    </button>
+                                                    <span className="w-6 text-center text-xs font-black text-white">{item.qty}</span>
+                                                    <button 
+                                                        onClick={() => updateQty(item.cartId, 1)}
+                                                        className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 active:scale-95"
+                                                    >
+                                                        <Plus className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                                <button 
+                                                    onClick={() => removeFromCart(item.cartId)}
+                                                    className="h-7 w-7 flex items-center justify-center text-slate-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg shrink-0 transition-colors"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            /* TAB 2: PEMBAYARAN & PELANGGAN (SPACIOUS IN-PANEL VIEW) */
+                            <div className="space-y-4">
                                 {/* TIPE PENJUALAN */}
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tipe Penjualan</label>
-                                    <div className="flex flex-wrap gap-2">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Penjualan</label>
+                                    <div className="flex flex-wrap gap-1.5">
                                         {[
-                                            { id: 'WALK_IN', label: 'Pelanggan Walk-in', icon: <User className="h-3 w-3" /> },
+                                            { id: 'WALK_IN', label: 'Walk-in', icon: <User className="h-3 w-3" /> },
                                             { id: 'GOFOOD', label: 'GoFood', icon: <ShoppingCart className="h-3 w-3" /> },
                                             { id: 'GRABFOOD', label: 'GrabFood', icon: <ShoppingCart className="h-3 w-3" /> },
                                             { id: 'SHOPEEFOOD', label: 'ShopeeFood', icon: <ShoppingCart className="h-3 w-3" /> },
@@ -684,9 +824,9 @@ export default function POSPage() {
                                             <button
                                                 key={opt.id}
                                                 onClick={() => setSaleType(opt.id)}
-                                                className={`flex items-center gap-2 px-3 py-2 rounded-full text-[10px] font-bold border transition-all ${
+                                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
                                                     saleType === opt.id 
-                                                    ? 'bg-blue-600 text-white border-blue-500' 
+                                                    ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/20' 
                                                     : 'bg-slate-900 text-slate-400 border-white/5 hover:border-white/20'
                                                 }`}
                                             >
@@ -697,182 +837,534 @@ export default function POSPage() {
                                 </div>
 
                                 {/* DATA PELANGGAN */}
-                                <div className="space-y-4">
+                                <div className="space-y-3 bg-slate-900/60 p-3.5 rounded-2xl border border-white/5">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data Pelanggan</label>
+                                        <div className="flex gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => { setCustomerName("Pelanggan Walk-in"); setCustomerPhone(""); }}
+                                                className="text-[9px] font-black bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-500/20 transition-all"
+                                            >
+                                                + Walk-in Umum
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nama Pelanggan</label>
                                         <div className="relative">
-                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
+                                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                                             <input 
                                                 type="text"
-                                                placeholder="Cari atau ketik nama pembeli..."
+                                                placeholder="Nama Pelanggan (Default: Pelanggan Walk-in)"
                                                 value={customerName}
                                                 onChange={(e) => setCustomerName(e.target.value)}
-                                                className="w-full pl-12 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                                className="w-full pl-10 pr-3 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 font-medium"
                                             />
                                         </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nomor HP Pelanggan (Opsional)</label>
-                                            <span className="text-[10px] font-black text-emerald-500 cursor-pointer hover:underline">DAFTAR MEMBER</span>
-                                        </div>
                                         <input 
                                             type="text"
-                                            placeholder="0812xxxxxxxxx"
+                                            placeholder="Nomor HP Pelanggan (Opsional)"
                                             value={customerPhone}
                                             onChange={(e) => setCustomerPhone(e.target.value)}
-                                            className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                            className="w-full px-3.5 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 font-medium"
                                         />
                                     </div>
-                                </div>
-
-                                {/* VOUCHER */}
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Kode Voucher</label>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text"
-                                            placeholder="Masukkan kode voucher"
-                                            value={voucherCode}
-                                            onChange={(e) => setVoucherCode(e.target.value)}
-                                            className="flex-1 px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 uppercase"
-                                        />
-                                        <button onClick={() => handleApplyVoucher()} className="px-4 py-3 bg-purple-500/10 text-purple-400 font-bold rounded-xl border border-purple-500/20 text-sm hover:bg-purple-500/20 transition-all">
-                                            Terapkan
-                                        </button>
-                                    </div>
-                                    {voucherDiscountAmount > 0 && (
-                                        <p className="mt-2 text-[10px] font-bold text-emerald-400">Diskon Voucher Aktif: -Rp {voucherDiscountAmount.toLocaleString('id-ID')}</p>
-                                    )}
-                                </div>
-
-                                {/* SALESPERSON */}
-                                <div className="space-y-3 pt-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pilih Karyawan / Salesperson</label>
-                                    <select
-                                        value={selectedSalesperson}
-                                        onChange={(e) => setSelectedSalesperson(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none transition-all"
-                                    >
-                                        <option value="">-- Tidak Ada / Default Kasir --</option>
-                                        {salespersons.map(sp => (
-                                            <option key={sp.id} value={sp.id}>{sp.name} {sp.jobTitle ? `(${sp.jobTitle})` : ''}</option>
-                                        ))}
-                                    </select>
                                 </div>
 
                                 {/* METODE PEMBAYARAN */}
-                                <div className="space-y-3 pt-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Metode Pembayaran</label>
-                                    <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2.5">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Metode Pembayaran</label>
+                                        <span className="text-[9px] font-bold text-slate-500">Pilih salah satu</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
                                         {accounts.map(acc => {
-                                            let icon = <Wallet className="h-4 w-4" />;
+                                            let icon = <Banknote className="h-4 w-4" />;
                                             let badgeText = "Tunai";
+                                            const isSelected = selectedAccount === acc.id;
                                             if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-4 w-4" />; }
-                                            else if (acc.type === 'BANK') { badgeText = "Transfer"; icon = <CreditCard className="h-4 w-4" />; }
+                                            else if (acc.type === 'BANK') { badgeText = "Transfer/EDC"; icon = <CreditCard className="h-4 w-4" />; }
                                             
                                             return (
                                                 <button 
                                                     key={acc.id}
                                                     onClick={() => setSelectedAccount(acc.id)}
-                                                    className={`flex items-center gap-3 p-4 rounded-2xl border transition-all ${
-                                                        selectedAccount === acc.id 
-                                                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' 
-                                                        : 'bg-slate-900 border-white/5 text-slate-500 hover:border-emerald-500/30'
+                                                    className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all ${
+                                                        isSelected 
+                                                        ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10' 
+                                                        : 'bg-slate-900 border-white/5 text-slate-400 hover:border-white/20'
                                                     }`}
                                                 >
-                                                    {icon}
-                                                    <span className="text-xs font-bold">{badgeText} - {acc.name}</span>
+                                                    <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-emerald-500 text-slate-950' : 'bg-slate-950 text-slate-400'}`}>
+                                                        {icon}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-[10px] font-black uppercase text-slate-500">{badgeText}</div>
+                                                        <div className="text-xs font-bold text-white truncate">{acc.name}</div>
+                                                    </div>
+                                                    {isSelected && <Check className="h-4 w-4 text-emerald-400 shrink-0" />}
                                                 </button>
                                             );
                                         })}
                                     </div>
-                                    {selectedAccount && (
-                                        <div className="pt-2 animate-in fade-in">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-between">
-                                                <span>Nomor Referensi / Approval EDC (Opsional)</span>
-                                                <span className="text-[9px] text-amber-400 font-bold">Contoh: 123456</span>
+
+                                    {/* JIKA METODE TUNAI */}
+                                    {selectedAccount && accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
+                                        <div className="bg-slate-900/80 p-3 rounded-2xl border border-emerald-500/20 space-y-2 mt-2 animate-in fade-in">
+                                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                <span>Uang Diterima</span>
+                                                {cashReceived && typeof cashReceived === 'number' && cashReceived >= finalTotalAmount && (
+                                                    <span className="text-emerald-400 font-bold">Kembalian: Rp {cashChange.toLocaleString('id-ID')}</span>
+                                                )}
+                                            </div>
+                                            {/* Quick Nominal Chips */}
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {cashShortcuts.map((nominal, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => setCashReceived(nominal)}
+                                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                                            cashReceived === nominal 
+                                                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black' 
+                                                            : 'bg-slate-950 text-slate-300 border-white/10 hover:border-emerald-500/40'
+                                                        }`}
+                                                    >
+                                                        {nominal === finalTotalAmount ? 'Uang Pas' : `Rp ${nominal.toLocaleString('id-ID')}`}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <input 
+                                                type="number"
+                                                placeholder="Ketik nominal tunai..."
+                                                value={cashReceived === '' ? '' : cashReceived}
+                                                onChange={(e) => setCashReceived(e.target.value === '' ? '' : Number(e.target.value))}
+                                                className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-sm font-mono font-bold text-emerald-400 outline-none focus:border-emerald-500"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* JIKA METODE NON-TUNAI / EDC */}
+                                    {selectedAccount && !accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
+                                        <div className="pt-1 animate-in fade-in">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                Nomor Referensi / Approval EDC (Opsional)
                                             </label>
                                             <input 
                                                 type="text"
                                                 value={paymentReference}
                                                 onChange={(e) => setPaymentReference(e.target.value)}
-                                                placeholder="Masukkan nomor approval / EDC..."
-                                                className="w-full mt-1.5 px-3.5 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono transition-colors"
+                                                placeholder="Contoh: 123456..."
+                                                className="w-full mt-1 px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
                                             />
                                         </div>
                                     )}
+                                </div>
+
+                                {/* SALESPERSON & VOUCHER ROW */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Salesperson</label>
+                                        <select
+                                            value={selectedSalesperson}
+                                            onChange={(e) => setSelectedSalesperson(e.target.value)}
+                                            className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:border-blue-500 outline-none"
+                                        >
+                                            <option value="">-- Default Kasir --</option>
+                                            {salespersons.map(sp => (
+                                                <option key={sp.id} value={sp.id}>{sp.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Voucher</label>
+                                        <div className="flex gap-1.5">
+                                            <input 
+                                                type="text"
+                                                placeholder="Kode"
+                                                value={voucherCode}
+                                                onChange={(e) => setVoucherCode(e.target.value)}
+                                                className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white uppercase outline-none focus:border-blue-500"
+                                            />
+                                            <button 
+                                                onClick={() => handleApplyVoucher()} 
+                                                className="px-3 py-2 bg-purple-500/20 text-purple-300 font-bold rounded-xl border border-purple-500/30 text-xs hover:bg-purple-500/30"
+                                            >
+                                                Cek
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Summary & Checkout (Bottom Stick) */}
-                    <div className="p-6 bg-slate-950/80 border-t border-white/5 space-y-4">
-                        <div className="bg-slate-900 rounded-xl p-4 border border-white/5 space-y-3">
-                            <div className="flex justify-between items-center text-sm font-medium text-slate-400">
-                                <span>Subtotal Items</span>
-                                <span>Rp {subtotal.toLocaleString()}</span>
+                    {/* Summary & Checkout (Bottom Sticky Footer - Compact & Touch-Friendly) */}
+                    <div className="p-4 bg-slate-950/90 border-t border-white/10 space-y-3 shrink-0">
+                        <div className="bg-slate-900/90 rounded-2xl p-3 border border-white/5 space-y-1.5 text-xs">
+                            <div className="flex justify-between items-center text-slate-400">
+                                <span>Subtotal ({cart.reduce((s, c) => s + c.qty, 0)} item)</span>
+                                <span className="font-bold text-white">Rp {subtotal.toLocaleString('id-ID')}</span>
                             </div>
                             
                             {employeeDiscount && (
-                                <div className="flex justify-between items-center text-sm font-medium text-emerald-400">
-                                    <span className="flex items-center gap-2">
-                                        <ShieldCheck className="w-4 h-4" />
+                                <div className="flex justify-between items-center text-emerald-400 font-bold">
+                                    <span className="flex items-center gap-1">
+                                        <ShieldCheck className="w-3.5 h-3.5" />
                                         {employeeDiscount.label} ({employeeDiscount.value}%)
                                     </span>
-                                    <span>- Rp {discountAmount.toLocaleString()}</span>
+                                    <span>-Rp {discountAmount.toLocaleString('id-ID')}</span>
                                 </div>
                             )}
 
-                            <div className="flex justify-between items-center text-sm font-medium text-slate-400">
-                                <span className="flex items-center gap-2">
+                            {voucherDiscountAmount > 0 && (
+                                <div className="flex justify-between items-center text-purple-400 font-bold">
+                                    <span>Voucher Diskon</span>
+                                    <span>-Rp {voucherDiscountAmount.toLocaleString('id-ID')}</span>
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-center text-slate-400">
+                                <span className="flex items-center gap-1.5">
                                     Pajak (11%)
                                     <button 
                                         onClick={() => setTaxRate(taxRate === 11 ? 0 : 11)} 
-                                        className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-blue-400"
+                                        className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                                            taxRate === 11 ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
+                                        }`}
                                     >
-                                        TOGGLE
+                                        {taxRate === 11 ? 'AKTIF' : 'OFF'}
                                     </button>
                                 </span>
-                                <span>+ Rp {taxAmount.toLocaleString()}</span>
+                                <span className="font-bold text-white">Rp {taxAmount.toLocaleString('id-ID')}</span>
                             </div>
-                            <hr className="border-white/5" />
-                            <div className="flex justify-between items-end">
-                                <span className="text-base font-black text-white uppercase tracking-wider">TOTAL BAYAR</span>
-                                <span className="text-3xl font-black text-blue-500">Rp {finalTotalAmount.toLocaleString()}</span>
+
+                            <div className="border-t border-white/10 pt-2 mt-1 flex justify-between items-baseline">
+                                <span className="text-xs font-black uppercase tracking-wider text-slate-300">TOTAL BAYAR</span>
+                                <span className="text-2xl font-black text-emerald-400 tracking-tight">Rp {finalTotalAmount.toLocaleString('id-ID')}</span>
                             </div>
                         </div>
 
-                        <button 
-                            disabled={cart.length === 0 || checkoutLoading}
-                            onClick={handleCheckout}
-                            className={`w-full py-6 rounded-[32px] font-black text-xs uppercase tracking-[0.4em] shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4 relative z-10 italic border-b-8 ${
-                                cart.length === 0 || checkoutLoading
-                                ? 'bg-slate-800 border-slate-950 text-slate-700 cursor-not-allowed opacity-50'
-                                : 'bg-blue-600 border-blue-900 text-white hover:bg-blue-500 hover:-translate-y-1'
-                            }`}
-                        >
-                            {checkoutLoading ? (
-                                <div className="h-6 w-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                                <>
-                                    <CheckCircle2 className="h-6 w-6 stroke-[3px]" />
-                                    Commit Sale
-                                </>
-                            )}
-                        </button>
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => setShowScanModal(true)}
+                                title="Scan ID Karyawan (Aivola ID)"
+                                className="h-13 px-3.5 rounded-2xl font-black text-xs text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-1.5 shrink-0"
+                            >
+                                <Scan className="w-4 h-4" />
+                                <span className="hidden sm:inline text-[10px]">ID KARYAWAN</span>
+                            </button>
 
-                        <button 
-                            onClick={() => setShowScanModal(true)}
-                            className="w-full py-4 rounded-[24px] font-black text-[10px] uppercase tracking-widest text-emerald-400 border-2 border-emerald-900/30 bg-emerald-900/10 hover:bg-emerald-900/30 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Scan className="w-4 h-4" />
-                            Scan ID Karyawan (Aivola ID)
-                        </button>
+                            {activeTab === 'cart' ? (
+                                <button 
+                                    disabled={cart.length === 0 || checkoutLoading}
+                                    onClick={() => {
+                                        if (cart.length === 0) return;
+                                        setShowCheckoutModal(true);
+                                    }}
+                                    className={`flex-1 h-13 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-98 flex items-center justify-center gap-2 italic ${
+                                        cart.length === 0 || checkoutLoading
+                                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed border border-white/5'
+                                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 text-white shadow-blue-500/25 hover:brightness-110 border border-blue-400/30'
+                                    }`}
+                                >
+                                    <span>BAYAR SEKARANG</span>
+                                    <ArrowRight className="h-4 w-4 stroke-[3px]" />
+                                </button>
+                            ) : (
+                                <div className="flex gap-2 flex-1">
+                                    <button 
+                                        onClick={() => setShowCheckoutModal(true)}
+                                        title="Buka Modal Layar Sentuh Lengkap"
+                                        className="h-13 px-3 rounded-2xl font-black text-xs text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all flex items-center justify-center gap-1"
+                                    >
+                                        <Maximize className="w-4 h-4" />
+                                        <span className="hidden sm:inline text-[10px]">LAYAR SENTUH</span>
+                                    </button>
+                                    <button 
+                                        disabled={cart.length === 0 || checkoutLoading}
+                                        onClick={handleCheckout}
+                                        className={`flex-1 h-13 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-98 flex items-center justify-center gap-2 italic ${
+                                            cart.length === 0 || checkoutLoading
+                                            ? 'bg-slate-800 text-slate-600 cursor-not-allowed border border-white/5'
+                                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/25 border border-emerald-400/30'
+                                        }`}
+                                    >
+                                        {checkoutLoading ? (
+                                            <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <>
+                                                <CheckCircle2 className="h-4 w-4 stroke-[2.5px]" />
+                                                <span>PROSES BAYAR</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* DEDICATED FULL TOUCH-SCREEN CHECKOUT MODAL */}
+            {showCheckoutModal && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-xl animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-white/10 w-full max-w-4xl max-h-[92vh] rounded-[36px] shadow-2xl flex flex-col overflow-hidden text-white animate-in zoom-in-95 duration-200">
+                        {/* Header Modal */}
+                        <div className="p-5 px-7 border-b border-white/10 bg-slate-950/70 flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black">
+                                    <Wallet className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black uppercase tracking-wider text-white">Jendela Pembayaran Layar Sentuh</h3>
+                                    <p className="text-xs text-slate-400">Total Tagihan: <span className="font-bold text-emerald-400">Rp {finalTotalAmount.toLocaleString('id-ID')}</span> ({cart.reduce((s, c) => s + c.qty, 0)} item)</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowCheckoutModal(false)}
+                                className="h-10 w-10 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-2xl flex items-center justify-center transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body - 2 Columns */}
+                        <div className="flex-1 overflow-y-auto p-6 pos-touch-scrollbar grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-950/30">
+                            {/* KOLOM KIRI: PELANGGAN & DETAIL ORDER */}
+                            <div className="space-y-5">
+                                {/* DATA PELANGGAN */}
+                                <div className="space-y-3 bg-slate-900/80 p-4 rounded-3xl border border-white/5">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs font-black uppercase tracking-widest text-slate-300">Pilihan Pelanggan</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setCustomerName("Pelanggan Walk-in"); setCustomerPhone(""); }}
+                                            className="text-xs font-bold bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 px-3 py-1 rounded-xl border border-blue-500/30 transition-all flex items-center gap-1"
+                                        >
+                                            <User className="h-3.5 w-3.5" />
+                                            <span>+ Set Walk-in Umum</span>
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2.5">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Pelanggan</label>
+                                            <input 
+                                                type="text"
+                                                placeholder="Ketik nama pelanggan..."
+                                                value={customerName}
+                                                onChange={(e) => setCustomerName(e.target.value)}
+                                                className="w-full mt-1 px-4 py-3 bg-slate-950 border border-white/10 rounded-2xl text-sm font-semibold text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Nomor HP (Opsional)</label>
+                                            <input 
+                                                type="text"
+                                                placeholder="0812xxxxxxxxx"
+                                                value={customerPhone}
+                                                onChange={(e) => setCustomerPhone(e.target.value)}
+                                                className="w-full mt-1 px-4 py-3 bg-slate-950 border border-white/10 rounded-2xl text-sm font-semibold text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* TIPE PENJUALAN */}
+                                <div className="space-y-2 bg-slate-900/80 p-4 rounded-3xl border border-white/5">
+                                    <label className="text-xs font-black uppercase tracking-widest text-slate-300">Tipe Penjualan</label>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        {[
+                                            { id: 'WALK_IN', label: 'Walk-in', icon: <User className="h-4 w-4" /> },
+                                            { id: 'GOFOOD', label: 'GoFood', icon: <ShoppingCart className="h-4 w-4" /> },
+                                            { id: 'GRABFOOD', label: 'GrabFood', icon: <ShoppingCart className="h-4 w-4" /> },
+                                            { id: 'SHOPEEFOOD', label: 'ShopeeFood', icon: <ShoppingCart className="h-4 w-4" /> },
+                                            { id: 'QPOON', label: 'QPoon', icon: <ShoppingCart className="h-4 w-4" /> }
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.id}
+                                                onClick={() => setSaleType(opt.id)}
+                                                className={`flex items-center gap-2 p-3 rounded-2xl text-xs font-bold border transition-all ${
+                                                    saleType === opt.id 
+                                                    ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/25' 
+                                                    : 'bg-slate-950 text-slate-400 border-white/5 hover:border-white/20'
+                                                }`}
+                                            >
+                                                {opt.icon} <span>{opt.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* SALESPERSON */}
+                                <div className="space-y-2 bg-slate-900/80 p-4 rounded-3xl border border-white/5">
+                                    <label className="text-xs font-black uppercase tracking-widest text-slate-300">Pilih Salesperson / Kasir</label>
+                                    <select
+                                        value={selectedSalesperson}
+                                        onChange={(e) => setSelectedSalesperson(e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-2xl text-sm font-semibold text-white focus:border-blue-500 outline-none"
+                                    >
+                                        <option value="">-- Default Kasir / Tanpa Salesperson --</option>
+                                        {salespersons.map(sp => (
+                                            <option key={sp.id} value={sp.id}>{sp.name} {sp.jobTitle ? `(${sp.jobTitle})` : ''}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* KOLOM KANAN: METODE PEMBAYARAN & TUNAI */}
+                            <div className="space-y-5">
+                                <div className="space-y-3 bg-slate-900/80 p-4 rounded-3xl border border-white/5">
+                                    <label className="text-xs font-black uppercase tracking-widest text-slate-300">Pilih Metode Pembayaran</label>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        {accounts.map(acc => {
+                                            let icon = <Banknote className="h-5 w-5" />;
+                                            let badgeText = "Tunai";
+                                            const isSelected = selectedAccount === acc.id;
+                                            if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-5 w-5" />; }
+                                            else if (acc.type === 'BANK') { badgeText = "Debit/Transfer"; icon = <CreditCard className="h-5 w-5" />; }
+                                            
+                                            return (
+                                                <button 
+                                                    key={acc.id}
+                                                    onClick={() => setSelectedAccount(acc.id)}
+                                                    className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
+                                                        isSelected 
+                                                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-lg shadow-emerald-500/15' 
+                                                        : 'bg-slate-950 border-white/5 text-slate-400 hover:border-white/20'
+                                                    }`}
+                                                >
+                                                    <div className={`p-2 rounded-xl ${isSelected ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400'}`}>
+                                                        {icon}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-[10px] font-black uppercase text-slate-500">{badgeText}</div>
+                                                        <div className="text-xs font-bold text-white truncate">{acc.name}</div>
+                                                    </div>
+                                                    {isSelected && <Check className="h-5 w-5 text-emerald-400 shrink-0" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* JIKA METODE TUNAI DIPILIH */}
+                                {selectedAccount && accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
+                                    <div className="space-y-3 bg-slate-900/90 p-4 rounded-3xl border border-emerald-500/30 animate-in fade-in">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-xs font-black uppercase tracking-widest text-emerald-400">Pembayaran Tunai</label>
+                                            <span className="text-xs text-slate-400">Tagihan: <b className="text-white">Rp {finalTotalAmount.toLocaleString('id-ID')}</b></span>
+                                        </div>
+
+                                        {/* Shortcut Nominal Cepat */}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {cashShortcuts.map((nominal, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    type="button"
+                                                    onClick={() => setCashReceived(nominal)}
+                                                    className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                                                        cashReceived === nominal 
+                                                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-md' 
+                                                        : 'bg-slate-950 text-slate-300 border-white/10 hover:border-emerald-500/40'
+                                                    }`}
+                                                >
+                                                    {nominal === finalTotalAmount ? 'Uang Pas' : `Rp ${nominal.toLocaleString('id-ID')}`}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="pt-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Input Uang Diterima Manual</label>
+                                            <div className="relative mt-1">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-500">Rp</span>
+                                                <input 
+                                                    type="number"
+                                                    placeholder="0"
+                                                    value={cashReceived === '' ? '' : cashReceived}
+                                                    onChange={(e) => setCashReceived(e.target.value === '' ? '' : Number(e.target.value))}
+                                                    className="w-full pl-12 pr-4 py-3 bg-slate-950 border border-white/10 rounded-2xl text-lg font-mono font-bold text-emerald-400 outline-none focus:border-emerald-500"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Kembalian Box */}
+                                        <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+                                            typeof cashReceived === 'number' && cashReceived >= finalTotalAmount
+                                            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                                            : typeof cashReceived === 'number' && cashReceived < finalTotalAmount
+                                            ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                                            : 'bg-slate-950 border-white/5 text-slate-400'
+                                        }`}>
+                                            <div>
+                                                <div className="text-[10px] font-black uppercase tracking-wider">
+                                                    {typeof cashReceived === 'number' && cashReceived < finalTotalAmount ? 'Uang Kurang' : 'Kembalian'}
+                                                </div>
+                                                <div className="text-xl font-black font-mono mt-0.5">
+                                                    {typeof cashReceived === 'number' && cashReceived < finalTotalAmount
+                                                        ? `- Rp ${(finalTotalAmount - cashReceived).toLocaleString('id-ID')}`
+                                                        : `Rp ${cashChange.toLocaleString('id-ID')}`
+                                                    }
+                                                </div>
+                                            </div>
+                                            {typeof cashReceived === 'number' && cashReceived >= finalTotalAmount && (
+                                                <CheckCircle2 className="h-7 w-7 text-emerald-400" />
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* JIKA NON-TUNAI / EDC */}
+                                {selectedAccount && !accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
+                                    <div className="space-y-2 bg-slate-900/80 p-4 rounded-3xl border border-white/5 animate-in fade-in">
+                                        <label className="text-xs font-black uppercase tracking-widest text-slate-300">
+                                            Nomor Approval / Ref EDC (Opsional)
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            value={paymentReference}
+                                            onChange={(e) => setPaymentReference(e.target.value)}
+                                            placeholder="Contoh: 123456 atau No Transaksi EDC..."
+                                            className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-2xl text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 px-7 border-t border-white/10 bg-slate-950/80 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+                            <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Selesai Dibayar</div>
+                                <div className="text-2xl font-black text-emerald-400">Rp {finalTotalAmount.toLocaleString('id-ID')}</div>
+                            </div>
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
+                                <button 
+                                    onClick={() => setShowCheckoutModal(false)}
+                                    className="px-5 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                                >
+                                    Batal
+                                </button>
+                                <button 
+                                    disabled={checkoutLoading}
+                                    onClick={handleCheckout}
+                                    className="flex-1 sm:flex-initial px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-500/25 transition-all active:scale-95 flex items-center justify-center gap-2 border border-emerald-400/40"
+                                >
+                                    {checkoutLoading ? (
+                                        <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 className="h-5 w-5 stroke-[2.5px]" />
+                                            <span>SELESAIKAN & CETAK STRUK</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             
             {/* MODIFIER MODAL */}
@@ -1029,9 +1521,8 @@ export default function POSPage() {
                     {/* HIDDEN PRINTABLE RECEIPT */}
                     <div id="thermal-receipt" className="hidden print:block font-mono text-[11px] p-2 bg-white text-black w-[58mm] leading-tight">
                         <div className="text-center mb-4">
-                            <h2 className="font-bold text-sm">AIVOLA POS</h2>
-                            <p>Jl. Contoh Resto No. 123</p>
-                            <p>Telp: 0812-3456-7890</p>
+                            <h2 className="font-bold text-sm uppercase">{companyName || 'AIVOLA POS'}</h2>
+                            <p className="text-[10px]">STRUK PEMBAYARAN RESMI</p>
                         </div>
                         
                         <div className="border-t border-dashed border-black py-2 mb-2">
@@ -1080,7 +1571,15 @@ export default function POSPage() {
 
                         <div className="border-t border-dashed border-black py-2 mt-4 text-center">
                             <p>Metode Pembayaran:</p>
-                            <p className="font-bold">{accounts.find(a => a.id === selectedAccount)?.name}</p>
+                            <p className="font-bold">{lastSale.paymentMethod || accounts.find(a => a.id === selectedAccount)?.name}</p>
+                            {lastSale?.paidAmount && (
+                                <div className="text-[11px] mt-1 space-y-0.5">
+                                    <div>Tunai Diterima: Rp {Number(lastSale.paidAmount).toLocaleString('id-ID')}</div>
+                                    {lastSale.changeAmount > 0 && (
+                                        <div className="font-bold">Kembalian: Rp {Number(lastSale.changeAmount).toLocaleString('id-ID')}</div>
+                                    )}
+                                </div>
+                            )}
                             {lastSale?.paymentReference && (
                                 <p className="text-[10px] mt-1 font-bold">REF/EDC: {lastSale.paymentReference}</p>
                             )}
@@ -1115,8 +1614,14 @@ export default function POSPage() {
                             )}
                             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest italic">
                                 <span className="text-slate-500">Protocol Method</span>
-                                <span className="text-blue-400">{accounts.find(a => a.id === selectedAccount)?.name}</span>
+                                <span className="text-blue-400">{lastSale.paymentMethod || accounts.find(a => a.id === selectedAccount)?.name}</span>
                             </div>
+                            {lastSale?.paidAmount && lastSale.changeAmount > 0 && (
+                                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest italic text-emerald-400">
+                                    <span>Kembalian</span>
+                                    <span className="font-mono text-sm font-bold">Rp {Number(lastSale.changeAmount).toLocaleString('id-ID')}</span>
+                                </div>
+                            )}
                             {lastSale?.paymentReference && (
                                 <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest italic text-amber-400">
                                     <span className="text-slate-500">Ref / Approval EDC</span>

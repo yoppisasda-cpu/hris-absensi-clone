@@ -199,6 +199,24 @@ body {
   background: rgba(148, 163, 184, 0.4);
 }
 
+/* Touch-friendly POS Scrollbar */
+.pos-touch-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.pos-touch-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+}
+.pos-touch-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5);
+  border-radius: 8px;
+}
+.pos-touch-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.8);
+}
+
+
 /* HIDE NUMBER INPUT SPINNERS GLOBALLY */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
