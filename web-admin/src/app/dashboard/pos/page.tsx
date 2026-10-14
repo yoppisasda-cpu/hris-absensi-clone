@@ -18,7 +18,9 @@ import {
     Monitor,
     Scan,
     X,
-    ShieldCheck
+    ShieldCheck,
+    Tv,
+    ExternalLink
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -80,6 +82,18 @@ export default function POSPage() {
     const [scanLoading, setScanLoading] = useState(false);
     const [salespersons, setSalespersons] = useState<any[]>([]);
     const [selectedSalesperson, setSelectedSalesperson] = useState<string>("");
+    const [companyName, setCompanyName] = useState<string>('SEVENBILLION COFFEE');
+
+    const openCustomerDisplay = () => {
+        const width = 1024;
+        const height = 768;
+        const left = window.screen.availWidth || 1920;
+        window.open(
+            '/dashboard/pos/customer-display',
+            'AivolaCustomerDisplay',
+            `width=${width},height=${height},left=${left},top=0,menubar=no,toolbar=no,location=no,status=no`
+        );
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -97,6 +111,14 @@ export default function POSPage() {
             
             // Force manual selection to prevent accidental usage of default account
             setSelectedAccount(null);
+
+            // Fetch company name for customer display header
+            try {
+                const compRes = await api.get('/companies/accessible');
+                const tId = localStorage.getItem('currentTenantId');
+                const currentComp = compRes.data?.find((c: any) => c.id.toString() === tId);
+                if (currentComp?.name) setCompanyName(currentComp.name);
+            } catch (e) {}
         } catch (error) {
             console.error("Failed to fetch POS data", error);
             toast.error("Gagal mengambil data produk");
@@ -187,6 +209,80 @@ export default function POSPage() {
         return subtotalAfterDiscount + taxAmount;
     }, [subtotalAfterDiscount, taxAmount]);
 
+    // Customer Display Broadcaster
+    const broadcastToCustomerDisplay = (overridePayload?: any) => {
+        const payload = overridePayload || {
+            type: 'CART_UPDATE',
+            tenantName: companyName,
+            saleType,
+            customerName,
+            items: cart.map(item => ({
+                id: item.id,
+                cartId: item.cartId,
+                name: item.name,
+                price: item.price,
+                qty: item.qty,
+                modifiers: item.modifiers,
+                total: item.price * item.qty
+            })),
+            subtotal,
+            discountAmount: discountAmount + voucherDiscountAmount,
+            taxAmount,
+            totalAmount: finalTotalAmount,
+            paymentMethod: accounts.find(a => a.id === selectedAccount)?.name || null,
+            isCompleted: showReceipt,
+            lastSale: lastSale ? {
+                invoiceNumber: lastSale.invoiceNumber,
+                queueNumber: lastSale.queueNumber,
+                totalAmount: lastSale.totalAmount,
+                paidAmount: lastSale.paidAmount,
+                changeAmount: lastSale.changeAmount,
+                paymentMethod: lastSale.paymentMethod
+            } : null
+        };
+
+        // 1. BroadcastChannel API (Native local sync)
+        try {
+            if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+                const channel = new BroadcastChannel('aivola_customer_display');
+                channel.postMessage(payload);
+                channel.close();
+            }
+        } catch (e) {}
+
+        // 2. LocalStorage Persistence fallback
+        try {
+            localStorage.setItem('aivola_pos_customer_state', JSON.stringify({
+                ...payload,
+                timestamp: Date.now()
+            }));
+        } catch (e) {}
+    };
+
+    // Auto-broadcast on any cart or checkout state changes
+    useEffect(() => {
+        broadcastToCustomerDisplay();
+    }, [cart, subtotal, discountAmount, voucherDiscountAmount, taxAmount, finalTotalAmount, selectedAccount, customerName, saleType, showReceipt, lastSale, companyName]);
+
+    // Listen for sync requests from newly opened customer display
+    useEffect(() => {
+        let channel: BroadcastChannel | null = null;
+        try {
+            if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+                channel = new BroadcastChannel('aivola_customer_display');
+                channel.onmessage = (event) => {
+                    if (event.data?.type === 'REQUEST_SYNC') {
+                        broadcastToCustomerDisplay();
+                    }
+                };
+            }
+        } catch (e) {}
+
+        return () => {
+            if (channel) channel.close();
+        };
+    }, [cart, subtotal, discountAmount, voucherDiscountAmount, taxAmount, finalTotalAmount, selectedAccount, customerName, saleType, showReceipt, lastSale, companyName]);
+
     const handleApplyVoucher = async (overrideCode?: string) => {
         const codeToApply = overrideCode || voucherCode;
         if (!codeToApply.trim()) {
@@ -265,6 +361,37 @@ export default function POSPage() {
             const res = await api.post('/pos/checkout', payload);
             setLastSale(res.data);
             toast.success("Transaksi Berhasil!");
+
+            // Broadcast Success to Customer Display
+            broadcastToCustomerDisplay({
+                type: 'TRANSACTION_SUCCESS',
+                tenantName: companyName,
+                saleType,
+                customerName,
+                items: cart.map(item => ({
+                    id: item.id,
+                    cartId: item.cartId,
+                    name: item.name,
+                    price: item.price,
+                    qty: item.qty,
+                    modifiers: item.modifiers,
+                    total: item.price * item.qty
+                })),
+                subtotal,
+                discountAmount: discountAmount + voucherDiscountAmount,
+                taxAmount,
+                totalAmount: finalTotalAmount,
+                paymentMethod: accounts.find(a => a.id === selectedAccount)?.name || 'Bayar di Kasir',
+                isCompleted: true,
+                lastSale: {
+                    invoiceNumber: res.data?.invoiceNumber,
+                    queueNumber: res.data?.queueNumber,
+                    totalAmount: res.data?.totalAmount || finalTotalAmount,
+                    paidAmount: res.data?.paidAmount || finalTotalAmount,
+                    changeAmount: res.data?.changeAmount || 0,
+                    paymentMethod: res.data?.paymentMethod || accounts.find(a => a.id === selectedAccount)?.name
+                }
+            });
             
             // OPTIMIZATION: Update local stock instantly without full re-fetch flicker
             const cartMap = new Map(cart.map(item => [item.id, item.qty]));
@@ -321,16 +448,26 @@ export default function POSPage() {
                                     <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase mt-1 italic">Authorized Transaction Interface</p>
                                 </div>
                             </div>
-                            <div className="relative w-full xl:w-[400px] group/search">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-700 group-focus-within/search:text-blue-500 transition-colors z-10" />
-                                <input 
-                                    id="pos-search"
-                                    type="text" 
-                                    placeholder="SCAN_OR_SEARCH_PRODUCT..."
-                                    className="w-full pl-12 pr-6 py-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black text-white focus:border-blue-500/50 outline-none transition-all italic tracking-[0.2em] uppercase placeholder:text-slate-800 shadow-inner"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+                            <div className="flex items-center gap-3 w-full xl:w-auto">
+                                <button
+                                    onClick={openCustomerDisplay}
+                                    title="Buka Layar Pelanggan (Dual-Screen Display)"
+                                    className="flex items-center gap-2 px-4 py-4 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-2xl text-[10px] font-black text-indigo-400 hover:text-indigo-300 transition-all uppercase tracking-wider italic shadow-lg shadow-indigo-500/10 active:scale-95 whitespace-nowrap"
+                                >
+                                    <Tv className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Layar Customer</span>
+                                </button>
+                                <div className="relative w-full xl:w-[350px] group/search">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-700 group-focus-within/search:text-blue-500 transition-colors z-10" />
+                                    <input 
+                                        id="pos-search"
+                                        type="text" 
+                                        placeholder="SCAN_OR_SEARCH_PRODUCT..."
+                                        className="w-full pl-12 pr-6 py-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black text-white focus:border-blue-500/50 outline-none transition-all italic tracking-[0.2em] uppercase placeholder:text-slate-800 shadow-inner"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -985,7 +1122,11 @@ export default function POSPage() {
                                     Generate Receipt
                                 </button>
                                 <button 
-                                    onClick={() => setShowReceipt(false)}
+                                    onClick={() => {
+                                        setShowReceipt(false);
+                                        setLastSale(null);
+                                        broadcastToCustomerDisplay({ type: 'RESET' });
+                                    }}
                                     className="w-full py-4 text-slate-500 hover:text-white text-[10px] font-black uppercase tracking-[0.3em] transition-all italic underline underline-offset-8 decoration-slate-800"
                                 >
                                     Close Terminal
