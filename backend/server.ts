@@ -2972,9 +2972,13 @@ app.patch('/api/users/me', tenantMiddleware, async (req: Request, res: Response)
   }
 });
 
-// A. Endpoint Mendaftar Perusahaan SaaS Baru (Super Admin)
-app.post('/api/companies', async (req: Request, res: Response) => {
+// A. Endpoint Mendaftar Perusahaan SaaS Baru (Super Admin Only)
+app.post('/api/companies', tenantMiddleware, async (req: Request, res: Response) => {
   try {
+    const userRole = (req as any).userRole;
+    if (userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Akses Ditolak: Hanya Super Admin yang dapat mendaftarkan klien baru' });
+    }
     const { 
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractDuration, contractValue, contractStart, contractEnd,
@@ -3055,9 +3059,13 @@ app.post('/api/companies', async (req: Request, res: Response) => {
   }
 });
 
-// A2. Endpoint Mendapatkan Daftar Perusahaan (Global)
-app.get('/api/companies', async (req: Request, res: Response) => {
+// A2. Endpoint Mendapatkan Daftar Perusahaan (Global - Super Admin Only)
+app.get('/api/companies', tenantMiddleware, async (req: Request, res: Response) => {
   try {
+    const userRole = (req as any).userRole;
+    if (userRole !== 'SUPERADMIN') {
+      return res.status(403).json({ error: 'Akses Ditolak: Hanya Super Admin yang dapat melihat daftar seluruh klien' });
+    }
     const companies = await prisma.company.findMany({
       include: {
         _count: {

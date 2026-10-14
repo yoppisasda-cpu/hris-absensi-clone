@@ -11,6 +11,13 @@ export default function OwnerSettingsPage() {
     const [message, setMessage] = useState({ type: '', text: '' });
 
     useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const role = localStorage.getItem('userRole');
+            if (role !== 'SUPERADMIN') {
+                window.location.href = '/dashboard';
+                return;
+            }
+        }
         fetchSettings();
     }, []);
 

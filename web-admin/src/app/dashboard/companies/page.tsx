@@ -150,10 +150,15 @@ export default function CompaniesPage() {
 
     // Fetch daftar perusahaan saat komponen dimuat
     useEffect(() => {
-        fetchCompanies();
         if (typeof window !== 'undefined') {
-            setUserRole(localStorage.getItem('userRole') || '');
+            const role = localStorage.getItem('userRole');
+            if (role !== 'SUPERADMIN') {
+                window.location.href = '/dashboard';
+                return;
+            }
+            setUserRole(role || '');
         }
+        fetchCompanies();
     }, []);
 
     const fetchCompanies = async () => {

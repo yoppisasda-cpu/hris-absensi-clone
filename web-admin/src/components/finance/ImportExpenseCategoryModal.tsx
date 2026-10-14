@@ -24,7 +24,7 @@ export default function ImportExpenseCategoryModal({ isOpen, onClose, onSuccess 
 
     const fetchCompanies = async () => {
         try {
-            const res = await api.get('/companies');
+            const res = await api.get('/companies/accessible');
             setCompanies(res.data);
         } catch (error) {
             console.error("Gagal mengambil data perusahaan", error);

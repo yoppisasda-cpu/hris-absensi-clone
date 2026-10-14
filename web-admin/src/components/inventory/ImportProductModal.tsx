@@ -28,7 +28,7 @@ export default function ImportProductModal({ isOpen, onClose, onSuccess }: Impor
 
     const fetchCompanies = async () => {
         try {
-            const res = await api.get('/companies');
+            const res = await api.get('/companies/accessible');
             setCompanies(res.data);
         } catch (error) {
             console.error("Gagal mengambil data perusahaan", error);

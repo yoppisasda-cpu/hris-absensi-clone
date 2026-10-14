@@ -604,8 +604,8 @@ export default function Sidebar() {
                     Hari Libur
                 </Link>
 
-                {/* HANYA MUNCUL JIKA YG LOGIN ADALAH SANG PEMILIK APLIKASI (SUPER ADMIN / OWNER) */}
-                {isMounted && (userRole === 'SUPERADMIN' || userRole === 'OWNER') && (
+                {/* HANYA MUNCUL JIKA YG LOGIN ADALAH SANG PEMILIK PLATFORM (SUPERADMIN ONLY) */}
+                {isMounted && userRole === 'SUPERADMIN' && (
                     <div className="space-y-1 pt-4 border-t border-slate-700/50 mt-4">
                         <div className="px-3 py-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest font-mono">Control SaaS</div>
                         <Link href="/dashboard/companies" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-600/10 text-blue-400 hover:bg-slate-800 transition-colors">
