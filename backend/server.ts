@@ -16204,8 +16204,21 @@ app.get('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) =
 app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+    let userRole = (req as any).userRole;
+    if (!userRole && userId) {
+      const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      userRole = u?.role;
+    }
+    const isGiftCardAuthorized = userRole === 'OWNER' || userRole === 'SUPERADMIN';
+
     const { code, discountType, discountValue, initialBalance, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
     
+    // RBAC: Only OWNER and SUPERADMIN can create Gift Cards (STORED_VALUE)
+    if (discountType === 'STORED_VALUE' && !isGiftCardAuthorized) {
+      return res.status(403).json({ error: 'Akses Ditolak. Hanya Owner dan Super Admin yang dapat membuat Gift Card (Saldo Tunai).' });
+    }
+
     let bal = undefined;
     if (discountType === 'STORED_VALUE') {
       bal = initialBalance ? Number(initialBalance) : Number(discountValue || 0);
@@ -16239,12 +16252,25 @@ app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) 
 app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+    let userRole = (req as any).userRole;
+    if (!userRole && userId) {
+      const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      userRole = u?.role;
+    }
+    const isGiftCardAuthorized = userRole === 'OWNER' || userRole === 'SUPERADMIN';
+
     const voucherId = Number(req.params.id);
     const { code, discountType, discountValue, initialBalance, currentBalance, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
     
     // Ensure voucher belongs to tenant
     const existing = await prisma.voucher.findFirst({ where: { id: voucherId, companyId: tenantId } });
     if (!existing) return res.status(404).json({ error: 'Voucher tidak ditemukan' });
+
+    // RBAC: Only OWNER and SUPERADMIN can edit Gift Cards (STORED_VALUE)
+    if ((existing.discountType === 'STORED_VALUE' || discountType === 'STORED_VALUE') && !isGiftCardAuthorized) {
+      return res.status(403).json({ error: 'Akses Ditolak. Hanya Owner dan Super Admin yang dapat mengubah Gift Card (Saldo Tunai).' });
+    }
 
     let dataToUpdate: any = {
       code,
@@ -16279,9 +16305,25 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
 app.delete('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+    let userRole = (req as any).userRole;
+    if (!userRole && userId) {
+      const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      userRole = u?.role;
+    }
+    const isGiftCardAuthorized = userRole === 'OWNER' || userRole === 'SUPERADMIN';
+
     const voucherId = Number(req.params.id);
-    await prisma.voucher.deleteMany({
-      where: { id: voucherId, companyId: tenantId }
+    const existing = await prisma.voucher.findFirst({ where: { id: voucherId, companyId: tenantId } });
+    if (!existing) return res.status(404).json({ error: 'Voucher tidak ditemukan' });
+
+    // RBAC: Only OWNER and SUPERADMIN can delete Gift Cards (STORED_VALUE)
+    if (existing.discountType === 'STORED_VALUE' && !isGiftCardAuthorized) {
+      return res.status(403).json({ error: 'Akses Ditolak. Hanya Owner dan Super Admin yang dapat menghapus Gift Card (Saldo Tunai).' });
+    }
+
+    await prisma.voucher.delete({
+      where: { id: voucherId }
     });
     res.json({ message: 'Voucher deleted' });
   } catch (error: any) {

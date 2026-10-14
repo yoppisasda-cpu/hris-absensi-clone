@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { X, Tag, Percent, DollarSign, Calendar, Users, Activity } from "lucide-react";
+import { X, Tag, Percent, DollarSign, Calendar, Users, Activity, Lock } from "lucide-react";
 import api from "@/lib/api";
 
 interface VoucherModalProps {
@@ -61,8 +61,16 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
         }
     }, [editData, isOpen]);
 
+    const isGiftCardAuthorized = userRole === 'OWNER' || userRole === 'SUPERADMIN';
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if ((formData.discountType === 'STORED_VALUE' || editData?.discountType === 'STORED_VALUE') && !isGiftCardAuthorized) {
+            alert("Akses Ditolak. Hanya Owner dan Super Admin yang dapat membuat atau mengedit Gift Card.");
+            return;
+        }
+
         try {
             setLoading(true);
             const payload = {
@@ -117,6 +125,13 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
 
                 <div className="p-6 overflow-y-auto flex-1">
                     <form id="voucherForm" onSubmit={handleSubmit} className="space-y-6">
+                        {editData?.discountType === 'STORED_VALUE' && !isGiftCardAuthorized && (
+                            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-3 text-amber-400 text-xs font-bold">
+                                <Lock className="h-5 w-5 flex-shrink-0" />
+                                <span>Akses Terbatas: Hanya Owner dan Super Admin yang dapat mengubah Gift Card (Saldo Tunai).</span>
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Kode Voucher *</label>
                             <input 
@@ -124,8 +139,9 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                                 required
                                 placeholder="Cth: PROMO10"
                                 value={formData.code}
+                                disabled={editData?.discountType === 'STORED_VALUE' && !isGiftCardAuthorized}
                                 onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})}
-                                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white font-bold focus:border-indigo-500 outline-none uppercase"
+                                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white font-bold focus:border-indigo-500 outline-none uppercase disabled:opacity-50"
                             />
                         </div>
 
@@ -134,12 +150,13 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Tipe Diskon *</label>
                                 <select 
                                     value={formData.discountType}
+                                    disabled={editData?.discountType === 'STORED_VALUE' && !isGiftCardAuthorized}
                                     onChange={e => setFormData({...formData, discountType: e.target.value})}
-                                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white font-bold focus:border-indigo-500 outline-none"
+                                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white font-bold focus:border-indigo-500 outline-none disabled:opacity-50"
                                 >
                                     <option value="PERCENTAGE">Persentase (%)</option>
                                     <option value="FIXED">Nominal Tetap (Rp)</option>
-                                    {(userRole === 'OWNER' || userRole === 'SUPERADMIN') && (
+                                    {(isGiftCardAuthorized || editData?.discountType === 'STORED_VALUE') && (
                                         <option value="STORED_VALUE">Saldo Tunai (Gift Card)</option>
                                     )}
                                 </select>
@@ -279,10 +296,10 @@ export default function VoucherModal({ isOpen, onClose, onSuccess, editData }: V
                     <button 
                         type="submit" 
                         form="voucherForm"
-                        disabled={loading}
+                        disabled={loading || (editData?.discountType === 'STORED_VALUE' && !isGiftCardAuthorized)}
                         className="px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-all shadow-lg shadow-indigo-500/20"
                     >
-                        {loading ? 'Menyimpan...' : 'Simpan Voucher'}
+                        {loading ? 'Menyimpan...' : (editData?.discountType === 'STORED_VALUE' && !isGiftCardAuthorized) ? 'Akses Terkunci' : 'Simpan Voucher'}
                     </button>
                 </div>
             </div>

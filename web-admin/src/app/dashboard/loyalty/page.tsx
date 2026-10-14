@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { 
     Tag, Gift, Search, Plus, Edit, Trash2, 
     Settings, Percent, Database, Save, History,
-    X, FileText, Calendar, DollarSign, Receipt, QrCode
+    X, FileText, Calendar, DollarSign, Receipt, QrCode, Lock
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -12,6 +12,7 @@ import api from "@/lib/api";
 import VoucherModal from "@/components/loyalty/VoucherModal";
 
 export default function LoyaltyPage() {
+    const [userRole, setUserRole] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'vouchers' | 'settings' | 'used_vouchers'>('settings');
     const [loading, setLoading] = useState(true);
     
@@ -35,6 +36,12 @@ export default function LoyaltyPage() {
         memberDiscountType: 'PERCENTAGE',
         memberDiscountValue: "0",
     });
+
+    useEffect(() => {
+        setUserRole(localStorage.getItem('userRole'));
+    }, []);
+
+    const isGiftCardAuthorized = userRole === 'OWNER' || userRole === 'SUPERADMIN';
 
     useEffect(() => {
         if (activeTab === 'vouchers') {
@@ -101,12 +108,17 @@ export default function LoyaltyPage() {
     };
 
     const handleDeleteVoucher = async (id: number) => {
+        const target = vouchers.find(v => v.id === id);
+        if (target?.discountType === 'STORED_VALUE' && !isGiftCardAuthorized) {
+            alert("Akses Ditolak. Hanya Owner dan Super Admin yang dapat menghapus Gift Card.");
+            return;
+        }
         if (!confirm("Apakah Anda yakin ingin menghapus voucher ini?")) return;
         try {
             await api.delete(`/vouchers/${id}`);
             fetchVouchers();
-        } catch (error) {
-            alert("Gagal menghapus voucher");
+        } catch (error: any) {
+            alert(error.response?.data?.error || "Gagal menghapus voucher");
         }
     };
 
@@ -130,11 +142,15 @@ export default function LoyaltyPage() {
     };
 
     const toggleVoucherStatus = async (voucher: any) => {
+        if (voucher.discountType === 'STORED_VALUE' && !isGiftCardAuthorized) {
+            alert("Akses Ditolak. Hanya Owner dan Super Admin yang dapat mengubah status Gift Card.");
+            return;
+        }
         try {
             await api.patch(`/vouchers/${voucher.id}`, { isActive: !voucher.isActive });
             fetchVouchers();
-        } catch (error) {
-            alert("Gagal mengubah status voucher");
+        } catch (error: any) {
+            alert(error.response?.data?.error || "Gagal mengubah status voucher");
         }
     };
 
@@ -325,9 +341,16 @@ export default function LoyaltyPage() {
                                             filteredVouchers.map((v) => (
                                                 <tr key={v.id} className="hover:bg-slate-800/30 transition-colors">
                                                     <td className="px-6 py-4">
-                                                        <span className="font-black text-white bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-lg border border-indigo-500/30">
-                                                            {v.code}
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-black text-white bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-lg border border-indigo-500/30">
+                                                                {v.code}
+                                                            </span>
+                                                            {v.discountType === 'STORED_VALUE' && (
+                                                                <span className="text-[9px] font-black tracking-widest uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                                                    <Gift className="h-3 w-3" /> Gift Card
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-sm font-bold text-slate-300">
                                                         {v.discountType === 'PERCENTAGE' ? `${v.discountValue}%` : 
@@ -369,21 +392,35 @@ export default function LoyaltyPage() {
                                                             >
                                                                 <QrCode className="h-4 w-4" />
                                                             </button>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    setEditingVoucher(v);
-                                                                    setIsVoucherModalOpen(true);
-                                                                }}
-                                                                className="p-2 text-slate-400 hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-800"
-                                                            >
-                                                                <Edit className="h-4 w-4" />
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => handleDeleteVoucher(v.id)}
-                                                                className="p-2 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-slate-800"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </button>
+                                                            {v.discountType === 'STORED_VALUE' && !isGiftCardAuthorized ? (
+                                                                <button 
+                                                                    onClick={() => alert("Akses Ditolak. Hanya Owner dan Super Admin yang dapat mengedit Gift Card.")}
+                                                                    className="p-2 text-slate-600 hover:text-amber-400 transition-colors rounded-lg hover:bg-slate-800"
+                                                                    title="Hanya Owner dan Super Admin yang dapat mengedit Gift Card"
+                                                                >
+                                                                    <Lock className="h-4 w-4 text-amber-500/70" />
+                                                                </button>
+                                                            ) : (
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setEditingVoucher(v);
+                                                                        setIsVoucherModalOpen(true);
+                                                                    }}
+                                                                    className="p-2 text-slate-400 hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-800"
+                                                                    title="Edit Voucher"
+                                                                >
+                                                                    <Edit className="h-4 w-4" />
+                                                                </button>
+                                                            )}
+                                                            {v.discountType === 'STORED_VALUE' && !isGiftCardAuthorized ? null : (
+                                                                <button 
+                                                                    onClick={() => handleDeleteVoucher(v.id)}
+                                                                    className="p-2 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-slate-800"
+                                                                    title="Hapus Voucher"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
