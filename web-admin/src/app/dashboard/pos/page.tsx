@@ -26,7 +26,10 @@ import {
     ArrowRight,
     ArrowLeft,
     Banknote,
-    Check
+    Check,
+    Clock,
+    PauseCircle,
+    PlayCircle
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -86,6 +89,15 @@ export default function POSPage() {
     const [activeTab, setActiveTab] = useState<'cart' | 'payment'>('cart');
     const [isPosFullscreen, setIsPosFullscreen] = useState(false);
     const [cashReceived, setCashReceived] = useState<number | ''>('');
+
+    // PENDING BILLS (HOLD BILL)
+    const [pendingBills, setPendingBills] = useState<any[]>([]);
+    const [activePendingBillId, setActivePendingBillId] = useState<number | null>(null);
+    const [activePendingBillLabel, setActivePendingBillLabel] = useState<string>('');
+    const [showHoldModal, setShowHoldModal] = useState(false);
+    const [showPendingBillsModal, setShowPendingBillsModal] = useState(false);
+    const [holdLabel, setHoldLabel] = useState('');
+    const [holdLoading, setHoldLoading] = useState(false);
 
     // NEW EMPLOYEE DISCOUNT FIELDS
     const [employeeDiscount, setEmployeeDiscount] = useState<{value: number, label: string} | null>(null);
@@ -187,11 +199,135 @@ export default function POSPage() {
                     if (currentComp?.name) setCompanyName(currentComp.name);
                 } catch (err) {}
             }
+
+            // Fetch pending bills list
+            fetchPendingBills();
         } catch (error) {
             console.error("Failed to fetch POS data", error);
             toast.error("Gagal mengambil data produk");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchPendingBills = async () => {
+        try {
+            const res = await api.get('/pos/pending');
+            setPendingBills(res.data || []);
+        } catch (e) {
+            console.error("Gagal mengambil pending bills:", e);
+        }
+    };
+
+    const handleHoldBill = async () => {
+        if (cart.length === 0) {
+            toast.error("Keranjang masih kosong");
+            return;
+        }
+
+        const finalLabel = holdLabel.trim() || (customerName && customerName !== 'Pelanggan Walk-in' ? customerName : `Meja #${pendingBills.length + 1}`);
+        setHoldLoading(true);
+        try {
+            // Jika sebelumnya melanjutkan pending bill, hapus bill lama agar tidak dobel
+            if (activePendingBillId) {
+                try {
+                    await api.delete(`/pos/pending/${activePendingBillId}`);
+                } catch (e) {}
+            }
+
+            const res = await api.post('/pos/hold', {
+                label: finalLabel,
+                items: cart.map(item => ({
+                    id: item.id,
+                    productId: item.id,
+                    name: item.name,
+                    price: item.price,
+                    qty: item.qty,
+                    quantity: item.qty,
+                    image: item.image,
+                    modifiers: item.modifiers,
+                    cartId: item.cartId
+                })),
+                saleType
+            });
+
+            toast.success(`Pesanan "${finalLabel}" berhasil ditahan! Antrean #${res.data?.queueNumber || '-'}`);
+            setCart([]);
+            setActivePendingBillId(null);
+            setActivePendingBillLabel('');
+            setHoldLabel('');
+            setShowHoldModal(false);
+            fetchPendingBills();
+            broadcastToCustomerDisplay({ type: 'RESET' });
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Gagal menahan pesanan");
+        } finally {
+            setHoldLoading(false);
+        }
+    };
+
+    const handleResumePendingBill = (bill: any) => {
+        let parsedItems: any[] = [];
+        if (typeof bill.items === 'string') {
+            try { parsedItems = JSON.parse(bill.items); } catch(e) {}
+        } else if (Array.isArray(bill.items)) {
+            parsedItems = bill.items;
+        }
+
+        if (!parsedItems || parsedItems.length === 0) {
+            toast.error("Data pesanan tidak valid atau kosong.");
+            return;
+        }
+
+        if (cart.length > 0) {
+            if (!confirm("Keranjang saat ini berisi item aktif. Timpa keranjang dengan pesanan tertunda ini?")) {
+                return;
+            }
+        }
+
+        const restoredCart: CartItem[] = parsedItems.map((item: any, idx: number) => {
+            const prodId = Number(item.id || item.productId);
+            const existingProd = products.find(p => p.id === prodId);
+            return {
+                id: prodId,
+                name: item.name || existingProd?.name || 'Produk',
+                price: Number(item.price || existingProd?.price || 0),
+                qty: Number(item.qty || item.quantity || 1),
+                stock: existingProd?.stock ?? 999,
+                unit: existingProd?.unit || 'pcs',
+                image: item.image || existingProd?.image,
+                category: existingProd?.category,
+                categoryId: existingProd?.categoryId,
+                modifiers: item.modifiers || null,
+                cartId: item.cartId || `${prodId}-${Date.now()}-${idx}`
+            };
+        });
+
+        setCart(restoredCart);
+        setActivePendingBillId(bill.id);
+        setActivePendingBillLabel(bill.label || `Antrean #${bill.queueNumber}`);
+        if (bill.label && !bill.label.startsWith('Meja #') && !bill.label.startsWith('Pesanan #')) {
+            setCustomerName(bill.label);
+        }
+        if (bill.saleType) {
+            setSaleType(bill.saleType);
+        }
+        setShowPendingBillsModal(false);
+        toast.success(`Pesanan "${bill.label || `Antrean #${bill.queueNumber}`}" berhasil dimuat!`);
+    };
+
+    const handleDeletePendingBill = async (id: number) => {
+        if (!confirm("Hapus pesanan tertunda ini?")) return;
+        try {
+            await api.delete(`/pos/pending/${id}`);
+            toast.success("Pending bill berhasil dihapus.");
+            if (activePendingBillId === id) {
+                setActivePendingBillId(null);
+                setActivePendingBillLabel('');
+            }
+            fetchPendingBills();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Gagal menghapus pending bill");
         }
     };
 
@@ -460,7 +596,8 @@ export default function POSPage() {
                 voucherCode,
                 voucherDiscountAmount,
                 memberDiscountAmount: discountAmount,
-                salespersonId: selectedSalesperson || null
+                salespersonId: selectedSalesperson || null,
+                pendingBillId: activePendingBillId || null
             };
 
             const res = await api.post('/pos/checkout', payload);
@@ -519,6 +656,9 @@ export default function POSPage() {
             setShowCheckoutModal(false);
             setLastCart([...cart]);
             setCart([]);
+            setActivePendingBillId(null);
+            setActivePendingBillLabel('');
+            fetchPendingBills();
             setShowReceipt(true);
         } catch (error: any) {
             toast.error(error.response?.data?.error || "Gagal memproses transaksi");
@@ -572,6 +712,19 @@ export default function POSPage() {
                                 >
                                     {isPosFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
                                     <span className="hidden sm:inline">{isPosFullscreen ? "Kecilkan" : "Layar Penuh POS"}</span>
+                                </button>
+                                <button
+                                    onClick={() => { fetchPendingBills(); setShowPendingBillsModal(true); }}
+                                    title="Daftar Pesanan Tertahan (Pending Bills)"
+                                    className="relative flex items-center gap-2 px-4 py-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-2xl text-[10px] font-black text-amber-400 hover:text-amber-300 transition-all uppercase tracking-wider italic shadow-lg shadow-amber-500/10 active:scale-95 whitespace-nowrap"
+                                >
+                                    <Clock className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Pending Bills</span>
+                                    {pendingBills.length > 0 && (
+                                        <span className="bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full min-w-[20px] text-center shadow-md animate-pulse">
+                                            {pendingBills.length}
+                                        </span>
+                                    )}
                                 </button>
                                 <button
                                     onClick={openCustomerDisplay}
@@ -719,13 +872,32 @@ export default function POSPage() {
                                 <span>Bayar & Tamu</span>
                             </button>
                         </div>
-                        <button 
-                            onClick={() => setCart([])}
-                            title="Kosongkan Pesanan"
-                            className="h-10 w-10 flex items-center justify-center bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded-xl border border-white/5 transition-all active:scale-95 shrink-0"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <button 
+                                disabled={cart.length === 0}
+                                onClick={() => {
+                                    if (cart.length === 0) return;
+                                    setHoldLabel(customerName && customerName !== 'Pelanggan Walk-in' ? customerName : '');
+                                    setShowHoldModal(true);
+                                }}
+                                title="Tahan Pesanan (Hold Bill / Pending)"
+                                className="h-10 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl border border-amber-500/30 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95"
+                            >
+                                <PauseCircle className="h-4 w-4" />
+                                <span className="hidden sm:inline">TAHAN</span>
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setCart([]);
+                                    setActivePendingBillId(null);
+                                    setActivePendingBillLabel('');
+                                }}
+                                title="Kosongkan Pesanan"
+                                className="h-10 w-10 flex items-center justify-center bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded-xl border border-white/5 transition-all active:scale-95"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Middle Scrollable Area */}
@@ -733,6 +905,29 @@ export default function POSPage() {
                         {activeTab === 'cart' ? (
                             /* TAB 1: DAFTAR KERANJANG */
                             <>
+                                {/* Active Pending Bill Indicator if resumed */}
+                                {activePendingBillId && (
+                                    <div className="flex items-center justify-between p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 text-xs animate-in slide-in-from-top-1">
+                                        <div className="flex items-center gap-2">
+                                            <PauseCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                                            <div>
+                                                <span className="text-[9px] uppercase font-bold text-amber-400 block">Melanjutkan Pending Bill:</span>
+                                                <span className="font-black text-white">{activePendingBillLabel || `#${activePendingBillId}`}</span>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                setActivePendingBillId(null);
+                                                setActivePendingBillLabel('');
+                                                toast.success("Dilepas dari pending bill (akan checkout sebagai transaksi baru).");
+                                            }}
+                                            className="text-[10px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 px-2.5 py-1 rounded-lg border border-amber-500/30"
+                                        >
+                                            Lepas
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* Quick Customer Bar */}
                                 <div className="flex items-center justify-between p-3 bg-slate-900/80 rounded-2xl border border-white/5 text-xs">
                                     <div className="flex items-center gap-2">
@@ -1712,6 +1907,191 @@ export default function POSPage() {
                                     {scanLoading ? 'Memvalidasi...' : 'Terapkan Diskon'}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* HOLD BILL MODAL */}
+            {showHoldModal && (
+                <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-white/10 w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl p-6 text-white animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/5">
+                            <div className="flex items-center gap-2.5">
+                                <div className="h-9 w-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                                    <PauseCircle className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black uppercase text-white">Tahan Pesanan (Hold Bill)</h3>
+                                    <p className="text-[10px] text-slate-400">Simpan pesanan sementara untuk dilanjutkan nanti</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowHoldModal(false)} className="text-slate-500 hover:text-white p-1">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                                    Label / Nomor Meja / Nama Pelanggan
+                                </label>
+                                <input 
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Contoh: Meja 4, Bpk Joko, dll."
+                                    value={holdLabel}
+                                    onChange={(e) => setHoldLabel(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleHoldBill();
+                                    }}
+                                    className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-2xl text-sm font-bold text-white focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
+                                />
+                            </div>
+
+                            {/* Quick Suggestion Chips */}
+                            <div className="space-y-1.5">
+                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Saran Cepat:</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {['Meja 1', 'Meja 2', 'Meja 3', 'Meja 4', 'Meja 5', 'Takeaway', 'Bungkus'].map(tag => (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => setHoldLabel(tag)}
+                                            className="px-2.5 py-1 rounded-xl text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-white/5 transition-all"
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Cart Summary */}
+                            <div className="bg-slate-950 p-3 rounded-2xl border border-white/5 text-xs flex justify-between items-center text-slate-400">
+                                <span>Ringkasan Pesanan:</span>
+                                <span className="font-bold text-white">{cart.reduce((s, c) => s + c.qty, 0)} item &bull; Rp {finalTotalAmount.toLocaleString('id-ID')}</span>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowHoldModal(false)}
+                                    className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={holdLoading}
+                                    onClick={handleHoldBill}
+                                    className="flex-1 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5"
+                                >
+                                    {holdLoading ? (
+                                        <div className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            <PauseCircle className="h-4 w-4" />
+                                            <span>Simpan & Tahan</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PENDING BILLS LIST MODAL */}
+            {showPendingBillsModal && (
+                <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-white/10 w-full max-w-2xl max-h-[85vh] rounded-[36px] shadow-2xl flex flex-col overflow-hidden text-white animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="p-5 px-6 border-b border-white/10 bg-slate-950/70 flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                                    <Clock className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black uppercase tracking-wider text-white">Daftar Pesanan Tertahan (Pending Bills)</h3>
+                                    <p className="text-xs text-slate-400">{pendingBills.length} pesanan sedang ditahan</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowPendingBillsModal(false)}
+                                className="h-10 w-10 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-2xl flex items-center justify-center transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto p-5 pos-touch-scrollbar space-y-3 bg-slate-950/20">
+                            {pendingBills.length === 0 ? (
+                                <div className="h-56 flex flex-col items-center justify-center text-slate-600 text-center gap-3">
+                                    <Clock className="h-12 w-12 opacity-30 text-slate-500" />
+                                    <p className="text-sm font-bold text-slate-400">Tidak ada pesanan yang sedang ditahan.</p>
+                                    <p className="text-xs text-slate-600">Gunakan tombol "TAHAN" pada keranjang untuk menunda pesanan.</p>
+                                </div>
+                            ) : (
+                                pendingBills.map((bill) => {
+                                    let itemsList: any[] = [];
+                                    if (typeof bill.items === 'string') {
+                                        try { itemsList = JSON.parse(bill.items); } catch(e) {}
+                                    } else if (Array.isArray(bill.items)) {
+                                        itemsList = bill.items;
+                                    }
+                                    const totalQty = itemsList.reduce((s: number, it: any) => s + (Number(it.qty || it.quantity) || 1), 0);
+                                    const totalBill = itemsList.reduce((s: number, it: any) => s + ((Number(it.price) || 0) * (Number(it.qty || it.quantity) || 1)), 0);
+
+                                    return (
+                                        <div key={bill.id} className="bg-slate-900/90 border border-white/5 hover:border-amber-500/30 p-4 rounded-3xl transition-all space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="bg-amber-500/20 text-amber-300 font-mono font-black text-xs px-2.5 py-1 rounded-xl border border-amber-500/30">
+                                                        #{bill.queueNumber || bill.id}
+                                                    </span>
+                                                    <div>
+                                                        <h4 className="font-black text-sm text-white uppercase">{bill.label || 'Pesanan Tanpa Nama'}</h4>
+                                                        <p className="text-[10px] text-slate-400">
+                                                            {new Date(bill.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} &bull; Kasir: {bill.user?.name || '-'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-xs font-black text-emerald-400">Rp {totalBill.toLocaleString('id-ID')}</div>
+                                                    <div className="text-[10px] text-slate-500 font-bold">{totalQty} item</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Items preview pills */}
+                                            <div className="flex flex-wrap gap-1 bg-slate-950 p-2.5 rounded-2xl border border-white/5 text-[11px] text-slate-300">
+                                                {itemsList.map((it: any, idx: number) => (
+                                                    <span key={idx} className="bg-slate-900 px-2 py-0.5 rounded-lg border border-white/5">
+                                                        {it.name} &times; {it.qty || it.quantity || 1}
+                                                    </span>
+                                                ))}
+                                            </div>
+
+                                            {/* Action buttons */}
+                                            <div className="flex justify-end items-center gap-2 pt-1 border-t border-white/5">
+                                                <button
+                                                    onClick={() => handleDeletePendingBill(bill.id)}
+                                                    className="px-3 py-2 text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all"
+                                                >
+                                                    Hapus
+                                                </button>
+                                                <button
+                                                    onClick={() => handleResumePendingBill(bill)}
+                                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95"
+                                                >
+                                                    <PlayCircle className="h-3.5 w-3.5" />
+                                                    <span>Lanjutkan Pesanan</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
                 </div>
