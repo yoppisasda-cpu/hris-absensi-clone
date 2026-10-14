@@ -14538,78 +14538,71 @@ app.delete('/api/pos/categories/:id', tenantMiddleware, async (req: Request, res
 
 // --- MODUL INVENTORI ---
 
-// P13. Import/Clone Products from another company
+// P13. Import/Clone Products from another company (Optimized Bulk Batching)
 app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const { sourceCompanyId, productIds } = req.body;
     const targetCompanyId = Number((req as any).tenantId);
 
-    if (!sourceCompanyId) return res.status(400).json({ error: 'Source company ID is required' });
+    if (!sourceCompanyId) return res.status(400).json({ error: 'ID perusahaan sumber wajib diisi' });
+    if (Number(sourceCompanyId) === targetCompanyId) {
+      return res.status(400).json({ error: 'Perusahaan sumber dan target tidak boleh sama' });
+    }
 
-    // 1. Fetch source products WITH recipes and materials
+    // 1. Fetch source products WITH nested recipes and customization groups
     const sourceProducts = await prisma.product.findMany({
       where: {
         companyId: Number(sourceCompanyId),
-        id: productIds ? { in: productIds.map(Number) } : undefined
+        id: productIds && productIds.length > 0 ? { in: productIds.map(Number) } : undefined
       },
       include: { 
         category: true,
+        customizations: {
+          include: {
+            Group: {
+              include: { options: true }
+            }
+          }
+        },
         Recipes: {
-          include: { Material: { include: { category: true } } }
+          include: {
+            Material: {
+              include: {
+                category: true,
+                Recipes: {
+                  include: {
+                    Material: { include: { category: true } }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     });
 
-    if (sourceProducts.length === 0) return res.status(404).json({ error: 'No products found to import' });
-
-    // --- SKU LIMIT CHECK ---
-    const targetCompanyInfo = await prisma.company.findUnique({
-      where: { id: targetCompanyId },
-      select: { addons: true }
-    });
-    
-    const addons = targetCompanyInfo?.addons || [];
-    let skuLimit = 10; // Default Free Tier
-    
-    if (addons.includes('INVENTORY_ENTERPRISE')) {
-      skuLimit = Infinity;
-    } else if (addons.includes('INVENTORY_PRO')) {
-      skuLimit = 1000;
-    } else if (addons.includes('INVENTORY_BASIC')) {
-      skuLimit = 100;
+    if (sourceProducts.length === 0) {
+      return res.status(404).json({ error: 'Tidak ada produk ditemukan untuk diimpor' });
     }
 
-    if (skuLimit !== Infinity) {
-      const currentSkuCount = await prisma.product.count({
-        where: { companyId: targetCompanyId }
-      });
-      
-      // Calculate how many products are being added. This is an estimate based on the main items imported.
-      if (currentSkuCount + sourceProducts.length > skuLimit) {
-        return res.status(403).json({ 
-          error: `Batas SKU tercapai. Anda mencoba mengimpor ${sourceProducts.length} produk, namun limit Add-on Inventory Anda adalah ${skuLimit} SKU (Saat ini: ${currentSkuCount} SKU). Silakan upgrade Add-on Inventory Anda.` 
-        });
+    // 2. Collect ALL unique products & materials that need to exist in target company
+    const allSourceMap = new Map<number, any>();
+    const queue: any[] = [...sourceProducts];
+    while (queue.length > 0) {
+      const p = queue.shift()!;
+      if (!allSourceMap.has(p.id)) {
+        allSourceMap.set(p.id, p);
+        if (p.Recipes) {
+          for (const r of p.Recipes) {
+            if (r.Material && !allSourceMap.has(r.Material.id)) {
+              queue.push(r.Material);
+            }
+          }
+        }
       }
     }
-    // --- END SKU LIMIT CHECK ---
 
-    let importedCount = 0;
-    let skippedCount = 0;
-
-    // Cache preloaded data to avoid hundreds of sequential roundtrip queries
-    const existingTargetProducts = await prisma.product.findMany({
-      where: { companyId: targetCompanyId },
-      select: { id: true, name: true, type: true, sku: true }
-    });
-    
-    // Map: name.toLowerCase() + '___' + type -> product id
-    const existingProductMap = new Map<string, number>();
-    const existingSkuSet = new Set<string>();
-    for (const p of existingTargetProducts) {
-      existingProductMap.set(`${p.name.trim().toLowerCase()}___${p.type}`, p.id);
-      if (p.sku) existingSkuSet.add(p.sku.trim().toLowerCase());
-    }
-
+    // 3. Preload target categories and create missing ones in bulk
     const existingCategories = await prisma.productCategory.findMany({
       where: { companyId: targetCompanyId },
       select: { id: true, name: true }
@@ -14619,62 +14612,106 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
       categoryMap.set(c.name.trim().toLowerCase(), c.id);
     }
 
-    // Mapping from source product ID to target product ID to avoid recreating and for linking recipes
-    const idMap = new Map<number, number>();
-
-    // Helper function to import or find a product
-    const importOrFindProduct = async (sourceProd: any) => {
-      if (idMap.has(sourceProd.id)) return idMap.get(sourceProd.id)!;
-
-      const cacheKey = `${sourceProd.name.trim().toLowerCase()}___${sourceProd.type || 'FINISHED_GOOD'}`;
-      if (existingProductMap.has(cacheKey)) {
-        const foundId = existingProductMap.get(cacheKey)!;
-        idMap.set(sourceProd.id, foundId);
-        return foundId;
-      }
-
-      // Handle Category
-      let targetCategoryId: number | null = null;
-      if (sourceProd.category?.name) {
-        const catKey = sourceProd.category.name.trim().toLowerCase();
-        if (categoryMap.has(catKey)) {
-          targetCategoryId = categoryMap.get(catKey)!;
-        } else {
-          const newCat = await prisma.productCategory.create({
-            data: { companyId: targetCompanyId, name: sourceProd.category.name.trim() }
-          });
-          categoryMap.set(catKey, newCat.id);
-          targetCategoryId = newCat.id;
+    const missingCategoryNames = new Set<string>();
+    for (const p of allSourceMap.values()) {
+      if (p.category?.name) {
+        const catName = p.category.name.trim();
+        if (!categoryMap.has(catName.toLowerCase())) {
+          missingCategoryNames.add(catName);
         }
       }
+    }
 
-      let finalSku = (sourceProd.sku && sourceProd.sku.trim() !== '') ? sourceProd.sku.trim() : null;
-      // Check SKU uniqueness before creating
+    if (missingCategoryNames.size > 0) {
+      for (const catName of missingCategoryNames) {
+        try {
+          const newCat = await prisma.productCategory.create({
+            data: { companyId: targetCompanyId, name: catName }
+          });
+          categoryMap.set(catName.toLowerCase(), newCat.id);
+        } catch (e) {
+          // If already created concurrently, re-fetch
+          const found = await prisma.productCategory.findFirst({
+            where: { companyId: targetCompanyId, name: catName }
+          });
+          if (found) categoryMap.set(catName.toLowerCase(), found.id);
+        }
+      }
+    }
+
+    // 4. Preload existing target products
+    const existingTargetProducts = await prisma.product.findMany({
+      where: { companyId: targetCompanyId },
+      select: { id: true, name: true, type: true, sku: true }
+    });
+
+    const skuToTargetId = new Map<string, number>();
+    const nameTypeToTargetId = new Map<string, number>();
+    const existingSkuSet = new Set<string>();
+
+    for (const p of existingTargetProducts) {
+      if (p.sku && p.sku.trim() !== '') {
+        const cleanSku = p.sku.trim().toLowerCase();
+        skuToTargetId.set(cleanSku, p.id);
+        existingSkuSet.add(cleanSku);
+      }
+      nameTypeToTargetId.set(`${p.name.trim().toLowerCase()}___${p.type}`, p.id);
+    }
+
+    // 5. Separate existing vs new products to create
+    const idMap = new Map<number, number>(); // sourceProductId -> targetProductId
+    let skippedCount = 0;
+    const productsToCreate: { sourceId: number; data: any }[] = [];
+
+    for (const sourceProd of allSourceMap.values()) {
+      const hasSku = Boolean(sourceProd.sku && sourceProd.sku.trim() !== '');
+      const cleanSku = hasSku ? sourceProd.sku.trim().toLowerCase() : '';
+      const nameKey = `${sourceProd.name.trim().toLowerCase()}___${sourceProd.type || 'FINISHED_GOOD'}`;
+
+      // Check if product already exists in target
+      if (hasSku && skuToTargetId.has(cleanSku)) {
+        idMap.set(sourceProd.id, skuToTargetId.get(cleanSku)!);
+        skippedCount++;
+        continue;
+      } else if (!hasSku && nameTypeToTargetId.has(nameKey)) {
+        idMap.set(sourceProd.id, nameTypeToTargetId.get(nameKey)!);
+        skippedCount++;
+        continue;
+      }
+
+      // Determine SKU for target
+      let finalSku: string | null = hasSku ? sourceProd.sku.trim() : null;
       if (finalSku) {
-        const lowerSku = finalSku.toLowerCase();
-        if (existingSkuSet.has(lowerSku)) {
-          const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const lower = finalSku.toLowerCase();
+        if (existingSkuSet.has(lower)) {
+          const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
           finalSku = `${finalSku}-COPY-${targetCompanyId}-${randomSuffix}`;
         }
         existingSkuSet.add(finalSku.toLowerCase());
       }
 
-      // Create new product
-      const newProd = await prisma.product.create({
+      let targetCategoryId: number | null = null;
+      if (sourceProd.category?.name) {
+        targetCategoryId = categoryMap.get(sourceProd.category.name.trim().toLowerCase()) || null;
+      }
+
+      productsToCreate.push({
+        sourceId: sourceProd.id,
         data: {
           companyId: targetCompanyId,
           name: sourceProd.name,
           sku: finalSku,
-          description: sourceProd.description,
+          description: sourceProd.description || null,
           price: Number(sourceProd.price) || 0,
           costPrice: Number(sourceProd.costPrice) || 0,
           unit: sourceProd.unit || 'Pcs',
           purchaseUnit: sourceProd.purchaseUnit || sourceProd.unit || 'Pcs',
           purchaseFactor: Number(sourceProd.purchaseFactor) || 1,
           minStock: Number(sourceProd.minStock) || 0,
-          showInPos: sourceProd.showInPos !== undefined ? sourceProd.showInPos : true,
-          trackStock: sourceProd.trackStock !== undefined ? sourceProd.trackStock : true,
-          isAutoDeduct: sourceProd.isAutoDeduct !== undefined ? sourceProd.isAutoDeduct : false,
+          showInPos: sourceProd.showInPos !== undefined ? Boolean(sourceProd.showInPos) : true,
+          trackStock: sourceProd.trackStock !== undefined ? Boolean(sourceProd.trackStock) : true,
+          isAutoDeduct: sourceProd.isAutoDeduct !== undefined ? Boolean(sourceProd.isAutoDeduct) : false,
+          isDiscountable: sourceProd.isDiscountable !== undefined ? Boolean(sourceProd.isDiscountable) : true,
           priceGofood: Number(sourceProd.priceGofood) || 0,
           priceGrabfood: Number(sourceProd.priceGrabfood) || 0,
           priceShopeefood: Number(sourceProd.priceShopeefood) || 0,
@@ -14682,61 +14719,195 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
           priceTiktok: Number(sourceProd.priceTiktok) || 0,
           recipeYield: Number(sourceProd.recipeYield) || 1,
           type: sourceProd.type || 'FINISHED_GOOD',
-          imageUrl: sourceProd.imageUrl,
+          fnbType: sourceProd.fnbType || 'OTHER',
+          imageUrl: sourceProd.imageUrl || null,
           categoryId: targetCategoryId,
           updatedAt: new Date()
         }
       });
+    }
 
-      existingProductMap.set(cacheKey, newProd.id);
-      idMap.set(sourceProd.id, newProd.id);
-      return newProd.id;
-    };
+    // --- SKU LIMIT CHECK ---
+    const targetCompanyInfo = await prisma.company.findUnique({
+      where: { id: targetCompanyId },
+      select: { addons: true }
+    });
+    
+    const addons = targetCompanyInfo?.addons || [];
+    let skuLimit = 10; // Default Free Tier
+    if (addons.includes('INVENTORY_ENTERPRISE')) {
+      skuLimit = Infinity;
+    } else if (addons.includes('INVENTORY_PRO')) {
+      skuLimit = 1000;
+    } else if (addons.includes('INVENTORY_BASIC')) {
+      skuLimit = 100;
+    }
 
-    // 2. Process each main product
-    for (const sourceProduct of sourceProducts) {
-      try {
-        const targetProdId = await importOrFindProduct(sourceProduct);
-        importedCount++;
+    if (skuLimit !== Infinity) {
+      const currentSkuCount = existingTargetProducts.length;
+      if (currentSkuCount + productsToCreate.length > skuLimit) {
+        return res.status(403).json({ 
+          error: `Batas SKU tercapai. Anda mencoba mengimpor ${productsToCreate.length} produk baru, namun sisa limit Add-on Inventory Anda adalah ${skuLimit - currentSkuCount} SKU (Total saat ini: ${currentSkuCount}/${skuLimit} SKU). Silakan upgrade Add-on Inventory Anda.` 
+        });
+      }
+    }
 
-        // Process Recipes if any
-        if (sourceProduct.Recipes && sourceProduct.Recipes.length > 0) {
-          for (const recipe of sourceProduct.Recipes) {
-            if (recipe.Material) {
-              // Ensure material exists in target company
-              const targetMaterialId = await importOrFindProduct(recipe.Material);
+    // 6. Bulk Insert Products in Batches of 100 with createManyAndReturn
+    let importedCount = 0;
+    for (let i = 0; i < productsToCreate.length; i += 100) {
+      const chunk = productsToCreate.slice(i, i + 100);
+      const insertedRows = await prisma.product.createManyAndReturn({
+        data: chunk.map(c => c.data),
+        select: { id: true, name: true, sku: true, type: true }
+      });
 
-              // Check if recipe link already exists to prevent duplicate
-              const existingRecipe = await prisma.productRecipe.findFirst({
-                where: { productId: targetProdId, materialId: targetMaterialId }
-              });
+      for (let j = 0; j < chunk.length; j++) {
+        const sourceId = chunk[j].sourceId;
+        const createdProduct = insertedRows[j];
+        if (createdProduct) {
+          idMap.set(sourceId, createdProduct.id);
+          if (createdProduct.sku) {
+            skuToTargetId.set(createdProduct.sku.trim().toLowerCase(), createdProduct.id);
+          }
+          nameTypeToTargetId.set(`${createdProduct.name.trim().toLowerCase()}___${createdProduct.type}`, createdProduct.id);
+          importedCount++;
+        }
+      }
+    }
 
-              if (!existingRecipe) {
-                await prisma.productRecipe.create({
-                  data: {
-                    productId: targetProdId,
-                    materialId: targetMaterialId,
-                    quantity: recipe.quantity,
-                    updatedAt: new Date()
-                  }
-                });
-              }
-            }
+    // 7. Bulk Process Recipes
+    const targetProductIds = Array.from(idMap.values());
+    const existingRecipes = await prisma.productRecipe.findMany({
+      where: { productId: { in: targetProductIds } },
+      select: { productId: true, materialId: true }
+    });
+    const existingRecipeSet = new Set(existingRecipes.map(r => `${r.productId}_${r.materialId}`));
+
+    const recipesToCreate: { productId: number; materialId: number; quantity: number; updatedAt: Date }[] = [];
+    for (const sp of allSourceMap.values()) {
+      const targetProdId = idMap.get(sp.id);
+      if (!targetProdId || !sp.Recipes || sp.Recipes.length === 0) continue;
+
+      for (const r of sp.Recipes) {
+        const sourceMaterialId = r.materialId || r.Material?.id;
+        if (!sourceMaterialId) continue;
+        const targetMaterialId = idMap.get(sourceMaterialId);
+        if (!targetMaterialId) continue;
+
+        const key = `${targetProdId}_${targetMaterialId}`;
+        if (!existingRecipeSet.has(key)) {
+          existingRecipeSet.add(key);
+          recipesToCreate.push({
+            productId: targetProdId,
+            materialId: targetMaterialId,
+            quantity: Number(r.quantity) || 1,
+            updatedAt: new Date()
+          });
+        }
+      }
+    }
+
+    if (recipesToCreate.length > 0) {
+      for (let i = 0; i < recipesToCreate.length; i += 200) {
+        await prisma.productRecipe.createMany({
+          data: recipesToCreate.slice(i, i + 200),
+          skipDuplicates: true
+        });
+      }
+    }
+
+    // 8. Bulk Process Customization Groups & Options
+    const existingGroups = await prisma.customizationGroup.findMany({
+      where: { companyId: targetCompanyId },
+      include: { options: true }
+    });
+    const groupMap = new Map<string, number>();
+    for (const g of existingGroups) {
+      groupMap.set(g.name.trim().toLowerCase(), g.id);
+    }
+
+    const sourceGroupsMap = new Map<number, any>();
+    for (const sp of allSourceMap.values()) {
+      if (sp.customizations) {
+        for (const c of sp.customizations) {
+          if (c.Group) {
+            sourceGroupsMap.set(c.Group.id, c.Group);
           }
         }
-      } catch (err) {
-        console.error(`Failed to import product ${sourceProduct.name}:`, err);
-        skippedCount++;
+      }
+    }
+
+    const groupIdMap = new Map<number, number>();
+    for (const [srcGrpId, srcGrp] of sourceGroupsMap.entries()) {
+      const key = srcGrp.name.trim().toLowerCase();
+      if (groupMap.has(key)) {
+        groupIdMap.set(srcGrpId, groupMap.get(key)!);
+      } else {
+        const newGroup = await prisma.customizationGroup.create({
+          data: {
+            companyId: targetCompanyId,
+            name: srcGrp.name.trim(),
+            isRequired: Boolean(srcGrp.isRequired),
+            minSelections: Number(srcGrp.minSelections) || 0,
+            maxSelections: Number(srcGrp.maxSelections) || 1,
+            options: srcGrp.options && srcGrp.options.length > 0 ? {
+              create: srcGrp.options.map((opt: any) => ({
+                name: opt.name,
+                price: Number(opt.price) || 0,
+                linkedProductId: opt.linkedProductId ? idMap.get(opt.linkedProductId) || null : null,
+                linkedQuantity: opt.linkedQuantity ? Number(opt.linkedQuantity) : null
+              }))
+            } : undefined
+          }
+        });
+        groupMap.set(key, newGroup.id);
+        groupIdMap.set(srcGrpId, newGroup.id);
+      }
+    }
+
+    const existingProdCustoms = await prisma.productCustomization.findMany({
+      where: { productId: { in: targetProductIds } },
+      select: { productId: true, groupId: true }
+    });
+    const existingProdCustomSet = new Set(existingProdCustoms.map(pc => `${pc.productId}_${pc.groupId}`));
+
+    const prodCustomsToCreate: { productId: number; groupId: number }[] = [];
+    for (const sp of allSourceMap.values()) {
+      const targetProdId = idMap.get(sp.id);
+      if (!targetProdId || !sp.customizations) continue;
+      for (const c of sp.customizations) {
+        const targetGroupId = groupIdMap.get(c.groupId || c.Group?.id);
+        if (targetGroupId) {
+          const key = `${targetProdId}_${targetGroupId}`;
+          if (!existingProdCustomSet.has(key)) {
+            existingProdCustomSet.add(key);
+            prodCustomsToCreate.push({
+              productId: targetProdId,
+              groupId: targetGroupId
+            });
+          }
+        }
+      }
+    }
+
+    if (prodCustomsToCreate.length > 0) {
+      for (let i = 0; i < prodCustomsToCreate.length; i += 200) {
+        await prisma.productCustomization.createMany({
+          data: prodCustomsToCreate.slice(i, i + 200),
+          skipDuplicates: true
+        });
       }
     }
 
     res.json({
-      message: `Successfully imported ${importedCount} products.`,
-      skipped: skippedCount
+      message: `Berhasil mengimpor ${importedCount} produk baru dan menyinkronkan resep & modifikasi.`,
+      imported: importedCount,
+      skipped: skippedCount,
+      recipesCreated: recipesToCreate.length
     });
   } catch (error) {
     console.error('Import Error:', error);
-    res.status(500).json({ error: 'Failed to import products' });
+    res.status(500).json({ error: 'Gagal melakukan import produk: ' + (error instanceof Error ? error.message : String(error)) });
   }
 });
 
