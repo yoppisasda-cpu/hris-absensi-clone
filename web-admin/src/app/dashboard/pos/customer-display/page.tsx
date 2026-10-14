@@ -73,6 +73,8 @@ const DEFAULT_STATE: DisplayState = {
     featuredProducts: []
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function CustomerDisplayPage() {
     const [state, setState] = useState<DisplayState>(DEFAULT_STATE);
     const [currentTime, setCurrentTime] = useState<string>('');
@@ -97,22 +99,47 @@ export default function CustomerDisplayPage() {
     useEffect(() => {
         const fetchInitialProfile = async () => {
             try {
-                const [compRes, prodRes] = await Promise.all([
-                    api.get('/companies/my'),
-                    api.get('/pos/products')
-                ]);
-                if (compRes.data?.name) {
-                    setState(prev => ({
-                        ...prev,
-                        tenantName: compRes.data.name,
-                        logoUrl: compRes.data.logoUrl || null,
-                        featuredProducts: (prodRes.data || []).slice(0, 4).map((p: any) => ({
-                            id: p.id,
-                            name: p.name,
-                            price: p.price,
-                            category: p.category?.name || 'MENU'
-                        }))
-                    }));
+                // 1. Fetch Company Name & Logo
+                try {
+                    const compRes = await api.get('/companies/my');
+                    if (compRes.data?.name) {
+                        setState(prev => ({
+                            ...prev,
+                            tenantName: compRes.data.name,
+                            logoUrl: compRes.data.logoUrl || null
+                        }));
+                    }
+                } catch (e) {
+                    try {
+                        const compRes = await api.get('/companies/accessible');
+                        const tId = typeof window !== 'undefined' ? localStorage.getItem('currentTenantId') : null;
+                        const currentComp = compRes.data?.find((c: any) => c.id.toString() === tId);
+                        if (currentComp?.name) {
+                            setState(prev => ({
+                                ...prev,
+                                tenantName: currentComp.name,
+                                logoUrl: currentComp.logoUrl || null
+                            }));
+                        }
+                    } catch (err) {}
+                }
+
+                // 2. Fetch Featured Products from Actual Database
+                try {
+                    const prodRes = await api.get('/pos/products');
+                    if (Array.isArray(prodRes.data) && prodRes.data.length > 0) {
+                        setState(prev => ({
+                            ...prev,
+                            featuredProducts: prodRes.data.slice(0, 4).map((p: any) => ({
+                                id: p.id,
+                                name: p.name,
+                                price: p.price,
+                                category: p.category?.name || 'MENU'
+                            }))
+                        }));
+                    }
+                } catch (prodErr) {
+                    console.warn('Could not load products for display', prodErr);
                 }
             } catch (e) {
                 console.warn('Could not load company profile directly for display', e);
