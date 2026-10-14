@@ -50,6 +50,7 @@ export default function Header() {
         };
 
         const fetchNotifications = async () => {
+            if (typeof document !== 'undefined' && document.hidden) return;
             try {
                 const res = await api.get('/notifications');
                 setNotifications(res.data);
@@ -65,9 +66,18 @@ export default function Header() {
         fetchCompany();
         fetchNotifications();
 
-        // Refresh notifications every 1 minute
-        const interval = setInterval(fetchNotifications, 60000);
-        return () => clearInterval(interval);
+        // Refresh notifications every 2 minutes only when tab is visible
+        const interval = setInterval(fetchNotifications, 120000);
+
+        const onVisibilityChange = () => {
+            if (!document.hidden) fetchNotifications();
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
     }, []);
 
     const markAllAsRead = async () => {

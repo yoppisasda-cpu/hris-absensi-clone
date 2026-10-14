@@ -426,6 +426,7 @@ model Attendance {
   user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([companyId, clockIn])
+  @@index([userId, clockIn(sort: Desc)])
 }
 
 model LeaveRequest {
@@ -551,6 +552,8 @@ model Notification {
   createdAt DateTime @default(now())
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, createdAt(sort: Desc)])
 }
 
 model EmployeeDocument {
@@ -913,6 +916,9 @@ model ProductRecipe {
   updatedAt  DateTime? @default(now()) @db.Timestamp(6)
   Material   Product   @relation("MaterialRecipes", fields: [materialId], references: [id], onDelete: Cascade)
   Product    Product   @relation("ProductRecipes", fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([materialId])
 }
 
 model Sale {
@@ -966,6 +972,8 @@ model Sale {
 
   @@index([companyId, date])
   @@index([companyId, branchId])
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([companyId, queueNumber])
 }
 
 model SaleItem {
@@ -979,6 +987,9 @@ model SaleItem {
   modifiers     Json?
   product       Product? @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   Sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([saleId])
+  @@index([productId])
 }
 
 model SaleReturn {
@@ -994,6 +1005,9 @@ model SaleReturn {
   updatedAt         DateTime         @default(now()) @db.Timestamp(6)
   Sale              Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   SaleReturnItem    SaleReturnItem[]
+
+  @@index([saleId])
+  @@index([companyId])
 }
 
 model SaleReturnItem {
@@ -1004,6 +1018,9 @@ model SaleReturnItem {
   price      Float
   total      Float
   SaleReturn SaleReturn @relation(fields: [returnId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([returnId])
+  @@index([productId])
 }
 
 model StockTransaction {
@@ -1019,6 +1036,9 @@ model StockTransaction {
   Product     Product    @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   supplier    Supplier?  @relation(fields: [supplierId], references: [id])
   warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+
+  @@index([productId, date(sort: Desc)])
+  @@index([warehouseId])
 }
 
 model Warehouse {
@@ -1082,6 +1102,8 @@ model PendingBill {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   user             User      @relation(fields: [cashierId], references: [id])
+
+  @@index([companyId, createdAt(sort: Desc)])
 }
 
 model PosClosing {
@@ -1618,6 +1640,8 @@ model AuditLog {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt(sort: Desc)])
 }
 
 model B2BContract {

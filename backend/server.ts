@@ -156,8 +156,27 @@ const runAutoMigration = async () => {
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "openTime" TEXT DEFAULT '08:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "closeTime" TEXT DEFAULT '22:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "isOpenManual" BOOLEAN DEFAULT true`,
+    // Performance indexes to prevent Disk IO exhaustion
+    `CREATE INDEX IF NOT EXISTS "idx_notification_company_user_created" ON "Notification" ("companyId", "userId", "createdAt" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_saleitem_saleid" ON "SaleItem" ("saleId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_saleitem_productid" ON "SaleItem" ("productId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_salereturn_saleid" ON "SaleReturn" ("saleId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_salereturn_companyid" ON "SaleReturn" ("companyId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_salereturnitem_returnid" ON "SaleReturnItem" ("returnId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_salereturnitem_productid" ON "SaleReturnItem" ("productId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_productrecipe_productid" ON "ProductRecipe" ("productId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_productrecipe_materialid" ON "ProductRecipe" ("materialId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_attendance_user_clockin" ON "Attendance" ("userId", "clockIn" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_stocktransaction_product_date" ON "StockTransaction" ("productId", "date" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_stocktransaction_warehouse" ON "StockTransaction" ("warehouseId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_sale_company_createdat" ON "Sale" ("companyId", "createdAt" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_sale_company_queuenumber" ON "Sale" ("companyId", "queueNumber")`,
+    `CREATE INDEX IF NOT EXISTS "idx_pendingbill_company_createdat" ON "PendingBill" ("companyId", "createdAt" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_auditlog_company_createdat" ON "AuditLog" ("companyId", "createdAt" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_income_company_date" ON "Income" ("companyId", "date" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_expense_company_date" ON "Expense" ("companyId", "date" DESC)`,
   ];
-  console.log('[AUTO-MIGRATION] Checking and applying missing columns...');
+  console.log('[AUTO-MIGRATION] Checking and applying missing columns and indexes...');
   for (const sql of migrations) {
     try {
       await prisma.$executeRawUnsafe(sql);
