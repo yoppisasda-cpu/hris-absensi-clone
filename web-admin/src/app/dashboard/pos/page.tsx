@@ -82,7 +82,8 @@ export default function POSPage() {
     const [scanLoading, setScanLoading] = useState(false);
     const [salespersons, setSalespersons] = useState<any[]>([]);
     const [selectedSalesperson, setSelectedSalesperson] = useState<string>("");
-    const [companyName, setCompanyName] = useState<string>('SEVENBILLION COFFEE');
+    const [companyName, setCompanyName] = useState<string>('');
+    const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
     const openCustomerDisplay = () => {
         const width = 1024;
@@ -112,13 +113,21 @@ export default function POSPage() {
             // Force manual selection to prevent accidental usage of default account
             setSelectedAccount(null);
 
-            // Fetch company name for customer display header
+            // Fetch company profile for customer display header
             try {
-                const compRes = await api.get('/companies/accessible');
-                const tId = localStorage.getItem('currentTenantId');
-                const currentComp = compRes.data?.find((c: any) => c.id.toString() === tId);
-                if (currentComp?.name) setCompanyName(currentComp.name);
-            } catch (e) {}
+                const compRes = await api.get('/companies/my');
+                if (compRes.data?.name) {
+                    setCompanyName(compRes.data.name);
+                    setCompanyLogo(compRes.data.logoUrl || null);
+                }
+            } catch (e) {
+                try {
+                    const compRes = await api.get('/companies/accessible');
+                    const tId = localStorage.getItem('currentTenantId');
+                    const currentComp = compRes.data?.find((c: any) => c.id.toString() === tId);
+                    if (currentComp?.name) setCompanyName(currentComp.name);
+                } catch (err) {}
+            }
         } catch (error) {
             console.error("Failed to fetch POS data", error);
             toast.error("Gagal mengambil data produk");
@@ -214,6 +223,7 @@ export default function POSPage() {
         const payload = overridePayload || {
             type: 'CART_UPDATE',
             tenantName: companyName,
+            logoUrl: companyLogo,
             saleType,
             customerName,
             items: cart.map(item => ({
@@ -224,6 +234,12 @@ export default function POSPage() {
                 qty: item.qty,
                 modifiers: item.modifiers,
                 total: item.price * item.qty
+            })),
+            featuredProducts: products.slice(0, 4).map(p => ({
+                id: p.id,
+                name: p.name,
+                price: p.price,
+                category: p.category?.name || 'MENU'
             })),
             subtotal,
             discountAmount: discountAmount + voucherDiscountAmount,
@@ -262,7 +278,7 @@ export default function POSPage() {
     // Auto-broadcast on any cart or checkout state changes
     useEffect(() => {
         broadcastToCustomerDisplay();
-    }, [cart, subtotal, discountAmount, voucherDiscountAmount, taxAmount, finalTotalAmount, selectedAccount, customerName, saleType, showReceipt, lastSale, companyName]);
+    }, [cart, subtotal, discountAmount, voucherDiscountAmount, taxAmount, finalTotalAmount, selectedAccount, customerName, saleType, showReceipt, lastSale, companyName, companyLogo, products]);
 
     // Listen for sync requests from newly opened customer display
     useEffect(() => {
@@ -281,7 +297,7 @@ export default function POSPage() {
         return () => {
             if (channel) channel.close();
         };
-    }, [cart, subtotal, discountAmount, voucherDiscountAmount, taxAmount, finalTotalAmount, selectedAccount, customerName, saleType, showReceipt, lastSale, companyName]);
+    }, [cart, subtotal, discountAmount, voucherDiscountAmount, taxAmount, finalTotalAmount, selectedAccount, customerName, saleType, showReceipt, lastSale, companyName, companyLogo, products]);
 
     const handleApplyVoucher = async (overrideCode?: string) => {
         const codeToApply = overrideCode || voucherCode;
@@ -366,6 +382,7 @@ export default function POSPage() {
             broadcastToCustomerDisplay({
                 type: 'TRANSACTION_SUCCESS',
                 tenantName: companyName,
+                logoUrl: companyLogo,
                 saleType,
                 customerName,
                 items: cart.map(item => ({

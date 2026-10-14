@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { 
-    Coffee, 
+    Store, 
     CheckCircle2, 
     QrCode, 
     CreditCard, 
@@ -11,12 +11,11 @@ import {
     Maximize2, 
     Minimize2,
     ShoppingBag,
-    Tag,
     Clock,
     Percent,
-    ArrowRight,
     Flame
 } from 'lucide-react';
+import api from '@/lib/api';
 
 interface CartItem {
     id: number;
@@ -28,8 +27,16 @@ interface CartItem {
     total: number;
 }
 
+interface FeaturedProduct {
+    id?: number;
+    name: string;
+    price: number;
+    category?: string;
+}
+
 interface DisplayState {
     tenantName: string;
+    logoUrl?: string | null;
     saleType: string;
     customerName: string;
     items: CartItem[];
@@ -47,10 +54,12 @@ interface DisplayState {
         changeAmount?: number;
         paymentMethod?: string;
     } | null;
+    featuredProducts: FeaturedProduct[];
 }
 
 const DEFAULT_STATE: DisplayState = {
-    tenantName: 'SEVENBILLION COFFEE',
+    tenantName: '',
+    logoUrl: null,
     saleType: 'WALK_IN',
     customerName: '',
     items: [],
@@ -60,7 +69,8 @@ const DEFAULT_STATE: DisplayState = {
     totalAmount: 0,
     paymentMethod: null,
     isCompleted: false,
-    lastSale: null
+    lastSale: null,
+    featuredProducts: []
 };
 
 export default function CustomerDisplayPage() {
@@ -83,6 +93,34 @@ export default function CustomerDisplayPage() {
         return () => clearInterval(timer);
     }, []);
 
+    // Initial direct load of company profile and products
+    useEffect(() => {
+        const fetchInitialProfile = async () => {
+            try {
+                const [compRes, prodRes] = await Promise.all([
+                    api.get('/companies/my'),
+                    api.get('/pos/products')
+                ]);
+                if (compRes.data?.name) {
+                    setState(prev => ({
+                        ...prev,
+                        tenantName: compRes.data.name,
+                        logoUrl: compRes.data.logoUrl || null,
+                        featuredProducts: (prodRes.data || []).slice(0, 4).map((p: any) => ({
+                            id: p.id,
+                            name: p.name,
+                            price: p.price,
+                            category: p.category?.name || 'MENU'
+                        }))
+                    }));
+                }
+            } catch (e) {
+                console.warn('Could not load company profile directly for display', e);
+            }
+        };
+        fetchInitialProfile();
+    }, []);
+
     // Scroll to bottom when items change
     useEffect(() => {
         if (state.items.length > 0) {
@@ -95,8 +133,10 @@ export default function CustomerDisplayPage() {
         const handleNewData = (data: any) => {
             if (!data) return;
             if (data.type === 'CART_UPDATE' || data.type === 'TRANSACTION_SUCCESS') {
-                setState({
-                    tenantName: data.tenantName || 'SEVENBILLION COFFEE',
+                setState(prev => ({
+                    ...prev,
+                    tenantName: data.tenantName || prev.tenantName || 'OUTLET KAMI',
+                    logoUrl: data.logoUrl !== undefined ? data.logoUrl : prev.logoUrl,
                     saleType: data.saleType || 'WALK_IN',
                     customerName: data.customerName || '',
                     items: Array.isArray(data.items) ? data.items : [],
@@ -106,12 +146,15 @@ export default function CustomerDisplayPage() {
                     totalAmount: Number(data.totalAmount) || 0,
                     paymentMethod: data.paymentMethod || null,
                     isCompleted: Boolean(data.isCompleted),
-                    lastSale: data.lastSale || null
-                });
+                    lastSale: data.lastSale || null,
+                    featuredProducts: data.featuredProducts && data.featuredProducts.length > 0 ? data.featuredProducts : prev.featuredProducts
+                }));
             } else if (data.type === 'RESET') {
                 setState(prev => ({
                     ...DEFAULT_STATE,
-                    tenantName: prev.tenantName
+                    tenantName: prev.tenantName,
+                    logoUrl: prev.logoUrl,
+                    featuredProducts: prev.featuredProducts
                 }));
             }
         };
@@ -121,7 +164,6 @@ export default function CustomerDisplayPage() {
             const cached = localStorage.getItem('aivola_pos_customer_state');
             if (cached) {
                 const parsed = JSON.parse(cached);
-                // Only use if within last 1 hour
                 if (parsed.timestamp && Date.now() - parsed.timestamp < 3600000) {
                     handleNewData(parsed);
                 }
@@ -168,7 +210,9 @@ export default function CustomerDisplayPage() {
                         clearInterval(interval);
                         setState(s => ({
                             ...DEFAULT_STATE,
-                            tenantName: s.tenantName
+                            tenantName: s.tenantName,
+                            logoUrl: s.logoUrl,
+                            featuredProducts: s.featuredProducts
                         }));
                         return 7;
                     }
@@ -206,13 +250,21 @@ export default function CustomerDisplayPage() {
             <header className="h-20 px-8 border-b border-white/10 bg-[#0B0F19]/80 backdrop-blur-2xl flex items-center justify-between z-20 shrink-0">
                 {/* Brand / Outlet Logo */}
                 <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 border border-white/20">
-                        <Coffee className="h-6 w-6 text-white stroke-[2.5]" />
-                    </div>
+                    {state.logoUrl ? (
+                        <img 
+                            src={state.logoUrl} 
+                            alt={state.tenantName} 
+                            className="h-12 w-12 rounded-2xl object-contain bg-white/5 border border-white/10 p-1 shadow-lg shadow-blue-500/20" 
+                        />
+                    ) : (
+                        <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 border border-white/20">
+                            <Store className="h-6 w-6 text-white stroke-[2.5]" />
+                        </div>
+                    )}
                     <div>
                         <div className="flex items-center gap-2.5">
                             <h1 className="text-xl font-black italic tracking-tight uppercase text-white">
-                                {state.tenantName}
+                                {state.tenantName || 'OUTLET KAMI'}
                             </h1>
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -279,29 +331,29 @@ export default function CustomerDisplayPage() {
                             <div>
                                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-black uppercase tracking-[0.2em] mb-6">
                                     <Sparkles className="h-3.5 w-3.5" />
-                                    PREMIUM SPECIALTY COFFEE
+                                    OFFICIAL SERVICE POINT
                                 </div>
                                 <h2 className="text-5xl font-black italic tracking-tighter uppercase leading-none text-white">
                                     SELAMAT DATANG DI <br />
                                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">
-                                        {state.tenantName}
+                                        {state.tenantName || 'OUTLET KAMI'}
                                     </span>
                                 </h2>
                                 <p className="text-base text-slate-400 font-medium tracking-wide mt-6 max-w-xl leading-relaxed">
-                                    Silakan pesan kopi dan menu favorit Anda langsung di meja kasir. Kami menyajikan seduhan biji kopi terbaik dan bahan pilihan segar setiap hari.
+                                    Silakan pilih produk dan menu favorit Anda langsung di meja kasir. Kami siap melayani pesanan Anda dengan kualitas terbaik dan bahan segar setiap hari.
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-3 gap-4 pt-8 border-t border-white/10">
                                 <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
                                     <span className="text-2xl font-black text-blue-400">100%</span>
-                                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-300 mt-1">Specialty Arabica</p>
-                                    <p className="text-[10px] text-slate-500 mt-0.5">Biji kopi pilihan kualitas juara</p>
+                                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-300 mt-1">Quality Guaranteed</p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">Produk pilihan kualitas terbaik</p>
                                 </div>
                                 <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
                                     <span className="text-2xl font-black text-indigo-400">FRESH</span>
-                                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-300 mt-1">Freshly Brewed</p>
-                                    <p className="text-[10px] text-slate-500 mt-0.5">Diseduh langsung saat dipesan</p>
+                                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-300 mt-1">Fresh & Higienis</p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">Disajikan segar untuk Anda</p>
                                 </div>
                                 <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
                                     <span className="text-2xl font-black text-purple-400">INSTANT</span>
@@ -317,50 +369,32 @@ export default function CustomerDisplayPage() {
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase tracking-widest">
                                         <Flame className="h-4 w-4" />
-                                        MENU FAVORIT
+                                        MENU PILIHAN
                                     </div>
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">RECOMMENDED</span>
                                 </div>
 
                                 <div className="space-y-3">
-                                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between hover:border-blue-500/30 transition-all">
-                                        <div className="flex items-center gap-3.5">
-                                            <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-sm">
-                                                01
+                                    {state.featuredProducts && state.featuredProducts.length > 0 ? (
+                                        state.featuredProducts.map((p, idx) => (
+                                            <div key={idx} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between hover:border-blue-500/30 transition-all">
+                                                <div className="flex items-center gap-3.5">
+                                                    <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-sm">
+                                                        0{idx + 1}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-black uppercase tracking-tight text-white">{p.name}</p>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{p.category || 'MENU'}</p>
+                                                    </div>
+                                                </div>
+                                                <span className="text-sm font-black text-blue-400 font-mono">Rp {Number(p.price || 0).toLocaleString('id-ID')}</span>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-black uppercase tracking-tight text-white">AREN COFFEE</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">7B Signature Drink</p>
-                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-8 text-center text-slate-500 text-xs italic">
+                                            Silakan pesan menu pilihan Anda di kasir
                                         </div>
-                                        <span className="text-sm font-black text-blue-400 font-mono">Rp 23.000</span>
-                                    </div>
-
-                                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between hover:border-blue-500/30 transition-all">
-                                        <div className="flex items-center gap-3.5">
-                                            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-sm">
-                                                02
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-black uppercase tracking-tight text-white">CREAMY SEVEN</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Rich & Smooth Latte</p>
-                                            </div>
-                                        </div>
-                                        <span className="text-sm font-black text-indigo-400 font-mono">Rp 25.000</span>
-                                    </div>
-
-                                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between hover:border-blue-500/30 transition-all">
-                                        <div className="flex items-center gap-3.5">
-                                            <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 font-black text-sm">
-                                                03
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-black uppercase tracking-tight text-white">BUTTERSCOTCH SEA SALT</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Sweet & Savory Blend</p>
-                                            </div>
-                                        </div>
-                                        <span className="text-sm font-black text-purple-400 font-mono">Rp 28.000</span>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -584,7 +618,7 @@ export default function CustomerDisplayPage() {
                                 PEMBAYARAN BERHASIL!
                             </h3>
                             <p className="text-sm text-slate-400 font-medium mt-2">
-                                Terima kasih atas kunjungan Anda di <span className="text-white font-bold">{state.tenantName}</span>
+                                Terima kasih atas kunjungan Anda di <span className="text-white font-bold">{state.tenantName || 'Outlet Kami'}</span>
                             </p>
 
                             {/* Queue Number Badge */}
