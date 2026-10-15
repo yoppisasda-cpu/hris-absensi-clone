@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '@/lib/api';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -8,7 +8,8 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, DollarSign, Percent, ArrowUpRight, 
-  Search, Filter, Download, Calendar, Package, Info
+  Search, Filter, Download, Calendar, Package, Info,
+  ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
@@ -39,6 +40,8 @@ interface Summary {
   avgMargin: number;
 }
 
+type SortKey = 'name' | 'qtySold' | 'revenue' | 'cogs' | 'profit' | 'marginPercentage';
+
 export default function ProfitabilityPage() {
   const [data, setData] = useState<{ products: ProductStat[], trend: TrendStat[], summary: Summary } | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -52,6 +55,10 @@ export default function ProfitabilityPage() {
   const [dateRange, setDateRange] = useState({
     startDate: format(new Date(), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd')
+  });
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({
+    key: 'profit',
+    direction: 'desc'
   });
 
   useEffect(() => {
@@ -118,12 +125,57 @@ export default function ProfitabilityPage() {
 
   const topProducts = data?.products.slice(0, 5) || [];
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return {
+          key,
+          direction: prev.direction === 'desc' ? 'asc' : 'desc'
+        };
+      }
+      return {
+        key,
+        direction: key === 'name' ? 'asc' : 'desc'
+      };
+    });
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown className="h-3 w-3 text-slate-400 opacity-40 group-hover/th:opacity-100 transition-opacity" />;
+    }
+    return sortConfig.direction === 'asc' ? (
+      <ArrowUp className="h-3.5 w-3.5 text-blue-600 stroke-[2.5px] transition-transform animate-in zoom-in-75 duration-150" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5 text-blue-600 stroke-[2.5px] transition-transform animate-in zoom-in-75 duration-150" />
+    );
+  };
+
   const filteredProducts = data?.products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || p.categoryId === Number(selectedCategory);
     return matchesSearch && matchesCategory;
   }) || [];
+
+  const sortedProducts = useMemo(() => {
+    return [...filteredProducts].sort((a, b) => {
+      const aVal = a[sortConfig.key];
+      const bVal = b[sortConfig.key];
+
+      if (sortConfig.key === 'name') {
+        const aStr = (aVal || '').toString().toLowerCase();
+        const bStr = (bVal || '').toString().toLowerCase();
+        return sortConfig.direction === 'asc' 
+          ? aStr.localeCompare(bStr) 
+          : bStr.localeCompare(aStr);
+      }
+
+      const aNum = Number(aVal || 0);
+      const bNum = Number(bVal || 0);
+      return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
+    });
+  }, [filteredProducts, sortConfig]);
 
   return (
     <DashboardLayout>
@@ -314,7 +366,7 @@ export default function ProfitabilityPage() {
               <div className="relative w-full sm:w-64 group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
                 <input 
-                  type="text"
+                  type="text" 
                   placeholder="Cari Produk / SKU..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -337,7 +389,33 @@ export default function ProfitabilityPage() {
                 </select>
               </div>
 
-              <div className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800 px-3 py-2 rounded-lg uppercase tracking-widest whitespace-nowrap">
+              {/* Dynamic Sort Dropdown */}
+              <div className="relative w-full sm:w-52">
+                <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                <select
+                  value={`${sortConfig.key}-${sortConfig.direction}`}
+                  onChange={(e) => {
+                    const [key, direction] = e.target.value.split('-');
+                    setSortConfig({ key: key as SortKey, direction: direction as 'asc' | 'desc' });
+                  }}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer transition-all font-medium"
+                >
+                  <option value="profit-desc">Urutkan: Profit Tertinggi</option>
+                  <option value="profit-asc">Urutkan: Profit Terendah</option>
+                  <option value="revenue-desc">Urutkan: Omzet Tertinggi</option>
+                  <option value="revenue-asc">Urutkan: Omzet Terendah</option>
+                  <option value="qtySold-desc">Urutkan: Terjual Terbanyak</option>
+                  <option value="qtySold-asc">Urutkan: Terjual Tersedikit</option>
+                  <option value="marginPercentage-desc">Urutkan: Margin % Tertinggi</option>
+                  <option value="marginPercentage-asc">Urutkan: Margin % Terendah</option>
+                  <option value="cogs-desc">Urutkan: HPP Tertinggi</option>
+                  <option value="cogs-asc">Urutkan: HPP Terendah</option>
+                  <option value="name-asc">Urutkan: Nama (A - Z)</option>
+                  <option value="name-desc">Urutkan: Nama (Z - A)</option>
+                </select>
+              </div>
+
+              <div className="hidden xl:flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800 px-3 py-2 rounded-lg uppercase tracking-widest whitespace-nowrap">
                 <Info className="h-3 w-3" />
                 HPP Berdasarkan Resep/BOM
               </div>
@@ -345,18 +423,72 @@ export default function ProfitabilityPage() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-[0.2em] font-black border-b border-slate-100">
+              <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-[0.2em] font-black border-b border-slate-100 select-none">
                 <tr>
-                  <th className="px-6 py-4">Nama Produk</th>
-                  <th className="px-6 py-4 text-center">Terjual</th>
-                  <th className="px-6 py-4 text-right">Omzet</th>
-                  <th className="px-6 py-4 text-right">Total HPP</th>
-                  <th className="px-6 py-4 text-right">Profit Kotor</th>
-                  <th className="px-6 py-4 text-right">Margin %</th>
+                  <th 
+                    onClick={() => handleSort('name')}
+                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group/th"
+                    title="Klik untuk mengurutkan berdasarkan nama produk"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Nama Produk</span>
+                      {renderSortIcon('name')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('qtySold')}
+                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group/th text-center"
+                    title="Klik untuk mengurutkan berdasarkan jumlah terjual"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Terjual</span>
+                      {renderSortIcon('qtySold')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('revenue')}
+                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group/th text-right"
+                    title="Klik untuk mengurutkan berdasarkan omzet"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Omzet</span>
+                      {renderSortIcon('revenue')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('cogs')}
+                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group/th text-right"
+                    title="Klik untuk mengurutkan berdasarkan total HPP"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Total HPP</span>
+                      {renderSortIcon('cogs')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('profit')}
+                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group/th text-right"
+                    title="Klik untuk mengurutkan berdasarkan profit kotor"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Profit Kotor</span>
+                      {renderSortIcon('profit')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('marginPercentage')}
+                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group/th text-right"
+                    title="Klik untuk mengurutkan berdasarkan margin %"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Margin %</span>
+                      {renderSortIcon('marginPercentage')}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredProducts.map((p) => (
+                {sortedProducts.map((p) => (
                   <tr key={p.productId} className="hover:bg-slate-50/80 transition-all group">
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
@@ -391,7 +523,7 @@ export default function ProfitabilityPage() {
                     </td>
                   </tr>
                 ))}
-                {filteredProducts.length === 0 && (
+                {sortedProducts.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-24 text-center">
                       <div className="flex flex-col items-center gap-4">
