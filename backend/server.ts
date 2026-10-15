@@ -15823,7 +15823,7 @@ app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) =
   try {
     const tenantId = Number(req.tenantId);
     const transactions = await prisma.$queryRawUnsafe(`
-      SELECT st.*, p.name as product_name, p.sku as product_sku
+      SELECT st.*, p.name as product_name, p.sku as product_sku, p.unit as product_unit, p."purchaseUnit" as product_purchase_unit
       FROM "StockTransaction" st
       JOIN "Product" p ON st."productId" = p.id
       WHERE p."companyId" = $1

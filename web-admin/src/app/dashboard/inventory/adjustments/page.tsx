@@ -119,7 +119,14 @@ export default function AdjustmentsPage() {
                                                     </div>
                                                     <div>
                                                         <p className="font-black text-white text-[11px] leading-tight italic uppercase tracking-tighter group-hover:text-indigo-400 transition-colors">{t.product_name}</p>
-                                                        <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mt-1 italic">{t.product_sku || 'UNTRACKED_SKU'}</p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest italic">{t.product_sku || 'UNTRACKED_SKU'}</p>
+                                                            {t.product_unit && (
+                                                                <span className="text-[8px] font-black uppercase tracking-wider text-indigo-400/80 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 italic">
+                                                                    {t.product_unit}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -130,9 +137,14 @@ export default function AdjustmentsPage() {
                                                 </span>
                                             </td>
                                             <td className="px-8 py-6 text-center">
-                                                <span className={`text-2xl font-black italic tracking-tighter text-glow-sm ${t.type === 'OUT' ? 'text-red-500' : t.type === 'IN' ? 'text-emerald-400' : 'text-amber-500'}`}>
-                                                    {t.type === 'OUT' ? '−' : t.type === 'IN' ? '+' : ''}{t.quantity}
-                                                </span>
+                                                <div className="flex items-baseline justify-center gap-1.5">
+                                                    <span className={`text-2xl font-black italic tracking-tighter text-glow-sm ${t.type === 'OUT' ? 'text-red-500' : t.type === 'IN' ? 'text-emerald-400' : 'text-amber-500'}`}>
+                                                        {t.type === 'OUT' ? '−' : t.type === 'IN' ? '+' : ''}{t.quantity}
+                                                    </span>
+                                                    <span className="text-[10px] font-black uppercase text-slate-400 italic tracking-wider">
+                                                        {t.product_unit || 'UNIT'}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <p className="text-slate-500 font-black italic text-[10px] uppercase tracking-widest max-w-xs truncate group-hover:text-slate-300 transition-colors">"{t.reference || 'SYSTEM_LOG'}"</p>
