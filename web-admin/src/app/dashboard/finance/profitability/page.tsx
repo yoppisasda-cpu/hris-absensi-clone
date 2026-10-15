@@ -117,15 +117,7 @@ export default function ProfitabilityPage() {
     }).format(val);
   };
 
-  if (loading && !data) return (
-    <DashboardLayout>
-      <div className="flex h-96 items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-      </div>
-    </DashboardLayout>
-  );
-
-  const topProducts = data?.products.slice(0, 5) || [];
+  const topProducts = data?.products ? data.products.slice(0, 5) : [];
 
   const handleSort = (key: SortKey) => {
     setSortConfig((prev) => {
@@ -153,12 +145,12 @@ export default function ProfitabilityPage() {
     );
   };
 
-  const filteredProducts = data?.products.filter(p => {
+  const filteredProducts = data?.products ? data.products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || p.categoryId === Number(selectedCategory);
     return matchesSearch && matchesCategory;
-  }) || [];
+  }) : [];
 
   const sortedProducts = useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
@@ -244,6 +236,14 @@ export default function ProfitabilityPage() {
       toast.error("Gagal mengekspor data ke Excel");
     }
   };
+
+  if (loading && !data) return (
+    <DashboardLayout>
+      <div className="flex h-96 items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    </DashboardLayout>
+  );
 
   return (
     <DashboardLayout>
