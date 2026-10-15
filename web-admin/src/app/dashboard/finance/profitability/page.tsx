@@ -14,6 +14,8 @@ import {
 import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import * as XLSX from 'xlsx';
+import { toast } from 'react-hot-toast';
 
 interface ProductStat {
   productId: number;
@@ -177,6 +179,72 @@ export default function ProfitabilityPage() {
     });
   }, [filteredProducts, sortConfig]);
 
+  const handleExportExcel = () => {
+    if (!sortedProducts || sortedProducts.length === 0) {
+      toast.error("Tidak ada data performa produk untuk diekspor");
+      return;
+    }
+
+    try {
+      // 1. Map data rows
+      const exportData = sortedProducts.map((p, index) => ({
+        "No": index + 1,
+        "Kode / SKU": p.sku || "-",
+        "Nama Produk": p.name,
+        "Kategori": p.categoryName || "-",
+        "Terjual": p.qtySold,
+        "Omzet (Rp)": p.revenue,
+        "Total HPP (Rp)": p.cogs,
+        "Profit Kotor (Rp)": p.profit,
+        "Margin (%)": Number(p.marginPercentage.toFixed(1))
+      }));
+
+      // 2. Summary row
+      const totalQty = sortedProducts.reduce((sum, p) => sum + (p.qtySold || 0), 0);
+      const totalRevenue = sortedProducts.reduce((sum, p) => sum + (p.revenue || 0), 0);
+      const totalCogs = sortedProducts.reduce((sum, p) => sum + (p.cogs || 0), 0);
+      const totalProfit = sortedProducts.reduce((sum, p) => sum + (p.profit || 0), 0);
+      const avgMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0;
+
+      exportData.push({
+        "No": "" as any,
+        "Kode / SKU": "TOTAL KESELURUHAN",
+        "Nama Produk": "",
+        "Kategori": "",
+        "Terjual": totalQty,
+        "Omzet (Rp)": totalRevenue,
+        "Total HPP (Rp)": totalCogs,
+        "Profit Kotor (Rp)": totalProfit,
+        "Margin (%)": Number(avgMargin.toFixed(1))
+      });
+
+      // 3. Create worksheet & auto-fit columns
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      worksheet['!cols'] = [
+        { wch: 6 },  // No
+        { wch: 18 }, // Kode / SKU
+        { wch: 32 }, // Nama Produk
+        { wch: 20 }, // Kategori
+        { wch: 12 }, // Terjual
+        { wch: 18 }, // Omzet
+        { wch: 18 }, // Total HPP
+        { wch: 18 }, // Profit Kotor
+        { wch: 14 }  // Margin %
+      ];
+
+      // 4. Create workbook & save
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Performa Produk");
+
+      const dateStr = `${dateRange.startDate}_sd_${dateRange.endDate}`;
+      XLSX.writeFile(workbook, `Laporan_Performa_Produk_${dateStr}.xlsx`);
+      toast.success("Laporan Excel berhasil diunduh");
+    } catch (err) {
+      console.error("Gagal export excel:", err);
+      toast.error("Gagal mengekspor data ke Excel");
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6 pb-12">
@@ -222,6 +290,14 @@ export default function ProfitabilityPage() {
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95 flex items-center gap-2 text-sm font-bold"
             >
               <Filter className="h-4 w-4" /> Filter
+            </button>
+            <button 
+              type="button"
+              onClick={handleExportExcel}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-md active:scale-95 flex items-center gap-2 text-sm font-bold whitespace-nowrap"
+              title="Ekspor data performa produk ke Excel (.xlsx)"
+            >
+              <Download className="h-4 w-4" /> Export Excel
             </button>
           </div>
         </div>
@@ -419,6 +495,15 @@ export default function ProfitabilityPage() {
                 <Info className="h-3 w-3" />
                 HPP Berdasarkan Resep/BOM
               </div>
+
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-md active:scale-95 flex items-center gap-2 text-sm font-bold whitespace-nowrap"
+                title="Ekspor tabel performa produk ke Excel (.xlsx)"
+              >
+                <Download className="h-4 w-4" /> Export Excel
+              </button>
             </div>
           </div>
           <div className="overflow-x-auto">
