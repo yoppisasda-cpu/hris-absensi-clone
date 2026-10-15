@@ -135,8 +135,17 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
                                         return (
                                             <tr key={item.id} className={isDone ? 'bg-emerald-500/[0.03]' : ''}>
                                                 <td className="px-4 py-3 text-white">
-                                                    {item.product?.name}
-                                                    <span className="ml-2 text-xs text-slate-500">({item.product?.unit})</span>
+                                                    <div className="font-bold text-[11px] text-white tracking-wide">{item.product?.name}</div>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        {item.product?.sku && (
+                                                            <span className="text-[9px] font-black text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 tracking-wider font-mono">
+                                                                SKU: {item.product.sku}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                                                            Satuan: {item.product?.purchaseUnit || item.product?.unit || 'Unit'}
+                                                        </span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-slate-300 font-bold">{item.quantity}</td>
                                                 <td className="px-4 py-3 text-center text-emerald-400 font-bold">{item.receivedQty || 0}</td>

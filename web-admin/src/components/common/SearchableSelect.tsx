@@ -25,7 +25,8 @@ export default function SearchableSelect({ options = [], value, onChange, placeh
     const inputRef = useRef<HTMLInputElement>(null);
 
     const filteredOptions = options.filter(option =>
-        option.name.toLowerCase().includes(searchTerm.toLowerCase())
+        option.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (option.description && option.description.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     const selectedOption = options.find(option => option.id.toString() === value?.toString());

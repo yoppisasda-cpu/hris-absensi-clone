@@ -241,7 +241,7 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, po 
                             </div>
 
                             <div className="flex gap-4 mb-4 px-4 text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] italic relative z-10">
-                                <div className="flex-[3.5]">Deskripsi Produk / Bahan</div>
+                                <div className="flex-[3.5]">Deskripsi Produk / Bahan (SKU)</div>
                                 <div className="flex-[1.8] text-center">Jumlah</div>
                                 <div className="flex-[1.8] text-right">Harga Satuan (IDR)</div>
                                 <div className="w-10"></div>
@@ -256,13 +256,26 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, po 
                                                     .filter(p => p.type === 'RAW_MATERIAL' || p.type === 'FINISHED_GOOD')
                                                     .map((p) => ({
                                                         id: p.id.toString(),
-                                                        name: `${p.name} (${p.type === 'FINISHED_GOOD' ? 'Finished Good' : 'Raw Material'})`
+                                                        name: p.sku ? `[${p.sku}] ${p.name}` : p.name,
+                                                        description: `${p.type === 'FINISHED_GOOD' ? 'Finished Good' : 'Bahan Baku'}${p.sku ? ` • SKU: ${p.sku}` : ''}`
                                                     }))
                                                 }
                                                 value={item.productId}
                                                 onChange={(val) => updateItem(index, 'productId', val.toString())}
                                                 placeholder="Pilih Barang..."
                                             />
+                                            {(() => {
+                                                const selectedProduct = products.find(p => p.id.toString() === item.productId?.toString());
+                                                if (!selectedProduct?.sku) return null;
+                                                return (
+                                                    <div className="mt-1 flex items-center gap-1.5 px-2">
+                                                        <span className="text-[8px] font-black uppercase tracking-wider text-slate-500 italic">Kode / SKU:</span>
+                                                        <span className="text-[9px] font-black text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 tracking-wider font-mono">
+                                                            {selectedProduct.sku}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                         <div className="flex-[1.8] relative group/qty">
                                             <input

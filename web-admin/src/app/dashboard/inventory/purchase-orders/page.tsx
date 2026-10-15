@@ -163,6 +163,7 @@ export default function PurchaseOrdersPage() {
             const items = po.items || [];
             const tableBody = items.map((item: any, index: number) => [
                 index + 1,
+                item.product?.sku || "-",
                 item.product?.name || "N/A",
                 `${item.quantity || 0} ${item.product?.purchaseUnit || item.product?.unit || 'Pcs'}`,
                 `Rp ${(item.price || 0).toLocaleString('id-ID')}`,
@@ -172,10 +173,10 @@ export default function PurchaseOrdersPage() {
             // Generate Table using standalone function
             autoTable(doc, {
                 startY: 100,
-                head: [['NO', 'NAMA BARANG', 'JUMLAH', 'HARGA SATUAN', 'TOTAL']],
+                head: [['NO', 'KODE / SKU', 'NAMA BARANG', 'JUMLAH', 'HARGA SATUAN', 'TOTAL']],
                 body: tableBody,
                 headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
-                foot: [['', '', '', 'TOTAL KESELURUHAN', `Rp ${((po.items?.some((i: any) => (i.receivedQty || 0) > 0) ? po.items.reduce((sum: number, item: any) => sum + ((item.receivedQty || 0) * item.price), 0) : po.totalAmount) || 0).toLocaleString('id-ID')}`]],
+                foot: [['', '', '', '', 'TOTAL KESELURUHAN', `Rp ${((po.items?.some((i: any) => (i.receivedQty || 0) > 0) ? po.items.reduce((sum: number, item: any) => sum + ((item.receivedQty || 0) * item.price), 0) : po.totalAmount) || 0).toLocaleString('id-ID')}`]],
                 footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 11 },
                 theme: 'grid',
                 styles: { fontSize: 9, cellPadding: 4, font: 'helvetica' }
