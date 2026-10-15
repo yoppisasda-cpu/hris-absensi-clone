@@ -47,6 +47,15 @@ export default function AdjustmentsPage() {
         }
     };
 
+    const formatQuantity = (val: number | string) => {
+        const num = Math.abs(Number(val) || 0);
+        if (num === 0) return '0';
+        if (Number.isInteger(num)) return num.toString();
+        const rounded = Number(num.toFixed(2));
+        if (rounded === 0) return '0.01';
+        return rounded.toString();
+    };
+
     return (
         <DashboardLayout>
             <div className="mb-10">
@@ -139,7 +148,7 @@ export default function AdjustmentsPage() {
                                             <td className="px-8 py-6 text-center">
                                                 <div className="flex items-baseline justify-center gap-1.5">
                                                     <span className={`text-2xl font-black italic tracking-tighter text-glow-sm ${t.type === 'OUT' ? 'text-red-500' : t.type === 'IN' ? 'text-emerald-400' : 'text-amber-500'}`}>
-                                                        {t.type === 'OUT' ? '−' : t.type === 'IN' ? '+' : ''}{t.quantity}
+                                                        {t.type === 'OUT' ? '−' : t.type === 'IN' ? '+' : ''}{formatQuantity(t.quantity)}
                                                     </span>
                                                     <span className="text-[10px] font-black uppercase text-slate-400 italic tracking-wider">
                                                         {t.product_unit || 'UNIT'}

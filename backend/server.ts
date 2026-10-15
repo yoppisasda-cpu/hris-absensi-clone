@@ -15822,14 +15822,18 @@ app.post('/api/products/sync-bulk-stock', tenantMiddleware, async (req: Request,
 app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) => {
   try {
     const tenantId = Number(req.tenantId);
-    const transactions = await prisma.$queryRawUnsafe(`
+    const transactions: any[] = await prisma.$queryRawUnsafe(`
       SELECT st.*, p.name as product_name, p.sku as product_sku, p.unit as product_unit, p."purchaseUnit" as product_purchase_unit
       FROM "StockTransaction" st
       JOIN "Product" p ON st."productId" = p.id
       WHERE p."companyId" = $1
       ORDER BY st."createdAt" DESC
     `, tenantId);
-    res.json(transactions);
+    const formatted = transactions.map(t => ({
+      ...t,
+      quantity: t.quantity != null ? Number(Number(t.quantity).toFixed(2)) : t.quantity
+    }));
+    res.json(formatted);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil data transaksi: ' + error.message });
   }
