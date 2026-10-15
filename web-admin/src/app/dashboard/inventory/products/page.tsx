@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, Filter, MoreVertical, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit3, Trash2, Box, Info, TrendingUp, ScanLine, MapPin, Edit2, Tag, ChefHat, Building2, CheckCircle2, Truck } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Edit3, Trash2, Box, Info, TrendingUp, ScanLine, MapPin, Edit2, Tag, ChefHat, Building2, CheckCircle2, Truck, History } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import AddProductModal from "@/components/inventory/AddProductModal";
@@ -186,6 +187,12 @@ export default function ProductsPage() {
                     >
                         <Tag className="h-4 w-4" /> Kategori
                     </button>
+                    <Link 
+                        href="/dashboard/inventory/adjustments"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-3.5 text-[10px] font-black text-slate-400 hover:bg-slate-800 hover:text-white transition-all uppercase tracking-widest italic"
+                    >
+                        <History className="h-4 w-4 text-indigo-400" /> Riwayat Stok
+                    </Link>
                     <button 
                         onClick={() => {
                             setSelectedProduct(null);

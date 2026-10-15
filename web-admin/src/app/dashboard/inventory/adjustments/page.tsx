@@ -55,11 +55,11 @@ export default function AdjustmentsPage() {
                         <History className="h-6 w-6 stroke-[2.5px]" />
                     </div>
                     <h1 className="text-4xl font-black italic tracking-tighter text-white uppercase text-glow-sm">
-                        Analisis <span className="text-indigo-500">Pergerakan</span>
+                        Riwayat & Mutasi <span className="text-indigo-500">Stok</span>
                     </h1>
                 </div>
                 <p className="text-[11px] font-black text-slate-500 tracking-[0.2em] uppercase italic max-w-2xl leading-relaxed">
-                    Jalur audit rinci dari pergerakan stok global. Pantau setiap penambahan, pengurangan, dan koreksi di seluruh jaringan logistik.
+                    Jalur audit rinci dari seluruh riwayat pergerakan stok: Penjualan POS, Pembelian (PO), Koreksi Opname, dan Transfer Gudang.
                 </p>
             </div>
 
