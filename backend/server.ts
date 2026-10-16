@@ -16411,7 +16411,16 @@ app.get('/api/customers/me/vouchers', tenantMiddleware, async (req: Request, res
     if (!customer) return res.json([]);
 
     const claimed = await prisma.customerVoucher.findMany({
-      where: { customerId: customer.id, isUsed: false },
+      where: { 
+        customerId: customer.id, 
+        isUsed: false,
+        voucher: {
+          isActive: true,
+          targetAudience: 'PUBLIC',
+          discountType: { not: 'STORED_VALUE' },
+          code: { not: 'KARYAWAN' }
+        }
+      },
       include: { voucher: true }
     });
     res.json(claimed.map(c => ({ ...c.voucher, claimedId: c.id })));
@@ -16554,8 +16563,14 @@ app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: 
     if (voucher.quota > 0 && voucher.usedCount >= voucher.quota) {
       return res.status(400).json({ error: 'Kuota voucher sudah habis' });
     }
+    if (voucher.discountType === 'STORED_VALUE') {
+      return res.status(400).json({ error: 'Gift Card tidak dapat diklaim sebagai voucher. Penggunaannya hanya melalui scan barcode di kasir.' });
+    }
+    if (voucher.targetAudience === 'EMPLOYEE' || voucher.code.toUpperCase() === 'KARYAWAN') {
+      return res.status(400).json({ error: 'Diskon karyawan tidak dapat diklaim sebagai voucher. Penggunaannya hanya melalui scan barcode ID Karyawan di kasir.' });
+    }
     if (voucher.targetAudience !== 'PUBLIC' && user.role !== 'EMPLOYEE' && user.role !== 'SUPERADMIN' && user.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Voucher ini khusus untuk internal karyawan' });
+      return res.status(403).json({ error: 'Voucher ini tidak tersedia untuk publik.' });
     }
 
     let customer = await prisma.customer.findFirst({ where: { email: user.email } });
@@ -16747,7 +16762,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         const now = new Date();
         const isNotExpired = (!voucher?.validUntil || voucher.validUntil >= now) && (!voucher?.validFrom || voucher.validFrom <= now);
         const hasQuota = !voucher?.quota || voucher.usedCount < voucher.quota;
-        const isPublicVoucher = voucher?.targetAudience === 'PUBLIC';
+        const isPublicVoucher = voucher?.targetAudience === 'PUBLIC' && voucher?.discountType !== 'STORED_VALUE' && voucher?.code.toUpperCase() !== 'KARYAWAN';
         
         let totalQuantity = 0;
         for (const item of items) {
@@ -18954,6 +18969,10 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
         return res.status(400).json({ error: 'Voucher tidak valid atau sudah tidak aktif.' });
       }
 
+      if (voucher.targetAudience === 'EMPLOYEE' || voucher.code.toUpperCase() === 'KARYAWAN') {
+        return res.status(400).json({ error: 'Diskon karyawan hanya dapat digunakan melalui Scan Barcode / QR ID Karyawan di kasir.' });
+      }
+
       const now = new Date();
       if ((voucher.validFrom && now < voucher.validFrom) || (voucher.validUntil && now > voucher.validUntil)) {
         return res.status(400).json({ error: 'Voucher sudah kedaluwarsa atau belum bisa digunakan.' });
@@ -21002,6 +21021,8 @@ app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response
         companyId, 
         isActive: true,
         targetAudience: 'PUBLIC',
+        discountType: { not: 'STORED_VALUE' },
+        code: { not: 'KARYAWAN' },
         AND: [
           {
             OR: [
