@@ -29,7 +29,10 @@ import {
     Check,
     Clock,
     PauseCircle,
-    PlayCircle
+    PlayCircle,
+    Smartphone,
+    RefreshCw,
+    AlertCircle
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -101,6 +104,14 @@ export default function POSPage() {
     const [holdLoading, setHoldLoading] = useState(false);
     const isFirstPendingFetch = useRef(true);
     const prevPendingCountRef = useRef(0);
+
+    // MOBILE ORDERS (AIVOLA GO / ONLINE / QR MEJA)
+    const [activeMobileOrders, setActiveMobileOrders] = useState<any[]>([]);
+    const [showMobileOrdersModal, setShowMobileOrdersModal] = useState(false);
+    const [mobileOrdersLoading, setMobileOrdersLoading] = useState(false);
+    const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
+    const isFirstMobileFetch = useRef(true);
+    const prevMobileCountRef = useRef(0);
 
     // NEW EMPLOYEE DISCOUNT FIELDS
     const [employeeDiscount, setEmployeeDiscount] = useState<{value: number, label: string} | null>(null);
@@ -203,8 +214,9 @@ export default function POSPage() {
                 } catch (err) {}
             }
 
-            // Fetch pending bills list
+            // Fetch pending bills list & mobile orders
             fetchPendingBills();
+            fetchActiveMobileOrders();
         } catch (error) {
             console.error("Failed to fetch POS data", error);
             toast.error("Gagal mengambil data produk");
@@ -256,10 +268,79 @@ export default function POSPage() {
         }
     };
 
-    // Auto-sync polling every 8 detik dari tablet satelit / perangkat kasir lainnya
+    const fetchActiveMobileOrders = async (isSilent = false) => {
+        try {
+            if (!isSilent) setMobileOrdersLoading(true);
+            const userBranchId = typeof window !== 'undefined' ? localStorage.getItem('userBranchId') : null;
+            let endpoint = '/sales?status=PENDING,PROCESSING,READY&saleType=ONLINE&includeItems=true';
+            if (userBranchId) endpoint += `&branchId=${userBranchId}`;
+            const res = await api.get(endpoint);
+            const data = Array.isArray(res.data) ? res.data : [];
+
+            if (isSilent && !isFirstMobileFetch.current && data.length > prevMobileCountRef.current) {
+                const diff = data.length - prevMobileCountRef.current;
+                playChime();
+                toast.success(`Ada ${diff} pesanan baru dari Mobile Order / Web!`, {
+                    icon: '📱',
+                    duration: 5000
+                });
+            }
+
+            isFirstMobileFetch.current = false;
+            prevMobileCountRef.current = data.length;
+            setActiveMobileOrders(data);
+        } catch (e) {
+            if (!isSilent) console.error("Gagal mengambil pesanan mobile aktif:", e);
+        } finally {
+            if (!isSilent) setMobileOrdersLoading(false);
+        }
+    };
+
+    const handleUpdateMobileOrderStatus = async (orderId: number, newStatus: string) => {
+        setUpdatingOrderId(orderId);
+        try {
+            const payload: any = { status: newStatus };
+            if (newStatus === 'PAID' || newStatus === 'PROCESSING') {
+                if (selectedAccount) payload.accountId = selectedAccount;
+            }
+            await api.patch(`/sales/${orderId}/status`, payload);
+            toast.success(`Status pesanan berhasil diubah ke ${newStatus}`);
+            await fetchActiveMobileOrders(true);
+        } catch (e: any) {
+            toast.error("Gagal mengubah status: " + (e.response?.data?.error || e.message));
+        } finally {
+            setUpdatingOrderId(null);
+        }
+    };
+
+    const handlePrintMobileOrder = (order: any) => {
+        const formattedCart: CartItem[] = (order.items || []).map((it: any, idx: number) => ({
+            id: it.productId || it.id || idx,
+            cartId: `mobile_${order.id}_${idx}`,
+            name: it.name || it.product?.name || 'Item',
+            price: Number(it.price) || 0,
+            qty: Number(it.quantity || it.qty) || 1,
+            stock: 999,
+            unit: 'pcs',
+            modifiers: it.modifiers
+        }));
+        setLastCart(formattedCart);
+        setLastSale({
+            ...order,
+            items: formattedCart,
+            cashierName: order.salespersonName || 'Pesanan Online',
+            paidAmount: order.totalAmount,
+            changeAmount: 0
+        });
+        setShowReceipt(true);
+    };
+
+    // Auto-sync polling every 8 detik dari tablet satelit & pesanan mobile online
     useEffect(() => {
+        fetchActiveMobileOrders(true);
         const timer = setInterval(() => {
             fetchPendingBills(true);
+            fetchActiveMobileOrders(true);
         }, 8000);
         return () => clearInterval(timer);
     }, []);
@@ -778,6 +859,19 @@ export default function POSPage() {
                                     {pendingBills.length > 0 && (
                                         <span className="bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full min-w-[20px] text-center shadow-md animate-pulse">
                                             {pendingBills.length}
+                                        </span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => { fetchActiveMobileOrders(); setShowMobileOrdersModal(true); }}
+                                    title="Pesanan Mobile Aktif (Aivola Go / Web Order)"
+                                    className="relative flex items-center gap-2 px-4 py-4 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-2xl text-[10px] font-black text-sky-400 hover:text-sky-300 transition-all uppercase tracking-wider italic shadow-lg shadow-sky-500/10 active:scale-95 whitespace-nowrap"
+                                >
+                                    <Smartphone className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Pesanan Mobile</span>
+                                    {activeMobileOrders.length > 0 && (
+                                        <span className="bg-sky-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full min-w-[20px] text-center shadow-md animate-pulse">
+                                            {activeMobileOrders.length}
                                         </span>
                                     )}
                                 </button>
@@ -2153,6 +2247,243 @@ export default function POSPage() {
                                                     <PlayCircle className="h-3.5 w-3.5" />
                                                     <span>Lanjutkan Pesanan</span>
                                                 </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ACTIVE MOBILE ORDERS MODAL */}
+            {showMobileOrdersModal && (
+                <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-white/10 w-full max-w-3xl max-h-[85vh] rounded-[36px] shadow-2xl flex flex-col overflow-hidden text-white animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="p-5 px-6 border-b border-white/10 bg-slate-950/70 flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                                    <Smartphone className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-base font-black uppercase tracking-wider text-white">Pesanan Mobile Aktif</h3>
+                                        <span className="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full font-bold">
+                                            Online / QR Meja
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-400">{activeMobileOrders.length} pesanan aktif memerlukan penanganan</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => fetchActiveMobileOrders(false)}
+                                    disabled={mobileOrdersLoading}
+                                    title="Segarkan Pesanan"
+                                    className="h-10 px-3 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-2xl flex items-center gap-2 transition-colors text-xs font-bold disabled:opacity-50"
+                                >
+                                    <RefreshCw className={`h-4 w-4 ${mobileOrdersLoading ? 'animate-spin' : ''}`} />
+                                    <span className="hidden sm:inline">Segarkan</span>
+                                </button>
+                                <button 
+                                    onClick={() => setShowMobileOrdersModal(false)}
+                                    className="h-10 w-10 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-2xl flex items-center justify-center transition-colors"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto p-5 pos-touch-scrollbar space-y-4 bg-slate-950/20">
+                            {activeMobileOrders.length === 0 ? (
+                                <div className="h-64 flex flex-col items-center justify-center text-slate-600 text-center gap-3">
+                                    <Smartphone className="h-14 w-14 opacity-25 text-sky-400" />
+                                    <p className="text-sm font-bold text-slate-400">Belum ada pesanan mobile aktif saat ini.</p>
+                                    <p className="text-xs text-slate-600 max-w-sm">
+                                        Pesanan yang dibuat pelanggan dari web order (QR Meja atau Aivola Go) akan otomatis masuk dan bersuara secara real-time.
+                                    </p>
+                                </div>
+                            ) : (
+                                activeMobileOrders.map((order) => {
+                                    const status = order.status || 'PENDING';
+                                    const isPending = status === 'PENDING';
+                                    const isProcessing = status === 'PROCESSING';
+                                    const isReady = status === 'READY';
+                                    const isPaid = status === 'PAID';
+
+                                    let badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+                                    let badgeText = 'PENDING (MENUNGGU)';
+                                    if (isProcessing) {
+                                        badgeColor = 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+                                        badgeText = 'SEDANG DIPROSES';
+                                    } else if (isReady) {
+                                        badgeColor = 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+                                        badgeText = 'SIAP DIAMBIL';
+                                    } else if (isPaid) {
+                                        badgeColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+                                        badgeText = 'SUDAH DIBAYAR';
+                                    }
+
+                                    const itemsList = order.items || [];
+                                    const totalQty = itemsList.reduce((acc: number, it: any) => acc + (Number(it.quantity || it.qty) || 1), 0);
+
+                                    return (
+                                        <div 
+                                            key={order.id} 
+                                            className={`bg-slate-900/90 border rounded-3xl p-5 transition-all space-y-4 shadow-lg ${
+                                                isPending 
+                                                    ? 'border-amber-500/40 shadow-amber-500/5' 
+                                                    : isProcessing 
+                                                        ? 'border-blue-500/40 shadow-blue-500/5' 
+                                                        : 'border-white/10 hover:border-sky-500/30'
+                                            }`}
+                                        >
+                                            {/* Header Card */}
+                                            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/5 pb-3">
+                                                <div>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-mono font-black text-sm text-sky-400">
+                                                            {order.invoiceNumber}
+                                                        </span>
+                                                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border uppercase tracking-wider ${badgeColor}`}>
+                                                            {badgeText}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-400 flex-wrap">
+                                                        <span className="font-semibold text-white">Pelanggan: {order.customerName || 'Walk-in / Guest'}</span>
+                                                        <span>&bull;</span>
+                                                        <span>{new Date(order.date || order.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-base font-black text-emerald-400">
+                                                        Rp {Number(order.totalAmount || 0).toLocaleString('id-ID')}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 font-bold">{totalQty} item pesanan</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Delivery & Payment Info */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-slate-950/60 p-3 rounded-2xl border border-white/5">
+                                                <div className="flex items-center gap-2 text-slate-300">
+                                                    <span className="text-slate-500 font-semibold">Tipe:</span>
+                                                    <span className="font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
+                                                        {order.deliveryMethod || 'Dine-in'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-slate-300">
+                                                    <span className="text-slate-500 font-semibold">Pembayaran:</span>
+                                                    <span className="font-bold text-sky-300 bg-sky-500/10 px-2 py-0.5 rounded-lg border border-sky-500/20">
+                                                        {order.paymentMethod || 'Bayar di Kasir'}
+                                                    </span>
+                                                </div>
+                                                {order.notes && (
+                                                    <div className="col-span-full flex items-start gap-2 pt-1 text-amber-300 text-[11px] font-medium border-t border-white/5 mt-1">
+                                                        <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-400" />
+                                                        <span>Catatan: {order.notes}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Items Breakdown */}
+                                            <div className="space-y-2 bg-slate-950 p-3.5 rounded-2xl border border-white/5">
+                                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex justify-between">
+                                                    <span>Daftar Menu</span>
+                                                    <span>Subtotal</span>
+                                                </div>
+                                                <div className="divide-y divide-white/5 space-y-2">
+                                                    {itemsList.map((item: any, idx: number) => {
+                                                        const itemMods = Array.isArray(item.modifiers) ? item.modifiers : (typeof item.modifiers === 'string' ? JSON.parse(item.modifiers || '[]') : []);
+                                                        return (
+                                                            <div key={idx} className="pt-2 first:pt-0">
+                                                                <div className="flex items-center justify-between text-xs">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-black text-white">{item.name}</span>
+                                                                        <span className="bg-slate-800 text-sky-400 font-bold px-1.5 py-0.5 rounded text-[10px]">
+                                                                            &times;{item.quantity || item.qty || 1}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="font-bold text-slate-300 text-xs">
+                                                                        Rp {Number(item.subtotal || (item.price * (item.quantity || item.qty || 1))).toLocaleString('id-ID')}
+                                                                    </span>
+                                                                </div>
+                                                                {itemMods && itemMods.length > 0 && (
+                                                                    <div className="text-[10px] text-slate-400 italic pl-3 pt-0.5 space-y-0.5">
+                                                                        {itemMods.map((mod: any, mIdx: number) => (
+                                                                            <div key={mIdx}>+ {mod.optionName || mod.name} {mod.price > 0 ? `(+Rp ${Number(mod.price).toLocaleString('id-ID')})` : ''}</div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-white/5">
+                                                <button
+                                                    onClick={() => handlePrintMobileOrder(order)}
+                                                    className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 border border-white/5"
+                                                    title="Cetak Struk Pesanan"
+                                                >
+                                                    <Printer className="h-3.5 w-3.5 text-sky-400" />
+                                                    <span>Cetak Struk</span>
+                                                </button>
+
+                                                <div className="flex items-center gap-2">
+                                                    {isPending && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleUpdateMobileOrderStatus(order.id, 'CANCELLED')}
+                                                                disabled={updatingOrderId === order.id}
+                                                                className="px-3.5 py-2.5 border border-red-500/40 text-red-400 hover:bg-red-500/10 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50"
+                                                            >
+                                                                Tolak
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleUpdateMobileOrderStatus(order.id, 'PROCESSING')}
+                                                                disabled={updatingOrderId === order.id}
+                                                                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                                            >
+                                                                <Check className="h-3.5 w-3.5 stroke-[3px]" />
+                                                                <span>Terima Pesanan</span>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {isProcessing && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleUpdateMobileOrderStatus(order.id, 'READY')}
+                                                                disabled={updatingOrderId === order.id}
+                                                                className="px-3.5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-purple-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                                            >
+                                                                <span>Siap Diambil</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleUpdateMobileOrderStatus(order.id, 'COMPLETED')}
+                                                                disabled={updatingOrderId === order.id}
+                                                                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                                            >
+                                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                <span>Selesai</span>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {(isReady || isPaid) && (
+                                                        <button
+                                                            onClick={() => handleUpdateMobileOrderStatus(order.id, 'COMPLETED')}
+                                                            disabled={updatingOrderId === order.id}
+                                                            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                                        >
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                            <span>Selesai / Diambil</span>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     );
