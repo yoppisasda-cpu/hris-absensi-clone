@@ -16757,15 +16757,29 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         const validPurchase = voucher && subtotal >= voucher.minPurchase;
         const validQuantity = voucher && voucher.minQuantity > 0 && totalQuantity >= voucher.minQuantity;
 
+        const prodIds = items.map((i: any) => Number(i.productId)).filter(Boolean);
+        const dbProducts = prodIds.length > 0 ? await tx.product.findMany({
+          where: { id: { in: prodIds } },
+          select: { id: true, isDiscountable: true }
+        }) : [];
+        const discMap = new Map(dbProducts.map(p => [p.id, p.isDiscountable]));
+        let discountableSubtotal = 0;
+        for (const item of items) {
+          const isDisc = discMap.get(Number(item.productId)) !== false;
+          if (isDisc) {
+            discountableSubtotal += (Number(item.price) || 0) * (Number(item.quantity) || 1);
+          }
+        }
+
         if (voucher && voucher.isActive && isNotExpired && hasQuota && isPublicVoucher && (voucher.minPurchase === 0 || validPurchase || validQuantity)) {
           voucherCode = voucher.code;
           if (voucher.discountType === 'PERCENTAGE') {
-            voucherDiscountAmount = subtotal * (voucher.discountValue / 100);
+            voucherDiscountAmount = discountableSubtotal * (voucher.discountValue / 100);
             if (voucher.maxDiscount && voucherDiscountAmount > voucher.maxDiscount) {
               voucherDiscountAmount = voucher.maxDiscount;
             }
           } else if (voucher.discountType === 'STORED_VALUE') {
-            voucherDiscountAmount = Math.min(subtotal, voucher.currentBalance || 0);
+            voucherDiscountAmount = Math.min(discountableSubtotal, voucher.currentBalance || 0);
           } else {
             voucherDiscountAmount = voucher.discountValue;
           }
@@ -18651,6 +18665,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
         categoryId: true,
         trackStock: true,
         isAutoDeduct: true,
+        isDiscountable: true,
         type: true,
         recipeYield: true,
         WarehouseStock: {

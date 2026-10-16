@@ -346,7 +346,8 @@ export default function POSPage() {
                 category: existingProd?.category,
                 categoryId: existingProd?.categoryId,
                 modifiers: item.modifiers || null,
-                cartId: item.cartId || `${prodId}-${Date.now()}-${idx}`
+                cartId: item.cartId || `${prodId}-${Date.now()}-${idx}`,
+                isDiscountable: item.isDiscountable !== undefined ? item.isDiscountable : (existingProd?.isDiscountable ?? true)
             };
         });
 
@@ -1026,9 +1027,16 @@ export default function POSPage() {
                                                             ))}
                                                         </div>
                                                     )}
-                                                    <p className="text-[11px] text-blue-400 font-black mt-0.5">
-                                                        Rp {item.price.toLocaleString('id-ID')}
-                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <p className="text-[11px] text-blue-400 font-black">
+                                                            Rp {item.price.toLocaleString('id-ID')}
+                                                        </p>
+                                                        {item.isDiscountable === false && (
+                                                            <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                                                                Non-Diskon
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center bg-slate-950 rounded-xl p-1 gap-1 border border-white/10 shrink-0">
                                                     <button 
@@ -1262,7 +1270,11 @@ export default function POSPage() {
                                         <ShieldCheck className="w-3.5 h-3.5" />
                                         {employeeDiscount.label} ({employeeDiscount.value}%)
                                     </span>
-                                    <span>-Rp {discountAmount.toLocaleString('id-ID')}</span>
+                                    <span>
+                                        {discountAmount > 0 
+                                            ? `-Rp ${discountAmount.toLocaleString('id-ID')}` 
+                                            : (discountableSubtotal === 0 && subtotal > 0 ? "Rp 0 (Produk Non-Diskon)" : "-Rp 0")}
+                                    </span>
                                 </div>
                             )}
 
