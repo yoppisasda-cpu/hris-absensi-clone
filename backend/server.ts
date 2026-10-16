@@ -17105,7 +17105,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     
     console.log(`[Socket Debug] Order created with status: ${orderStatus}, target branch: ${targetBranchId}`);
 
-    if (orderStatus === 'PENDING') {
+    if (['PENDING', 'PROCESSING', 'PAID', 'APPROVED'].includes(orderStatus)) {
       try {
         const saleItems = await prisma.saleItem.findMany({
           where: { saleId: result.id },
@@ -17155,6 +17155,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           if (socketId) {
             io.to(socketId).emit('new_mobile_order', orderPayload);
           }
+          io.to(`company_${bKey}`).emit('new_mobile_order', orderPayload);
         }
         io.to(`company_${tenantId}`).emit('new_mobile_order', orderPayload);
         io.emit('new_mobile_order', orderPayload);
@@ -17519,15 +17520,35 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
 
   let { branchId, startDate, endDate, paymentMethod, saleType, status } = query;
 
+  const currentCompany = await prisma.company.findUnique({
+    where: { id: tenantId },
+    select: { id: true, franchiseId: true }
+  });
+
   let whereConditions = [`s."companyId" = $1`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')` ];
   let queryParams: any[] = [tenantId];
   let paramIndex = 2;
 
+  if (currentCompany?.franchiseId && (saleType === 'ONLINE' || status?.toString().includes('PENDING'))) {
+    const franchiseCompanies = await prisma.company.findMany({
+      where: { franchiseId: currentCompany.franchiseId },
+      select: { id: true }
+    });
+    const fIds = franchiseCompanies.map(c => c.id);
+    whereConditions[0] = `(s."companyId" = $1 OR (s."saleType" = 'ONLINE' AND s."companyId" IN (${fIds.join(',')}) AND (s."branchId" = $1 OR s."branchId" IS NULL OR s."branchId" = 0)))`;
+  }
+
   if (status && status !== 'all') {
     const statuses = (status as string).split(',');
-    const inList = statuses.map((_, i) => `$${paramIndex++}`).join(', ');
-    whereConditions.push(`s."status" IN (${inList})`);
-    queryParams.push(...statuses);
+    if (saleType === 'ONLINE' && statuses.includes('PENDING')) {
+      const inList = statuses.map((_, i) => `$${paramIndex++}`).join(', ');
+      whereConditions.push(`(s."status" IN (${inList}) OR (s."status" = 'PAID' AND (s."kitchenStatus" IS NULL OR s."kitchenStatus" IN ('PENDING', 'PROCESSING', 'READY'))))`);
+      queryParams.push(...statuses);
+    } else {
+      const inList = statuses.map((_, i) => `$${paramIndex++}`).join(', ');
+      whereConditions.push(`s."status" IN (${inList})`);
+      queryParams.push(...statuses);
+    }
   }
 
   if (isPosViewer) {
@@ -17546,8 +17567,8 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
     if (effectiveBranchId === 'null') {
       whereConditions.push(`s."branchId" IS NULL`);
     } else {
-      if (isPosViewer) {
-        whereConditions.push(`(s."branchId" = $${paramIndex} OR s."branchId" IS NULL)`);
+      if (isPosViewer || saleType === 'ONLINE') {
+        whereConditions.push(`(s."branchId" = $${paramIndex} OR s."branchId" IS NULL OR s."branchId" = 0)`);
       } else {
         whereConditions.push(`s."branchId" = $${paramIndex}`);
       }

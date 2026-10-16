@@ -17,7 +17,7 @@ class SocketService extends ChangeNotifier {
 
   SocketService() {
     _initSocket();
-    _fetchActiveOrders();
+    fetchActiveOrders();
   }
 
   void _playNotificationSound() async {
@@ -36,7 +36,7 @@ class SocketService extends ChangeNotifier {
     _playNotificationSound();
   }
 
-  Future<void> _fetchActiveOrders() async {
+  Future<void> fetchActiveOrders() async {
     try {
       final activeOrders = await ApiService().getActiveOrders();
       newOrders = List<Map<String, dynamic>>.from(activeOrders);
@@ -51,7 +51,7 @@ class SocketService extends ChangeNotifier {
     socket?.disconnect();
     socket?.dispose();
     _initSocket();
-    _fetchActiveOrders();
+    fetchActiveOrders();
   }
 
   void _initSocket() async {
@@ -74,7 +74,7 @@ class SocketService extends ChangeNotifier {
 
     socket = IO.io(socketUrl, 
       IO.OptionBuilder()
-        .setTransports(['websocket'])
+        .setTransports(['websocket', 'polling'])
         .setQuery({'branchId': branchId})
         .enableAutoConnect()
         .build()

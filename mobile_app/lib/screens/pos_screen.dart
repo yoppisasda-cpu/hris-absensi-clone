@@ -2101,7 +2101,7 @@ class _POSScreenState extends State<POSScreen> {
 
       final socketService = Provider.of<SocketService>(context, listen: false);
       
-      if (newStatus == 'PAID' || newStatus == 'CANCELLED') {
+      if (newStatus == 'PAID' || newStatus == 'COMPLETED' || newStatus == 'CANCELLED') {
         socketService.removeOrder(orderId);
       } else {
         // Update local status in the list so UI reflects the change
@@ -2124,6 +2124,9 @@ class _POSScreenState extends State<POSScreen> {
   }
 
   void _showIncomingOrdersModal(BuildContext context) {
+    // Auto-fetch latest active orders from API upon opening modal
+    Provider.of<SocketService>(context, listen: false).fetchActiveOrders();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2138,7 +2141,19 @@ class _POSScreenState extends State<POSScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Pesanan Mobile Aktif', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      Text('Pesanan Mobile Aktif', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(Icons.refresh, color: Colors.blue[700]),
+                        tooltip: 'Segarkan Pesanan',
+                        onPressed: () {
+                          socket.fetchActiveOrders();
+                        },
+                      ),
+                    ],
+                  ),
                   IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close)),
                 ],
               ),
@@ -2267,10 +2282,10 @@ class _POSScreenState extends State<POSScreen> {
                                         child: Text('TERIMA'),
                                       ),
                                     ),
-                                  ] else if (status == 'PROCESSING' || status == 'READY') ...[
+                                  ] else if (status == 'PROCESSING' || status == 'READY' || status == 'PAID') ...[
                                     Expanded(
                                       child: ElevatedButton.icon(
-                                        onPressed: () => _updateMobileOrderStatus(order['id'], 'PAID'),
+                                        onPressed: () => _updateMobileOrderStatus(order['id'], 'COMPLETED'),
                                         icon: Icon(Icons.check_circle),
                                         label: Text('SELESAI / DIAMBIL'),
                                         style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
