@@ -991,6 +991,19 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
   const authHeader = req.headers.authorization;
   const apiKey = req.headers['x-api-key'];
 
+  const isPublicOnlineOrder = req.method === 'POST' && (
+    req.path === '/api/sales' || 
+    req.path === '/sales' || 
+    req.path === '/api/sales/orders' || 
+    req.path === '/sales/orders'
+  ) && (
+    req.body?.saleType === 'ONLINE' || 
+    req.body?.saleType === 'PRE_ORDER' ||
+    (typeof req.body?.notes === 'string' && (req.body.notes.includes('Aivola GO') || req.body.notes.includes('Guest Name:')))
+  );
+
+  const targetTenantId = req.headers['x-tenant-id'] || req.body?.companyId || req.query.tenantId;
+
   // 1. JWT PATH (Login Aplikasi Standar)
   let token = '';
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -999,7 +1012,7 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
     token = req.query.token as string;
   }
 
-  if (token) {
+  if (token && token !== 'null' && token !== 'undefined') {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       (req as any).tenantId = Number(decoded.companyId);
@@ -1007,7 +1020,6 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
       (req as any).userRole = decoded.role;
       (req as any).primaryCompanyId = Number(decoded.companyId);
 
-      const targetTenantId = req.headers['x-tenant-id'] || req.query.tenantId;
       if (targetTenantId) {
           const requestedTenantId = parseInt(targetTenantId as string);
           
@@ -1051,7 +1063,28 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
 
       return next();
     } catch (error) {
+      // If this is a public online order, an expired/invalid token shouldn't block the customer checkout; allow fallback to guest!
+      if (isPublicOnlineOrder && targetTenantId) {
+        const requestedTenantId = parseInt(targetTenantId as string);
+        if (!isNaN(requestedTenantId) && requestedTenantId > 0) {
+          (req as any).tenantId = requestedTenantId;
+          (req as any).userId = 0;
+          (req as any).userRole = 'GUEST';
+          return next();
+        }
+      }
       return res.status(401).json({ error: 'Token tidak valid atau sudah kadaluarsa.' });
+    }
+  }
+
+  // Fallback for public online order without token
+  if (isPublicOnlineOrder && targetTenantId) {
+    const requestedTenantId = parseInt(targetTenantId as string);
+    if (!isNaN(requestedTenantId) && requestedTenantId > 0) {
+      (req as any).tenantId = requestedTenantId;
+      (req as any).userId = 0;
+      (req as any).userRole = 'GUEST';
+      return next();
     }
   }
 

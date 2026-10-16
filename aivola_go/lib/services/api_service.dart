@@ -258,15 +258,20 @@ class ApiService {
   }) async {
     try {
       final token = await getToken();
+      Map<String, String> headers = {
+        "Content-Type": "application/json",
+        "x-tenant-id": companyId.toString(),
+      };
+      if (token != null && token.isNotEmpty && token != "null" && token != "undefined") {
+        headers["Authorization"] = "Bearer $token";
+      }
+
       final response = await http.post(
         Uri.parse("$baseUrl/sales"),
-        headers: {
-          "Authorization": "Bearer $token",
-          "Content-Type": "application/json",
-          "x-tenant-id": companyId.toString(),
-        },
+        headers: headers,
         body: jsonEncode({
           "items": items,
+          "companyId": companyId,
           "customerId": customerId,
           "branchId": branchId,
           "voucherId": voucherId,
@@ -290,7 +295,12 @@ class ApiService {
           "paymentInstructions": data['paymentInstructions']
         };
       }
-            final errData = jsonDecode(response.body);
+      if (response.statusCode == 401) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('jwt_token');
+        await prefs.remove('token');
+      }
+      final errData = jsonDecode(response.body);
       return {"success": false, "message": errData["error"] ?? "Terjadi kesalahan sistem"};
     
     } catch (e) {
@@ -314,15 +324,20 @@ class ApiService {
   }) async {
     try {
       final token = await getToken();
+      Map<String, String> headers = {
+        "Content-Type": "application/json",
+        "x-tenant-id": companyId.toString(),
+      };
+      if (token != null && token.isNotEmpty && token != "null" && token != "undefined") {
+        headers["Authorization"] = "Bearer $token";
+      }
+
       final response = await http.post(
         Uri.parse("$baseUrl/sales/orders"),
-        headers: {
-          "Authorization": "Bearer $token",
-          "Content-Type": "application/json",
-          "x-tenant-id": companyId.toString(),
-        },
+        headers: headers,
         body: jsonEncode({
           "items": items,
+          "companyId": companyId,
           "customerId": customerId,
           "branchId": branchId,
           "voucherId": voucherId,
@@ -343,7 +358,12 @@ class ApiService {
           "paymentInstructions": data['paymentInstructions']
         };
       }
-            final errData = jsonDecode(response.body);
+      if (response.statusCode == 401) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('jwt_token');
+        await prefs.remove('token');
+      }
+      final errData = jsonDecode(response.body);
       return {"success": false, "message": errData["error"] ?? "Terjadi kesalahan sistem"};
     
     } catch (e) {
