@@ -68,18 +68,37 @@ const io = new Server(httpServer, {
 const branchSockets = new Map<string, string>();
 
 io.on('connection', (socket) => {
-  console.log(`[Socket] New connection: ${socket.id}`);
+  const queryBranch = socket.handshake.query?.branchId;
+  const queryCompany = socket.handshake.query?.companyId;
 
-  socket.on('register_branch', (branchId) => {
+  if (queryBranch) {
+    const bKey = queryBranch.toString();
+    socket.join(`branch_${bKey}`);
+    branchSockets.set(bKey, socket.id);
+    console.log(`[Socket] Auto-joined branch_${bKey} from handshake query for ${socket.id}`);
+  }
+  if (queryCompany) {
+    socket.join(`company_${queryCompany.toString()}`);
+  }
+
+  socket.on('register_branch', (data: any) => {
+    let branchId = data;
+    let companyId = null;
+    if (typeof data === 'object' && data !== null) {
+      branchId = data.branchId;
+      companyId = data.companyId;
+    }
     const bKey = branchId ? branchId.toString() : 'null';
     console.log(`[Socket] Registering branch: "${bKey}" for socket: ${socket.id}`);
+    socket.join(`branch_${bKey}`);
     branchSockets.set(bKey, socket.id);
+    if (companyId) {
+      socket.join(`company_${companyId.toString()}`);
+    }
     console.log(`[Socket] Total branches connected: ${branchSockets.size} (${Array.from(branchSockets.keys()).join(', ')})`);
   });
 
   socket.on('disconnect', () => {
-    console.log(`[Socket] Disconnected: ${socket.id}`);
-    // Remove from map
     for (const [bid, sid] of branchSockets.entries()) {
       if (sid === socket.id) {
         branchSockets.delete(bid);
@@ -17052,29 +17071,67 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     });
 
     // --- SOCKET NOTIFICATION ---
-    const orderStatus = req.body.status;
-    const targetBranchId = req.body.branchId;
+    const orderStatus = req.body.status || 'PENDING';
+    const targetBranchId = req.body.branchId || finalBranchId;
     
     console.log(`[Socket Debug] Order created with status: ${orderStatus}, target branch: ${targetBranchId}`);
 
-    if (orderStatus === 'PENDING' && targetBranchId) {
-      const bKey = targetBranchId.toString();
-      const socketId = branchSockets.get(bKey);
-      
-      if (socketId) {
-        console.log(`[Socket] SUCCESS: Sending new order alert to branch ${bKey}`);
+    if (orderStatus === 'PENDING') {
+      try {
+        const saleItems = await prisma.saleItem.findMany({
+          where: { saleId: result.id },
+          include: { product: { select: { id: true, name: true, price: true } } }
+        });
+        const formattedItems = saleItems.map(si => ({
+          id: si.productId,
+          productId: si.productId,
+          name: si.product?.name || 'Item',
+          quantity: si.quantity,
+          qty: si.quantity,
+          price: si.price,
+          subtotal: si.total,
+          modifiers: si.modifiers
+        }));
+
+        let resolvedCustomerName = (req as any).user?.name || req.body.customerName || 'Customer';
+        if (finalCustomerId) {
+          const cust = await prisma.customer.findUnique({ where: { id: finalCustomerId }, select: { name: true } });
+          if (cust?.name) resolvedCustomerName = cust.name;
+        }
+        if (notes && notes.includes('Guest Name:')) {
+          const m = notes.match(/Guest Name:\s*([^\n\r]+)/);
+          if (m && m[1]) resolvedCustomerName = m[1].trim();
+        }
+
         const finalTotal = result.totalAmount ? Number(result.totalAmount) : (req.body.totalAmount ? Number(req.body.totalAmount) : 0);
-        
-        io.to(socketId).emit('new_mobile_order', {
+        const orderPayload = {
           id: result.id,
+          saleId: result.id,
           invoiceNumber: result.invoiceNumber,
           totalAmount: finalTotal,
-          customerName: (req as any).user?.name || req.body.customerName || 'Customer',
+          customerName: resolvedCustomerName,
           paymentMethod: req.body.paymentMethod || 'Bayar di Kasir',
-          deliveryMethod: req.body.deliveryMethod || 'Dine-in'
-        });
-      } else {
-        console.log(`[Socket] FAIL: Branch ${bKey} not connected. Connected keys: ${Array.from(branchSockets.keys()).join(', ')}`);
+          deliveryMethod: req.body.deliveryMethod || 'Dine-in',
+          notes: notes || null,
+          status: orderStatus,
+          saleType: req.body.saleType || 'ONLINE',
+          branchId: targetBranchId,
+          items: formattedItems
+        };
+
+        if (targetBranchId) {
+          const bKey = targetBranchId.toString();
+          io.to(`branch_${bKey}`).emit('new_mobile_order', orderPayload);
+          const socketId = branchSockets.get(bKey);
+          if (socketId) {
+            io.to(socketId).emit('new_mobile_order', orderPayload);
+          }
+        }
+        io.to(`company_${tenantId}`).emit('new_mobile_order', orderPayload);
+        io.emit('new_mobile_order', orderPayload);
+        console.log(`[Socket] SUCCESS: Broadcasted new order ${result.invoiceNumber} with ${formattedItems.length} items`);
+      } catch (sockErr) {
+        console.error('[Socket] Error sending order notification:', sockErr);
       }
     }
   } catch (error: any) {
@@ -17554,7 +17611,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
     const tenantId = Number((req as any).tenantId);
     const filterRes = await buildPosWhereClause(req, tenantId, req.query);
 
-    const sales = await prisma.$queryRawUnsafe(`
+    const sales: any[] = await prisma.$queryRawUnsafe(`
       SELECT s.*, 
              COALESCE(c.name, s."customerName") as "customerName", 
              fa.name as "accountName",
@@ -17572,6 +17629,31 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
       WHERE ${filterRes.whereClause}
       ORDER BY s."date" DESC
     `, ...filterRes.queryParams);
+
+    if (sales.length > 0 && (req.query.saleType === 'ONLINE' || req.query.status?.toString().includes('PENDING') || req.query.includeItems === 'true')) {
+      const saleIds = sales.map((s: any) => s.id);
+      const items = await prisma.saleItem.findMany({
+        where: { saleId: { in: saleIds } },
+        include: { product: { select: { id: true, name: true, price: true } } }
+      });
+      const itemsBySaleId: { [key: number]: any[] } = {};
+      for (const item of items) {
+        if (!itemsBySaleId[item.saleId]) itemsBySaleId[item.saleId] = [];
+        itemsBySaleId[item.saleId].push({
+          id: item.productId,
+          productId: item.productId,
+          name: item.product?.name || 'Item',
+          quantity: item.quantity,
+          qty: item.quantity,
+          price: item.price,
+          subtotal: item.total,
+          modifiers: item.modifiers
+        });
+      }
+      for (const sale of sales) {
+        sale.items = itemsBySaleId[sale.id] || [];
+      }
+    }
     
     res.json(sales);
   } catch (error: any) {
@@ -19647,19 +19729,19 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
 
     let mergedResults: any[] = [...pendingBills];
 
-    // If fetching PRE_ORDER explicitly (like Web Admin does), also fetch from Sale table 
-    // to include paid orders from the mobile app
-    if (saleType === 'PRE_ORDER') {
-      // Get start of today to only show recent/active pre-orders 
-      // (or we can just fetch all pending/paid pre-orders for today)
+    // Fetch active online orders (ONLINE / PRE_ORDER) from Sale table
+    // Always include them so POS Web and Cashier can view and process them in Pending Bills / Active Mobile Orders
+    const shouldFetchOnlineOrders = !saleType || saleType === 'ONLINE' || saleType === 'PRE_ORDER' || saleType === 'all';
+    if (shouldFetchOnlineOrders) {
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
       const salesAsPending = await prisma.sale.findMany({
         where: {
           companyId: tenantId,
-          ...(targetBranchId ? { branchId: targetBranchId } : {}),
-          saleType: 'PRE_ORDER',
+          ...(targetBranchId ? { OR: [{ branchId: targetBranchId }, { branchId: null }, { branchId: 0 }] } : {}),
+          saleType: saleType === 'PRE_ORDER' ? 'PRE_ORDER' : { in: ['ONLINE', 'PRE_ORDER'] },
+          status: { in: ['PENDING', 'PROCESSING', 'READY'] },
           date: { gte: startOfDay }
         },
         include: {
@@ -19670,71 +19752,99 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
         orderBy: { date: 'desc' }
       });
 
-      const mappedSales = salesAsPending.map(s => ({
-        id: -(s.id + 1000000),
-        companyId: s.companyId,
-        branchId: s.branchId,
-        cashierId: 0,
-        label: s.customerName || 'Online Order',
-        saleType: s.saleType,
-        kitchenStatus: 'PENDING',
-        queueNumber: 0,
-        preparedAt: null,
-        createdAt: s.date,
-        updatedAt: s.date,
-        user: { name: 'Aivola GO' },
-        items: s.SaleItem.map(i => ({
-          id: i.productId || 0,
-          productId: i.productId || 0,
-          name: i.product?.name || 'Item',
-          qty: i.quantity,
-          quantity: i.quantity,
-          price: i.price,
-          subtotal: i.total
-        }))
-      }));
+      const custIds = salesAsPending.map(s => s.customerId).filter(Boolean) as number[];
+      const customers = custIds.length > 0 ? await prisma.customer.findMany({
+        where: { id: { in: custIds } },
+        select: { id: true, name: true, phone: true }
+      }) : [];
+      const custMap = new Map(customers.map(c => [c.id, c.name]));
 
-      // Also fetch from SalesOrder (Web Admin POs)
-      const salesOrders = await prisma.salesOrder.findMany({
-        where: {
-          companyId: tenantId,
-          status: 'PENDING',
-          date: { gte: startOfDay }
-        },
-        include: {
-          items: {
-            include: { product: true }
-          },
-          customer: true
-        },
-        orderBy: { date: 'desc' }
+      const mappedSales = salesAsPending.map(s => {
+        let custName = (s.customerId ? custMap.get(s.customerId) : null) || s.customerName || 'Pelanggan Online';
+        if (s.notes && s.notes.includes('Guest Name:')) {
+          const m = s.notes.match(/Guest Name:\s*([^\n\r]+)/);
+          if (m && m[1]) custName = m[1].trim();
+        }
+
+        return {
+          id: -(s.id + 1000000),
+          saleId: s.id,
+          isOnlineSale: true,
+          companyId: s.companyId,
+          branchId: s.branchId,
+          cashierId: 0,
+          label: `[Online] ${custName} (${s.invoiceNumber})`,
+          invoiceNumber: s.invoiceNumber,
+          customerName: custName,
+          saleType: s.saleType,
+          kitchenStatus: s.kitchenStatus || s.status,
+          status: s.status,
+          totalAmount: s.totalAmount,
+          paymentMethod: s.paymentMethod || 'Bayar di Kasir',
+          deliveryMethod: s.deliveryMethod || 'Dine-in',
+          notes: s.notes,
+          queueNumber: s.queueNumber || s.invoiceNumber.split('-').pop() || s.id,
+          preparedAt: s.preparedAt,
+          createdAt: s.date,
+          updatedAt: s.updatedAt || s.date,
+          user: { name: 'Aivola GO / Web' },
+          items: s.SaleItem.map(i => ({
+            id: i.productId || 0,
+            productId: i.productId || 0,
+            name: i.product?.name || 'Item',
+            qty: i.quantity,
+            quantity: i.quantity,
+            price: i.price,
+            subtotal: i.total,
+            modifiers: i.modifiers
+          }))
+        };
       });
 
-      const mappedSalesOrders = salesOrders.map(so => ({
-        id: -(so.id + 2000000),
-        companyId: so.companyId,
-        branchId: targetBranchId || 0,
-        cashierId: 0,
-        label: so.customer?.name || 'Web Admin PO',
-        saleType: 'PRE_ORDER',
-        kitchenStatus: 'PENDING',
-        queueNumber: 0,
-        preparedAt: null,
-        createdAt: so.date,
-        updatedAt: so.date,
-        user: { name: 'Web Admin' },
-        items: so.items.map(i => ({
-          id: i.productId || 0,
-          productId: i.productId || 0,
-          name: i.product?.name || 'Item',
-          qty: i.quantity,
-          quantity: i.quantity,
-          price: i.price,
-          subtotal: i.total
-        }))
-      }));
+      // Also fetch from SalesOrder (Web Admin POs) if PRE_ORDER or all
+      let mappedSalesOrders: any[] = [];
+      if (saleType === 'PRE_ORDER' || !saleType) {
+        const salesOrders = await prisma.salesOrder.findMany({
+          where: {
+            companyId: tenantId,
+            status: 'PENDING',
+            date: { gte: startOfDay }
+          },
+          include: {
+            items: {
+              include: { product: true }
+            },
+            customer: true
+          },
+          orderBy: { date: 'desc' }
+        });
 
-      mergedResults = [...mergedResults, ...mappedSales, ...mappedSalesOrders];
+        mappedSalesOrders = salesOrders.map(so => ({
+          id: -(so.id + 2000000),
+          companyId: so.companyId,
+          branchId: targetBranchId || 0,
+          cashierId: 0,
+          label: so.customer?.name || 'Web Admin PO',
+          saleType: 'PRE_ORDER',
+          kitchenStatus: 'PENDING',
+          queueNumber: 0,
+          preparedAt: null,
+          createdAt: so.date,
+          updatedAt: so.date,
+          user: { name: 'Web Admin' },
+          items: so.items.map(i => ({
+            id: i.productId || 0,
+            productId: i.productId || 0,
+            name: i.product?.name || 'Item',
+            qty: i.quantity,
+            quantity: i.quantity,
+            price: i.price,
+            subtotal: i.total
+          }))
+        }));
+      }
+
+      mergedResults = [...mappedSales, ...mergedResults, ...mappedSalesOrders];
     }
 
     res.json(mergedResults);
@@ -19748,6 +19858,15 @@ app.delete('/api/pos/pending/:id', tenantMiddleware, async (req: Request, res: R
   try {
     const tenantId = Number((req as any).tenantId);
     const id = Number(req.params.id);
+
+    if (id < -1000000 && id > -2000000) {
+      const saleId = Math.abs(id) - 1000000;
+      await prisma.sale.updateMany({
+        where: { id: saleId, companyId: tenantId },
+        data: { status: 'CANCELLED' }
+      });
+      return res.json({ message: 'Pesanan online berhasil dibatalkan.' });
+    }
 
     const pendingBill = await prisma.pendingBill.findFirst({ where: { id, companyId: tenantId } });
     if (pendingBill) {
