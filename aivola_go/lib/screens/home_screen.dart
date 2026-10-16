@@ -14,6 +14,7 @@ import 'order_history_screen.dart';
 import 'wallet_screen.dart';
 import 'profile_screen.dart';
 import 'merchant_selection_screen.dart';
+import 'login_screen.dart';
 import '../providers/branding_provider.dart';
 import 'package:flutter/gestures.dart';
 import '../services/api_service.dart';
@@ -503,7 +504,33 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(context: context, builder: (context) => AlertDialog(backgroundColor: Color(0xFF1E293B), title: Text("Switch Brand?", style: GoogleFonts.outfit(color: Colors.white)), content: Text("This will clear your current selection and return to the brand discovery ecosystem.", style: TextStyle(color: Color(0xFF94A3B8))), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text("Cancel", style: TextStyle(color: Color(0xFF94A3B8)))), ElevatedButton(onPressed: () { brandingProvider.clearMerchant(); Navigator.pop(context); Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => MerchantSelectionScreen())); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent), child: Text("Switch", style: TextStyle(color: Colors.white)))]));
   }
 
-  void _confirmClaimVoucher(BuildContext context, model.Voucher voucher) {
+  void _confirmClaimVoucher(BuildContext context, model.Voucher voucher) async {
+    final token = await ApiService.getToken();
+    if (!context.mounted) return;
+
+    if (token == null || token.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Color(0xFF1E293B),
+          title: Text("Perlu Masuk Akun", style: GoogleFonts.outfit(color: Colors.white)),
+          content: Text("Silakan masuk atau daftar akun terlebih dahulu untuk mengklaim voucher promo ini.", style: TextStyle(color: Color(0xFF94A3B8))),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text("Batal", style: TextStyle(color: Color(0xFF94A3B8)))),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => LoginScreen()));
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Provider.of<BrandingProvider>(context, listen: false).primaryColor),
+              child: Text("Masuk", style: TextStyle(color: Colors.white)),
+            )
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -516,13 +543,14 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () async {
               Navigator.pop(context);
               final success = await ApiService.claimVoucher(voucher.id);
+              if (!context.mounted) return;
               if (success) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: Colors.green, content: Text("Voucher berhasil diklaim! Cek di profil Anda.")));
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: Colors.redAccent, content: Text("Gagal mengklaim voucher (mungkin sudah pernah diklaim).")));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: Colors.redAccent, content: Text("Gagal mengklaim voucher (mungkin sudah pernah diklaim atau sudah habis).")));
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Provider.of<BrandingProvider>(context).primaryColor),
+            style: ElevatedButton.styleFrom(backgroundColor: Provider.of<BrandingProvider>(context, listen: false).primaryColor),
             child: Text("Klaim Sekarang", style: TextStyle(color: Colors.white)),
           )
         ],

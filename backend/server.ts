@@ -16522,6 +16522,23 @@ app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: 
     const voucher = await prisma.voucher.findUnique({ where: { id: voucherId } });
     if (!voucher) return res.status(404).json({ error: 'Voucher tidak ditemukan' });
 
+    const now = new Date();
+    if (!voucher.isActive) {
+      return res.status(400).json({ error: 'Voucher tidak aktif' });
+    }
+    if (voucher.validUntil && voucher.validUntil < now) {
+      return res.status(400).json({ error: 'Voucher sudah kedaluwarsa' });
+    }
+    if (voucher.validFrom && voucher.validFrom > now) {
+      return res.status(400).json({ error: 'Voucher belum berlaku' });
+    }
+    if (voucher.quota > 0 && voucher.usedCount >= voucher.quota) {
+      return res.status(400).json({ error: 'Kuota voucher sudah habis' });
+    }
+    if (voucher.targetAudience !== 'PUBLIC' && user.role !== 'EMPLOYEE' && user.role !== 'SUPERADMIN' && user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Voucher ini khusus untuk internal karyawan' });
+    }
+
     let customer = await prisma.customer.findFirst({ where: { email: user.email } });
     
     // Create customer profile if doesn't exist (Auto-Member)
@@ -16708,6 +16725,10 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
       if (voucherId) {
         const voucher = await tx.voucher.findUnique({ where: { id: parseInt(voucherId) } });
+        const now = new Date();
+        const isNotExpired = (!voucher?.validUntil || voucher.validUntil >= now) && (!voucher?.validFrom || voucher.validFrom <= now);
+        const hasQuota = !voucher?.quota || voucher.usedCount < voucher.quota;
+        const isPublicVoucher = voucher?.targetAudience === 'PUBLIC';
         
         let totalQuantity = 0;
         for (const item of items) {
@@ -16717,7 +16738,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         const validPurchase = voucher && subtotal >= voucher.minPurchase;
         const validQuantity = voucher && voucher.minQuantity > 0 && totalQuantity >= voucher.minQuantity;
 
-        if (voucher && voucher.isActive && (voucher.minPurchase === 0 || validPurchase || validQuantity)) {
+        if (voucher && voucher.isActive && isNotExpired && hasQuota && isPublicVoucher && (voucher.minPurchase === 0 || validPurchase || validQuantity)) {
           voucherCode = voucher.code;
           if (voucher.discountType === 'PERCENTAGE') {
             voucherDiscountAmount = subtotal * (voucher.discountValue / 100);
@@ -20841,15 +20862,31 @@ app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response
   const companyId = parseInt(req.params.id as string);
   console.log(`[Vouchers API] Fetching for companyId: ${companyId}`);
   try {
+    const now = new Date();
     const vouchers = await prisma.voucher.findMany({
       where: { 
         companyId, 
-        isActive: true
-        // Date check is disabled for now to ensure visibility during testing
+        isActive: true,
+        targetAudience: 'PUBLIC',
+        AND: [
+          {
+            OR: [
+              { validFrom: null },
+              { validFrom: { lte: now } }
+            ]
+          },
+          {
+            OR: [
+              { validUntil: null },
+              { validUntil: { gte: now } }
+            ]
+          }
+        ]
       },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(vouchers);
+    const availableVouchers = vouchers.filter(v => v.quota === 0 || v.usedCount < v.quota);
+    res.json(availableVouchers);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch vouchers.' });
   }
