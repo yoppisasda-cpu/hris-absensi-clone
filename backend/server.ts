@@ -17217,11 +17217,9 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           if (socketId) {
             io.to(socketId).emit('new_mobile_order', orderPayload);
           }
-          io.to(`company_${bKey}`).emit('new_mobile_order', orderPayload);
         }
         io.to(`company_${tenantId}`).emit('new_mobile_order', orderPayload);
-        io.emit('new_mobile_order', orderPayload);
-        console.log(`[Socket] SUCCESS: Broadcasted new order ${result.invoiceNumber} with ${formattedItems.length} items`);
+        console.log(`[Socket] SUCCESS: Broadcasted new order ${result.invoiceNumber} to company_${tenantId} and branch_${targetBranchId || 'none'}`);
       } catch (sockErr) {
         console.error('[Socket] Error sending order notification:', sockErr);
       }
@@ -17591,14 +17589,6 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
   let queryParams: any[] = [tenantId];
   let paramIndex = 2;
 
-  if (currentCompany?.franchiseId && (saleType === 'ONLINE' || status?.toString().includes('PENDING'))) {
-    const franchiseCompanies = await prisma.company.findMany({
-      where: { franchiseId: currentCompany.franchiseId },
-      select: { id: true }
-    });
-    const fIds = franchiseCompanies.map(c => c.id);
-    whereConditions[0] = `(s."companyId" = $1 OR (s."saleType" = 'ONLINE' AND s."companyId" IN (${fIds.join(',')}) AND (s."branchId" = $1 OR s."branchId" IS NULL OR s."branchId" = 0)))`;
-  }
 
   if (status && status !== 'all') {
     const statuses = (status as string).split(',');

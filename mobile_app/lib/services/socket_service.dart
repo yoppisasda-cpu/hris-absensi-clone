@@ -97,6 +97,18 @@ class SocketService extends ChangeNotifier {
 
     socket!.on('new_mobile_order', (data) {
       print('[Socket] New Order Received: $data');
+      if (data == null) return;
+
+      Map<String, dynamic> safeData = Map<String, dynamic>.from(data);
+
+      // Verify branch: ignore order if intended for a different branch
+      final orderBranchId = safeData['branchId'];
+      if (branchId != null && orderBranchId != null) {
+        if (orderBranchId.toString() != branchId.toString()) {
+          print('[Socket] Ignored order for branch $orderBranchId (current: $branchId)');
+          return;
+        }
+      }
       
       // Visual feedback via SnackBar
       scaffoldMessengerKey.currentState?.showSnackBar(
