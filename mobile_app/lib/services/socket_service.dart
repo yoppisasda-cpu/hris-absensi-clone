@@ -126,9 +126,6 @@ class SocketService extends ChangeNotifier {
         ),
       );
 
-      // Ensure data is mutable and fields are safe
-      Map<String, dynamic> safeData = Map<String, dynamic>.from(data);
-      
       // Force totalAmount to be a double and handle null
       var rawAmount = safeData['totalAmount'];
       if (rawAmount == null) {
