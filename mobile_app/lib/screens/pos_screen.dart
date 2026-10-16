@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
@@ -1270,8 +1271,11 @@ class _POSScreenState extends State<POSScreen> {
 
   Future<void> _processCheckout(BuildContext currentContext, {bool isModal = true}) async {
     if (isModal) Navigator.pop(currentContext);
-    setState(() => _isLoading = true);
-    
+
+    // 1. Generate unique invoice number immediately on client for instant printing
+    final randomSuffix = (100 + Random().nextInt(900)).toString();
+    final generatedInvoiceNumber = 'POS-${DateTime.now().millisecondsSinceEpoch}-$randomSuffix';
+
     final checkoutItems = _cart.map((item) {
       final salePrice = _getItemPrice(item);
       return {
@@ -1282,73 +1286,98 @@ class _POSScreenState extends State<POSScreen> {
       };
     }).toList();
 
-    try {
-      final response = await _apiService.checkoutPos(
-        items: checkoutItems,
-        accountId: _selectedAccountId!,
-        totalAmount: _grandTotal,
-        customerId: _activeCustomerId,
-        customerName: _customerNameController.text.trim(),
-        customerPhone: _customerPhoneController.text.trim(),
-        saleType: _saleType,
-        serviceFee: 0,
-        markupPercentage: 0,
-        notes: _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
-        memberDiscountAmount: _memberDiscountAmount,
-        voucherCode: _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
-        voucherDiscountAmount: _voucherDiscountAmount,
-        pointsUsed: _pointsUsed,
-        pointsEarned: _pointsEarned,
-        taxRate: _globalTaxRate,
-        taxAmount: _taxAmount,
-        pendingBillId: _activePendingBillId,
-        salespersonId: _selectedSalespersonId,
-        paymentMethod: _selectedPaymentMethod,
-        paymentReference: _paymentReferenceController.text.trim().isNotEmpty
-            ? _paymentReferenceController.text.trim()
-            : null,
-      );
+    final saleData = {
+      'invoiceNumber': generatedInvoiceNumber,
+      'items': checkoutItems,
+      'totalAmount': _grandTotal,
+      'cashReceived': _cashReceived > 0 ? _cashReceived : _grandTotal,
+      'paymentMethod': _selectedPaymentMethod,
+      'paymentReference': _paymentReferenceController.text.trim(),
+      'customerName': _customerNameController.text.trim(),
+      'taxRate': _globalTaxRate,
+      'taxAmount': _taxAmount,
+      'memberDiscountAmount': _memberDiscountAmount + _employeeDiscountAmount,
+      'voucherDiscountAmount': _voucherDiscountAmount,
+      'pointsUsed': _pointsUsed,
+      'subtotal': _subtotalAmount,
+    };
 
-      print("=== [DEBUG] CHECKOUT SUCCESS ===");
-      print("Salesperson ID used: $_selectedSalespersonId");
-      
-      if (_activePendingBillId != null) {
-        try {
-          await _apiService.deletePendingPosBill(_activePendingBillId!);
-        } catch (_) {}
+    // 2. INSTANT PRINT: Send command immediately to thermal/label/kitchen printers (<0.1s)
+    _printerService.getAutoPrintSettings().then((settings) {
+      if (settings['receipt'] == true) {
+        _printerService.printReceipt(saleData);
       }
+      if (settings['label'] == true) {
+        _printerService.printStickerLabels(saleData);
+      }
+      if (settings['kitchen'] == true) {
+        _printerService.printKitchenReceipt(saleData);
+      }
+    });
 
-      final saleData = {
-        'invoiceNumber': response['invoiceNumber'],
+    // Unfocus any active text fields to prevent keyboard lag
+    FocusScope.of(context).unfocus();
+
+    // 3. BACKGROUND STOCK DEDUCTION & CLOUD SYNC:
+    // Process server checkout and stock deduction in background so cashier is never blocked!
+    final pendingBillToDelete = _activePendingBillId;
+    _apiService.checkoutPos(
+      items: checkoutItems,
+      accountId: _selectedAccountId!,
+      totalAmount: _grandTotal,
+      customerId: _activeCustomerId,
+      customerName: _customerNameController.text.trim(),
+      customerPhone: _customerPhoneController.text.trim(),
+      saleType: _saleType,
+      serviceFee: 0,
+      markupPercentage: 0,
+      notes: _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
+      memberDiscountAmount: _memberDiscountAmount,
+      voucherCode: _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
+      voucherDiscountAmount: _voucherDiscountAmount,
+      pointsUsed: _pointsUsed,
+      pointsEarned: _pointsEarned,
+      offlineInvoiceNumber: generatedInvoiceNumber,
+      taxRate: _globalTaxRate,
+      taxAmount: _taxAmount,
+      pendingBillId: pendingBillToDelete,
+      salespersonId: _selectedSalespersonId,
+      paymentMethod: _selectedPaymentMethod,
+      paymentReference: _paymentReferenceController.text.trim().isNotEmpty
+          ? _paymentReferenceController.text.trim()
+          : null,
+    ).then((response) {
+      print("=== [POS] BACKGROUND SYNC SUCCESS for $generatedInvoiceNumber ===");
+      if (pendingBillToDelete != null) {
+        _apiService.deletePendingPosBill(pendingBillToDelete).catchError((_) {});
+      }
+    }).catchError((e) async {
+      print("=== [POS] SYNC FAILED, SAVING TO OFFLINE QUEUE: $e ===");
+      final offlineSaleData = {
+        'invoiceNumber': generatedInvoiceNumber,
         'items': checkoutItems,
+        'accountId': _selectedAccountId!,
         'totalAmount': _grandTotal,
-        'cashReceived': _cashReceived > 0 ? _cashReceived : _grandTotal,
-        'paymentMethod': _selectedPaymentMethod,
-        'paymentReference': _paymentReferenceController.text.trim(),
+        'customerId': _activeCustomerId,
         'customerName': _customerNameController.text.trim(),
-        'taxRate': _globalTaxRate,
-        'taxAmount': _taxAmount,
-        'memberDiscountAmount': _memberDiscountAmount + _employeeDiscountAmount,
+        'customerPhone': _customerPhoneController.text.trim(),
+        'saleType': _saleType,
+        'notes': _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
+        'memberDiscountAmount': _memberDiscountAmount,
+        'voucherCode': _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
         'voucherDiscountAmount': _voucherDiscountAmount,
         'pointsUsed': _pointsUsed,
-        'subtotal': _subtotalAmount,
+        'pointsEarned': _pointsEarned,
+        'taxRate': _globalTaxRate,
+        'taxAmount': _taxAmount,
+        'paymentMethod': _selectedPaymentMethod,
+        'paymentReference': _paymentReferenceController.text.trim(),
+        'date': DateTime.now().toIso8601String(),
+        'salespersonId': _selectedSalespersonId,
+        'isSynced': false,
       };
-
-      // Print in background to not block UI
-      _printerService.getAutoPrintSettings().then((settings) {
-        if (settings['receipt'] == true) {
-          _printerService.printReceipt(saleData);
-        }
-        if (settings['label'] == true) {
-          _printerService.printStickerLabels(saleData);
-        }
-        if (settings['kitchen'] == true) {
-          _printerService.printKitchenReceipt(saleData);
-        }
-      });
-      
-      // Unfocus any active text fields to prevent keyboard lag
-      FocusScope.of(context).unfocus();
+      await PosLocalDbService.saveOfflineSale(offlineSaleData);
+    });
       
       // Show success dialog and wait for user to click OK
       await showDialog(
@@ -1362,7 +1391,7 @@ class _POSScreenState extends State<POSScreen> {
               Text('Transaksi Berhasil!', style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-          content: Text('Pesanan #${response['invoiceNumber']} telah sukses diproses.', textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey)),
+          content: Text('Pesanan #$generatedInvoiceNumber telah sukses diproses.', textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey)),
           actionsAlignment: MainAxisAlignment.center,
           actions: [
             Column(
@@ -1425,178 +1454,7 @@ class _POSScreenState extends State<POSScreen> {
         ),
       );
 
-      _clearCartAndInputs();
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (!mounted) return;
-
-      final errorMsg = e.toString();
-      final isNetworkError = errorMsg.contains('NETWORK_ERROR');
-
-      if (!isNetworkError) {
-        // SERVER REJECTED IT (e.g. Stock Insufficient, Invalid Voucher, etc)
-        // Show as a SnackBar error and DO NOT save offline
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.white),
-                SizedBox(width: 8),
-                Expanded(child: Text(errorMsg.replaceAll('Exception: ', ''))),
-              ],
-            ),
-            backgroundColor: Colors.red[800],
-            duration: Duration(seconds: 4),
-          ),
-        );
-        return; // Stop checkout process
-      }
-
-      // IF NETWORK FAILS (No internet connection or timeout), ASK IF THEY WANT TO SAVE OFFLINE
-      final bool saveOffline = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Icon(Icons.wifi_off, color: Colors.orange[800], size: 28),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Koneksi Terganggu',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            'Gagal memproses transaksi online ($e).\n\nApakah Anda ingin menyimpan transaksi ini secara OFFLINE untuk dicetak sekarang? Transaksi akan otomatis sinkron setelah internet kembali.',
-            style: TextStyle(color: Colors.blueGrey[800]),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('Batal', style: TextStyle(color: Colors.blueGrey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange[800],
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () => Navigator.pop(context, true),
-              child: Text('Ya, Simpan Offline'),
-            ),
-          ],
-        ),
-      ) ?? false;
-
-      if (saveOffline) {
-        setState(() => _isLoading = true);
-        
-        final String localInvoiceNumber = "INV-OFFLINE-${DateTime.now().millisecondsSinceEpoch}";
-        
-        final offlineSaleData = {
-          'localInvoiceNumber': localInvoiceNumber,
-          'invoiceNumber': localInvoiceNumber,
-          'items': checkoutItems,
-          'accountId': _selectedAccountId!,
-          'totalAmount': _grandTotal,
-          'cashReceived': _cashReceived > 0 ? _cashReceived : _grandTotal,
-          'customerId': _activeCustomerId,
-          'customerName': _customerNameController.text.trim(),
-          'customerPhone': _customerPhoneController.text.trim(),
-          'saleType': _saleType,
-          'notes': _selectedPaymentMethod != 'Tunai' ? '[Offline] [Metode: $_selectedPaymentMethod]' : '[Offline]',
-          'memberDiscountAmount': _memberDiscountAmount,
-          'voucherCode': _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
-          'voucherDiscountAmount': _voucherDiscountAmount,
-          'pointsUsed': _pointsUsed,
-          'pointsEarned': _pointsEarned,
-          'taxRate': _globalTaxRate,
-          'taxAmount': _taxAmount,
-          'paymentMethod': _selectedPaymentMethod,
-          'paymentReference': _paymentReferenceController.text.trim(),
-          'date': DateTime.now().toIso8601String(),
-          'salespersonId': _selectedSalespersonId,
-          'isSynced': false,
-        };
-
-        // Save to Hive offline sale box
-        await PosLocalDbService.saveOfflineSale(offlineSaleData);
-        setState(() => _isLoading = false);
-
-        // Auto print receipt offline if enabled
-        _printerService.isAutoPrintEnabled().then((enabled) {
-          if (enabled) {
-            _printerService.printReceipt(offlineSaleData);
-          }
-        });
-
-        // Unfocus active fields
-        FocusScope.of(context).unfocus();
-
-        // Show offline success dialog
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Column(
-              children: [
-                Icon(Icons.cloud_queue, color: Colors.orange[800], size: 64),
-                SizedBox(height: 16),
-                Text('Tersimpan Offline!', style: TextStyle(fontWeight: FontWeight.bold)),
-              ],
-            ),
-            content: Text(
-              'Pesanan #$localInvoiceNumber berhasil disimpan secara lokal.\n\nStruk bisa dicetak secara offline sekarang.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.blueGrey[800]),
-            ),
-            actionsAlignment: MainAxisAlignment.center,
-            actions: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => _printerService.printReceipt(offlineSaleData),
-                    icon: Icon(Icons.print, color: Colors.white),
-                    label: Text('CETAK STRUK OFFLINE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange[800],
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => _printerService.printKitchenReceipt(offlineSaleData),
-                    icon: Icon(Icons.restaurant, color: Colors.white),
-                    label: Text('CETAK DAPUR OFFLINE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.orange[900],
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: Text('OK, KEMBALI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                  ),
-                ],
-              )
-            ],
-          ),
-        );
-
-        _clearCartAndInputs();
-      }
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    _clearCartAndInputs();
   }
 
   void _clearCartAndInputs() {
