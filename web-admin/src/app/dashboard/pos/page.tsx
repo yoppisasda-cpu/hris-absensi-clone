@@ -44,6 +44,7 @@ interface Product {
     unit: string;
     trackStock?: boolean;
     isAutoDeduct?: boolean;
+    isDiscountable?: boolean;
     type?: string;
     customizations?: any[];
 }
@@ -442,10 +443,17 @@ export default function POSPage() {
         return cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     }, [cart]);
 
+    const discountableSubtotal = useMemo(() => {
+        return cart.reduce((sum, item) => {
+            const isDisc = item.isDiscountable !== false;
+            return sum + (isDisc ? (item.price * item.qty) : 0);
+        }, 0);
+    }, [cart]);
+
     const discountAmount = useMemo(() => {
         if (!employeeDiscount) return 0;
-        return Math.round(subtotal * (employeeDiscount.value / 100));
-    }, [subtotal, employeeDiscount]);
+        return Math.round(discountableSubtotal * (employeeDiscount.value / 100));
+    }, [discountableSubtotal, employeeDiscount]);
 
     const subtotalAfterDiscount = useMemo(() => {
         return Math.max(0, subtotal - discountAmount - voucherDiscountAmount);
@@ -574,7 +582,7 @@ export default function POSPage() {
         try {
             const res = await api.post('/pos/calculate', {
                 subtotal,
-                discountableSubtotal: subtotal,
+                discountableSubtotal: discountableSubtotal,
                 voucherCode: codeToApply,
                 totalQuantity: cart.reduce((sum, item) => sum + item.qty, 0)
             });

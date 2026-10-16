@@ -416,7 +416,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             priceQpoon: Number(formData.priceQpoon) || 0,
             priceTiktok: Number(formData.priceTiktok) || 0,
             recipeYield: formData.recipeYield !== undefined ? Number(formData.recipeYield) : 0,
-            purchaseFactor: Number(formData.purchaseFactor) || 1
+            purchaseFactor: Number(formData.purchaseFactor) || 1,
+            isDiscountable: Boolean(formData.isDiscountable)
         };
 
         try {
@@ -726,7 +727,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                         <span className="text-[10px] font-black uppercase text-amber-500/80 tracking-[0.2em] italic group-hover:text-amber-400 transition-colors">AUTO DEDUCT (POS)</span>
                                     </label>
                                 )}
-                                {formData.type === 'FINISHED_GOOD' && (
+                                {formData.type !== 'RAW_MATERIAL' && (
                                     <label className="flex items-center gap-4 cursor-pointer group">
                                         <div className="relative">
                                             <input 

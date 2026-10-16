@@ -15000,7 +15000,7 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
 app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, priceTiktok, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
+    const { name, sku, description, price, costPrice, stock, minStock, recordExpense, accountId, unit, warehouseId, categoryId, showInPos, isAutoDeduct, isDiscountable, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, priceTiktok, recipeYield, imageUrl, purchaseUnit, purchaseFactor } = req.body;
 
     // --- SKU LIMIT CHECK ---
     const company = await prisma.company.findUnique({
@@ -15047,6 +15047,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           unit: String(unit || "Pcs"),
           showInPos: showInPos !== undefined ? showInPos : true,
           isAutoDeduct: isAutoDeduct !== undefined ? isAutoDeduct : false,
+          isDiscountable: isDiscountable !== undefined ? Boolean(isDiscountable) : true,
           categoryId: categoryId && !isNaN(parseInt(String(categoryId))) ? parseInt(String(categoryId)) : null,
           type: req.body.type || 'FINISHED_GOOD',
           fnbType: req.body.fnbType || 'OTHER',
@@ -15158,7 +15159,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
   try {
     const tenantId = Number((req as any).tenantId);
     const productId = parseInt(req.params.id as string);
-    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, isAutoDeduct, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, priceTiktok, recipeYield, imageUrl, type, trackStock, purchaseUnit, purchaseFactor } = req.body;
+    const { name, sku, description, price, costPrice, minStock, unit, categoryId, showInPos, isAutoDeduct, isDiscountable, priceGofood, priceGrabfood, priceShopeefood, priceQpoon, priceTiktok, recipeYield, imageUrl, type, trackStock, purchaseUnit, purchaseFactor } = req.body;
 
     // Verify ownership
     const existingProduct = await prisma.product.findFirst({
@@ -15181,6 +15182,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
         unit: String(unit || "Pcs"),
         showInPos: showInPos !== undefined ? showInPos : true,
         isAutoDeduct: isAutoDeduct !== undefined ? isAutoDeduct : existingProduct.isAutoDeduct,
+        isDiscountable: isDiscountable !== undefined ? Boolean(isDiscountable) : (req.body.isDiscountable !== undefined ? Boolean(req.body.isDiscountable) : existingProduct.isDiscountable),
         categoryId: categoryId && !isNaN(parseInt(String(categoryId))) ? parseInt(String(categoryId)) : null,
         type: req.body.type || existingProduct.type,
         fnbType: req.body.fnbType || existingProduct.fnbType,

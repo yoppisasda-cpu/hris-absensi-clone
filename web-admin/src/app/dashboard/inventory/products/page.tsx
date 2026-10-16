@@ -398,6 +398,11 @@ export default function ProductsPage() {
                                                                 RAW
                                                             </span>
                                                         )}
+                                                        {product.isDiscountable === false && (
+                                                            <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 italic tracking-wider">
+                                                                NO DISKON
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         {product.category && (
