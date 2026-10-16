@@ -1068,7 +1068,7 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
         const requestedTenantId = parseInt(targetTenantId as string);
         if (!isNaN(requestedTenantId) && requestedTenantId > 0) {
           (req as any).tenantId = requestedTenantId;
-          (req as any).userId = 0;
+          (req as any).userId = null;
           (req as any).userRole = 'GUEST';
           return next();
         }
@@ -1082,7 +1082,7 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
     const requestedTenantId = parseInt(targetTenantId as string);
     if (!isNaN(requestedTenantId) && requestedTenantId > 0) {
       (req as any).tenantId = requestedTenantId;
-      (req as any).userId = 0;
+      (req as any).userId = null;
       (req as any).userRole = 'GUEST';
       return next();
     }
@@ -1307,7 +1307,13 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
     }
 
     if (!finalCustomerId) {
-       return res.status(400).json({ error: 'Data pelanggan tidak ditemukan' });
+      let guest = await prisma.customer.findFirst({ where: { companyId: tenantId, email: 'guest@aivola.local' } });
+      if (!guest) {
+        guest = await prisma.customer.create({
+          data: { companyId: tenantId, name: 'Guest', email: 'guest@aivola.local', phone: '00000000000' }
+        });
+      }
+      finalCustomerId = guest.id;
     }
 
     let finalOrderNumber = orderNumber;
@@ -16723,7 +16729,8 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
   try {
     const tenantId = Number((req as any).tenantId);
     const { items, accountId, customerId, status, notes, date, dueDate, branchId, voucherId, deliveryMethod, pointsUsed, saleType, paymentMethod, taxRate, taxAmount, memberDiscountAmount, poNumber, salespersonId } = req.body;
-    const userId = Number((req as any).userId);
+    const rawUserId = (req as any).userId;
+    const userId = (rawUserId && !isNaN(Number(rawUserId)) && Number(rawUserId) > 0) ? Number(rawUserId) : null;
     let finalCustomerId = customerId ? parseInt(customerId) : null;
     const dueDateVal = (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') ? new Date(dueDate) : null;
 
@@ -16754,10 +16761,32 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     }
 
     let finalBranchId = branchId ? parseInt(branchId) : null;
+    if (finalBranchId) {
+      const bExists = await prisma.branch.findUnique({ where: { id: finalBranchId }, select: { id: true } });
+      if (!bExists) finalBranchId = null;
+    }
     if (!finalBranchId && userId) {
       const u = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
       if (u && u.branchId) {
         finalBranchId = u.branchId;
+      }
+    }
+
+    // Resolve cashierId safely to prevent FK constraint violations
+    let finalCashierId: number | null = null;
+    if (userId && userRole !== 'GUEST' && userRole !== 'CUSTOMER') {
+      const staffUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+      if (staffUser) {
+        finalCashierId = staffUser.id;
+      }
+    }
+
+    let finalSalespersonId: number | null = null;
+    if (salespersonId) {
+      const spId = parseInt(salespersonId);
+      if (!isNaN(spId) && spId > 0) {
+        const spUser = await prisma.user.findUnique({ where: { id: spId }, select: { id: true } });
+        if (spUser) finalSalespersonId = spUser.id;
       }
     }
 
@@ -16894,8 +16923,8 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       `, 
       tenantId, 
       finalBranchId, 
-      userId, 
-      salespersonId ? parseInt(salespersonId) : null,
+      finalCashierId, 
+      finalSalespersonId,
       invoiceNumber, 
       finalCustomerId, 
       dateVal, 
