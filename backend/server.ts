@@ -19763,18 +19763,18 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
 
     let mergedResults: any[] = [...pendingBills];
 
-    // Fetch active online orders (ONLINE / PRE_ORDER) from Sale table
-    // Always include them so POS Web and Cashier can view and process them in Pending Bills / Active Mobile Orders
-    const shouldFetchOnlineOrders = !saleType || saleType === 'ONLINE' || saleType === 'PRE_ORDER' || saleType === 'all';
-    if (shouldFetchOnlineOrders) {
+    // Only if explicitly requesting PRE_ORDER (like Web Admin POs), include from Sale & SalesOrder
+    // NOTE: ONLINE orders from Web / Aivola Go belong strictly to "Pesanan Mobile Aktif" (socket & /api/sales?saleType=ONLINE),
+    // and must NEVER be in Pending Bills to prevent duplicate payment inputs at the cashier.
+    if (saleType === 'PRE_ORDER') {
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
       const salesAsPending = await prisma.sale.findMany({
         where: {
           companyId: tenantId,
-          ...(targetBranchId ? { OR: [{ branchId: targetBranchId }, { branchId: null }, { branchId: 0 }] } : {}),
-          saleType: saleType === 'PRE_ORDER' ? 'PRE_ORDER' : { in: ['ONLINE', 'PRE_ORDER'] },
+          ...(targetBranchId ? { branchId: targetBranchId } : {}),
+          saleType: 'PRE_ORDER',
           status: { in: ['PENDING', 'PROCESSING', 'READY'] },
           date: { gte: startOfDay }
         },
@@ -19794,12 +19794,7 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
       const custMap = new Map(customers.map(c => [c.id, c.name]));
 
       const mappedSales = salesAsPending.map(s => {
-        let custName = (s.customerId ? custMap.get(s.customerId) : null) || s.customerName || 'Pelanggan Online';
-        if (s.notes && s.notes.includes('Guest Name:')) {
-          const m = s.notes.match(/Guest Name:\s*([^\n\r]+)/);
-          if (m && m[1]) custName = m[1].trim();
-        }
-
+        let custName = (s.customerId ? custMap.get(s.customerId) : null) || s.customerName || 'Pre-Order';
         return {
           id: -(s.id + 1000000),
           saleId: s.id,
@@ -19807,7 +19802,7 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
           companyId: s.companyId,
           branchId: s.branchId,
           cashierId: 0,
-          label: `[Online] ${custName} (${s.invoiceNumber})`,
+          label: `[Pre-Order] ${custName} (${s.invoiceNumber})`,
           invoiceNumber: s.invoiceNumber,
           customerName: custName,
           saleType: s.saleType,
@@ -19821,7 +19816,7 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
           preparedAt: s.preparedAt,
           createdAt: s.date,
           updatedAt: s.updatedAt || s.date,
-          user: { name: 'Aivola GO / Web' },
+          user: { name: 'Aivola Pre-Order' },
           items: s.SaleItem.map(i => ({
             id: i.productId || 0,
             productId: i.productId || 0,
@@ -19835,48 +19830,44 @@ app.get('/api/pos/pending', tenantMiddleware, async (req: Request, res: Response
         };
       });
 
-      // Also fetch from SalesOrder (Web Admin POs) if PRE_ORDER or all
-      let mappedSalesOrders: any[] = [];
-      if (saleType === 'PRE_ORDER' || !saleType) {
-        const salesOrders = await prisma.salesOrder.findMany({
-          where: {
-            companyId: tenantId,
-            status: 'PENDING',
-            date: { gte: startOfDay }
+      const salesOrders = await prisma.salesOrder.findMany({
+        where: {
+          companyId: tenantId,
+          status: 'PENDING',
+          date: { gte: startOfDay }
+        },
+        include: {
+          items: {
+            include: { product: true }
           },
-          include: {
-            items: {
-              include: { product: true }
-            },
-            customer: true
-          },
-          orderBy: { date: 'desc' }
-        });
+          customer: true
+        },
+        orderBy: { date: 'desc' }
+      });
 
-        mappedSalesOrders = salesOrders.map(so => ({
-          id: -(so.id + 2000000),
-          companyId: so.companyId,
-          branchId: targetBranchId || 0,
-          cashierId: 0,
-          label: so.customer?.name || 'Web Admin PO',
-          saleType: 'PRE_ORDER',
-          kitchenStatus: 'PENDING',
-          queueNumber: 0,
-          preparedAt: null,
-          createdAt: so.date,
-          updatedAt: so.date,
-          user: { name: 'Web Admin' },
-          items: so.items.map(i => ({
-            id: i.productId || 0,
-            productId: i.productId || 0,
-            name: i.product?.name || 'Item',
-            qty: i.quantity,
-            quantity: i.quantity,
-            price: i.price,
-            subtotal: i.total
-          }))
-        }));
-      }
+      const mappedSalesOrders = salesOrders.map(so => ({
+        id: -(so.id + 2000000),
+        companyId: so.companyId,
+        branchId: targetBranchId || 0,
+        cashierId: 0,
+        label: so.customer?.name || 'Web Admin PO',
+        saleType: 'PRE_ORDER',
+        kitchenStatus: 'PENDING',
+        queueNumber: 0,
+        preparedAt: null,
+        createdAt: so.date,
+        updatedAt: so.date,
+        user: { name: 'Web Admin' },
+        items: so.items.map(i => ({
+          id: i.productId || 0,
+          productId: i.productId || 0,
+          name: i.product?.name || 'Item',
+          qty: i.quantity,
+          quantity: i.quantity,
+          price: i.price,
+          subtotal: i.total
+        }))
+      }));
 
       mergedResults = [...mappedSales, ...mergedResults, ...mappedSalesOrders];
     }
