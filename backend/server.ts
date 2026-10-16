@@ -19757,24 +19757,25 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         });
       }
 
-      // 5. Calculate and persist real-time COGS for this POS transaction
-      try {
-        const calculatedCogs = await calculateSingleSaleCOGS(tenantId, sale.id, tx);
-        if (calculatedCogs > 0) {
-          await tx.sale.update({
-            where: { id: sale.id },
-            data: { totalCogs: calculatedCogs }
-          });
-          sale.totalCogs = calculatedCogs;
-        }
-      } catch (cogsErr) {
-        console.error("Error calculating POS sale COGS:", cogsErr);
-      }
-
       return sale;
     }, { timeout: 120000 });
 
     res.json(result);
+
+    // Calculate COGS asynchronously in background without delaying POS response
+    setImmediate(async () => {
+      try {
+        const calculatedCogs = await calculateSingleSaleCOGS(tenantId, result.id, prisma);
+        if (calculatedCogs > 0) {
+          await prisma.sale.update({
+            where: { id: result.id },
+            data: { totalCogs: calculatedCogs }
+          });
+        }
+      } catch (cogsErr) {
+        console.error("Background error calculating POS sale COGS:", cogsErr);
+      }
+    });
   } catch (error: any) {
     console.error("CHECKOUT ERROR:", error);
     res.status(500).json({ error: 'Gagal checkout: ' + error.message });
