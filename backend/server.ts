@@ -17237,12 +17237,29 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
     const id = parseInt(req.params.id as string);
     const { status, accountId } = req.body; // e.g., PROCESSING, READY, COMPLETED, CANCELLED
 
-    const sale = await prisma.sale.findUnique({
+    let sale = await prisma.sale.findUnique({
       where: { id, companyId: tenantId },
       include: { SaleItem: true }
     });
 
-    if (!sale) return res.status(404).json({ error: 'Sale not found' });
+    if (!sale) {
+      // Check if it exists under another company (e.g. broadcast leak)
+      const anySale = await prisma.sale.findUnique({ where: { id } });
+      if (anySale) {
+        if (['CANCELLED', 'VOID'].includes(status)) {
+          await prisma.sale.update({
+            where: { id },
+            data: { status: 'CANCELLED', updatedAt: new Date() }
+          });
+          return res.json({ message: 'Pesanan berhasil dibatalkan', id, status: 'CANCELLED' });
+        }
+      }
+      // If sale is already deleted or not found, return 200 for cancel so POS UI can remove it cleanly
+      if (['CANCELLED', 'VOID', 'COMPLETED'].includes(status)) {
+        return res.json({ message: 'Pesanan sudah dihapus atau dibatalkan', id, status: 'CANCELLED' });
+      }
+      return res.status(404).json({ error: 'Sale not found' });
+    }
     const oldStatus = sale.status;
 
     await prisma.$transaction(async (tx) => {

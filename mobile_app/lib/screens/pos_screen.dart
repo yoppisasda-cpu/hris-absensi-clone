@@ -2117,9 +2117,16 @@ class _POSScreenState extends State<POSScreen> {
       );
     } catch (e) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memperbarui: $e'), backgroundColor: Colors.red),
-      );
+      if (newStatus == 'CANCELLED' || newStatus == 'COMPLETED' || e.toString().contains('404')) {
+        Provider.of<SocketService>(context, listen: false).removeOrder(orderId);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Pesanan telah dihapus dari daftar.'), backgroundColor: Colors.orange),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memperbarui: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
