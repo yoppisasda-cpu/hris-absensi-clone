@@ -15,6 +15,7 @@ import 'wallet_screen.dart';
 import 'profile_screen.dart';
 import 'merchant_selection_screen.dart';
 import '../providers/branding_provider.dart';
+import 'package:flutter/gestures.dart';
 import '../services/api_service.dart';
 import '../models/voucher.dart' as model;
 
@@ -37,6 +38,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedCategoryId = 0; // 0 for "All"
   int _currentIndex = 0;
+  final ScrollController _categoryScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _categoryScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -306,7 +314,69 @@ class _HomeScreenState extends State<HomeScreen> {
             child: TextField(style: TextStyle(color: Colors.white), decoration: InputDecoration(hintText: "Cari kopi favoritmu...", hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14), border: InputBorder.none, icon: Icon(Icons.search, color: Color(0xFF94A3B8)))),
           ),
           SizedBox(height: 20),
-          SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [_buildCategoryChip("Semua", 0), ...productProvider.categories.map((cat) => _buildCategoryChip(cat.name, cat.id))])),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final bool showNavButtons = constraints.maxWidth > 500;
+              return Row(
+                children: [
+                  if (showNavButtons)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left_rounded, color: Colors.white70, size: 28),
+                      tooltip: "Geser ke kiri",
+                      onPressed: () {
+                        if (_categoryScrollController.hasClients) {
+                          _categoryScrollController.animateTo(
+                            (_categoryScrollController.offset - 250).clamp(0.0, _categoryScrollController.position.maxScrollExtent),
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      },
+                    ),
+                  Expanded(
+                    child: Listener(
+                      onPointerSignal: (pointerSignal) {
+                        if (pointerSignal is PointerScrollEvent && _categoryScrollController.hasClients) {
+                          final double delta = pointerSignal.scrollDelta.dy != 0
+                              ? pointerSignal.scrollDelta.dy
+                              : pointerSignal.scrollDelta.dx;
+                          final double target = _categoryScrollController.offset + delta;
+                          final double max = _categoryScrollController.position.maxScrollExtent;
+                          final double min = _categoryScrollController.position.minScrollExtent;
+                          _categoryScrollController.jumpTo(target.clamp(min, max));
+                        }
+                      },
+                      child: SingleChildScrollView(
+                        controller: _categoryScrollController,
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                        child: Row(
+                          children: [
+                            _buildCategoryChip("Semua", 0),
+                            ...productProvider.categories.map((cat) => _buildCategoryChip(cat.name, cat.id)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (showNavButtons)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right_rounded, color: Colors.white70, size: 28),
+                      tooltip: "Geser ke kanan",
+                      onPressed: () {
+                        if (_categoryScrollController.hasClients) {
+                          _categoryScrollController.animateTo(
+                            (_categoryScrollController.offset + 250).clamp(0.0, _categoryScrollController.position.maxScrollExtent),
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      },
+                    ),
+                ],
+              );
+            },
+          ),
           SizedBox(height: 20),
           productProvider.isLoading 
             ? Center(child: CircularProgressIndicator(color: brandingProvider.primaryColor)) 
@@ -327,13 +397,26 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategoryChip(String label, int id) {
     bool isSelected = _selectedCategoryId == id;
     final primaryColor = Provider.of<BrandingProvider>(context).primaryColor;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedCategoryId = id),
-      child: Container(
-        margin: EdgeInsets.only(right: 10),
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(color: isSelected ? primaryColor : Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(25), border: Border.all(color: isSelected ? primaryColor : Colors.white.withOpacity(0.1))),
-        child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Color(0xFF94A3B8), fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedCategoryId = id),
+        child: Container(
+          margin: const EdgeInsets.only(right: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? primaryColor : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: isSelected ? primaryColor : Colors.white.withOpacity(0.1)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
       ),
     );
   }
