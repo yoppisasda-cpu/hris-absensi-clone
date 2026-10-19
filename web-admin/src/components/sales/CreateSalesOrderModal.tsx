@@ -43,6 +43,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [productTypeFilter, setProductTypeFilter] = useState<string>("ALL");
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [activeContractItems, setActiveContractItems] = useState<Record<number, number>>({});
 
@@ -53,8 +54,8 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
         api.get("/inventory/products")
       ]);
       setCustomers(cusRes.data);
-      const finishedGoods = prodRes.data.filter((p: any) => p.type === "FINISHED_GOOD");
-      setProducts(finishedGoods);
+      // Mendukung semua produk yang dapat dijual: FINISHED_GOOD, RAW_MATERIAL (Bahan Baku), dan WIP
+      setProducts(prodRes.data);
       
       if (orderId) {
         await fetchOrderDetails();
@@ -122,9 +123,10 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     setIsProductDropdownOpen(false);
     const prod = products.find(p => p.id.toString() === pId);
     if (prod) {
-      // Gunakan harga kontrak jika ada, fallback ke harga normal
+      // Gunakan harga kontrak jika ada, fallback ke harga jual (price) atau harga modal (costPrice)
       const contractPrice = activeContractItems[prod.id];
-      setPrice(contractPrice !== undefined ? contractPrice.toString() : prod.price.toString());
+      const defaultPrice = prod.price > 0 ? prod.price : (prod.costPrice || 0);
+      setPrice(contractPrice !== undefined ? contractPrice.toString() : defaultPrice.toString());
     } else {
       setPrice("");
     }
@@ -152,10 +154,12 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     } catch {}
   };
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
-    (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase()))
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
+      (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase()));
+    const matchesType = productTypeFilter === 'ALL' || p.type === productTypeFilter;
+    return matchesSearch && matchesType;
+  });
 
   const handleAddItem = () => {
     if (!selectedProduct || !quantity || !price) return toast.error("Lengkapi data item");
@@ -353,27 +357,53 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                     >
                       <span>
                         {selectedProduct 
-                          ? products.find(p => p.id.toString() === selectedProduct)?.name.toUpperCase() 
-                          : "-- UNIT RESOLUTION --"}
+                          ? (() => {
+                              const p = products.find(prod => prod.id.toString() === selectedProduct);
+                              return p ? `${p.name.toUpperCase()} ${p.type === 'RAW_MATERIAL' ? '(BAHAN BAKU)' : ''}` : "-- PILIH PRODUK / BAHAN --";
+                            })()
+                          : "-- PILIH PRODUK / BAHAN BAKU --"}
                       </span>
                       <Search className={`h-4 w-4 transition-transform ${isProductDropdownOpen ? 'rotate-180 text-indigo-400' : 'text-slate-600'}`} />
                     </button>
 
                     {isProductDropdownOpen && (
                       <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-[#0A0A0B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                        <div className="p-3 border-b border-white/5 bg-white/5">
+                        <div className="p-3 border-b border-white/5 bg-white/5 space-y-2">
                           <input
                             type="text"
-                            placeholder="SEARCH UNIT..."
+                            placeholder="CARI PRODUK / BAHAN BAKU..."
                             autoFocus
                             value={productSearch}
                             onChange={(e) => setProductSearch(e.target.value)}
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-[10px] font-black italic text-white outline-none focus:border-indigo-500/50 uppercase tracking-widest"
                           />
+                          <div className="flex gap-1.5">
+                            {[
+                              { label: 'SEMUA', value: 'ALL' },
+                              { label: 'PRODUK JADI', value: 'FINISHED_GOOD' },
+                              { label: 'BAHAN BAKU', value: 'RAW_MATERIAL' },
+                            ].map(tab => (
+                              <button
+                                key={tab.value}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProductTypeFilter(tab.value);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all ${
+                                  productTypeFilter === tab.value
+                                    ? 'bg-indigo-600 text-white shadow'
+                                    : 'bg-slate-900 text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                {tab.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         <div className="max-h-60 overflow-y-auto no-scrollbar py-2">
                           {filteredProducts.length === 0 ? (
-                            <div className="px-5 py-4 text-[9px] font-black text-slate-700 italic uppercase tracking-widest text-center">No matching units</div>
+                            <div className="px-5 py-4 text-[9px] font-black text-slate-700 italic uppercase tracking-widest text-center">Tidak ada produk / bahan baku</div>
                           ) : (
                             filteredProducts.map(p => (
                               <button
@@ -383,11 +413,22 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                                 className="w-full px-5 py-3 text-left hover:bg-indigo-500/10 group transition-all"
                               >
                                 <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-black text-slate-400 group-hover:text-white uppercase italic transition-colors">
-                                    {p.name}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-slate-400 group-hover:text-white uppercase italic transition-colors">
+                                      {p.name}
+                                    </span>
+                                    {p.type === 'RAW_MATERIAL' ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[7px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                                        Bahan Baku
+                                      </span>
+                                    ) : p.type === 'WIP' ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[7px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                                        WIP
+                                      </span>
+                                    ) : null}
+                                  </div>
                                   <span className="text-[8px] font-black text-slate-600 uppercase italic">
-                                    AVL: {p.stock}
+                                    AVL: {p.stock} {p.unit || ''}
                                   </span>
                                 </div>
                               </button>
