@@ -206,7 +206,8 @@ class _ReimbursementRequestScreenState
                   );
                 },
                 child: Container(
-                  height: 200,
+                  height: 260,
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(12),
@@ -230,13 +231,39 @@ class _ReimbursementRequestScreenState
                         )
                       : Stack(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                _image!,
-                                width: double.infinity,
-                                height: 200,
-                                fit: BoxFit.cover,
+                            Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(
+                                    _image!,
+                                    fit: BoxFit.contain,
+                                    height: 244,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              right: 8,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.edit, size: 12, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Ganti Foto',
+                                      style: TextStyle(color: Colors.white, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                             if (_isScanning)
