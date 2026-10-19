@@ -19237,7 +19237,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       customerName,
       customerPhone,
       notes, 
-      saleType = 'WALK_IN', 
+      saleType = 'DINE_IN', 
+      deliveryMethod,
       serviceFee = 0, 
       markupPercentage = 0,
       memberDiscountAmount = 0,
@@ -19412,6 +19413,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           notes: finalNotes,
           status: 'PAID',
           saleType,
+          deliveryMethod: deliveryMethod || (saleType === 'TAKE_AWAY' ? 'Take Away' : (saleType === 'DINE_IN' ? 'Dine In' : 'Dine-in')),
           paymentMethod: detectedNormalizedMethod,
           paymentReference: paymentReference ? String(paymentReference).trim() : null,
           serviceFee: Number(serviceFee),
@@ -19813,7 +19815,7 @@ app.post('/api/pos/hold', tenantMiddleware, async (req: Request, res: Response) 
         cashierId: userId,
         label: label || 'Pesanan',
         items: items, // JSON
-        saleType: saleType || 'WALK_IN',
+        saleType: saleType || 'DINE_IN',
         kitchenStatus: 'PREPARING',
         queueNumber: nextQueueNumber
       },
@@ -20446,7 +20448,7 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       } else if (accType === 'CASH' || accName.includes('TUNAI') || accName.includes('CASH')) {
         methodLabel = 'Tunai';
         methodType = 'CASH';
-      } else if (sale.saleType === 'WALK_IN' || !sale.accountId) {
+      } else if (sale.saleType === 'WALK_IN' || sale.saleType === 'DINE_IN' || sale.saleType === 'TAKE_AWAY' || !sale.accountId) {
         methodLabel = 'Tunai';
         methodType = 'CASH';
       } else {

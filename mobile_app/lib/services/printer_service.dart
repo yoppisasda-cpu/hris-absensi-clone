@@ -256,6 +256,8 @@ class PrinterService {
       }
       bytes += generator.text('Tanggal: ${DateFormat('dd-MM-yyyy HH:mm').format(DateTime.now())}');
       bytes += generator.text('Kasir  : ${saleData['cashierName'] ?? 'Admin'}');
+      final String orderType = saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')));
+      bytes += generator.text('Tipe   : $orderType', styles: PosStyles(bold: true));
       bytes += generator.hr();
 
       // Items
@@ -385,7 +387,8 @@ class PrinterService {
       bytes += generator.text('Pelanggan: ${saleData['customerName']}');
     }
     bytes += generator.text('Waktu: ${DateFormat('dd-MM HH:mm').format(DateTime.now())}');
-    bytes += generator.text('Tipe : ${saleData['deliveryMethod'] ?? 'Dine-in'}', styles: PosStyles(bold: true));
+    final String kitchenType = saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')));
+    bytes += generator.text('Tipe : $kitchenType', styles: PosStyles(bold: true));
     bytes += generator.hr();
 
     // Items
@@ -510,6 +513,7 @@ class PrinterService {
                 pw.Text('Pelanggan: ${saleData['customerName']}', style: pw.TextStyle(fontSize: 8)),
               pw.Text('Tanggal: ${DateFormat('dd-MM-yyyy HH:mm').format(DateTime.now())}', style: pw.TextStyle(fontSize: 8)),
               pw.Text('Kasir  : ${saleData['cashierName'] ?? 'Admin'}', style: pw.TextStyle(fontSize: 8)),
+              pw.Text('Tipe   : ${saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')))}', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
               pw.Divider(thickness: 0.5),
               ...((saleData['items'] as List?) ?? []).map((item) {
                 return pw.Column(

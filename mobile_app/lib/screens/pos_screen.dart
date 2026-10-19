@@ -36,7 +36,7 @@ class _POSScreenState extends State<POSScreen> {
   int? _selectedAccountId;
   String _selectedPaymentMethod = 'Tunai';
   String _searchQuery = "";
-  String _saleType = 'WALK_IN';
+  String _saleType = 'DINE_IN';
   int? _activePendingBillId;
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerPhoneController = TextEditingController();
@@ -553,7 +553,7 @@ class _POSScreenState extends State<POSScreen> {
   void _showCheckoutModal() {
     if (_cart.isEmpty) return;
     
-    _saleType = 'WALK_IN';
+    _saleType = 'DINE_IN';
 
     showModalBottomSheet(
       context: context,
@@ -662,7 +662,8 @@ class _POSScreenState extends State<POSScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _buildCompactSaleTypeChip('WALK_IN', 'Pelanggan Walk-in', Icons.person, setPanelState),
+                    _buildCompactSaleTypeChip('DINE_IN', 'Dine In', Icons.restaurant, setPanelState),
+                    _buildCompactSaleTypeChip('TAKE_AWAY', 'Take Away', Icons.shopping_bag_outlined, setPanelState),
                     _buildCompactSaleTypeChip('GOFOOD', 'GoFood', Icons.delivery_dining, setPanelState),
                     _buildCompactSaleTypeChip('GRABFOOD', 'GrabFood', Icons.delivery_dining, setPanelState),
                     _buildCompactSaleTypeChip('SHOPEEFOOD', 'ShopeeFood', Icons.delivery_dining, setPanelState),
@@ -931,7 +932,7 @@ class _POSScreenState extends State<POSScreen> {
                   ),
                 ),
                 
-                if (_saleType == 'WALK_IN') ...[
+                if (_saleType == 'WALK_IN' || _saleType == 'DINE_IN' || _saleType == 'TAKE_AWAY') ...[
                   SizedBox(height: 24),
                   Text('Metode Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
                   SizedBox(height: 10),
@@ -1161,6 +1162,8 @@ class _POSScreenState extends State<POSScreen> {
   Widget _buildCompactSaleTypeChip(String type, String label, IconData icon, StateSetter setPanelState) {
     bool isSelected = _saleType == type;
     Color activeColor = Colors.blue[800]!;
+    if (type == 'DINE_IN') activeColor = Colors.blue[800]!;
+    if (type == 'TAKE_AWAY') activeColor = Colors.teal[700]!;
     if (type == 'GOFOOD') activeColor = Colors.red[800]!;
     if (type == 'GRABFOOD') activeColor = Colors.green[800]!;
     if (type == 'SHOPEEFOOD') activeColor = Colors.orange[800]!;
@@ -1178,10 +1181,12 @@ class _POSScreenState extends State<POSScreen> {
               orElse: () => _accounts.isNotEmpty ? _accounts.first : null
             );
             if (marketAcc != null) _selectedAccountId = marketAcc['id'];
-          } else if (type == 'WALK_IN') {
-            _selectedPaymentMethod = 'Tunai';
-            final cashAcc = _accounts.firstWhere((a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
-            if (cashAcc != null) _selectedAccountId = cashAcc['id'];
+          } else if (type == 'WALK_IN' || type == 'DINE_IN' || type == 'TAKE_AWAY') {
+            if (_selectedPaymentMethod == 'GoFood' || _selectedPaymentMethod == 'GrabFood' || _selectedPaymentMethod == 'ShopeeFood' || _selectedPaymentMethod == 'QPoon' || _selectedPaymentMethod == 'Tiktok Go') {
+              _selectedPaymentMethod = 'Tunai';
+              final cashAcc = _accounts.firstWhere((a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
+              if (cashAcc != null) _selectedAccountId = cashAcc['id'];
+            }
           }
         });
         setState(() {});
@@ -1208,6 +1213,8 @@ class _POSScreenState extends State<POSScreen> {
   Widget _buildSaleTypeChip(String type, String label, IconData icon, StateSetter setPanelState) {
     bool isSelected = _saleType == type;
     Color activeColor = Colors.blue[800]!;
+    if (type == 'DINE_IN') activeColor = Colors.blue[800]!;
+    if (type == 'TAKE_AWAY') activeColor = Colors.teal[700]!;
     if (type == 'GOFOOD') activeColor = Colors.red[800]!;
     if (type == 'GRABFOOD') activeColor = Colors.green[800]!;
     if (type == 'SHOPEEFOOD') activeColor = Colors.orange[800]!;
@@ -1229,10 +1236,12 @@ class _POSScreenState extends State<POSScreen> {
               if (marketAcc != null) {
                 _selectedAccountId = marketAcc['id'];
               }
-            } else if (type == 'WALK_IN') {
-              _selectedPaymentMethod = 'Tunai';
-              final cashAcc = _accounts.firstWhere((a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
-              if (cashAcc != null) _selectedAccountId = cashAcc['id'];
+            } else if (type == 'WALK_IN' || type == 'DINE_IN' || type == 'TAKE_AWAY') {
+              if (_selectedPaymentMethod == 'GoFood' || _selectedPaymentMethod == 'GrabFood' || _selectedPaymentMethod == 'ShopeeFood' || _selectedPaymentMethod == 'QPoon' || _selectedPaymentMethod == 'Tiktok Go') {
+                _selectedPaymentMethod = 'Tunai';
+                final cashAcc = _accounts.firstWhere((a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
+                if (cashAcc != null) _selectedAccountId = cashAcc['id'];
+              }
             }
           });
           setState(() {});
@@ -1286,6 +1295,10 @@ class _POSScreenState extends State<POSScreen> {
       };
     }).toList();
 
+    final deliveryMethod = _saleType == 'TAKE_AWAY'
+        ? 'Take Away'
+        : (_saleType == 'DINE_IN' ? 'Dine In' : (_saleType == 'WALK_IN' ? 'Walk-in' : _saleType));
+
     final saleData = {
       'invoiceNumber': generatedInvoiceNumber,
       'items': checkoutItems,
@@ -1300,6 +1313,8 @@ class _POSScreenState extends State<POSScreen> {
       'voucherDiscountAmount': _voucherDiscountAmount,
       'pointsUsed': _pointsUsed,
       'subtotal': _subtotalAmount,
+      'saleType': _saleType,
+      'deliveryMethod': deliveryMethod,
     };
 
     // 2. INSTANT PRINT: Send command immediately to thermal/label/kitchen printers (<0.1s)
@@ -1329,6 +1344,7 @@ class _POSScreenState extends State<POSScreen> {
       customerName: _customerNameController.text.trim(),
       customerPhone: _customerPhoneController.text.trim(),
       saleType: _saleType,
+      deliveryMethod: deliveryMethod,
       serviceFee: 0,
       markupPercentage: 0,
       notes: _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,

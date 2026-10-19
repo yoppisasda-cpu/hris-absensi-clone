@@ -13,6 +13,8 @@ import {
     CreditCard, 
     Wallet, 
     User,
+    Utensils,
+    ShoppingBag,
     Tag, 
     Printer,
     Monitor,
@@ -81,7 +83,7 @@ export default function POSPage() {
 
 
     // NEW CHECKOUT FIELDS
-    const [saleType, setSaleType] = useState<string>('WALK_IN');
+    const [saleType, setSaleType] = useState<string>('DINE_IN');
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [paymentReference, setPaymentReference] = useState("");
@@ -1166,7 +1168,8 @@ export default function POSPage() {
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Penjualan</label>
                                     <div className="flex flex-wrap gap-1.5">
                                         {[
-                                            { id: 'WALK_IN', label: 'Walk-in', icon: <User className="h-3 w-3" /> },
+                                            { id: 'DINE_IN', label: 'Dine In', icon: <Utensils className="h-3 w-3" /> },
+                                            { id: 'TAKE_AWAY', label: 'Take Away', icon: <ShoppingBag className="h-3 w-3" /> },
                                             { id: 'GOFOOD', label: 'GoFood', icon: <ShoppingCart className="h-3 w-3" /> },
                                             { id: 'GRABFOOD', label: 'GrabFood', icon: <ShoppingCart className="h-3 w-3" /> },
                                             { id: 'SHOPEEFOOD', label: 'ShopeeFood', icon: <ShoppingCart className="h-3 w-3" /> },
@@ -1531,7 +1534,8 @@ export default function POSPage() {
                                     <label className="text-xs font-black uppercase tracking-widest text-slate-300">Tipe Penjualan</label>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                         {[
-                                            { id: 'WALK_IN', label: 'Walk-in', icon: <User className="h-4 w-4" /> },
+                                            { id: 'DINE_IN', label: 'Dine In', icon: <Utensils className="h-4 w-4" /> },
+                                            { id: 'TAKE_AWAY', label: 'Take Away', icon: <ShoppingBag className="h-4 w-4" /> },
                                             { id: 'GOFOOD', label: 'GoFood', icon: <ShoppingCart className="h-4 w-4" /> },
                                             { id: 'GRABFOOD', label: 'GrabFood', icon: <ShoppingCart className="h-4 w-4" /> },
                                             { id: 'SHOPEEFOOD', label: 'ShopeeFood', icon: <ShoppingCart className="h-4 w-4" /> },
@@ -1886,7 +1890,7 @@ export default function POSPage() {
                                 <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
                             </div>
                             <div>No: {lastSale.invoiceNumber}</div>
-                            <div>Kasir: {lastSale.saleType}</div>
+                            <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : (lastSale.saleType === 'WALK_IN' ? 'Walk-in' : lastSale.saleType))}</div>
                             {lastSale.customerName && <div>Plg: {lastSale.customerName}</div>}
                         </div>
 

@@ -734,6 +734,8 @@ export default function POSReportsPage() {
                                 className="w-full appearance-none rounded-xl border border-slate-800 bg-slate-950/50 py-2.5 pl-10 pr-10 text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all font-bold cursor-pointer hover:bg-slate-800"
                             >
                                 <option value="all">Semua Channel</option>
+                                <option value="DINE_IN">🍽️ Dine In (Makan di Tempat)</option>
+                                <option value="TAKE_AWAY">🛍️ Take Away (Bungkus)</option>
                                 <option value="WALK_IN">Walk-In (Kasir Langsung)</option>
                                 <option value="GOFOOD">GoFood</option>
                                 <option value="GRABFOOD">GrabFood</option>
@@ -820,13 +822,15 @@ export default function POSReportsPage() {
                                                     {sale.salespersonName && <span className="text-blue-400 font-bold">• 🤵 {sale.salespersonName}</span>}
                                                     {sale.saleType && (
                                                         <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${
+                                                            sale.saleType === 'DINE_IN' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                            sale.saleType === 'TAKE_AWAY' ? 'bg-teal-500/10 text-teal-400 border-teal-500/20' :
                                                             sale.saleType === 'GOFOOD' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
                                                             sale.saleType === 'GRABFOOD' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                                                             sale.saleType === 'SHOPEEFOOD' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                                                             sale.saleType === 'QPOON' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
                                                             'bg-slate-800/80 text-slate-400 border-slate-700/60'
                                                         }`}>
-                                                            {sale.saleType.replace('_', ' ')}
+                                                            {sale.saleType === 'DINE_IN' ? '🍽️ DINE IN' : sale.saleType === 'TAKE_AWAY' ? '🛍️ TAKE AWAY' : sale.saleType.replace('_', ' ')}
                                                         </span>
                                                     )}
                                                 </div>

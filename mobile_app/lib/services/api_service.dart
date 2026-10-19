@@ -745,6 +745,7 @@ class ApiService {
     int? salespersonId,
     String? paymentMethod,
     String? paymentReference,
+    String? deliveryMethod,
   }) async {
     try {
       final response = await _dio.post('/pos/checkout', data: {
@@ -757,6 +758,7 @@ class ApiService {
         'customerPhone': customerPhone,
         'notes': notes,
         'saleType': saleType,
+        'deliveryMethod': deliveryMethod,
         'serviceFee': serviceFee,
         'markupPercentage': markupPercentage,
         'memberDiscountAmount': memberDiscountAmount,
