@@ -48,15 +48,16 @@ class PosSyncManager {
           salespersonId: sale['salespersonId'],
           pointsUsed: ((sale['pointsUsed'] ?? 0) as num).toDouble(),
           pointsEarned: ((sale['pointsEarned'] ?? 0) as num).toDouble(),
-          offlineInvoiceNumber: sale['localInvoiceNumber'],
+          offlineInvoiceNumber: sale['localInvoiceNumber'] ?? sale['invoiceNumber'],
           date: sale['date'],
           paymentMethod: sale['paymentMethod'],
           paymentReference: sale['paymentReference'],
         );
 
         // Jika berhasil, hapus transaksi dari antrean lokal
-        await PosLocalDbService.removeOfflineSale(sale['localInvoiceNumber']);
-        print("PosSyncManager: Transaksi ${sale['localInvoiceNumber']} sukses disinkronkan ke server.");
+        final invNum = (sale['localInvoiceNumber'] ?? sale['invoiceNumber'] ?? '').toString();
+        await PosLocalDbService.removeOfflineSale(invNum);
+        print("PosSyncManager: Transaksi $invNum sukses disinkronkan ke server.");
       } catch (e) {
         print("PosSyncManager: Gagal mensinkronkan transaksi ${sale['localInvoiceNumber']}: $e");
         lastError = e.toString();

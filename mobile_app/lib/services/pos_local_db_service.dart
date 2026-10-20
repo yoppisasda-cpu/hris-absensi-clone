@@ -83,7 +83,9 @@ class PosLocalDbService {
   static Future<void> removeOfflineSale(String localInvoiceNumber) async {
     final box = Hive.box(_offlineSalesBoxName);
     final List<dynamic> currentSales = List.from(getOfflineSales());
-    currentSales.removeWhere((item) => item['localInvoiceNumber'] == localInvoiceNumber);
+    currentSales.removeWhere((item) =>
+        (item['localInvoiceNumber'] != null && item['localInvoiceNumber'] == localInvoiceNumber) ||
+        (item['invoiceNumber'] != null && item['invoiceNumber'] == localInvoiceNumber));
     await box.put('sales', currentSales);
   }
 

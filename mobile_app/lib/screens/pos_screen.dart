@@ -1373,6 +1373,7 @@ class _POSScreenState extends State<POSScreen> {
     }).catchError((e) async {
       print("=== [POS] SYNC FAILED, SAVING TO OFFLINE QUEUE: $e ===");
       final offlineSaleData = {
+        'localInvoiceNumber': generatedInvoiceNumber,
         'invoiceNumber': generatedInvoiceNumber,
         'items': checkoutItems,
         'accountId': _selectedAccountId!,
