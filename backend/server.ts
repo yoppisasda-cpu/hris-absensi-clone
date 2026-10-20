@@ -19397,6 +19397,17 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         return existingSale;
       }
 
+      // Guard against stuck offline queue resending the 403,000 transaction for Sukmajaya
+      if (tenantId === 43 && Number(totalAmount) === 403000 && items.length === 14) {
+        const existing403 = await tx.sale.findFirst({
+          where: { companyId: 43, totalAmount: 403000, id: 35229 }
+        });
+        if (existing403) {
+          console.warn("[POS CHECKOUT] Returning original sale 35229 to prevent duplicate from stuck offline queue.");
+          return existing403;
+        }
+      }
+
       let finalPointsEarned = Number(pointsEarned) || 0;
       if (finalCustomerId && !req.body.offlineInvoiceNumber) {
         const company = await tx.company.findUnique({ where: { id: tenantId }, select: { pointsEarnRatio: true } });
