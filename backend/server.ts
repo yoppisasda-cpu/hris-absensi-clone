@@ -16220,7 +16220,9 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
         companyId: tenantId,
         OR: [
           { voucherCode: { not: null } },
-          { memberDiscountAmount: { gt: 0 } }
+          { voucherDiscountAmount: { gt: 0 } },
+          { memberDiscountAmount: { gt: 0 } },
+          { customerName: { contains: '(Karyawan)' } }
         ]
       },
       select: {
@@ -16236,13 +16238,24 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
     });
     
     // Map to a consistent format for frontend
-    const mappedResult = salesWithVoucher.map(sale => ({
-      id: sale.id,
-      voucher: { code: sale.voucherCode || 'Diskon Member/Karyawan' },
-      customer: { name: sale.customerName || 'Anonim (Tanpa Member)' },
-      usedAt: sale.date,
-      discountAmount: sale.voucherDiscountAmount > 0 ? sale.voucherDiscountAmount : sale.memberDiscountAmount
-    }));
+    const mappedResult = salesWithVoucher.map(sale => {
+      let code = sale.voucherCode;
+      if (!code || code.trim() === '' || code.startsWith('https://')) {
+        code = sale.customerName?.includes('(Karyawan)') ? 'DISKON KARYAWAN' : (code || 'Diskon Member');
+      }
+
+      const discount = sale.voucherDiscountAmount > 0 
+        ? sale.voucherDiscountAmount 
+        : (sale.memberDiscountAmount > 0 ? sale.memberDiscountAmount : 0);
+
+      return {
+        id: sale.id,
+        voucher: { code },
+        customer: { name: sale.customerName || 'Anonim (Tanpa Member)' },
+        usedAt: sale.date,
+        discountAmount: discount
+      };
+    });
 
     res.json(mappedResult);
   } catch (error: any) {

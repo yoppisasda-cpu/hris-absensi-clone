@@ -389,6 +389,9 @@ class _POSScreenState extends State<POSScreen> {
         } else {
           _employeeDiscountAmount = _discountableSubtotalAmount * (discValue / 100);
         }
+        final discLabel = res['discount']?['label']?.toString() ?? 'DISKON KARYAWAN';
+        _voucherController.text = discLabel;
+        _voucherDiscountAmount = _employeeDiscountAmount;
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Diskon Karyawan Diterapkan!'), backgroundColor: Colors.green));
       setState(() {});
@@ -1348,9 +1351,9 @@ class _POSScreenState extends State<POSScreen> {
       serviceFee: 0,
       markupPercentage: 0,
       notes: _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
-      memberDiscountAmount: _memberDiscountAmount,
+      memberDiscountAmount: _memberDiscountAmount + _employeeDiscountAmount,
       voucherCode: _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
-      voucherDiscountAmount: _voucherDiscountAmount,
+      voucherDiscountAmount: _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount,
       pointsUsed: _pointsUsed,
       pointsEarned: _pointsEarned,
       offlineInvoiceNumber: generatedInvoiceNumber,

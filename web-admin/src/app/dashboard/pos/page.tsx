@@ -687,6 +687,7 @@ export default function POSPage() {
             setEmployeeDiscount(res.data.discount);
             setCustomerName(res.data.customer.name);
             setCustomerPhone(res.data.customer.phone);
+            setVoucherCode(res.data.discount?.label || 'DISKON KARYAWAN');
             toast.success("ID Karyawan Valid! Diskon diterapkan.");
             setShowScanModal(false);
             setScannedQRToken("");
@@ -731,8 +732,8 @@ export default function POSPage() {
                 paymentReference: paymentReference.trim() || null,
                 customerName: finalCustName,
                 customerPhone: customerPhone.trim() || null,
-                voucherCode,
-                voucherDiscountAmount,
+                voucherCode: voucherCode || (employeeDiscount ? (employeeDiscount.label || 'DISKON KARYAWAN') : null),
+                voucherDiscountAmount: voucherDiscountAmount > 0 ? voucherDiscountAmount : discountAmount,
                 memberDiscountAmount: discountAmount,
                 salespersonId: selectedSalesperson || null,
                 pendingBillId: activePendingBillId || null
