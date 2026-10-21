@@ -3882,16 +3882,51 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
 
       // 3. Create Expense for received items
       if (totalExpenseAmount !== 0) {
+        // Detect if received items are packaging
+        let isPackaging = false;
+        try {
+          const receivedItemIds = (receivedItems || []).map((r: any) => Number(r.id)).filter((id: number) => !isNaN(id));
+          const itemsData = await tx.purchaseOrderItem.findMany({
+            where: { id: { in: receivedItemIds } },
+            include: { product: { include: { category: true } } }
+          });
+          if (itemsData.length > 0) {
+            isPackaging = itemsData.every((it: any) => {
+              const pName = (it.product?.name || '').toLowerCase();
+              const cName = (it.product?.category?.name || '').toLowerCase();
+              return /cup|lid|sedotan|straw|plastik|packaging|kemasan|box|kantong|opp|sealer/i.test(`${pName} ${cName}`);
+            });
+          }
+        } catch (e) {
+          console.warn("Could not check packaging for PO received items:", e);
+        }
+
+        let targetCategoryName = 'Pembelian (Auto-PO)';
+        let targetCategoryType = 'INVENTORY';
+
+        if (isPackaging) {
+          const packCat = await tx.expenseCategory.findFirst({
+            where: {
+              companyId: tenantId,
+              name: { contains: 'packaging', mode: 'insensitive' }
+            }
+          });
+          if (packCat) {
+            targetCategoryName = packCat.name;
+            targetCategoryType = packCat.type;
+          }
+        }
+
         let category: any = await tx.expenseCategory.findFirst({
-          where: { companyId: tenantId, name: 'Pembelian (Auto-PO)' }
+          where: { companyId: tenantId, name: targetCategoryName }
         });
 
         if (!category) {
           const catResult: any[] = await tx.$queryRawUnsafe(`
             INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
-            VALUES ($1, 'Pembelian (Auto-PO)', 'INVENTORY', NOW())
+            VALUES ($1, $2, $3, NOW())
             RETURNING id
-          `, tenantId);
+          `, tenantId, targetCategoryName, targetCategoryType);
           category = { id: catResult[0].id };
         }
 
@@ -11984,15 +12019,20 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
       const newStatus = isFullyPaid ? 'PAID' : 'PENDING';
 
       // Update Expense using safe Prisma client
+      const updateData: any = {
+        status: newStatus as any,
+        paidAmount: newPaidAmount,
+        accountId: parseInt(accountId),
+        paidAt: isFullyPaid ? payDate : undefined,
+        updatedAt: payDate
+      };
+      if (req.body.categoryId) {
+        updateData.categoryId = parseInt(req.body.categoryId);
+      }
+
       const updatedExpense = await tx.expense.update({
         where: { id: expenseId },
-        data: {
-          status: newStatus as any,
-          paidAmount: newPaidAmount,
-          accountId: parseInt(accountId),
-          paidAt: isFullyPaid ? payDate : undefined,
-          updatedAt: payDate
-        }
+        data: updateData
       });
 
       // Decrement account balance by the payment amount
@@ -12015,6 +12055,32 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
     console.error("DEBUG EXPENSE PAY ERROR:", error);
     fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] EXPENSE PAY ERROR: ${error.message}\n${error.stack}\n`);
     res.status(500).json({ error: 'Gagal mencatat pembayaran hutang: ' + error.message });
+  }
+});
+
+// F5.3b. Quick Update Expense Category (from Payables / Buku Hutang)
+app.patch('/api/finance/expense/:id/category', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const expenseId = parseInt(req.params.id as string);
+    const { categoryId } = req.body;
+    const tenantId = Number((req as any).tenantId);
+
+    if (!categoryId) return res.status(400).json({ error: 'Kategori harus dipilih' });
+
+    const category = await prisma.expenseCategory.findFirst({
+      where: { id: parseInt(categoryId), companyId: tenantId }
+    });
+    if (!category) return res.status(404).json({ error: 'Kategori tidak ditemukan' });
+
+    const updated = await prisma.expense.update({
+      where: { id: expenseId, companyId: tenantId },
+      data: { categoryId: category.id, updatedAt: new Date() },
+      include: { category: true }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengubah kategori hutang: ' + error.message });
   }
 });
 

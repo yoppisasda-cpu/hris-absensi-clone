@@ -13,6 +13,8 @@ export default function PayablesPage() {
     
     // Quick Pay States
     const [accounts, setAccounts] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [updatingCatId, setUpdatingCatId] = useState<number | null>(null);
     const [isPayModalOpen, setIsPayModalOpen] = useState(false);
     const [selectedExpense, setSelectedExpense] = useState<any>(null);
     const [payLoading, setPayLoading] = useState(false);
@@ -20,6 +22,7 @@ export default function PayablesPage() {
     useEffect(() => {
         fetchPayables();
         fetchAccounts();
+        fetchCategories();
     }, []);
 
     const fetchPayables = async () => {
@@ -42,11 +45,37 @@ export default function PayablesPage() {
         }
     };
 
-    const handlePay = async (accountId: string, paymentAmount?: number, paymentDate?: string) => {
+    const fetchCategories = async () => {
+        try {
+            const res = await api.get('/finance/expense-categories');
+            setCategories(res.data);
+        } catch (error) {
+            console.error("Gagal mengambil daftar kategori", error);
+        }
+    };
+
+    const handleCategoryChange = async (expenseId: number, newCatId: string) => {
+        setUpdatingCatId(expenseId);
+        try {
+            await api.patch(`/finance/expense/${expenseId}/category`, { categoryId: newCatId });
+            fetchPayables();
+        } catch (error: any) {
+            alert(error.response?.data?.error || "Gagal mengubah kategori");
+        } finally {
+            setUpdatingCatId(null);
+        }
+    };
+
+    const handlePay = async (accountId: string, paymentAmount?: number, paymentDate?: string, categoryId?: string) => {
         if (!selectedExpense) return;
         setPayLoading(true);
         try {
-            await api.post(`/finance/expense/${selectedExpense.id}/pay`, { accountId, paymentAmount, paymentDate });
+            await api.post(`/finance/expense/${selectedExpense.id}/pay`, { 
+                accountId, 
+                paymentAmount, 
+                paymentDate,
+                categoryId 
+            });
             alert("Pembayaran berhasil dicatat!");
             setIsPayModalOpen(false);
             fetchPayables(); // Refresh list
@@ -175,9 +204,21 @@ export default function PayablesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-wider">
-                                                    {p.categoryName}
-                                                </span>
+                                                <div className="relative inline-flex items-center">
+                                                    <select
+                                                        value={p.categoryId || ''}
+                                                        disabled={updatingCatId === p.id}
+                                                        onChange={(e) => handleCategoryChange(p.id, e.target.value)}
+                                                        className={`px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-wider border border-slate-200 focus:border-rose-500 outline-none cursor-pointer transition-all ${updatingCatId === p.id ? 'opacity-50 pointer-events-none' : ''}`}
+                                                        title="Ubah kategori hutang ini langsung"
+                                                    >
+                                                        {categories.map((cat) => (
+                                                            <option key={cat.id} value={cat.id}>
+                                                                {cat.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <p className="text-sm font-black text-slate-800">Rp {p.amount.toLocaleString()}</p>
@@ -243,6 +284,7 @@ export default function PayablesPage() {
                 onClose={() => setIsPayModalOpen(false)}
                 onConfirm={handlePay}
                 accounts={accounts}
+                categories={categories}
                 expense={selectedExpense}
                 loading={payLoading}
             />

@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { X, CheckCircle2, Wallet } from "lucide-react";
+import { X, CheckCircle2, Wallet, Tag } from "lucide-react";
 
 interface PayDebtModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (accountId: string, paymentAmount?: number, paymentDate?: string) => void;
+    onConfirm: (accountId: string, paymentAmount?: number, paymentDate?: string, categoryId?: string) => void;
     accounts: any[];
+    categories?: any[];
     expense: any;
     loading: boolean;
 }
 
-export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, expense, loading }: PayDebtModalProps) {
+export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, categories = [], expense, loading }: PayDebtModalProps) {
     const [selectedId, setSelectedId] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState('');
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -22,6 +24,7 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
     useEffect(() => {
         if (expense) {
             setSelectedId('');
+            setSelectedCategoryId(expense.categoryId ? expense.categoryId.toString() : '');
             setPaymentAmount(remainingAmount.toFixed(0));
             setPaymentDate(new Date().toISOString().split('T')[0]);
         }
@@ -32,7 +35,7 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
     const handleConfirm = () => {
         if (!selectedId) return;
         const amt = paymentAmount ? parseFloat(paymentAmount) : remainingAmount;
-        onConfirm(selectedId, amt, paymentDate);
+        onConfirm(selectedId, amt, paymentDate, selectedCategoryId || undefined);
     };
 
     return (
@@ -109,6 +112,35 @@ export default function PayDebtModal({ isOpen, onClose, onConfirm, accounts, exp
                             className="w-full px-6 py-4 bg-slate-950/50 rounded-[1.8rem] border border-white/5 focus:border-rose-500 outline-none text-white font-bold"
                         />
                     </div>
+
+                    {categories && categories.length > 0 && (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between ml-1">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">
+                                    Kategori Pengeluaran
+                                </label>
+                                <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider">
+                                    {categories.find(c => c.id.toString() === selectedCategoryId)?.name || 'Pilih Kategori'}
+                                </span>
+                            </div>
+                            <div className="relative">
+                                <select
+                                    value={selectedCategoryId}
+                                    onChange={(e) => setSelectedCategoryId(e.target.value)}
+                                    className="w-full px-6 py-4 bg-slate-950/50 rounded-[1.8rem] border border-white/5 focus:border-rose-500 outline-none text-white font-bold text-xs appearance-none cursor-pointer"
+                                >
+                                    {categories.map((cat) => (
+                                        <option key={cat.id} value={cat.id.toString()} className="bg-slate-900 text-white">
+                                            {cat.name} {cat.type ? `(${cat.type})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                                    <Tag className="h-4 w-4" />
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="space-y-4">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Funding Interface Selection</label>
