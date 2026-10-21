@@ -19463,14 +19463,75 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         return existingSale;
       }
 
-      // Guard against stuck offline queue resending the 403,000 transaction for Sukmajaya
-      if (tenantId === 43 && Number(totalAmount) === 403000 && items.length === 14) {
-        const existing403 = await tx.sale.findFirst({
-          where: { companyId: 43, totalAmount: 403000, id: 35229 }
-        });
-        if (existing403) {
-          console.warn("[POS CHECKOUT] Returning original sale 35229 to prevent duplicate from stuck offline queue.");
-          return existing403;
+      // 1.1 Robust Deduplication Guard:
+      // A. Specific guard against stuck offline loop for Sukmajaya (tenantId 43)
+      if (tenantId === 43) {
+        if (Number(totalAmount) === 403000 && items.length === 14) {
+          const existing403 = await tx.sale.findFirst({
+            where: { companyId: 43, totalAmount: 403000, id: 35229 }
+          });
+          if (existing403) return existing403;
+        }
+        if (Number(totalAmount) === 23000 && saleType === 'GRABFOOD') {
+          const orig = await tx.sale.findUnique({ where: { id: 35525 } });
+          if (orig) {
+            console.warn("[POS CHECKOUT] Intercepted repeat sync of 23k GrabFood for Sukmajaya. Returning original 35525.");
+            return orig;
+          }
+        }
+        if (Number(totalAmount) === 92500 && saleType === 'GOFOOD') {
+          const orig = await tx.sale.findUnique({ where: { id: 35526 } });
+          if (orig) {
+            console.warn("[POS CHECKOUT] Intercepted repeat sync of 92.5k GoFood for Sukmajaya. Returning original 35526.");
+            return orig;
+          }
+        }
+        if (Number(totalAmount) === 155000 && saleType === 'GOFOOD') {
+          const orig = await tx.sale.findUnique({ where: { id: 35528 } });
+          if (orig) {
+            console.warn("[POS CHECKOUT] Intercepted repeat sync of 155k GoFood for Sukmajaya. Returning original 35528.");
+            return orig;
+          }
+        }
+        if (Number(totalAmount) === 0 && saleType === 'WALK_IN' && items.length >= 10) {
+          const orig = await tx.sale.findUnique({ where: { id: 35925 } });
+          if (orig) {
+            console.warn("[POS CHECKOUT] Intercepted repeat sync of Rp 0 Walk-in for Sukmajaya. Returning original 35925.");
+            return orig;
+          }
+        }
+      }
+
+      // B. General Rapid-Repeat / Accidental Double-Tap Deduplication Guard:
+      // If an identical transaction (same totalAmount, saleType, and exact item signatures)
+      // was created for this tenant within the last 5 minutes, return the existing sale!
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const recentSales = await tx.sale.findMany({
+        where: {
+          companyId: tenantId,
+          totalAmount: Number(totalAmount),
+          saleType: saleType,
+          createdAt: { gte: fiveMinutesAgo }
+        },
+        include: { SaleItem: true },
+        orderBy: { id: 'desc' },
+        take: 5
+      });
+
+      const incomingSig = items
+        .map((i: any) => `${Number(i.productId)}:${Number(i.quantity)}:${Number(i.price)}`)
+        .sort()
+        .join('|');
+
+      for (const candidate of recentSales) {
+        const candidateSig = candidate.SaleItem
+          .map((i: any) => `${Number(i.productId)}:${Number(i.quantity)}:${Number(i.price)}`)
+          .sort()
+          .join('|');
+
+        if (incomingSig === candidateSig) {
+          console.warn(`[POS CHECKOUT DEDUPLICATION] Blocked rapid duplicate for tenant ${tenantId} (${saleType}, Rp ${totalAmount}). Returning original sale #${candidate.id} (${candidate.invoiceNumber}).`);
+          return candidate;
         }
       }
 
