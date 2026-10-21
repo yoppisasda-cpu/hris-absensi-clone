@@ -53,6 +53,9 @@ class _POSScreenState extends State<POSScreen> {
   
   double _memberDiscountAmount = 0;
   double _employeeDiscountAmount = 0;
+  String? _employeeDiscountType;
+  double _employeeDiscountValue = 0;
+  String? _employeeDiscountLabel;
   double _voucherDiscountAmount = 0;
   double? _voucherBalanceRemaining;
   double _pointsUsed = 0;
@@ -337,7 +340,25 @@ class _POSScreenState extends State<POSScreen> {
           'modifiers': modifiers,
         });
       }
+      _recalculateEmployeeDiscount();
     });
+  }
+
+  void _recalculateEmployeeDiscount() {
+    if (_employeeDiscountType == null || _employeeDiscountValue <= 0 || _cart.isEmpty) {
+      _employeeDiscountAmount = 0;
+      return;
+    }
+    if (_employeeDiscountType == 'NOMINAL') {
+      _employeeDiscountAmount = _employeeDiscountValue > _discountableSubtotalAmount
+          ? _discountableSubtotalAmount
+          : _employeeDiscountValue;
+    } else {
+      _employeeDiscountAmount = _discountableSubtotalAmount * (_employeeDiscountValue / 100);
+    }
+    if (_voucherController.text.isEmpty || _voucherController.text == (_employeeDiscountLabel ?? 'DISKON KARYAWAN')) {
+      _voucherDiscountAmount = _employeeDiscountAmount;
+    }
   }
 
   Future<void> _calculateDiscounts(StateSetter setPanelState) async {
@@ -381,16 +402,12 @@ class _POSScreenState extends State<POSScreen> {
         _customerPhoneController.text = res['customer']['phone'] ?? '';
         _activeCustomerId = res['customer']['id'];
         
-        final discType = res['discount']['type'];
-        final discValue = (res['discount']['value'] as num).toDouble();
-        
-        if (discType == 'NOMINAL') {
-          _employeeDiscountAmount = discValue > _discountableSubtotalAmount ? _discountableSubtotalAmount : discValue;
-        } else {
-          _employeeDiscountAmount = _discountableSubtotalAmount * (discValue / 100);
-        }
-        final discLabel = res['discount']?['label']?.toString() ?? 'DISKON KARYAWAN';
-        _voucherController.text = discLabel;
+        _employeeDiscountType = res['discount']['type'];
+        _employeeDiscountValue = (res['discount']['value'] as num).toDouble();
+        _employeeDiscountLabel = res['discount']?['label']?.toString() ?? 'DISKON KARYAWAN';
+
+        _recalculateEmployeeDiscount();
+        _voucherController.text = _employeeDiscountLabel!;
         _voucherDiscountAmount = _employeeDiscountAmount;
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Diskon Karyawan Diterapkan!'), backgroundColor: Colors.green));
@@ -424,12 +441,21 @@ class _POSScreenState extends State<POSScreen> {
         final newQty = _cart[index]['quantity'] + delta;
         if (newQty <= 0) {
           _cart.removeAt(index);
+          if (_cart.isEmpty) {
+            _employeeDiscountAmount = 0;
+            _employeeDiscountType = null;
+            _employeeDiscountValue = 0;
+            _employeeDiscountLabel = null;
+          } else {
+            _recalculateEmployeeDiscount();
+          }
         } else {
           bool trackStock = _cart[index]['trackStock'] ?? true;
           int maxStock = int.tryParse(_cart[index]['maxStock']?.toString() ?? '0') ?? 0;
 
           if (!trackStock || newQty <= maxStock) {
             _cart[index]['quantity'] = newQty;
+            _recalculateEmployeeDiscount();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Stok tidak cukup')),
@@ -840,7 +866,49 @@ class _POSScreenState extends State<POSScreen> {
                 if (_employeeDiscountAmount > 0)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
-                    child: Text('Diskon Karyawan Aktif: - Rp ${_employeeDiscountAmount.toStringAsFixed(0)}', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 12)),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.shade200),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Diskon Karyawan Aktif: - Rp ${_employeeDiscountAmount.toStringAsFixed(0)}',
+                              style: TextStyle(color: Colors.teal.shade800, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              setPanelState(() {
+                                _employeeDiscountAmount = 0;
+                                _employeeDiscountType = null;
+                                _employeeDiscountValue = 0;
+                                _employeeDiscountLabel = null;
+                                _aivolaIdController.clear();
+                                if (_voucherController.text == 'DISKON KARYAWAN' ||
+                                    _voucherController.text.startsWith('DISKON KARYAWAN')) {
+                                  _voucherController.clear();
+                                  _voucherDiscountAmount = 0;
+                                }
+                              });
+                              setState(() {});
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                              child: Text(
+                                'Hapus',
+                                style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 SizedBox(height: 24),
 
@@ -1484,10 +1552,15 @@ class _POSScreenState extends State<POSScreen> {
       _customerNameController.clear();
       _customerPhoneController.clear();
       _activeCustomerId = null;
+      _aivolaIdController.clear();
       _voucherController.clear();
       _usePoints = false;
       _availablePoints = 0;
       _memberDiscountAmount = 0;
+      _employeeDiscountAmount = 0;
+      _employeeDiscountType = null;
+      _employeeDiscountValue = 0;
+      _employeeDiscountLabel = null;
       _voucherDiscountAmount = 0;
       _voucherBalanceRemaining = null;
       _pointsUsed = 0;
