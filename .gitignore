@@ -44,4 +44,5 @@ mobile_app/analysis.txt
 backend/*.ts
 backend/*.js
 !backend/server.ts
+backend/scratch/
 .vercel

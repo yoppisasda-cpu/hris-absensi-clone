@@ -87,6 +87,7 @@ export default function POSPage() {
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [paymentReference, setPaymentReference] = useState("");
+    const [paymentSubMethod, setPaymentSubMethod] = useState<'QRIS' | 'EDC' | 'TRANSFER'>('QRIS');
     const [voucherCode, setVoucherCode] = useState("");
     const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0);
 
@@ -728,7 +729,13 @@ export default function POSPage() {
                 taxRate,
                 taxAmount,
                 saleType,
-                paymentMethod: accounts.find(a => a.id === selectedAccount)?.name || 'Bayar di Kasir',
+                paymentMethod: (() => {
+                    const acc = accounts.find(a => a.id === selectedAccount);
+                    const isCash = acc?.type === 'CASH' || acc?.name.toUpperCase().includes('KAS') || acc?.name.toUpperCase().includes('TUNAI');
+                    if (isCash) return acc?.name || 'Tunai';
+                    if (acc?.name.toUpperCase().includes('QRIS')) return acc.name;
+                    return `${paymentSubMethod} - ${acc?.name || 'Bank'}`;
+                })(),
                 paymentReference: paymentReference.trim() || null,
                 customerName: finalCustName,
                 customerPhone: customerPhone.trim() || null,
@@ -767,7 +774,13 @@ export default function POSPage() {
                 discountAmount: discountAmount + voucherDiscountAmount,
                 taxAmount,
                 totalAmount: finalTotalAmount,
-                paymentMethod: accounts.find(a => a.id === selectedAccount)?.name || 'Bayar di Kasir',
+                paymentMethod: (() => {
+                    const acc = accounts.find(a => a.id === selectedAccount);
+                    const isCash = acc?.type === 'CASH' || acc?.name.toUpperCase().includes('KAS') || acc?.name.toUpperCase().includes('TUNAI');
+                    if (isCash) return acc?.name || 'Tunai';
+                    if (acc?.name.toUpperCase().includes('QRIS')) return acc.name;
+                    return `${paymentSubMethod} - ${acc?.name || 'Bank'}`;
+                })(),
                 isCompleted: true,
                 lastSale: {
                     invoiceNumber: res.data?.invoiceNumber,
@@ -788,6 +801,7 @@ export default function POSPage() {
 
             setCustomerPhone("");
             setPaymentReference("");
+            setPaymentSubMethod('QRIS');
             setVoucherCode("");
             setVoucherDiscountAmount(0);
             setEmployeeDiscount(null);
@@ -1238,7 +1252,7 @@ export default function POSPage() {
                                             let badgeText = "Tunai";
                                             const isSelected = selectedAccount === acc.id;
                                             if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-4 w-4" />; }
-                                            else if (acc.type === 'BANK') { badgeText = "Transfer/EDC"; icon = <CreditCard className="h-4 w-4" />; }
+                                            else if (acc.type === 'BANK') { badgeText = "Bank / Non-Tunai"; icon = <CreditCard className="h-4 w-4" />; }
                                             
                                             return (
                                                 <button 
@@ -1299,18 +1313,45 @@ export default function POSPage() {
                                         </div>
                                     )}
 
-                                    {/* JIKA METODE NON-TUNAI / EDC */}
+                                    {/* JIKA METODE NON-TUNAI / EDC / QRIS */}
                                     {selectedAccount && !accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
-                                        <div className="pt-1 animate-in fade-in">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                Nomor Referensi / Approval EDC (Opsional)
+                                        <div className="pt-1 animate-in fade-in space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    Pilih Jalur Non-Tunai
+                                                </label>
+                                                <span className="text-[9px] font-bold text-blue-400">QRIS / EDC / Transfer</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                {[
+                                                    { id: 'QRIS', label: 'QRIS', icon: <Scan className="h-3.5 w-3.5" /> },
+                                                    { id: 'EDC', label: 'EDC / Kartu', icon: <CreditCard className="h-3.5 w-3.5" /> },
+                                                    { id: 'TRANSFER', label: 'Transfer', icon: <Wallet className="h-3.5 w-3.5" /> },
+                                                ].map((m) => (
+                                                    <button
+                                                        key={m.id}
+                                                        type="button"
+                                                        onClick={() => setPaymentSubMethod(m.id as any)}
+                                                        className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-xl text-xs font-bold border transition-all ${
+                                                            paymentSubMethod === m.id
+                                                                ? 'bg-blue-600/25 border-blue-500 text-blue-300 shadow-sm'
+                                                                : 'bg-slate-950 border-white/10 text-slate-400 hover:text-white'
+                                                        }`}
+                                                    >
+                                                        {m.icon}
+                                                        <span>{m.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block pt-1">
+                                                Nomor Referensi / Approval (Opsional)
                                             </label>
                                             <input 
                                                 type="text"
                                                 value={paymentReference}
                                                 onChange={(e) => setPaymentReference(e.target.value)}
                                                 placeholder="Contoh: 123456..."
-                                                className="w-full mt-1 px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                                                className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
                                             />
                                         </div>
                                     )}
@@ -1583,7 +1624,7 @@ export default function POSPage() {
                                             let badgeText = "Tunai";
                                             const isSelected = selectedAccount === acc.id;
                                             if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-5 w-5" />; }
-                                            else if (acc.type === 'BANK') { badgeText = "Debit/Transfer"; icon = <CreditCard className="h-5 w-5" />; }
+                                            else if (acc.type === 'BANK') { badgeText = "Bank / Non-Tunai"; icon = <CreditCard className="h-5 w-5" />; }
                                             
                                             return (
                                                 <button 
@@ -1675,10 +1716,37 @@ export default function POSPage() {
                                     </div>
                                 )}
 
-                                {/* JIKA NON-TUNAI / EDC */}
+                                {/* JIKA NON-TUNAI / EDC / QRIS */}
                                 {selectedAccount && !accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
-                                    <div className="space-y-2 bg-slate-900/80 p-4 rounded-3xl border border-white/5 animate-in fade-in">
-                                        <label className="text-xs font-black uppercase tracking-widest text-slate-300">
+                                    <div className="space-y-3 bg-slate-900/80 p-4 rounded-3xl border border-white/5 animate-in fade-in">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-xs font-black uppercase tracking-widest text-slate-300">
+                                                Pilih Jalur Non-Tunai
+                                            </label>
+                                            <span className="text-[10px] font-bold text-blue-400">QRIS / EDC / Transfer Bank</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { id: 'QRIS', label: 'QRIS', icon: <Scan className="h-4 w-4" /> },
+                                                { id: 'EDC', label: 'EDC / Kartu', icon: <CreditCard className="h-4 w-4" /> },
+                                                { id: 'TRANSFER', label: 'Transfer', icon: <Wallet className="h-4 w-4" /> },
+                                            ].map((m) => (
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => setPaymentSubMethod(m.id as any)}
+                                                    className={`flex items-center justify-center gap-2 py-2.5 px-2 rounded-2xl text-xs font-bold border transition-all ${
+                                                        paymentSubMethod === m.id
+                                                            ? 'bg-blue-600/25 border-blue-500 text-blue-300 shadow-md shadow-blue-500/10'
+                                                            : 'bg-slate-950 border-white/10 text-slate-400 hover:text-white'
+                                                    }`}
+                                                >
+                                                    {m.icon}
+                                                    <span>{m.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <label className="text-xs font-black uppercase tracking-widest text-slate-300 block pt-1">
                                             Nomor Approval / Ref EDC (Opsional)
                                         </label>
                                         <input 

@@ -1022,10 +1022,31 @@ class _POSScreenState extends State<POSScreen> {
                             _selectedPaymentMethod = method;
                             
                             if (method == 'Tunai') {
-                               final cashAcc = _accounts.firstWhere((a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
+                               final cashAcc = _accounts.firstWhere(
+                                 (a) => a['type'] == 'CASH' || a['name'].toString().toLowerCase().contains('tunai') || a['name'].toString().toLowerCase().contains('kas'),
+                                 orElse: () => _accounts.firstWhere((a) => a['type'] == 'CASH', orElse: () => _accounts.isNotEmpty ? _accounts.first : null)
+                               );
                                if (cashAcc != null) _selectedAccountId = cashAcc['id'];
+                            } else if (method == 'QRIS') {
+                               final qrisAcc = _accounts.firstWhere(
+                                 (a) => a['name'].toString().toLowerCase().contains('qris'),
+                                 orElse: () => _accounts.firstWhere(
+                                   (a) => a['type'] == 'BANK',
+                                   orElse: () => _accounts.firstWhere(
+                                     (a) => a['type'] != 'CASH' && !a['name'].toString().toLowerCase().contains('tunai') && !a['name'].toString().toLowerCase().contains('kas'),
+                                     orElse: () => _accounts.isNotEmpty ? _accounts.first : null
+                                   )
+                                 )
+                               );
+                               if (qrisAcc != null) _selectedAccountId = qrisAcc['id'];
                             } else {
-                               final bankAcc = _accounts.firstWhere((a) => a['type'] == 'BANK' || !a['name'].toString().toLowerCase().contains('tunai'), orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
+                               final bankAcc = _accounts.firstWhere(
+                                 (a) => a['type'] == 'BANK',
+                                 orElse: () => _accounts.firstWhere(
+                                   (a) => a['type'] != 'CASH' && !a['name'].toString().toLowerCase().contains('tunai') && !a['name'].toString().toLowerCase().contains('kas'),
+                                   orElse: () => _accounts.isNotEmpty ? _accounts.first : null
+                                 )
+                               );
                                if (bankAcc != null) _selectedAccountId = bankAcc['id'];
                             }
                           });

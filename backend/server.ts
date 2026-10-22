@@ -15949,9 +15949,17 @@ app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) =
   try {
     const tenantId = Number(req.tenantId);
     const transactions: any[] = await prisma.$queryRawUnsafe(`
-      SELECT st.*, p.name as product_name, p.sku as product_sku, p.unit as product_unit, p."purchaseUnit" as product_purchase_unit
+      SELECT st.*, 
+             p.name as product_name, 
+             p.sku as product_sku, 
+             p.unit as product_unit, 
+             p."purchaseUnit" as product_purchase_unit,
+             p.stock as current_stock,
+             p.type as product_type,
+             w.name as warehouse_name
       FROM "StockTransaction" st
       JOIN "Product" p ON st."productId" = p.id
+      LEFT JOIN "Warehouse" w ON st."warehouseId" = w.id
       WHERE p."companyId" = $1
       ORDER BY st."createdAt" DESC
     `, tenantId);
@@ -19394,20 +19402,85 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
       }
 
-      const account = finalAccountId ? await tx.financialAccount.findUnique({ where: { id: finalAccountId } }) : null;
+      let account = finalAccountId ? await tx.financialAccount.findUnique({ where: { id: finalAccountId } }) : null;
       let detectedNormalizedMethod = 'TUNAI';
       const rawPm = (paymentMethod || '').toString().trim().toUpperCase();
       const rawNotes = (notes || '').toString().toUpperCase();
       const rawAcc = (account?.name || '').toString().toUpperCase();
+      const rawAccType = (account?.type || '').toString().toUpperCase();
 
       if (rawPm.includes('QRIS') || rawNotes.includes('QRIS') || rawAcc.includes('QRIS')) {
         detectedNormalizedMethod = 'QRIS';
       } else if (paymentReference || rawPm.includes('EDC') || rawPm.includes('DEBIT') || rawPm.includes('KREDIT') || rawPm.includes('CREDIT') || rawNotes.includes('EDC') || rawNotes.includes('DEBIT') || rawNotes.includes('KREDIT') || rawNotes.includes('CREDIT') || rawAcc.includes('EDC') || rawAcc.includes('DEBIT')) {
         detectedNormalizedMethod = 'EDC';
-      } else if (rawPm.includes('TRANSFER') || rawNotes.includes('TRANSFER') || rawAcc.includes('TRANSFER')) {
+      } else if (rawPm.includes('TRANSFER') || rawNotes.includes('TRANSFER') || rawAcc.includes('TRANSFER') || rawAccType === 'BANK') {
         detectedNormalizedMethod = 'TRANSFER';
       } else {
         detectedNormalizedMethod = 'TUNAI';
+      }
+
+      // Safeguard & Auto-Routing: Ensure non-cash methods (QRIS, EDC, TRANSFER) are routed to BANK/QRIS accounts, and cash to CASH accounts
+      if (detectedNormalizedMethod === 'QRIS') {
+        const isCash = !account || account.type === 'CASH' || account.name.toLowerCase().includes('tunai') || account.name.toLowerCase().includes('cash') || account.name.toLowerCase().includes('petty');
+        if (isCash) {
+          const targetBankAcc = await tx.financialAccount.findFirst({
+            where: {
+              companyId: tenantId,
+              name: { contains: 'QRIS', mode: 'insensitive' }
+            }
+          }) || await tx.financialAccount.findFirst({
+            where: {
+              companyId: tenantId,
+              type: 'BANK'
+            }
+          }) || await tx.financialAccount.findFirst({
+            where: {
+              companyId: tenantId,
+              NOT: [
+                { type: 'CASH' },
+                { name: { contains: 'Tunai', mode: 'insensitive' } },
+                { name: { contains: 'Petty', mode: 'insensitive' } }
+              ]
+            }
+          });
+          if (targetBankAcc) {
+            console.log(`[POS CHECKOUT ROUTING] Re-routed QRIS sale from cash account #${finalAccountId} (${account?.name}) to bank/QRIS account #${targetBankAcc.id} (${targetBankAcc.name}) for tenant ${tenantId}`);
+            finalAccountId = targetBankAcc.id;
+            account = targetBankAcc;
+          }
+        }
+      } else if (detectedNormalizedMethod === 'EDC' || detectedNormalizedMethod === 'TRANSFER') {
+        const isCash = !account || account.type === 'CASH' || account.name.toLowerCase().includes('tunai') || account.name.toLowerCase().includes('cash') || account.name.toLowerCase().includes('petty');
+        if (isCash) {
+          const targetBankAcc = await tx.financialAccount.findFirst({
+            where: {
+              companyId: tenantId,
+              type: 'BANK'
+            }
+          });
+          if (targetBankAcc) {
+            finalAccountId = targetBankAcc.id;
+            account = targetBankAcc;
+          }
+        }
+      } else if (detectedNormalizedMethod === 'TUNAI') {
+        const isBank = account && account.type === 'BANK';
+        if (isBank) {
+          const targetCashAcc = await tx.financialAccount.findFirst({
+            where: {
+              companyId: tenantId,
+              OR: [
+                { type: 'CASH' },
+                { name: { contains: 'Tunai', mode: 'insensitive' } },
+                { name: { contains: 'Cash', mode: 'insensitive' } }
+              ]
+            }
+          });
+          if (targetCashAcc) {
+            finalAccountId = targetCashAcc.id;
+            account = targetCashAcc;
+          }
+        }
       }
 
       const paymentMethodTag = `[Metode: ${detectedNormalizedMethod}]`;
@@ -19885,9 +19958,9 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
 
       // 4. Finance
-      if (accountId) {
+      if (finalAccountId) {
         await tx.financialAccount.update({
-          where: { id: Number(accountId) },
+          where: { id: finalAccountId },
           data: { balance: { increment: Number(totalAmount) } }
         });
 
@@ -19901,7 +19974,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           data: {
             companyId: tenantId,
             branchId: user?.branchId || null,
-            accountId: Number(accountId),
+            accountId: finalAccountId,
             categoryId: category.id,
             amount: Number(totalAmount),
             receivedFrom: `Pelanggan POS (${saleType})`,
@@ -20558,6 +20631,7 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
     const methodMap = new Map<string, { accountId: number | null; accountName: string; accountType: string; expectedAmount: number }>();
 
     for (const sale of sales) {
+      const pm = (sale.paymentMethod || '').toUpperCase();
       const notes = (sale.notes || '').toUpperCase();
       const account = sale.accountId ? accountMap.get(sale.accountId) : null;
       const accName = (account?.name || '').toUpperCase();
@@ -20566,27 +20640,24 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
       let methodLabel = '';
       let methodType = 'OTHER';
 
-      if (notes.includes('QRIS')) {
+      if (pm === 'QRIS' || pm.includes('QRIS') || notes.includes('QRIS') || accName.includes('QRIS')) {
         methodLabel = 'QRIS';
         methodType = 'QRIS';
-      } else if (notes.includes('DEBIT/CREDIT') || notes.includes('DEBIT / CREDIT')) {
+      } else if (pm === 'EDC' || pm.includes('DEBIT') || pm.includes('CREDIT') || notes.includes('DEBIT/CREDIT') || notes.includes('DEBIT / CREDIT')) {
         methodLabel = 'Debit / Credit';
         methodType = 'DEBIT';
-      } else if (notes.includes('DEBIT')) {
+      } else if (notes.includes('DEBIT') || pm.includes('DEBIT')) {
         methodLabel = 'Debit';
         methodType = 'DEBIT';
-      } else if (notes.includes('CREDIT')) {
+      } else if (notes.includes('CREDIT') || pm.includes('CREDIT')) {
         methodLabel = 'Credit';
         methodType = 'CREDIT';
-      } else if (notes.includes('TRANSFER')) {
+      } else if (pm === 'TRANSFER' || pm.includes('TRANSFER') || notes.includes('TRANSFER')) {
         methodLabel = 'Transfer Bank';
         methodType = 'TRANSFER';
-      } else if (notes.includes('TUNAI') || notes.includes('CASH')) {
+      } else if (pm === 'TUNAI' || pm === 'CASH' || notes.includes('TUNAI') || notes.includes('CASH')) {
         methodLabel = 'Tunai';
         methodType = 'CASH';
-      } else if (accName.includes('QRIS')) {
-        methodLabel = 'QRIS';
-        methodType = 'QRIS';
       } else if (accName.includes('DEBIT')) {
         methodLabel = 'Debit';
         methodType = 'DEBIT';

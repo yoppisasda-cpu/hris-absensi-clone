@@ -387,7 +387,13 @@ export default function ProductsPage() {
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-3 mb-2">
-                                                        <p className="font-black text-sm italic text-white uppercase tracking-tighter leading-none">{product.name}</p>
+                                                        <Link 
+                                                            href={`/dashboard/inventory/adjustments?product=${encodeURIComponent(product.name)}`}
+                                                            className="font-black text-sm italic text-white hover:text-indigo-400 transition-colors uppercase tracking-tighter leading-none hover:underline"
+                                                            title="Lihat Riwayat Mutasi & Pemakaian Stok"
+                                                        >
+                                                            {product.name}
+                                                        </Link>
                                                         {product.type === 'WIP' && (
                                                             <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 italic">
                                                                 WIP
@@ -599,6 +605,13 @@ export default function ProductsPage() {
                                                                     >
                                                                         <Truck className="h-4 w-4 text-indigo-400" /> Mutasi Stok
                                                                     </button>
+                                                                    <Link 
+                                                                        href={`/dashboard/inventory/adjustments?product=${encodeURIComponent(product.name)}`}
+                                                                        onClick={() => setOpenMenuId(null)}
+                                                                        className="w-full px-5 py-3 text-left text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest flex items-center gap-3 transition-all italic"
+                                                                    >
+                                                                        <History className="h-4 w-4 text-emerald-400" /> Riwayat & Pemakaian
+                                                                    </Link>
                                                                 </>
                                                             )}
 
