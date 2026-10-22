@@ -15965,7 +15965,7 @@ app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) =
     `, tenantId);
     const formatted = transactions.map(t => ({
       ...t,
-      quantity: t.quantity != null ? Number(Number(t.quantity).toFixed(2)) : t.quantity
+      quantity: t.quantity != null ? Number(t.quantity) : t.quantity
     }));
     res.json(formatted);
   } catch (error: any) {

@@ -52,13 +52,14 @@ function AdjustmentsContent() {
         }
     }, [queryProduct]);
 
-    const formatQuantity = (val: number | string) => {
-        const num = Math.abs(Number(val) || 0);
-        if (num === 0) return '0';
-        if (Number.isInteger(num)) return num.toLocaleString('id-ID');
-        const rounded = Number(num.toFixed(2));
-        if (rounded === 0) return '0.01';
-        return rounded.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const formatQuantity = (val: number | string, allowNegative = false) => {
+        const rawNum = Number(val) || 0;
+        const absNum = Math.abs(rawNum);
+        if (absNum === 0) return '0';
+        const formatted = Number.isInteger(absNum)
+            ? absNum.toLocaleString('id-ID')
+            : Number(absNum.toFixed(2)).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        return (allowNegative && rawNum < 0) ? `−${formatted}` : formatted;
     };
 
     const getTypeDetails = (type: string) => {
@@ -401,6 +402,24 @@ function AdjustmentsContent() {
 
                         <div className="flex items-center gap-6 flex-wrap">
                             <div className="text-left md:text-right">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block italic">
+                                    Stok Saat Ini
+                                </span>
+                                <span className={`text-lg font-black italic ${Number(singleProductMatch.current_stock) < 0 ? 'text-rose-400' : 'text-white'}`}>
+                                    {formatQuantity(singleProductMatch.current_stock ?? 0, true)} {singleProductMatch.product_unit || 'UNIT'}
+                                </span>
+                                {Number(singleProductMatch.current_stock) < 0 ? (
+                                    <span className="text-[8px] font-black text-rose-400 uppercase tracking-wider block bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 italic">
+                                        Defisit
+                                    </span>
+                                ) : (
+                                    <span className="text-[8px] font-bold text-slate-500 block">
+                                        Tersedia
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="text-left md:text-right">
                                 <span className="text-[9px] font-black uppercase tracking-widest text-rose-400 block italic">
                                     Jumlah Pemakaian (OUT)
                                 </span>
@@ -697,13 +716,24 @@ function AdjustmentsContent() {
                                             </span>
                                         </div>
 
-                                        <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/5">
-                                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-                                                Stok Saat Ini
-                                            </span>
-                                            <span className={`text-lg font-black italic ${Number(selectedProduct.current_stock) < 0 ? 'text-rose-400' : 'text-white'}`}>
-                                                {formatQuantity(selectedProduct.current_stock ?? 0)} {selectedProduct.product_unit}
-                                            </span>
+                                        <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 flex flex-col justify-between">
+                                            <div>
+                                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                                                    Stok Saat Ini
+                                                </span>
+                                                <span className={`text-lg font-black italic ${Number(selectedProduct.current_stock) < 0 ? 'text-rose-400' : 'text-white'}`}>
+                                                    {formatQuantity(selectedProduct.current_stock ?? 0, true)} {selectedProduct.product_unit}
+                                                </span>
+                                            </div>
+                                            {Number(selectedProduct.current_stock) < 0 ? (
+                                                <span className="text-[8px] font-black text-rose-400 uppercase tracking-wider block mt-1.5 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 italic">
+                                                    Defisit (Belum Input PO / Stok Awal)
+                                                </span>
+                                            ) : (
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block mt-1">
+                                                    Tersedia di Gudang
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
