@@ -286,7 +286,7 @@ app.use('/uploads', express.static(uploadsDir));
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
-    version: 'v1.0.8-qris-image',
+    version: 'v1.0.9-dedup-routing',
     env: process.env.NODE_ENV,
     time: new Date().toISOString() 
   });
