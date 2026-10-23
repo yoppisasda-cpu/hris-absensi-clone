@@ -15950,7 +15950,7 @@ app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) =
              p.sku as product_sku, 
              p.unit as product_unit, 
              p."purchaseUnit" as product_purchase_unit,
-             p.stock as current_stock,
+             COALESCE((SELECT SUM(ws.quantity) FROM "WarehouseStock" ws WHERE ws."productId" = p.id), p.stock) as current_stock,
              p.type as product_type,
              w.name as warehouse_name
       FROM "StockTransaction" st
