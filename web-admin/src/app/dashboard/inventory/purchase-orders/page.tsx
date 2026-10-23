@@ -285,7 +285,7 @@ export default function PurchaseOrdersPage() {
 
     const userRole = role.toUpperCase();
     const isPurchasingOrAdmin = ['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'MANAGER'].includes(userRole);
-    const canCreatePO = ['OPERATIONAL', 'ADMIN', 'SUPERADMIN', 'OWNER', 'PURCHASING', 'MANAGER'].includes(userRole);
+    const canCreatePO = ['OPERATIONAL', 'ADMIN', 'SUPERADMIN', 'OWNER', 'PURCHASING', 'MANAGER', 'SUPERVISOR'].includes(userRole);
     const canReceiveGoods = ['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'FINANCE', 'WAREHOUSE_ADMIN', 'OPERATIONAL', 'SUPERVISOR'].includes(userRole);
 
     return (
@@ -572,6 +572,18 @@ export default function PurchaseOrdersPage() {
                                                     </div>
                                                 ) : (
                                                     <div className="flex items-center gap-2">
+                                                        {po.status === 'PENDING' && canCreatePO && (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setSelectedEditPo(po);
+                                                                    setIsEditModalOpen(true);
+                                                                }}
+                                                                title="EDIT MANIFEST"
+                                                                className="h-10 w-10 flex items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 hover:bg-slate-800 transition-all border border-amber-500/20 active:scale-95 shadow-inner shadow-amber-500/5"
+                                                            >
+                                                                <Edit3 className="h-4 w-4 stroke-[2.5px]" />
+                                                            </button>
+                                                        )}
                                                         {po.status !== 'REJECTED' && (
                                                             <>
                                                                 <button 
