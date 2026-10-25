@@ -375,6 +375,28 @@ h1 { font-size: 4.8rem; font-weight: 850; letter-spacing: -0.03em; line-height: 
     font-weight: 700 !important;
 }
 
+.nav-comparison-link {
+    color: #38bdf8 !important;
+    font-weight: 700 !important;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.nav-comparison-link::after {
+    content: 'VS';
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 850;
+    background: linear-gradient(135deg, #0284c7, #38bdf8);
+    color: white;
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-left: 5px;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
 /* AI Showcase Section */
 .ai-showcase-section {
     padding: 8rem 5%;

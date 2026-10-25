@@ -30,20 +30,16 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
 
   Future<void> _fetchOrders() async {
     setState(() => _isLoading = true);
+    List<dynamic> localData = [];
     try {
-      final onlineData = await _apiService.getPosOrders(
-        startDate: _startDate,
-        endDate: _endDate,
-      );
-      
-      // Mengambil transaksi offline yang BELUM tersinkron
+      // Mengambil transaksi offline yang BELUM tersinkron terlebih dahulu
       final offlineSales = PosLocalDbService.getOfflineSales();
-      final localData = offlineSales.map((sale) => {
+      localData = offlineSales.map((sale) => {
         'id': 'offline_${sale['localInvoiceNumber']}',
         'invoiceNumber': sale['localInvoiceNumber'],
         'date': sale['date'] ?? DateTime.now().toIso8601String(),
         'totalAmount': sale['totalAmount'],
-        'status': 'MENUNGGU SINKRON',
+        'status': 'MENUNGGU SINKRON (OFFLINE)',
         'saleType': sale['saleType'] ?? 'WALK_IN',
         'paymentMethod': sale['paymentMethod'],
         'paymentReference': sale['paymentReference'],
@@ -58,13 +54,29 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
         'totalCommission': 0.0,
       }).toList();
 
-      setState(() => _orders = [...localData, ...onlineData]);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengambil riwayat: $e'), backgroundColor: Colors.red),
+      final onlineData = await _apiService.getPosOrders(
+        startDate: _startDate,
+        endDate: _endDate,
       );
+      
+      if (mounted) {
+        setState(() => _orders = [...localData, ...onlineData]);
+      }
+    } catch (e) {
+      // Jika jaringan gagal, pastikan transaksi offline lokal tetap terlihat oleh kasir
+      if (mounted) {
+        setState(() => _orders = localData);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localData.isNotEmpty
+                ? 'Mode Offline: Menampilkan ${localData.length} transaksi lokal menunggu sinkron.'
+                : 'Koneksi terputus: Gagal memuat riwayat dari server ($e)'),
+            backgroundColor: Colors.orange[800],
+          ),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

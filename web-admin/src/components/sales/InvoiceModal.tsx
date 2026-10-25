@@ -409,18 +409,46 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                     )}
                                 </div>
                                 <div className="w-full md:w-80 print:w-64 space-y-2 print:space-y-1">
-                                    <div className="flex justify-between items-center text-slate-500 text-[9.5px] print:text-[8.5px] font-black uppercase tracking-widest italic print:text-black">
-                                        <span>Subtotal</span>
-                                        <span className="text-slate-950 font-black">
-                                            {(parseFloat(sale.totalAmount) - parseFloat(sale.taxAmount || 0)).toLocaleString('id-ID')}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-slate-500 text-[9.5px] print:text-[8.5px] font-black uppercase tracking-widest italic print:text-black">
-                                        <span>Pajak ({sale.taxRate || 0}%)</span>
-                                        <span className={`font-black ${(sale.taxRate || 0) > 0 ? 'text-amber-600' : 'text-slate-950'}`}>
-                                            {parseFloat(sale.taxAmount || 0).toLocaleString('id-ID')}
-                                        </span>
-                                    </div>
+                                    {(() => {
+                                        const itemsGrossTotal = (sale.items || []).reduce((sum: number, it: any) => sum + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+                                        const storedDiscount = Number(sale.discountAmount || 0) || (Number(sale.voucherDiscountAmount || 0) + Number(sale.memberDiscountAmount || 0));
+                                        const calculatedDiff = Math.max(0, itemsGrossTotal - (parseFloat(sale.totalAmount) - parseFloat(sale.taxAmount || 0)));
+                                        const effectiveDiscount = storedDiscount > 0 ? storedDiscount : calculatedDiff;
+                                        const discountLabel = sale.voucherCode ? `Potongan (${sale.voucherCode})` : 'Potongan Diskon';
+
+                                        return (
+                                            <>
+                                                {effectiveDiscount > 0 && (
+                                                    <>
+                                                        <div className="flex justify-between items-center text-slate-500 text-[9.5px] print:text-[8.5px] font-black uppercase tracking-widest italic print:text-black">
+                                                            <span>Total Item</span>
+                                                            <span className="text-slate-950 font-black">
+                                                                Rp {itemsGrossTotal.toLocaleString('id-ID')}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-rose-500 text-[9.5px] print:text-[8.5px] font-black uppercase tracking-widest italic print:text-black">
+                                                            <span>{discountLabel}</span>
+                                                            <span className="font-black text-rose-600 print:text-black">
+                                                                -Rp {effectiveDiscount.toLocaleString('id-ID')}
+                                                            </span>
+                                                        </div>
+                                                    </>
+                                                )}
+                                                <div className="flex justify-between items-center text-slate-500 text-[9.5px] print:text-[8.5px] font-black uppercase tracking-widest italic print:text-black">
+                                                    <span>Subtotal</span>
+                                                    <span className="text-slate-950 font-black">
+                                                        Rp {(parseFloat(sale.totalAmount) - parseFloat(sale.taxAmount || 0)).toLocaleString('id-ID')}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-slate-500 text-[9.5px] print:text-[8.5px] font-black uppercase tracking-widest italic print:text-black">
+                                                    <span>Pajak ({sale.taxRate || 0}%)</span>
+                                                    <span className={`font-black ${(sale.taxRate || 0) > 0 ? 'text-amber-600' : 'text-slate-950'}`}>
+                                                        Rp {parseFloat(sale.taxAmount || 0).toLocaleString('id-ID')}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
                                     <div className="h-[1px] bg-slate-200 my-1 print:my-0.5 print:bg-black"></div>
                                     <div className="p-3 px-4 print:p-1.5 print:px-3 bg-white border-2 border-slate-950 rounded-xl text-slate-950 shadow-sm print:border-black print:border-2">
                                         <p className="text-[7.5px] font-black uppercase tracking-[0.2em] mb-0.5 print:text-black">Total Bersih</p>

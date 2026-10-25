@@ -35,6 +35,7 @@ const Header = () => (
     <div className="nav-links">
       <a href="#features">Fitur</a>
       <a href="#ai-showcase" className="nav-ai-link">AI Co-Pilot</a>
+      <a href="#comparison" className="nav-comparison-link">Komparasi</a>
       <a href="#finance" className="nav-finance-link">Finance & POS</a>
       <a href="#pricing">Harga</a>
       <a href="https://order.aivola.id" className="btn-login" style={{ background: '#ff7a00', color: 'white', border: 'none' }}>Pesan Makanan</a>
@@ -911,6 +912,7 @@ const AttendancePage = () => {
       <ClientsSection />
       <AIShowcase />
       <FeaturesShowcase />
+      <ComparisonSection />
       <DemoSection onPlay={() => setShowModal(true)} />
       <PricingSection />
       <AboutSection />
@@ -923,6 +925,7 @@ const AttendancePage = () => {
 
 import FinancePage from './FinancePage';
 import { ChatWidget } from './components/ChatWidget';
+import { ComparisonSection } from './components/ComparisonSection';
 
 function App() {
   const [activePage, setActivePage] = useState('attendance');
@@ -931,9 +934,19 @@ function App() {
     // Basic hash-based "routing" or just state
     const handleHash = () => {
       const hash = window.location.hash;
-      if (hash === '#finance') setActivePage('finance');
-      else if (hash === '#privacy') setActivePage('privacy');
-      else setActivePage('attendance');
+      if (hash === '#finance') {
+        setActivePage('finance');
+      } else if (hash === '#privacy') {
+        setActivePage('privacy');
+      } else {
+        setActivePage('attendance');
+        if (hash === '#comparison') {
+          setTimeout(() => {
+            const el = document.getElementById('comparison');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+      }
     };
 
     window.addEventListener('hashchange', handleHash);

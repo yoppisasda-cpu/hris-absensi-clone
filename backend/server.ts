@@ -16295,14 +16295,8 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
           { customerName: { contains: '(Karyawan)' } }
         ]
       },
-      select: {
-        id: true,
-        invoiceNumber: true,
-        date: true,
-        voucherCode: true,
-        voucherDiscountAmount: true,
-        memberDiscountAmount: true,
-        customerName: true
+      include: {
+        SaleItem: true
       },
       orderBy: { date: 'desc' }
     });
@@ -16314,9 +16308,16 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
         code = sale.customerName?.includes('(Karyawan)') ? 'DISKON KARYAWAN' : (code || 'Diskon Member');
       }
 
-      const discount = sale.voucherDiscountAmount > 0 
+      const itemsSubtotal = (sale.SaleItem || []).reduce((sum: number, it: any) => sum + (Number(it.price) * Number(it.quantity)), 0);
+      const diffDiscount = Math.max(0, itemsSubtotal - Number(sale.totalAmount));
+
+      let discount = sale.voucherDiscountAmount > 0 
         ? sale.voucherDiscountAmount 
         : (sale.memberDiscountAmount > 0 ? sale.memberDiscountAmount : 0);
+
+      if (discount === 0 && diffDiscount > 0) {
+        discount = diffDiscount;
+      }
 
       return {
         id: sale.id,
@@ -18531,6 +18532,31 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
       WHERE si."saleId" = $1
     `, saleId);
 
+    // Calculate effective discount fallback if not explicitly stored
+    const itemsTotal = ((items as any[]) || []).reduce((sum: number, it: any) => sum + (Number(it.price) * Number(it.quantity)), 0);
+    const diffDiscount = Math.max(0, itemsTotal - Number(sale.totalAmount) - Number(sale.taxAmount || 0));
+
+    let effectiveVoucherDiscount = Number(sale.voucherDiscountAmount) || 0;
+    let effectiveMemberDiscount = Number(sale.memberDiscountAmount) || 0;
+    let effectiveVoucherCode = sale.voucherCode;
+
+    if (effectiveVoucherDiscount === 0 && effectiveMemberDiscount === 0 && diffDiscount > 0) {
+      if (sale.customerName?.includes('(Karyawan)') || (sale.notes && sale.notes.includes('Karyawan'))) {
+        effectiveVoucherCode = effectiveVoucherCode || 'DISKON KARYAWAN';
+        effectiveVoucherDiscount = diffDiscount;
+      } else {
+        effectiveMemberDiscount = diffDiscount;
+      }
+    }
+
+    const salePayload = {
+      ...sales[0],
+      voucherCode: effectiveVoucherCode,
+      voucherDiscountAmount: effectiveVoucherDiscount,
+      memberDiscountAmount: effectiveMemberDiscount,
+      discountAmount: diffDiscount > 0 ? diffDiscount : (effectiveVoucherDiscount || effectiveMemberDiscount),
+    };
+
     const company: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Company" WHERE id = $1`, tenantId);
     
     // Fetch active bank accounts of the company to display on invoice
@@ -18563,9 +18589,9 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         comp.logoUrl = `${baseUrl}${comp.logoUrl}`;
       }
-      res.json({ ...sales[0], items, company: comp, bankAccounts, customer: customerObj, shippedAt });
+      res.json({ ...salePayload, items, company: comp, bankAccounts, customer: customerObj, shippedAt });
     } else {
-      res.json({ ...sales[0], items, company: null, bankAccounts, customer: customerObj, shippedAt });
+      res.json({ ...salePayload, items, company: null, bankAccounts, customer: customerObj, shippedAt });
     }
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil detail penjualan: ' + error.message });
@@ -19180,8 +19206,9 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
     // Ensure total is not negative
     if (finalTotal < 0) finalTotal = 0;
 
-    // Calculate Points Earned based on FINAL TOTAL
-    if (customer && customer.isMember && company.pointsEarnRatio > 0 && finalTotal >= company.pointsEarnRatio) {
+    // Calculate Points Earned based on FINAL TOTAL (Exclude Employee from earning points)
+    const isEmployee = customer?.name?.includes('(Karyawan)') || customer?.phone?.startsWith('EMP-');
+    if (customer && customer.isMember && !isEmployee && company.pointsEarnRatio > 0 && finalTotal >= company.pointsEarnRatio) {
       pointsEarned = Math.floor(finalTotal / company.pointsEarnRatio);
     }
 
@@ -19276,7 +19303,7 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
           companyId: tenantId,
           name: decoded.name + ' (Karyawan)',
           phone: decoded.phone || `EMP-${decoded.userId}`,
-          isMember: true
+          isMember: false
         }
       });
     }
@@ -19605,13 +19632,19 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       }
 
       let finalPointsEarned = Number(pointsEarned) || 0;
-      if (finalCustomerId && !req.body.offlineInvoiceNumber) {
-        const company = await tx.company.findUnique({ where: { id: tenantId }, select: { pointsEarnRatio: true } });
-        const customer = await tx.customer.findUnique({ where: { id: finalCustomerId }, select: { isMember: true } });
-        if (company && company.pointsEarnRatio > 0 && customer && customer.isMember) {
-          const finalTotalAmountNumber = Number(totalAmount);
-          if (finalTotalAmountNumber >= company.pointsEarnRatio) {
-            finalPointsEarned = Math.floor(finalTotalAmountNumber / company.pointsEarnRatio);
+      if (finalCustomerId) {
+        const customer = await tx.customer.findUnique({ where: { id: finalCustomerId }, select: { isMember: true, name: true, phone: true } });
+        const isEmployee = customer?.name?.includes('(Karyawan)') || customer?.phone?.startsWith('EMP-');
+
+        if (isEmployee) {
+          finalPointsEarned = 0;
+        } else if (finalPointsEarned === 0) {
+          const company = await tx.company.findUnique({ where: { id: tenantId }, select: { pointsEarnRatio: true } });
+          if (company && company.pointsEarnRatio > 0 && customer && customer.isMember) {
+            const finalTotalAmountNumber = Number(totalAmount);
+            if (finalTotalAmountNumber >= company.pointsEarnRatio) {
+              finalPointsEarned = Math.floor(finalTotalAmountNumber / company.pointsEarnRatio);
+            }
           }
         }
       }

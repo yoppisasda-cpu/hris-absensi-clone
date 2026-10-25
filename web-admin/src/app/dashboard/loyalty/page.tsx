@@ -543,22 +543,32 @@ export default function LoyaltyPage() {
                         {/* Content */}
                         <div className="p-6 overflow-y-auto space-y-6 flex-1">
                             {/* Summary Cards */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Pembayaran</p>
-                                    <p className="text-lg font-bold text-white flex items-center gap-2">
-                                        <DollarSign className="h-4 w-4 text-emerald-400" />
-                                        Rp {(selectedSaleDetail.totalAmount || 0).toLocaleString('id-ID')}
-                                    </p>
-                                </div>
-                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Potongan Diskon</p>
-                                    <p className="text-lg font-bold text-white flex items-center gap-2">
-                                        <Tag className="h-4 w-4 text-fuchsia-400" />
-                                        Rp {((selectedSaleDetail.voucherDiscountAmount > 0 ? selectedSaleDetail.voucherDiscountAmount : selectedSaleDetail.memberDiscountAmount) || 0).toLocaleString('id-ID')}
-                                    </p>
-                                </div>
-                            </div>
+                            {(() => {
+                                const itemsTotal = (selectedSaleDetail.items || []).reduce((sum: number, it: any) => sum + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+                                const diffDiscount = Math.max(0, itemsTotal - Number(selectedSaleDetail.totalAmount || 0) - Number(selectedSaleDetail.taxAmount || 0));
+                                const displayedDiscount = Number(selectedSaleDetail.discountAmount) || 
+                                    (selectedSaleDetail.voucherDiscountAmount > 0 ? selectedSaleDetail.voucherDiscountAmount : selectedSaleDetail.memberDiscountAmount) || 
+                                    diffDiscount;
+
+                                return (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
+                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Pembayaran</p>
+                                            <p className="text-lg font-bold text-white flex items-center gap-2">
+                                                <DollarSign className="h-4 w-4 text-emerald-400" />
+                                                Rp {(selectedSaleDetail.totalAmount || 0).toLocaleString('id-ID')}
+                                            </p>
+                                        </div>
+                                        <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
+                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Potongan Diskon</p>
+                                            <p className="text-lg font-bold text-white flex items-center gap-2">
+                                                <Tag className="h-4 w-4 text-fuchsia-400" />
+                                                Rp {displayedDiscount.toLocaleString('id-ID')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Items List */}
                             <div>

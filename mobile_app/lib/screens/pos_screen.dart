@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +21,7 @@ class POSScreen extends StatefulWidget {
 }
 
 class _POSScreenState extends State<POSScreen> {
+  Timer? _autoSyncTimer;
   final ApiService _apiService = ApiService();
   final PrinterService _printerService = PrinterService();
   List<dynamic> _products = [];
@@ -72,10 +74,20 @@ class _POSScreenState extends State<POSScreen> {
     _fetchData();
     _printerService.init();
     _loadWaiterMode();
+
+    // Auto-sync antrean transaksi offline setiap 20 detik jika koneksi internet kembali normal
+    _autoSyncTimer = Timer.periodic(Duration(seconds: 20), (timer) {
+      if (PosSyncManager.getPendingCount() > 0) {
+        PosSyncManager.syncOfflineSales().then((_) {
+          if (mounted) setState(() {});
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _autoSyncTimer?.cancel();
     _customerNameController.dispose();
     _customerPhoneController.dispose();
     _cashReceivedController.dispose();
@@ -1472,9 +1484,11 @@ class _POSScreenState extends State<POSScreen> {
         'customerPhone': _customerPhoneController.text.trim(),
         'saleType': _saleType,
         'notes': _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
-        'memberDiscountAmount': _memberDiscountAmount,
-        'voucherCode': _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
-        'voucherDiscountAmount': _voucherDiscountAmount,
+        'memberDiscountAmount': _memberDiscountAmount + _employeeDiscountAmount,
+        'voucherCode': _voucherController.text.trim().isNotEmpty
+            ? _voucherController.text.trim()
+            : (_employeeDiscountAmount > 0 ? (_employeeDiscountLabel ?? 'DISKON KARYAWAN') : null),
+        'voucherDiscountAmount': _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount,
         'pointsUsed': _pointsUsed,
         'pointsEarned': _pointsEarned,
         'taxRate': _globalTaxRate,
@@ -1484,8 +1498,28 @@ class _POSScreenState extends State<POSScreen> {
         'date': DateTime.now().toIso8601String(),
         'salespersonId': _selectedSalespersonId,
         'isSynced': false,
-      };
       await PosLocalDbService.saveOfflineSale(offlineSaleData);
+      if (mounted) {
+        setState(() {}); // refresh badge di icon cloud
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.cloud_off, color: Colors.white, size: 24),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Koneksi Internet Terputus!\nTransaksi #$generatedInvoiceNumber tersimpan di tablet (Antrean Offline). Struk sudah tercetak & JANGAN input ulang. Sistem akan otomatis sinkron ke cloud saat internet kembali.',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange[900],
+            duration: Duration(seconds: 7),
+          ),
+        );
+      }
     });
       
       // Show success dialog and wait for user to click OK
@@ -1725,12 +1759,32 @@ class _POSScreenState extends State<POSScreen> {
         actions: [
           (() {
             final int pendingSyncCount = PosSyncManager.getPendingCount();
-            if (pendingSyncCount == 0) return SizedBox();
+            if (pendingSyncCount == 0) {
+              return IconButton(
+                icon: Icon(Icons.cloud_done_rounded, color: Colors.teal[600], size: 22),
+                tooltip: 'Cloud: Semua transaksi tersinkron',
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.white, size: 20),
+                          SizedBox(width: 8),
+                          Text('Semua transaksi kasir sudah tersinkron ke cloud.'),
+                        ],
+                      ),
+                      backgroundColor: Colors.teal[700],
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              );
+            }
 
             return IconButton(
               icon: Badge(
                 label: Text(pendingSyncCount.toString()),
-                child: Icon(Icons.cloud_upload_outlined, color: Colors.orange[800]),
+                child: Icon(Icons.cloud_upload_rounded, color: Colors.orange[900], size: 24),
               ),
               tooltip: 'Sinkronkan $pendingSyncCount Transaksi Offline',
               onPressed: () async {
