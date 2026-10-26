@@ -18549,12 +18549,17 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
       }
     }
 
+    const isEmployeeSale = sale.customerName?.includes('(Karyawan)') || sale.customerPhone?.startsWith('EMP-') || effectiveVoucherCode === 'DISKON KARYAWAN' || (sale.notes && sale.notes.includes('Karyawan'));
+    if (isEmployeeSale && effectiveVoucherDiscount > 0) {
+      effectiveMemberDiscount = 0;
+    }
+
     const salePayload = {
       ...sales[0],
       voucherCode: effectiveVoucherCode,
       voucherDiscountAmount: effectiveVoucherDiscount,
       memberDiscountAmount: effectiveMemberDiscount,
-      discountAmount: diffDiscount > 0 ? diffDiscount : (effectiveVoucherDiscount || effectiveMemberDiscount),
+      discountAmount: isEmployeeSale ? effectiveVoucherDiscount : (diffDiscount > 0 ? diffDiscount : (effectiveVoucherDiscount || effectiveMemberDiscount)),
     };
 
     const company: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Company" WHERE id = $1`, tenantId);

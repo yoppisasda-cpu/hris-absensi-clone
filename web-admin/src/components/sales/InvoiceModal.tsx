@@ -411,7 +411,10 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: { isOpen: bool
                                 <div className="w-full md:w-80 print:w-64 space-y-2 print:space-y-1">
                                     {(() => {
                                         const itemsGrossTotal = (sale.items || []).reduce((sum: number, it: any) => sum + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
-                                        const storedDiscount = Number(sale.discountAmount || 0) || (Number(sale.voucherDiscountAmount || 0) + Number(sale.memberDiscountAmount || 0));
+                                        const isEmployee = sale.voucherCode === 'DISKON KARYAWAN' || sale.customerName?.includes('(Karyawan)') || sale.customerPhone?.startsWith('EMP-');
+                                        const storedDiscount = isEmployee
+                                            ? (Number(sale.voucherDiscountAmount || 0) || Number(sale.memberDiscountAmount || 0) || Number(sale.discountAmount || 0))
+                                            : (Number(sale.discountAmount || 0) || (Number(sale.voucherDiscountAmount || 0) + Number(sale.memberDiscountAmount || 0)));
                                         const calculatedDiff = Math.max(0, itemsGrossTotal - (parseFloat(sale.totalAmount) - parseFloat(sale.taxAmount || 0)));
                                         const effectiveDiscount = storedDiscount > 0 ? storedDiscount : calculatedDiff;
                                         const discountLabel = sale.voucherCode ? `Potongan (${sale.voucherCode})` : 'Potongan Diskon';

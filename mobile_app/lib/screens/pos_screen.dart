@@ -369,7 +369,7 @@ class _POSScreenState extends State<POSScreen> {
       _employeeDiscountAmount = _discountableSubtotalAmount * (_employeeDiscountValue / 100);
     }
     if (_voucherController.text.isEmpty || _voucherController.text == (_employeeDiscountLabel ?? 'DISKON KARYAWAN')) {
-      _voucherDiscountAmount = _employeeDiscountAmount;
+      _voucherDiscountAmount = 0; // JANGAN duplikasi ke voucherDiscountAmount agar tidak terpotong 2x di grandTotal
     }
   }
 
@@ -420,7 +420,7 @@ class _POSScreenState extends State<POSScreen> {
 
         _recalculateEmployeeDiscount();
         _voucherController.text = _employeeDiscountLabel!;
-        _voucherDiscountAmount = _employeeDiscountAmount;
+        _voucherDiscountAmount = 0; // Diskon karyawan sudah ditangani di _employeeDiscountAmount
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Diskon Karyawan Diterapkan!'), backgroundColor: Colors.green));
       setState(() {});
@@ -1412,9 +1412,11 @@ class _POSScreenState extends State<POSScreen> {
       'paymentReference': _paymentReferenceController.text.trim(),
       'customerName': _customerNameController.text.trim(),
       'taxRate': _globalTaxRate,
-      'taxAmount': _taxAmount,
-      'memberDiscountAmount': _memberDiscountAmount + _employeeDiscountAmount,
-      'voucherDiscountAmount': _voucherDiscountAmount,
+      'memberDiscountAmount': _memberDiscountAmount,
+      'voucherDiscountAmount': _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount,
+      'voucherCode': _voucherController.text.trim().isNotEmpty
+          ? _voucherController.text.trim()
+          : (_employeeDiscountAmount > 0 ? (_employeeDiscountLabel ?? 'DISKON KARYAWAN') : null),
       'pointsUsed': _pointsUsed,
       'subtotal': _subtotalAmount,
       'saleType': _saleType,
@@ -1452,8 +1454,10 @@ class _POSScreenState extends State<POSScreen> {
       serviceFee: 0,
       markupPercentage: 0,
       notes: _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
-      memberDiscountAmount: _memberDiscountAmount + _employeeDiscountAmount,
-      voucherCode: _voucherController.text.trim().isNotEmpty ? _voucherController.text.trim() : null,
+      memberDiscountAmount: _memberDiscountAmount,
+      voucherCode: _voucherController.text.trim().isNotEmpty
+          ? _voucherController.text.trim()
+          : (_employeeDiscountAmount > 0 ? (_employeeDiscountLabel ?? 'DISKON KARYAWAN') : null),
       voucherDiscountAmount: _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount,
       pointsUsed: _pointsUsed,
       pointsEarned: _pointsEarned,
@@ -1484,7 +1488,7 @@ class _POSScreenState extends State<POSScreen> {
         'customerPhone': _customerPhoneController.text.trim(),
         'saleType': _saleType,
         'notes': _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
-        'memberDiscountAmount': _memberDiscountAmount + _employeeDiscountAmount,
+        'memberDiscountAmount': _memberDiscountAmount,
         'voucherCode': _voucherController.text.trim().isNotEmpty
             ? _voucherController.text.trim()
             : (_employeeDiscountAmount > 0 ? (_employeeDiscountLabel ?? 'DISKON KARYAWAN') : null),
