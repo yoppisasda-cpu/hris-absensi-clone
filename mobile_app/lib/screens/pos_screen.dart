@@ -1694,7 +1694,9 @@ class _POSScreenState extends State<POSScreen> {
                                     'groupId': group['id'],
                                     'groupName': group['name'],
                                     'optionId': opt['id'],
+                                    'id': opt['id'],
                                     'optionName': opt['name'],
+                                    'name': opt['name'],
                                     'price': opt['price'],
                                   });
                                 } else {

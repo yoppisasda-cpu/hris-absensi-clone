@@ -19745,7 +19745,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         for (const item of items) {
             if (item.modifiers) {
                 Object.values(item.modifiers).forEach((val: any) => {
-                    if (val && val.id) optionIds.push(Number(val.id));
+                    const optId = val ? (val.optionId ?? val.id) : null;
+                    if (optId) optionIds.push(Number(optId));
                 });
             }
         }
@@ -19816,15 +19817,19 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
 
                 // Add modifiers
                 if (item.modifiers) {
-                    Object.values(item.modifiers).forEach((val: any) => {
-                        if (val && val.id && optionMap[val.id]) {
-                            const opt = optionMap[val.id];
+                    for (const val of Object.values(item.modifiers) as any[]) {
+                        const optId = val ? (val.optionId ?? val.id) : null;
+                        if (optId && optionMap[optId]) {
+                            const opt = optionMap[optId];
                             if (opt.linkedProductId) {
                                 const modQty = quantity * (opt.linkedQuantity || 1);
-                                requiredStock[opt.linkedProductId] = (requiredStock[opt.linkedProductId] || 0) + modQty;
+                                const deductions = await getRecursiveDeductions(Number(opt.linkedProductId), modQty);
+                                for (const ded of deductions) {
+                                    requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
+                                }
                             }
                         }
-                    });
+                    }
                 }
             }
 
@@ -19864,8 +19869,9 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             if (item.modifiers) {
                 Object.entries(item.modifiers).forEach(([key, val]: [string, any]) => {
                     const finalVal = { ...val };
-                    if (val && val.id && optionMap[val.id]) {
-                        const opt = optionMap[val.id];
+                    const optId = val ? (val.optionId ?? val.id) : null;
+                    if (optId && optionMap[optId]) {
+                        const opt = optionMap[optId];
                         if (opt.linkedProductId) {
                            finalVal.linkedProductId = opt.linkedProductId;
                            finalVal.linkedQuantity = opt.linkedQuantity;
@@ -19924,32 +19930,36 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             if (item.modifiers) {
                 // Must use for..of for await inside loop
                 for (const val of Object.values(item.modifiers) as any[]) {
-                    if (val && val.id && optionMap[val.id]) {
-                        const opt = optionMap[val.id];
+                    const optId = val ? (val.optionId ?? val.id) : null;
+                    if (optId && optionMap[optId]) {
+                        const opt = optionMap[optId];
                         if (opt.linkedProductId) {
                             const modQty = quantity * (opt.linkedQuantity || 1);
                             
-                            await tx.product.update({
-                                where: { id: opt.linkedProductId },
-                                data: { stock: { decrement: modQty } }
-                            });
+                            const deductions = await getRecursiveDeductions(Number(opt.linkedProductId), modQty);
+                            for (const ded of deductions) {
+                                await tx.product.update({
+                                    where: { id: ded.id },
+                                    data: { stock: { decrement: ded.qty } }
+                                });
 
-                            await tx.warehouseStock.upsert({
-                                where: { productId_warehouseId: { productId: opt.linkedProductId, warehouseId: warehouse.id } },
-                                update: { quantity: { decrement: modQty } },
-                                create: { productId: opt.linkedProductId, warehouseId: warehouse.id, quantity: -modQty }
-                            });
+                                await tx.warehouseStock.upsert({
+                                    where: { productId_warehouseId: { productId: ded.id, warehouseId: warehouse.id } },
+                                    update: { quantity: { decrement: ded.qty } },
+                                    create: { productId: ded.id, warehouseId: warehouse.id, quantity: -ded.qty }
+                                });
 
-                            await tx.stockTransaction.create({
-                                data: {
-                                    productId: opt.linkedProductId,
-                                    warehouseId: warehouse.id,
-                                    type: 'OUT',
-                                    quantity: modQty,
-                                    reference: `POS Add-on ${invoiceNumber}`,
-                                    date: new Date()
-                                }
-                            });
+                                await tx.stockTransaction.create({
+                                    data: {
+                                        productId: ded.id,
+                                        warehouseId: warehouse.id,
+                                        type: 'OUT',
+                                        quantity: ded.qty,
+                                        reference: `POS Add-on ${invoiceNumber}`,
+                                        date: new Date()
+                                    }
+                                });
+                            }
                         }
                     }
                 }
