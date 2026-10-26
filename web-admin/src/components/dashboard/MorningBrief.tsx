@@ -26,14 +26,31 @@ const MorningBrief: React.FC<MorningBriefProps> = ({ stats, insights, loading, a
     const lateCount = stats?.lateCount || 0;
     const inventoryLow = insights.find(i => i.message.includes('Stok')) ? true : false;
     
+    const presentCount = stats?.presentCount || 0;
+    const totalEmployees = stats?.totalEmployees || 0;
+
     const getSummaryText = () => {
         if (!stats) return "Sistem siap membantu operasional Anda hari ini.";
         let text = `Selamat pagi, ${adminName}! `;
-        if (lateCount > 0) {
-            text += `Ada ${lateCount} keterlambatan pagi ini. `;
-        } else {
-            text += `Seluruh tim hadir tepat waktu, luar biasa! `;
+        
+        if (totalEmployees > 0) {
+            if (presentCount === 0) {
+                text += `Belum ada tim yang melakukan absensi pagi ini. `;
+            } else if (presentCount === totalEmployees) {
+                if (lateCount > 0) {
+                    text += `Seluruh tim sudah hadir (${lateCount} terlambat). `;
+                } else {
+                    text += `Seluruh tim hadir tepat waktu, luar biasa! `;
+                }
+            } else {
+                if (lateCount > 0) {
+                    text += `Sebanyak ${presentCount} dari ${totalEmployees} tim telah hadir (${lateCount} terlambat). `;
+                } else {
+                    text += `Sebanyak ${presentCount} dari ${totalEmployees} tim telah hadir tepat waktu. `;
+                }
+            }
         }
+        
         if (stats.totalPayable > 0) {
             text += `Terdapat tagihan jatuh tempo yang perlu diperhatikan. `;
         }
