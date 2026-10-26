@@ -1502,6 +1502,7 @@ class _POSScreenState extends State<POSScreen> {
         'date': DateTime.now().toIso8601String(),
         'salespersonId': _selectedSalespersonId,
         'isSynced': false,
+      };
       await PosLocalDbService.saveOfflineSale(offlineSaleData);
       if (mounted) {
         setState(() {}); // refresh badge di icon cloud
