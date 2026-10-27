@@ -18681,6 +18681,15 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
           VALUES ($1, $2, $3, $4, $5)
         `, returnId, item.productId, item.quantity, item.price, item.total);
 
+        // Find target warehouse for stock restoration
+        const targetWarehouse = await tx.warehouse.findFirst({
+          where: { companyId: tenantId, branchId: originalSale.branchId, type: 'STORE' }
+        }) || await tx.warehouse.findFirst({
+          where: { companyId: tenantId, isMain: true }
+        }) || await tx.warehouse.findFirst({
+          where: { companyId: tenantId }
+        });
+
         // Check BOM
         const recipes: any[] = await tx.$queryRawUnsafe(`
           SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr
@@ -18692,17 +18701,31 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
           for (const recipe of recipes) {
             const materialQty = (parseFloat(recipe.quantity) / yieldVal) * item.quantity;
             await tx.$executeRawUnsafe(`UPDATE "Product" SET stock = stock + $1 WHERE id = $2`, materialQty, recipe.materialId);
+            if (targetWarehouse) {
+              await tx.warehouseStock.upsert({
+                where: { productId_warehouseId: { productId: recipe.materialId, warehouseId: targetWarehouse.id } },
+                update: { quantity: { increment: materialQty } },
+                create: { productId: recipe.materialId, warehouseId: targetWarehouse.id, quantity: materialQty }
+              });
+            }
             await tx.$executeRawUnsafe(`
-              INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
-              VALUES ($1, 'RETURN', $2, $3, NOW())
-            `, recipe.materialId, materialQty, `Retur (BOM) ${returnNumber} dari ${originalSale.invoiceNumber}`);
+              INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "warehouseId")
+              VALUES ($1, 'RETURN', $2, $3, NOW(), $4)
+            `, recipe.materialId, materialQty, `Retur (BOM) ${returnNumber} dari ${originalSale.invoiceNumber}`, targetWarehouse ? targetWarehouse.id : null);
           }
         } else {
           await tx.$executeRawUnsafe(`UPDATE "Product" SET stock = stock + $1 WHERE id = $2`, item.quantity, item.productId);
+          if (targetWarehouse) {
+            await tx.warehouseStock.upsert({
+              where: { productId_warehouseId: { productId: item.productId, warehouseId: targetWarehouse.id } },
+              update: { quantity: { increment: item.quantity } },
+              create: { productId: item.productId, warehouseId: targetWarehouse.id, quantity: item.quantity }
+            });
+          }
           await tx.$executeRawUnsafe(`
-            INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
-            VALUES ($1, 'RETURN', $2, $3, NOW())
-          `, item.productId, item.quantity, `Retur ${returnNumber} dari ${originalSale.invoiceNumber}`);
+            INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "warehouseId")
+            VALUES ($1, 'RETURN', $2, $3, NOW(), $4)
+          `, item.productId, item.quantity, `Retur ${returnNumber} dari ${originalSale.invoiceNumber}`, targetWarehouse ? targetWarehouse.id : null);
         }
       }
 
