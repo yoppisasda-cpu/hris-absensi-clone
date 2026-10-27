@@ -19319,7 +19319,7 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
         return res.status(400).json({ error: "QR Code tidak valid untuk diskon karyawan" });
       }
     } catch (err: any) {
-      // Fallback: cek jika kasir input/scan Employee ID langsung (e.g. EMP-94, 94, phone, or email)
+      // Fallback: cek jika kasir input/scan Employee ID langsung (e.g. EMP-94, 94, or email)
       const trimmed = String(token).trim();
       const empIdMatch = trimmed.match(/^EMP-(\d+)$/i);
       const parsedId = empIdMatch ? Number(empIdMatch[1]) : (Number.isInteger(Number(trimmed)) ? Number(trimmed) : null);
@@ -19329,17 +19329,16 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
           companyId: tenantId,
           OR: [
             ...(parsedId ? [{ id: parsedId }] : []),
-            { phone: trimmed },
             { email: trimmed }
           ]
         },
-        select: { id: true, name: true, phone: true }
+        select: { id: true, name: true }
       });
 
       if (foundUser) {
         employeeUserId = foundUser.id;
         employeeName = foundUser.name;
-        employeePhone = foundUser.phone || `EMP-${foundUser.id}`;
+        employeePhone = `EMP-${foundUser.id}`;
       } else {
         return res.status(400).json({ error: "QR Code kedaluwarsa atau ID Karyawan tidak ditemukan" });
       }
