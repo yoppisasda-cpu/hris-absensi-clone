@@ -19305,23 +19305,51 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
     }
 
     const secret = process.env.JWT_SECRET || 'supersecretkey';
-    let decoded: any;
-    
-    try {
-      decoded = jwt.verify(token, secret);
-    } catch (err: any) {
-      return res.status(400).json({ error: "QR Code kadaluarsa atau tidak valid" });
-    }
+    let employeeUserId: number | null = null;
+    let employeeName = '';
+    let employeePhone = '';
 
-    if (decoded.type !== 'EMPLOYEE_DISCOUNT') {
-      return res.status(400).json({ error: "QR Code tidak valid" });
+    try {
+      const decoded: any = jwt.verify(token, secret);
+      if (decoded.type === 'EMPLOYEE_DISCOUNT') {
+        employeeUserId = decoded.userId;
+        employeeName = decoded.name;
+        employeePhone = decoded.phone || `EMP-${decoded.userId}`;
+      } else {
+        return res.status(400).json({ error: "QR Code tidak valid untuk diskon karyawan" });
+      }
+    } catch (err: any) {
+      // Fallback: cek jika kasir input/scan Employee ID langsung (e.g. EMP-94, 94, phone, or email)
+      const trimmed = String(token).trim();
+      const empIdMatch = trimmed.match(/^EMP-(\d+)$/i);
+      const parsedId = empIdMatch ? Number(empIdMatch[1]) : (Number.isInteger(Number(trimmed)) ? Number(trimmed) : null);
+
+      const foundUser = await prisma.user.findFirst({
+        where: {
+          companyId: tenantId,
+          OR: [
+            ...(parsedId ? [{ id: parsedId }] : []),
+            { phone: trimmed },
+            { email: trimmed }
+          ]
+        },
+        select: { id: true, name: true, phone: true }
+      });
+
+      if (foundUser) {
+        employeeUserId = foundUser.id;
+        employeeName = foundUser.name;
+        employeePhone = foundUser.phone || `EMP-${foundUser.id}`;
+      } else {
+        return res.status(400).json({ error: "QR Code kedaluwarsa atau ID Karyawan tidak ditemukan" });
+      }
     }
 
     // Ensure customer profile exists for this employee
     let customer = await prisma.customer.findFirst({
       where: { 
         companyId: tenantId, 
-        phone: decoded.phone || `EMP-${decoded.userId}`
+        phone: employeePhone
       }
     });
 
@@ -19329,18 +19357,19 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
       customer = await prisma.customer.create({
         data: {
           companyId: tenantId,
-          name: decoded.name + ' (Karyawan)',
-          phone: decoded.phone || `EMP-${decoded.userId}`,
+          name: employeeName + ' (Karyawan)',
+          phone: employeePhone,
           isMember: false
         }
       });
     }
 
-    // Ambil setting diskon dari voucher "EMPLOYEE"
+    // Ambil setting diskon dari voucher "EMPLOYEE" (kecualikan STORED_VALUE / gift card)
     const internalVoucher = await prisma.voucher.findFirst({
       where: {
         companyId: tenantId,
         targetAudience: 'EMPLOYEE',
+        discountType: { not: 'STORED_VALUE' },
         isActive: true,
       },
       orderBy: { createdAt: 'desc' }

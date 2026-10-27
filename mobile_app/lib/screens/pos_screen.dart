@@ -361,12 +361,16 @@ class _POSScreenState extends State<POSScreen> {
       _employeeDiscountAmount = 0;
       return;
     }
-    if (_employeeDiscountType == 'NOMINAL') {
+    if (_employeeDiscountType == 'NOMINAL' || _employeeDiscountType == 'FIXED') {
       _employeeDiscountAmount = _employeeDiscountValue > _discountableSubtotalAmount
           ? _discountableSubtotalAmount
           : _employeeDiscountValue;
-    } else {
+    } else if (_employeeDiscountType == 'PERCENTAGE') {
       _employeeDiscountAmount = _discountableSubtotalAmount * (_employeeDiscountValue / 100);
+    } else {
+      _employeeDiscountAmount = _employeeDiscountValue > _discountableSubtotalAmount
+          ? _discountableSubtotalAmount
+          : _employeeDiscountValue;
     }
     if (_voucherController.text.isEmpty || _voucherController.text == (_employeeDiscountLabel ?? 'DISKON KARYAWAN')) {
       _voucherDiscountAmount = 0; // JANGAN duplikasi ke voucherDiscountAmount agar tidak terpotong 2x di grandTotal

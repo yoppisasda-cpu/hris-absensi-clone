@@ -117,7 +117,7 @@ export default function POSPage() {
     const prevMobileCountRef = useRef(0);
 
     // NEW EMPLOYEE DISCOUNT FIELDS
-    const [employeeDiscount, setEmployeeDiscount] = useState<{value: number, label: string} | null>(null);
+    const [employeeDiscount, setEmployeeDiscount] = useState<{type?: string, value: number, label: string} | null>(null);
     const [scannedQRToken, setScannedQRToken] = useState("");
     const [showScanModal, setShowScanModal] = useState(false);
     const [scanLoading, setScanLoading] = useState(false);
@@ -537,6 +537,10 @@ export default function POSPage() {
 
     const discountAmount = useMemo(() => {
         if (!employeeDiscount) return 0;
+        const isFixedOrNominal = employeeDiscount.type === 'NOMINAL' || employeeDiscount.type === 'FIXED';
+        if (isFixedOrNominal) {
+            return Math.min(discountableSubtotal, employeeDiscount.value);
+        }
         return Math.round(discountableSubtotal * (employeeDiscount.value / 100));
     }, [discountableSubtotal, employeeDiscount]);
 
@@ -1407,7 +1411,7 @@ export default function POSPage() {
                                 <div className="flex justify-between items-center text-emerald-400 font-bold">
                                     <span className="flex items-center gap-1">
                                         <ShieldCheck className="w-3.5 h-3.5" />
-                                        {employeeDiscount.label} ({employeeDiscount.value}%)
+                                        {employeeDiscount.label} {employeeDiscount.type === 'PERCENTAGE' || !employeeDiscount.type ? `(${employeeDiscount.value}%)` : `(-Rp ${employeeDiscount.value.toLocaleString('id-ID')})`}
                                     </span>
                                     <span>
                                         {discountAmount > 0 
