@@ -963,6 +963,28 @@ class ApiService {
   }
 
   // --- MEMBERSHIP & OTP WA ---
+  Future<Map<String, dynamic>> registerDirectMember({
+    required String phone,
+    String? name,
+    String? birthDate,
+    String? gender,
+  }) async {
+    try {
+      final response = await _dio.post('/customers/register-member', data: {
+        'phone': phone,
+        'name': name,
+        'birthDate': birthDate,
+        'gender': gender,
+      });
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data is Map && e.response?.data['error'] != null) {
+        throw Exception(e.response?.data['error']);
+      }
+      throw Exception('Gagal mendaftarkan member: ${e.response?.statusMessage ?? e.message}');
+    }
+  }
+
   Future<void> requestOtp(String phone) async {
     try {
       await _dio.post('/customers/otp-request', data: {'phone': phone});

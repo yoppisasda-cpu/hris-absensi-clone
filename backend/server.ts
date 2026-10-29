@@ -16240,6 +16240,48 @@ app.post('/api/customers/otp-verify', tenantMiddleware, async (req: Request, res
   }
 });
 
+// Direct Member Registration without OTP (Cukup dengan sebut nomor HP saja)
+app.post('/api/customers/register-member', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    let { phone, name, birthDate, gender } = req.body;
+
+    if (!phone || typeof phone !== 'string' || !phone.trim()) {
+      return res.status(400).json({ error: 'Nomor HP pelanggan wajib diisi' });
+    }
+
+    const cleanPhone = phone.trim();
+    const cleanName = (name && typeof name === 'string' && name.trim()) ? name.trim() : 'Pelanggan Member';
+
+    const customer = await prisma.customer.upsert({
+      where: { companyId_phone: { companyId: tenantId, phone: cleanPhone } },
+      update: {
+        name: (name && name.trim()) ? name.trim() : undefined,
+        isMember: true,
+        // @ts-ignore
+        birthDate: birthDate ? new Date(birthDate) : undefined,
+        // @ts-ignore
+        gender: gender || undefined
+      },
+      create: {
+        companyId: tenantId,
+        phone: cleanPhone,
+        name: cleanName,
+        isMember: true,
+        // @ts-ignore
+        birthDate: birthDate ? new Date(birthDate) : null,
+        // @ts-ignore
+        gender: gender || null
+      }
+    });
+
+    res.json({ message: 'Pendaftaran Member berhasil!', customer });
+  } catch (error: any) {
+    console.error('Direct Member Register Error:', error);
+    res.status(500).json({ error: 'Gagal mendaftarkan member: ' + error.message });
+  }
+});
+
 // --- MODUL LOYALTY & VOUCHER ---
 
 // L1. Get Company Loyalty Settings
@@ -19583,14 +19625,16 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             } 
           },
           update: {
-            name: customerName || 'Pelanggan',
-            totalSpent: { increment: Number(totalAmount) }
+            name: customerName || undefined,
+            totalSpent: { increment: Number(totalAmount) },
+            isMember: true
           },
           create: {
             companyId: tenantId,
             name: customerName || 'Pelanggan',
             phone: customerPhone,
-            totalSpent: Number(totalAmount)
+            totalSpent: Number(totalAmount),
+            isMember: true
           }
         });
         finalCustomerId = customer.id;
@@ -19655,35 +19699,38 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       }
 
       // B. General Rapid-Repeat / Accidental Double-Tap Deduplication Guard:
-      // If an identical transaction (same totalAmount, saleType, and exact item signatures)
-      // was created for this tenant within the last 5 minutes, return the existing sale!
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      const recentSales = await tx.sale.findMany({
-        where: {
-          companyId: tenantId,
-          totalAmount: Number(totalAmount),
-          saleType: saleType,
-          createdAt: { gte: fiveMinutesAgo }
-        },
-        include: { SaleItem: true },
-        orderBy: { id: 'desc' },
-        take: 5
-      });
+      // Only apply when client does NOT supply a unique offlineInvoiceNumber (since offlineInvoiceNumber
+      // already deduplicates network retries/offline syncs above), and limit window to 3 seconds with matching paymentMethod.
+      if (!req.body.offlineInvoiceNumber) {
+        const threeSecondsAgo = new Date(Date.now() - 3 * 1000);
+        const recentSales = await tx.sale.findMany({
+          where: {
+            companyId: tenantId,
+            totalAmount: Number(totalAmount),
+            saleType: saleType,
+            paymentMethod: detectedNormalizedMethod,
+            createdAt: { gte: threeSecondsAgo }
+          },
+          include: { SaleItem: true },
+          orderBy: { id: 'desc' },
+          take: 5
+        });
 
-      const incomingSig = items
-        .map((i: any) => `${Number(i.productId)}:${Number(i.quantity)}:${Number(i.price)}`)
-        .sort()
-        .join('|');
-
-      for (const candidate of recentSales) {
-        const candidateSig = candidate.SaleItem
+        const incomingSig = items
           .map((i: any) => `${Number(i.productId)}:${Number(i.quantity)}:${Number(i.price)}`)
           .sort()
           .join('|');
 
-        if (incomingSig === candidateSig) {
-          console.warn(`[POS CHECKOUT DEDUPLICATION] Blocked rapid duplicate for tenant ${tenantId} (${saleType}, Rp ${totalAmount}). Returning original sale #${candidate.id} (${candidate.invoiceNumber}).`);
-          return candidate;
+        for (const candidate of recentSales) {
+          const candidateSig = candidate.SaleItem
+            .map((i: any) => `${Number(i.productId)}:${Number(i.quantity)}:${Number(i.price)}`)
+            .sort()
+            .join('|');
+
+          if (incomingSig === candidateSig) {
+            console.warn(`[POS CHECKOUT DEDUPLICATION] Blocked rapid duplicate for tenant ${tenantId} (${saleType}, Rp ${totalAmount}). Returning original sale #${candidate.id} (${candidate.invoiceNumber}).`);
+            return candidate;
+          }
         }
       }
 

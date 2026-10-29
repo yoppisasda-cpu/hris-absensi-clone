@@ -22,6 +22,7 @@ class POSScreen extends StatefulWidget {
 
 class _POSScreenState extends State<POSScreen> {
   Timer? _autoSyncTimer;
+  Timer? _phoneLookupTimer;
   final ApiService _apiService = ApiService();
   final PrinterService _printerService = PrinterService();
   List<dynamic> _products = [];
@@ -88,6 +89,7 @@ class _POSScreenState extends State<POSScreen> {
   @override
   void dispose() {
     _autoSyncTimer?.cancel();
+    _phoneLookupTimer?.cancel();
     _customerNameController.dispose();
     _customerPhoneController.dispose();
     _cashReceivedController.dispose();
@@ -525,73 +527,73 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 
-  void _showOtpDialog(String phone) {
-    final TextEditingController otpController = TextEditingController();
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Verifikasi OTP WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Masukkan kode OTP yang dikirim ke $phone', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600])),
-            SizedBox(height: 20),
-            TextField(
-              controller: otpController,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 12, color: Colors.blue[900]),
-              maxLength: 4,
-              decoration: InputDecoration(
-                counterText: "",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                hintText: '0000',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Batal')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green[700], foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            onPressed: () async {
-              if (otpController.text.length < 4) return;
-              try {
-                final result = await _apiService.verifyOtp(
-                  phone: phone,
-                  code: otpController.text.trim(),
-                  name: _customerNameController.text.trim(),
-                );
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Member Berhasil Didaftarkan!'), backgroundColor: Colors.green));
-                setState(() {
-                  _customerNameController.text = result['customer']['name'];
-                });
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Verifikasi Gagal: $e'), backgroundColor: Colors.red));
-              }
-            },
-            child: Text('VERIFIKASI'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _handleOtpRequest() async {
+  Future<void> _handleDirectMemberRegister(StateSetter setPanelState) async {
     final phone = _customerPhoneController.text.trim();
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Masukkan nomor WA terlebih dahulu')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Masukkan nomor HP terlebih dahulu')));
       return;
     }
-    
+
     try {
-      await _apiService.requestOtp(phone);
-      _showOtpDialog(phone);
+      final result = await _apiService.registerDirectMember(
+        phone: phone,
+        name: _customerNameController.text.trim().isNotEmpty ? _customerNameController.text.trim() : null,
+      );
+      final customer = result['customer'];
+      if (customer != null) {
+        setPanelState(() {
+          _activeCustomerId = customer['id'];
+          if (_customerNameController.text.trim().isEmpty && customer['name'] != null) {
+            _customerNameController.text = customer['name'];
+          }
+          _availablePoints = (customer['points'] ?? 0).toDouble();
+          _calculateDiscounts(setPanelState);
+        });
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Member "${customer['name']}" aktif! (Poin: ${(customer['points'] ?? 0).toInt()})'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _lookupCustomerByPhone(String phone, StateSetter setPanelState) async {
+    final cleanPhone = phone.trim();
+    if (cleanPhone.length < 8) return;
+
+    try {
+      final results = await _apiService.searchCustomers(cleanPhone);
+      if (results.isEmpty) return;
+
+      final targetDigits = cleanPhone.replaceAll(RegExp(r'\D'), '');
+      dynamic match;
+      for (var c in results) {
+        final cPhone = (c['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+        if (cPhone.isNotEmpty && (cPhone == targetDigits || (targetDigits.length >= 8 && cPhone.endsWith(targetDigits)))) {
+          match = c;
+          break;
+        }
+      }
+      match ??= results.first;
+
+      if (match != null) {
+        setPanelState(() {
+          _activeCustomerId = match['id'];
+          if (_customerNameController.text.trim().isEmpty && match['name'] != null) {
+            _customerNameController.text = match['name'];
+          }
+          _availablePoints = (match['points'] ?? 0).toDouble();
+          _calculateDiscounts(setPanelState);
+        });
+        setState(() {});
+      }
+    } catch (e) {
+      print('Auto-lookup customer error: $e');
     }
   }
 
@@ -772,12 +774,29 @@ class _POSScreenState extends State<POSScreen> {
                               itemCount: options.length,
                               itemBuilder: (BuildContext context, int index) {
                                 final dynamic option = options.elementAt(index);
+                                final bool isMember = option['isMember'] == true;
+                                final int points = ((option['points'] ?? 0) as num).toInt();
                                 return ListTile(
-                                  title: Text(option['name'], style: TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(option['phone'] ?? 'No HP tidak tersedia', style: TextStyle(fontSize: 12)),
+                                  title: Row(
+                                    children: [
+                                      Expanded(child: Text(option['name'], style: TextStyle(fontWeight: FontWeight.bold))),
+                                      if (isMember) ...[
+                                        SizedBox(width: 6),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.green.shade300)),
+                                          child: Text('MEMBER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  subtitle: Text(
+                                    '${option['phone'] ?? 'No HP tidak tersedia'}${isMember ? ' • $points Poin' : ''}',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  ),
                                   leading: CircleAvatar(
-                                    backgroundColor: Colors.blue[50],
-                                    child: Icon(Icons.person, size: 18, color: Colors.blue[800]),
+                                    backgroundColor: isMember ? Colors.green.shade50 : Colors.blue[50],
+                                    child: Icon(isMember ? Icons.stars_rounded : Icons.person, size: 18, color: isMember ? Colors.green.shade800 : Colors.blue[800]),
                                   ),
                                   onTap: () => onSelected(option),
                                 );
@@ -820,22 +839,197 @@ class _POSScreenState extends State<POSScreen> {
                   },
                 ),
                 SizedBox(height: 16),
-                Text('Nomor HP Pelanggan (Opsional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
+                Text('Nomor HP Pelanggan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[600])),
                 SizedBox(height: 10),
                 TextField(
                   controller: _customerPhoneController,
                   keyboardType: TextInputType.phone,
+                  onChanged: (val) {
+                    _phoneLookupTimer?.cancel();
+                    _phoneLookupTimer = Timer(Duration(milliseconds: 600), () {
+                      _lookupCustomerByPhone(val, setPanelState);
+                    });
+                  },
                   decoration: InputDecoration(
                     hintText: '0812xxxxxxxx',
                     contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
-                    suffixIcon: TextButton(
-                      onPressed: _handleOtpRequest,
-                      child: Text('DAFTAR MEMBER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green[700])),
-                    ),
+                    suffixIcon: _activeCustomerId != null
+                        ? Icon(Icons.check_circle, color: Colors.green[700])
+                        : TextButton(
+                            onPressed: () => _handleDirectMemberRegister(setPanelState),
+                            child: Text('DAFTAR MEMBER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green[700])),
+                          ),
                   ),
                 ),
+
+                // Card Informasi Member & Poin Pelanggan
+                if (_activeCustomerId != null) ...[
+                  Container(
+                    margin: EdgeInsets.only(top: 10),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.shade300, width: 1.2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.stars_rounded, color: Colors.green.shade700, size: 22),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'MEMBER AKTIF',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.8,
+                                      color: Colors.green.shade800,
+                                    ),
+                                  ),
+                                  Text(
+                                    _customerNameController.text.isNotEmpty ? _customerNameController.text : 'Pelanggan',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                setPanelState(() {
+                                  _activeCustomerId = null;
+                                  _customerNameController.clear();
+                                  _customerPhoneController.clear();
+                                  _availablePoints = 0;
+                                  _usePoints = false;
+                                  _calculateDiscounts(setPanelState);
+                                });
+                                setState(() {});
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.grey.shade300),
+                                ),
+                                child: Text('Ganti / Batal', style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Divider(height: 16, color: Colors.green.shade200),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.monetization_on_rounded, color: Colors.amber.shade700, size: 20),
+                                SizedBox(width: 6),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Poin Tersedia', style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+                                    Text(
+                                      '${_availablePoints.toStringAsFixed(0)} Poin',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: _availablePoints > 0 ? Colors.green.shade900 : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            if (_availablePoints > 0)
+                              Row(
+                                children: [
+                                  Text(
+                                    'Gunakan Poin',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: _usePoints ? Colors.green.shade800 : Colors.grey.shade700,
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: _usePoints,
+                                    activeColor: Colors.green.shade700,
+                                    onChanged: (val) {
+                                      setPanelState(() {
+                                        _usePoints = val;
+                                        _calculateDiscounts(setPanelState);
+                                      });
+                                    },
+                                  ),
+                                ],
+                              )
+                            else
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('0 Poin', style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.bold)),
+                              ),
+                          ],
+                        ),
+                        if (_pointsEarned > 0) ...[
+                          SizedBox(height: 6),
+                          Text(
+                            '+${_pointsEarned.toInt()} Poin baru akan didapat dari transaksi ini',
+                            style: TextStyle(fontSize: 11, color: Colors.teal.shade700, fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ] else if (_customerPhoneController.text.trim().length >= 8) ...[
+                  Container(
+                    margin: EdgeInsets.only(top: 10),
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.amber.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 18, color: Colors.amber.shade800),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Nomor belum terdaftar member',
+                            style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                          ),
+                        ),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            backgroundColor: Colors.amber.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                          onPressed: () => _handleDirectMemberRegister(setPanelState),
+                          child: Text('Daftar Sekarang', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 SizedBox(height: 24),
 
                 // Loyalty Section
@@ -953,36 +1147,6 @@ class _POSScreenState extends State<POSScreen> {
                     ),
                   ],
                 ),
-                if (_activeCustomerId != null && _availablePoints > 0) ...[
-                  SizedBox(height: 16),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.orange[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.orange[200]!)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Gunakan Poin Member', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange[800])),
-                            Text('Tersedia: ${_availablePoints.toStringAsFixed(0)} Poin', style: TextStyle(fontSize: 12, color: Colors.orange[600])),
-                          ],
-                        ),
-                        Switch(
-                          value: _usePoints,
-                          activeColor: Colors.orange,
-                          onChanged: (val) {
-                            setPanelState(() {
-                              _usePoints = val;
-                              _calculateDiscounts(setPanelState);
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
                 SizedBox(height: 24),
                 
                 Container(
