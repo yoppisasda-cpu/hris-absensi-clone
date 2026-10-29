@@ -284,7 +284,8 @@ class _POSScreenState extends State<POSScreen> {
 
   double get _discountableSubtotalAmount {
     return _cart.fold(0, (sum, item) {
-      bool isDisc = item['isDiscountable'] ?? true;
+      final val = item['isDiscountable'];
+      final bool isDisc = val != false && val != 0 && val != 'false';
       if (isDisc) {
         return sum + (_getItemPrice(item) * item['quantity']);
       }
@@ -328,6 +329,9 @@ class _POSScreenState extends State<POSScreen> {
         return item['productId'] == product['id'] && itemModifiersJson == modifiersJson;
       });
 
+      final rawDisc = product['isDiscountable'];
+      final bool isDisc = rawDisc != false && rawDisc != 0 && rawDisc != 'false';
+
       if (index >= 0) {
         if (trackStock && _cart[index]['quantity'] >= product['stock']) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -350,11 +354,14 @@ class _POSScreenState extends State<POSScreen> {
           'maxStock': product['stock'],
           'trackStock': product['trackStock'] ?? true,
           'isAutoDeduct': product['isAutoDeduct'] == true,
-          'isDiscountable': product['isDiscountable'] ?? true,
+          'isDiscountable': isDisc,
           'modifiers': modifiers,
         });
       }
       _recalculateEmployeeDiscount();
+      if (_activeCustomerId != null || _voucherController.text.isNotEmpty) {
+        _calculateDiscounts(setState);
+      }
     });
   }
 
@@ -389,6 +396,7 @@ class _POSScreenState extends State<POSScreen> {
         voucherCode: _voucherController.text.trim(),
         pointsToUse: _usePoints ? _availablePoints : 0,
         totalQuantity: totalQty,
+        items: _cart,
       );
       setPanelState(() {
         _memberDiscountAmount = (res['memberDiscountAmount'] ?? 0).toDouble();
@@ -464,8 +472,13 @@ class _POSScreenState extends State<POSScreen> {
             _employeeDiscountType = null;
             _employeeDiscountValue = 0;
             _employeeDiscountLabel = null;
+            _memberDiscountAmount = 0;
+            _voucherDiscountAmount = 0;
           } else {
             _recalculateEmployeeDiscount();
+            if (_activeCustomerId != null || _voucherController.text.isNotEmpty) {
+              _calculateDiscounts(setState);
+            }
           }
         } else {
           bool trackStock = _cart[index]['trackStock'] ?? true;
@@ -474,6 +487,9 @@ class _POSScreenState extends State<POSScreen> {
           if (!trackStock || newQty <= maxStock) {
             _cart[index]['quantity'] = newQty;
             _recalculateEmployeeDiscount();
+            if (_activeCustomerId != null || _voucherController.text.isNotEmpty) {
+              _calculateDiscounts(setState);
+            }
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Stok tidak cukup')),
@@ -2005,6 +2021,30 @@ class _POSScreenState extends State<POSScreen> {
               ),
               onPressed: () => _showIncomingOrdersModal(context),
             ),
+          ),
+          IconButton(
+            icon: Icon(Icons.sync_rounded, color: Colors.blue[800]),
+            tooltip: 'Perbarui Menu & Promo',
+            onPressed: () async {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                      SizedBox(width: 12),
+                      Text('Memperbarui data produk & promo dari server...'),
+                    ],
+                  ),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+              await _fetchData();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Katalog produk & diskon berhasil disinkronkan!'), backgroundColor: Colors.green),
+                );
+              }
+            },
           ),
           IconButton(
             icon: Icon(Icons.print_outlined, color: Colors.blue[800]),

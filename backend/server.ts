@@ -19250,10 +19250,33 @@ app.get('/api/pos/customers', tenantMiddleware, async (req: Request, res: Respon
 app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    const { customerId, voucherCode, pointsToUse = 0, subtotal = 0, totalQuantity = 0, discountableSubtotal } = req.body;
+    const { customerId, voucherCode, pointsToUse = 0, subtotal = 0, totalQuantity = 0, discountableSubtotal, items } = req.body;
 
     let finalTotal = Number(subtotal);
     let baseDiscountAmount = discountableSubtotal !== undefined ? Number(discountableSubtotal) : Number(subtotal);
+
+    // If items are provided, calculate discountableSubtotal directly from DB Product.isDiscountable as the single source of truth
+    if (Array.isArray(items) && items.length > 0) {
+      const productIds = items.map((i: any) => Number(i.productId || i.id)).filter(Boolean);
+      if (productIds.length > 0) {
+        const dbProducts = await prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, isDiscountable: true }
+        });
+        const discMap = new Map(dbProducts.map(p => [p.id, p.isDiscountable]));
+        
+        let calcDiscountable = 0;
+        for (const it of items) {
+          const pId = Number(it.productId || it.id);
+          const isDisc = discMap.has(pId) ? (discMap.get(pId) !== false) : (it.isDiscountable !== false && it.isDiscountable !== 0 && it.isDiscountable !== 'false');
+          if (isDisc) {
+            calcDiscountable += (Number(it.price) || 0) * (Number(it.quantity) || 1);
+          }
+        }
+        baseDiscountAmount = calcDiscountable;
+      }
+    }
+
     let memberDiscountAmount = 0;
     let voucherDiscountAmount = 0;
     let pointsUsed = Number(pointsToUse);
@@ -19273,8 +19296,8 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
         }
       }
       
-      // Member Discount
-      if (customer && customer.isMember) {
+      // Member Discount - strictly only if discountable amount > 0
+      if (customer && customer.isMember && baseDiscountAmount > 0) {
         if (company.memberDiscountValue > 0) {
           if (company.memberDiscountType === 'PERCENTAGE') {
             memberDiscountAmount = baseDiscountAmount * (company.memberDiscountValue / 100);
@@ -19868,6 +19891,41 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
       }
 
+      // Re-verify and enforce member discount against DB isDiscountable
+      let verifiedMemberDiscount = Number(memberDiscountAmount) || 0;
+      if (finalCustomerId && Number(memberDiscountAmount) > 0) {
+        const customer = await tx.customer.findUnique({ where: { id: finalCustomerId }, select: { isMember: true } });
+        if (customer && customer.isMember) {
+          const productIds = (items || []).map((i: any) => Number(i.productId || i.id)).filter(Boolean);
+          const dbProducts = productIds.length > 0 ? await tx.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, isDiscountable: true }
+          }) : [];
+          const discMap = new Map(dbProducts.map(p => [p.id, p.isDiscountable]));
+          let calcDiscountable = 0;
+          for (const it of (items || [])) {
+            const pId = Number(it.productId || it.id);
+            const isDisc = discMap.has(pId) ? (discMap.get(pId) !== false) : (it.isDiscountable !== false && it.isDiscountable !== 0 && it.isDiscountable !== 'false');
+            if (isDisc) {
+              calcDiscountable += (Number(it.price) || 0) * (Number(it.quantity) || 1);
+            }
+          }
+
+          const company = await tx.company.findUnique({ where: { id: tenantId } });
+          let maxAllowedMemberDiscount = 0;
+          if (company && company.memberDiscountValue > 0 && calcDiscountable > 0) {
+            if (company.memberDiscountType === 'PERCENTAGE') {
+              maxAllowedMemberDiscount = calcDiscountable * (company.memberDiscountValue / 100);
+            } else {
+              maxAllowedMemberDiscount = Math.min(company.memberDiscountValue, calcDiscountable);
+            }
+          }
+          if (verifiedMemberDiscount > maxAllowedMemberDiscount) {
+            verifiedMemberDiscount = maxAllowedMemberDiscount;
+          }
+        }
+      }
+
       const sale = await tx.sale.create({
         data: {
           companyId: tenantId,
@@ -19890,7 +19948,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           paymentReference: paymentReference ? String(paymentReference).trim() : null,
           serviceFee: Number(serviceFee),
           markupPercentage: Number(markupPercentage),
-          memberDiscountAmount: Number(memberDiscountAmount),
+          memberDiscountAmount: verifiedMemberDiscount,
           voucherCode: voucherCode || null,
           voucherDiscountAmount: Number(voucherDiscountAmount),
           pointsUsed: Number(pointsUsed),

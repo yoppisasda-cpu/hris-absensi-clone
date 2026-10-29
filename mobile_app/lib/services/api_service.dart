@@ -699,6 +699,7 @@ class ApiService {
     String? voucherCode,
     double pointsToUse = 0,
     double totalQuantity = 0,
+    List<Map<String, dynamic>>? items,
   }) async {
     try {
       final response = await _dio.post('/pos/calculate', data: {
@@ -708,6 +709,7 @@ class ApiService {
         'voucherCode': voucherCode,
         'pointsToUse': pointsToUse,
         'totalQuantity': totalQuantity,
+        if (items != null) 'items': items,
       });
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {

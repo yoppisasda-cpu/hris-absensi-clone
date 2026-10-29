@@ -673,7 +673,8 @@ export default function POSPage() {
                 subtotal,
                 discountableSubtotal: discountableSubtotal,
                 voucherCode: codeToApply,
-                totalQuantity: cart.reduce((sum, item) => sum + item.qty, 0)
+                totalQuantity: cart.reduce((sum, item) => sum + item.qty, 0),
+                items: cart.map(i => ({ productId: i.id, price: i.price, quantity: i.qty, isDiscountable: i.isDiscountable }))
             });
             setVoucherDiscountAmount(res.data.voucherDiscountAmount || 0);
             toast.success("Voucher berhasil diaplikasikan!");
