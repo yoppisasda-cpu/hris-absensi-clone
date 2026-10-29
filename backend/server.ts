@@ -16053,6 +16053,23 @@ app.delete('/api/inventory/warehouses/:id', tenantMiddleware, async (req: Reques
 
 // --- MODUL PELANGGAN & MEMBER ---
 
+// Helper to get all company IDs in the same franchise group (e.g. 7B_GROUP, ROTI_SUBUH_GROUP)
+async function getFranchiseCompanyIds(tenantId: number, txClient?: any): Promise<number[]> {
+  const client = txClient || prisma;
+  const company = await client.company.findUnique({
+    where: { id: tenantId },
+    select: { franchiseId: true }
+  });
+  if (!company || !company.franchiseId) {
+    return [tenantId];
+  }
+  const sisterCompanies = await client.company.findMany({
+    where: { franchiseId: company.franchiseId },
+    select: { id: true }
+  });
+  return sisterCompanies.map((c: any) => c.id);
+}
+
 // C1. List Customers
 app.get('/api/customers', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -16253,27 +16270,59 @@ app.post('/api/customers/register-member', tenantMiddleware, async (req: Request
     const cleanPhone = phone.trim();
     const cleanName = (name && typeof name === 'string' && name.trim()) ? name.trim() : 'Pelanggan Member';
 
+    // Check if customer already exists in tenantId or any sister company under the same franchise group
+    const companyIds = await getFranchiseCompanyIds(tenantId);
+    const existingInFranchise = await prisma.customer.findFirst({
+      where: {
+        companyId: { in: companyIds },
+        phone: cleanPhone
+      },
+      orderBy: { points: 'desc' }
+    });
+
+    const initialPoints = existingInFranchise ? existingInFranchise.points : 0;
+    const initialSpent = existingInFranchise ? existingInFranchise.totalSpent : 0;
+    const resolvedName = (name && name.trim()) ? name.trim() : (existingInFranchise?.name || cleanName);
+
     const customer = await prisma.customer.upsert({
       where: { companyId_phone: { companyId: tenantId, phone: cleanPhone } },
       update: {
-        name: (name && name.trim()) ? name.trim() : undefined,
+        name: resolvedName,
         isMember: true,
         // @ts-ignore
-        birthDate: birthDate ? new Date(birthDate) : undefined,
+        birthDate: birthDate ? new Date(birthDate) : (existingInFranchise?.birthDate || undefined),
         // @ts-ignore
-        gender: gender || undefined
+        gender: gender || existingInFranchise?.gender || undefined,
+        points: initialPoints > 0 ? initialPoints : undefined
       },
       create: {
         companyId: tenantId,
         phone: cleanPhone,
-        name: cleanName,
+        name: resolvedName,
         isMember: true,
+        points: initialPoints,
+        totalSpent: initialSpent,
         // @ts-ignore
-        birthDate: birthDate ? new Date(birthDate) : null,
+        birthDate: birthDate ? new Date(birthDate) : (existingInFranchise?.birthDate || null),
         // @ts-ignore
-        gender: gender || null
+        gender: gender || existingInFranchise?.gender || null
       }
     });
+
+    // Propagate isMember: true and points to any sister records in other branches
+    if (companyIds.length > 1) {
+      await prisma.customer.updateMany({
+        where: {
+          companyId: { in: companyIds.filter((cid: number) => cid !== tenantId) },
+          phone: cleanPhone
+        },
+        data: {
+          name: resolvedName,
+          isMember: true,
+          points: customer.points
+        }
+      });
+    }
 
     res.json({ message: 'Pendaftaran Member berhasil!', customer });
   } catch (error: any) {
@@ -19156,25 +19205,42 @@ app.patch('/api/pos/products/:id/customizations', tenantMiddleware, async (req: 
 });
 
 
-// 1.5. POS Customer Search (Autocomplete)
+// 1.5. POS Customer Search (Autocomplete) - Cross-branch aware for franchise groups
 app.get('/api/pos/customers', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
     const q = req.query.q as string || "";
     
+    const companyIds = await getFranchiseCompanyIds(tenantId);
+
     const customers = await prisma.customer.findMany({
       where: {
-        companyId: tenantId,
+        companyId: { in: companyIds },
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
           { phone: { contains: q, mode: 'insensitive' } }
         ]
       },
-      take: 20,
-      orderBy: { name: 'asc' }
+      take: 40,
+      orderBy: { points: 'desc' }
     });
     
-    res.json(customers);
+    // Deduplicate by phone so cashier sees one clean, consolidated record per customer
+    const customerMap = new Map<string, any>();
+    for (const c of customers) {
+      const cleanPhone = c.phone ? c.phone.trim().replace(/\D/g, '') : `id_${c.id}`;
+      if (!customerMap.has(cleanPhone)) {
+        customerMap.set(cleanPhone, c);
+      } else {
+        const existing = customerMap.get(cleanPhone);
+        // Prefer record from active tenantId, or one with higher points/spent
+        if (c.companyId === tenantId || (c.points > existing.points && existing.companyId !== tenantId)) {
+          customerMap.set(cleanPhone, c);
+        }
+      }
+    }
+
+    res.json(Array.from(customerMap.values()));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -19200,6 +19266,12 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
     let customer = null;
     if (customerId) {
       customer = await prisma.customer.findUnique({ where: { id: Number(customerId) } });
+      if (customer && customer.companyId !== tenantId) {
+        const companyIds = await getFranchiseCompanyIds(tenantId);
+        if (!companyIds.includes(customer.companyId)) {
+          customer = null;
+        }
+      }
       
       // Member Discount
       if (customer && customer.isMember) {
@@ -19617,27 +19689,71 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       // 0. Sync Customer if phone provided
       let finalCustomerId = customerId ? Number(customerId) : null;
       if (customerPhone) {
-        const customer = await tx.customer.upsert({
+        let customer = await tx.customer.findUnique({
           where: { 
             companyId_phone: { 
               companyId: tenantId, 
               phone: customerPhone 
             } 
-          },
-          update: {
-            name: customerName || undefined,
-            totalSpent: { increment: Number(totalAmount) },
-            isMember: true
-          },
-          create: {
-            companyId: tenantId,
-            name: customerName || 'Pelanggan',
-            phone: customerPhone,
-            totalSpent: Number(totalAmount),
-            isMember: true
           }
         });
+
+        if (!customer) {
+          // Check if customer exists in sister companies under the same franchise group
+          const companyIds = await getFranchiseCompanyIds(tenantId, tx);
+          const sisterCustomer = await tx.customer.findFirst({
+            where: { companyId: { in: companyIds }, phone: customerPhone },
+            orderBy: { points: 'desc' }
+          });
+
+          customer = await tx.customer.create({
+            data: {
+              companyId: tenantId,
+              name: customerName || sisterCustomer?.name || 'Pelanggan',
+              phone: customerPhone,
+              points: sisterCustomer?.points || 0,
+              totalSpent: Number(totalAmount),
+              isMember: true,
+              birthDate: sisterCustomer?.birthDate || null,
+              gender: sisterCustomer?.gender || null
+            }
+          });
+        } else {
+          customer = await tx.customer.update({
+            where: { id: customer.id },
+            data: {
+              name: customerName || undefined,
+              totalSpent: { increment: Number(totalAmount) },
+              isMember: true
+            }
+          });
+        }
         finalCustomerId = customer.id;
+      } else if (finalCustomerId) {
+        // If customer was selected by ID from a sister company, link or create record in current tenant
+        const selectedCust = await tx.customer.findUnique({ where: { id: finalCustomerId } });
+        if (selectedCust && selectedCust.companyId !== tenantId && selectedCust.phone) {
+          const localCust = await tx.customer.upsert({
+            where: { companyId_phone: { companyId: tenantId, phone: selectedCust.phone } },
+            update: {
+              name: selectedCust.name,
+              points: selectedCust.points,
+              isMember: true,
+              totalSpent: { increment: Number(totalAmount) }
+            },
+            create: {
+              companyId: tenantId,
+              phone: selectedCust.phone,
+              name: selectedCust.name,
+              points: selectedCust.points,
+              totalSpent: Number(totalAmount),
+              isMember: true,
+              birthDate: selectedCust.birthDate,
+              gender: selectedCust.gender
+            }
+          });
+          finalCustomerId = localCust.id;
+        }
       }
 
       // 0. Calculate Total Commission from Items
@@ -19788,14 +19904,32 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
 
       // 1.5 Process Points and Vouchers
       if (finalCustomerId && (Number(pointsUsed) > 0 || finalPointsEarned > 0)) {
-        await tx.customer.update({
+        const pointsDiff = finalPointsEarned - Number(pointsUsed);
+        const updatedCust = await tx.customer.update({
           where: { id: finalCustomerId },
           data: {
             points: {
-              increment: finalPointsEarned - Number(pointsUsed)
+              increment: pointsDiff
             }
           }
         });
+
+        // Also sync points and member status to sister customer records under the same franchise
+        if (updatedCust.phone) {
+          const companyIds = await getFranchiseCompanyIds(tenantId, tx);
+          if (companyIds.length > 1) {
+            await tx.customer.updateMany({
+              where: {
+                companyId: { in: companyIds.filter((cid: number) => cid !== tenantId) },
+                phone: updatedCust.phone
+              },
+              data: {
+                points: updatedCust.points,
+                isMember: true
+              }
+            });
+          }
+        }
       }
 
       if (voucherCode) {
