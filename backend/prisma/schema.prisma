@@ -1185,26 +1185,32 @@ model ProductCustomization {
 }
 
 model PurchaseOrder {
-  id           Int                 @id @default(autoincrement())
-  companyId    Int
-  supplierId   Int
-  orderNumber  String              @unique
-  date         DateTime            @default(now())
-  totalAmount  Float               @default(0)
-  taxAmount    Float?              @default(0)
-  status       POStatus            @default(PENDING)
-  notes        String?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  createdById  Int
-  approvedById Int?
-  warehouseId  Int?
-  approvedBy   User?               @relation("POApprovedBy", fields: [approvedById], references: [id])
-  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy    User                @relation("POCreatedBy", fields: [createdById], references: [id])
-  supplier     Supplier            @relation(fields: [supplierId], references: [id])
-  warehouse    Warehouse?          @relation(fields: [warehouseId], references: [id])
-  items        PurchaseOrderItem[]
+  id                    Int                 @id @default(autoincrement())
+  companyId             Int
+  supplierId            Int
+  orderNumber           String              @unique
+  date                  DateTime            @default(now())
+  totalAmount           Float               @default(0)
+  taxAmount             Float?              @default(0)
+  status                POStatus            @default(PENDING)
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  createdById           Int
+  approvedById          Int?
+  warehouseId           Int?
+  supplierInvoiceNumber String?
+  invoiceDate           DateTime?
+  invoiceDueDate        DateTime?
+  isInvoiceVerified     Boolean             @default(false)
+  invoiceNotes          String?
+  invoiceTotal          Float?              @default(0)
+  approvedBy            User?               @relation("POApprovedBy", fields: [approvedById], references: [id])
+  company               Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy             User                @relation("POCreatedBy", fields: [createdById], references: [id])
+  supplier              Supplier            @relation(fields: [supplierId], references: [id])
+  warehouse             Warehouse?          @relation(fields: [warehouseId], references: [id])
+  items                 PurchaseOrderItem[]
 }
 
 model PurchaseOrderItem {
@@ -1214,6 +1220,7 @@ model PurchaseOrderItem {
   quantity        Float
   receivedQty     Float         @default(0)
   price           Float
+  initialPrice    Float?        @default(0)
   total           Float
   product         Product       @relation(fields: [productId], references: [id])
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)

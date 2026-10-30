@@ -175,6 +175,13 @@ const runAutoMigration = async () => {
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "openTime" TEXT DEFAULT '08:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "closeTime" TEXT DEFAULT '22:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "isOpenManual" BOOLEAN DEFAULT true`,
+    `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "supplierInvoiceNumber" TEXT`,
+    `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceDate" TIMESTAMP`,
+    `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceDueDate" TIMESTAMP`,
+    `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "isInvoiceVerified" BOOLEAN DEFAULT false`,
+    `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceNotes" TEXT`,
+    `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceTotal" FLOAT DEFAULT 0`,
+    `ALTER TABLE "PurchaseOrderItem" ADD COLUMN IF NOT EXISTS "initialPrice" FLOAT DEFAULT 0`,
     // Performance indexes to prevent Disk IO exhaustion
     `CREATE INDEX IF NOT EXISTS "idx_notification_company_user_created" ON "Notification" ("companyId", "userId", "createdAt" DESC)`,
     `CREATE INDEX IF NOT EXISTS "idx_saleitem_saleid" ON "SaleItem" ("saleId")`,
@@ -3632,6 +3639,7 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
         productId: parseInt(item.productId),
         quantity: parseFloat(item.quantity),
         price: parseFloat(item.price),
+        initialPrice: parseFloat(item.price),
         total: parseFloat(item.quantity) * parseFloat(item.price)
       }))
     });
@@ -3691,6 +3699,7 @@ app.put('/api/inventory/purchase-orders/:id', tenantMiddleware, async (req: Requ
           productId: parseInt(item.productId),
           quantity: parseFloat(item.quantity),
           price: parseFloat(item.price),
+          initialPrice: parseFloat(item.price),
           total: parseFloat(item.quantity) * parseFloat(item.price)
         }))
       });
@@ -3992,6 +4001,169 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
   } catch (error: any) {
     console.error("PO RECEIVE ERROR:", error);
     res.status(500).json({ error: 'Gagal memproses penerimaan barang: ' + error.message });
+  }
+});
+
+// PO3.8 Verify Supplier Invoice & Update Prices
+app.post('/api/inventory/purchase-orders/:id/verify-invoice', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const userId = Number((req as any).userId);
+    const userRole = (req as any).userRole;
+    const poId = parseInt(req.params.id as string);
+    const { supplierInvoiceNumber, invoiceDate, invoiceDueDate, invoiceNotes, items } = req.body;
+
+    if (!['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'FINANCE'].includes(userRole)) {
+      return res.status(403).json({ error: 'Anda tidak memiliki hak untuk memverifikasi invoice PO ini.' });
+    }
+
+    if (!supplierInvoiceNumber || typeof supplierInvoiceNumber !== 'string' || !supplierInvoiceNumber.trim()) {
+      return res.status(400).json({ error: 'Nomor invoice / faktur supplier wajib diisi.' });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Data rincian harga barang tidak boleh kosong.' });
+    }
+
+    const updatedPo = await prisma.$transaction(async (tx) => {
+      const po = await tx.purchaseOrder.findFirst({
+        where: { id: poId, companyId: tenantId },
+        include: { supplier: true, items: { include: { product: true } } }
+      });
+
+      if (!po) throw new Error('PO tidak ditemukan.');
+      if (po.status === 'REJECTED' || po.status === 'CANCELLED') {
+        throw new Error('PO yang ditolak atau dibatalkan tidak dapat diverifikasi invoicenya.');
+      }
+
+      let totalInvoiceAmount = 0;
+
+      for (const rxItem of items) {
+        const poItem = po.items.find(i => i.id === Number(rxItem.id));
+        if (!poItem) continue;
+
+        const newPrice = Number(rxItem.price);
+        if (isNaN(newPrice) || newPrice < 0) {
+          throw new Error(`Harga tidak valid untuk barang ${poItem.product?.name || poItem.productId}`);
+        }
+
+        const oldPrice = poItem.price;
+        const initialPrice = poItem.initialPrice && poItem.initialPrice > 0 ? poItem.initialPrice : oldPrice;
+        const billQty = poItem.receivedQty > 0 ? poItem.receivedQty : poItem.quantity;
+        const itemTotal = billQty * newPrice;
+        totalInvoiceAmount += itemTotal;
+
+        // 1. Update PurchaseOrderItem
+        await tx.purchaseOrderItem.update({
+          where: { id: poItem.id },
+          data: {
+            price: newPrice,
+            initialPrice: initialPrice,
+            total: itemTotal
+          }
+        });
+
+        // 2. Adjust Product HPP (WAC / costPrice) if goods have been received
+        if (poItem.receivedQty > 0 && oldPrice !== newPrice) {
+          const product = await tx.product.findUnique({
+            where: { id: poItem.productId },
+            select: { stock: true, costPrice: true, purchaseFactor: true }
+          });
+
+          if (product) {
+            const factor = product.purchaseFactor || 1;
+            const currentStock = Math.max(0, product.stock);
+            const currentCost = product.costPrice || 0;
+            const totalValueDiff = (newPrice - oldPrice) * (poItem.receivedQty / factor);
+
+            if (currentStock > 0) {
+              const adjustedCost = Math.max(0, ((currentStock * currentCost) + totalValueDiff) / currentStock);
+              await tx.product.update({
+                where: { id: poItem.productId },
+                data: { costPrice: Number(adjustedCost.toFixed(2)) }
+              });
+            }
+          }
+        }
+      }
+
+      const parsedInvoiceDate = invoiceDate ? new Date(invoiceDate) : new Date();
+      const parsedDueDate = invoiceDueDate 
+        ? new Date(invoiceDueDate) 
+        : new Date(parsedInvoiceDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      // 3. Update PO Header
+      const savedPo = await tx.purchaseOrder.update({
+        where: { id: poId },
+        data: {
+          supplierInvoiceNumber: supplierInvoiceNumber.trim(),
+          invoiceDate: parsedInvoiceDate,
+          invoiceDueDate: parsedDueDate,
+          isInvoiceVerified: true,
+          invoiceNotes: invoiceNotes ? String(invoiceNotes).trim() : null,
+          invoiceTotal: totalInvoiceAmount,
+          totalAmount: totalInvoiceAmount,
+          updatedAt: new Date()
+        },
+        include: {
+          supplier: true,
+          warehouse: true,
+          items: { include: { product: true } }
+        }
+      });
+
+      // 4. Update or Create Expense (Hutang otomatis)
+      const existingExpense = await tx.expense.findFirst({
+        where: {
+          companyId: tenantId,
+          description: { startsWith: `Hutang otomatis dari PO #${po.orderNumber}` }
+        }
+      });
+
+      if (existingExpense) {
+        await tx.expense.update({
+          where: { id: existingExpense.id },
+          data: {
+            amount: totalInvoiceAmount,
+            dueDate: parsedDueDate,
+            description: `Hutang otomatis dari PO #${po.orderNumber} (Faktur: ${supplierInvoiceNumber.trim()})`,
+            updatedAt: new Date()
+          }
+        });
+      } else if (po.items.some(i => i.receivedQty > 0)) {
+        let targetCategory = await tx.expenseCategory.findFirst({
+          where: { companyId: tenantId, name: 'Pembelian (Auto-PO)' }
+        });
+        if (!targetCategory) {
+          targetCategory = await tx.expenseCategory.findFirst({ where: { companyId: tenantId } });
+        }
+        if (targetCategory) {
+          await tx.expense.create({
+            data: {
+              companyId: tenantId,
+              categoryId: targetCategory.id,
+              amount: totalInvoiceAmount,
+              date: parsedInvoiceDate,
+              dueDate: parsedDueDate,
+              description: `Hutang otomatis dari PO #${po.orderNumber} (Faktur: ${supplierInvoiceNumber.trim()})`,
+              paidTo: po.supplier?.name || 'Supplier',
+              supplierId: po.supplierId,
+              status: 'PENDING'
+            }
+          });
+        }
+      }
+
+      return savedPo;
+    });
+
+    res.json({
+      message: 'Faktur supplier berhasil diverifikasi. Harga PO, hutang, dan HPP stok telah diperbarui.',
+      po: updatedPo
+    });
+  } catch (error: any) {
+    console.error("PO VERIFY INVOICE ERROR:", error);
+    res.status(500).json({ error: 'Gagal memverifikasi invoice PO: ' + error.message });
   }
 });
 

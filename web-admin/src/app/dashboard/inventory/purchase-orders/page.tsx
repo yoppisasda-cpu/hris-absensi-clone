@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
     ShoppingBag, Search, Filter, MoreVertical, CheckCircle2, XCircle, 
-    Clock, FileText, Plus, ArrowUpRight, ArrowDownRight, Package, Truck, User, Download, MessageCircle, Mail, Printer, Edit3, Sparkles 
+    Clock, FileText, Plus, ArrowUpRight, ArrowDownRight, Package, Truck, User, Download, MessageCircle, Mail, Printer, Edit3, Sparkles, Receipt 
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
@@ -12,6 +12,7 @@ import PurchaseOrderModal from "@/components/inventory/PurchaseOrderModal";
 import EditPurchaseOrderModal from "@/components/inventory/EditPurchaseOrderModal";
 import PODetailModal from "@/components/inventory/PODetailModal";
 import ReceiveGoodsModal from "@/components/inventory/ReceiveGoodsModal";
+import VerifyInvoiceModal from "@/components/inventory/VerifyInvoiceModal";
 import AiPoModal from "@/components/inventory/AiPoModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -25,6 +26,7 @@ export default function PurchaseOrdersPage() {
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+    const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [selectedPo, setSelectedPo] = useState<any>(null);
     const [selectedEditPo, setSelectedEditPo] = useState<any>(null);
     const [role, setRole] = useState<string>("");
@@ -518,6 +520,16 @@ export default function PurchaseOrdersPage() {
                                                          'PAY_PENDING'}
                                                     </span>
                                                 )}
+
+                                                {po.isInvoiceVerified ? (
+                                                    <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.2em] italic border bg-sky-500/10 text-sky-400 border-sky-500/20" title={`Faktur Supplier Terverifikasi: #${po.supplierInvoiceNumber || '-'}`}>
+                                                        <Receipt className="h-2.5 w-2.5" /> INV_VERIFIED
+                                                    </span>
+                                                ) : (po.status === 'APPROVED' || po.status === 'PARTIAL' || po.status === 'COMPLETED') ? (
+                                                    <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.2em] italic border bg-amber-500/10 text-amber-400 border-amber-500/20" title="Menunggu verifikasi faktur invoice supplier">
+                                                        WAITING_INV
+                                                    </span>
+                                                ) : null}
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">
@@ -624,6 +636,22 @@ export default function PurchaseOrdersPage() {
                                                                 <Package className="h-5 w-5 stroke-[2.5px]" />
                                                             </button>
                                                         )}
+                                                        {(po.status === 'APPROVED' || po.status === 'PARTIAL' || po.status === 'COMPLETED') && isPurchasingOrAdmin && (
+                                                            <button 
+                                                                className={`h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-lg border active:scale-95 ${
+                                                                    po.isInvoiceVerified 
+                                                                        ? 'bg-sky-600/10 text-sky-400 border-sky-500/30 hover:bg-sky-600 hover:text-white' 
+                                                                        : 'bg-amber-600/10 text-amber-400 border-amber-500/30 hover:bg-amber-600 hover:text-white'
+                                                                }`}
+                                                                title={po.isInvoiceVerified ? `FAKTUR TERVERIFIKASI (${po.supplierInvoiceNumber || 'INV'}) - KLIK UNTUK EDIT` : "VERIFIKASI INVOICE & UPDATE HARGA"}
+                                                                onClick={() => {
+                                                                    setSelectedPo(po);
+                                                                    setIsInvoiceModalOpen(true);
+                                                                }}
+                                                            >
+                                                                <Receipt className="h-5 w-5 stroke-[2.5px]" />
+                                                            </button>
+                                                        )}
                                                         <button 
                                                             className="h-10 w-10 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 border border-white/10"
                                                             title="INSPECT MANIFEST"
@@ -661,6 +689,12 @@ export default function PurchaseOrdersPage() {
             <ReceiveGoodsModal
                 isOpen={isReceiveModalOpen}
                 onClose={() => setIsReceiveModalOpen(false)}
+                po={selectedPo}
+                onSuccess={fetchPos}
+            />
+            <VerifyInvoiceModal
+                isOpen={isInvoiceModalOpen}
+                onClose={() => setIsInvoiceModalOpen(false)}
                 po={selectedPo}
                 onSuccess={fetchPos}
             />

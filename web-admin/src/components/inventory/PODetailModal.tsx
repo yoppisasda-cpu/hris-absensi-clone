@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Truck, Package, Clock, User, CheckCircle2, XCircle, FileText, ShoppingBag, Printer, Download } from "lucide-react";
+import { X, Truck, Package, Clock, User, CheckCircle2, XCircle, FileText, ShoppingBag, Printer, Download, Receipt } from "lucide-react";
 import * as XLSX from "xlsx";
 
 export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject, onCancel }: any) {
@@ -157,6 +157,42 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                         </div>
                     </div>
 
+                    {/* Info Faktur Supplier (Jika ada) */}
+                    {po.isInvoiceVerified && (
+                        <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 text-slate-950 relative z-10">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Receipt className="h-4 w-4 text-amber-700 stroke-[2px]" />
+                                    <h3 className="text-[10px] font-black uppercase text-amber-800 tracking-[0.2em] italic">
+                                        Faktur / Invoice Supplier Terverifikasi
+                                    </h3>
+                                </div>
+                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                                    Terverifikasi
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-bold text-slate-800">
+                                <div>
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-normal block">Nomor Faktur Supplier:</span>
+                                    <span className="font-mono font-black text-slate-900">{po.supplierInvoiceNumber || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-normal block">Tanggal Faktur:</span>
+                                    <span>{po.invoiceDate ? new Date(po.invoiceDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-normal block">Jatuh Tempo Pembayaran:</span>
+                                    <span>{po.invoiceDueDate ? new Date(po.invoiceDueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span>
+                                </div>
+                            </div>
+                            {po.invoiceNotes && (
+                                <p className="text-[10px] text-slate-600 mt-2.5 pt-2 border-t border-amber-500/20 italic">
+                                    Catatan: {po.invoiceNotes}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {/* Item Breakdown Premium */}
                     <div className="space-y-4 mb-4 relative z-10">
                         <div className="flex items-center gap-3 mb-1">
@@ -185,7 +221,14 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                                             <td className="px-6 py-4 font-bold text-slate-500 text-[10px] uppercase tracking-widest">{item.product?.sku || '-'}</td>
                                             <td className="px-6 py-4 text-center font-black text-slate-950 text-[11px] uppercase">{item.quantity} <span className="text-[9px] text-slate-500">{(item.product?.purchaseUnit || item.product?.unit || 'PCS').toUpperCase()}</span></td>
                                             <td className="px-6 py-4 text-center font-black text-emerald-600 text-[11px] uppercase">{item.receivedQty || 0}</td>
-                                            <td className="px-6 py-4 text-right font-black text-slate-500 text-[11px] tracking-widest">{item.price.toLocaleString('id-ID')}</td>
+                                            <td className="px-6 py-4 text-right font-black text-slate-500 text-[11px] tracking-widest">
+                                                <div>{item.price.toLocaleString('id-ID')}</div>
+                                                {item.initialPrice && item.initialPrice > 0 && item.initialPrice !== item.price && (
+                                                    <div className="text-[8px] text-slate-400 font-normal line-through">
+                                                        Awal: {item.initialPrice.toLocaleString('id-ID')}
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="px-6 py-4 text-right font-black text-slate-950 text-[11px] tracking-widest">{(qtyToCalculate * item.price).toLocaleString('id-ID')}</td>
                                         </tr>
                                         );
