@@ -3932,12 +3932,23 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
         });
 
         if (!category) {
-          const catResult: any[] = await tx.$queryRawUnsafe(`
-            INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
-            VALUES ($1, $2, $3, NOW())
-            RETURNING id
-          `, tenantId, targetCategoryName, targetCategoryType);
-          category = { id: catResult[0].id };
+          try {
+            category = await tx.expenseCategory.create({
+              data: {
+                companyId: tenantId,
+                name: targetCategoryName,
+                type: (targetCategoryType as any) || 'INVENTORY'
+              }
+            });
+          } catch (createErr) {
+            const catResult: any[] = await tx.$queryRawUnsafe(`
+              INSERT INTO "ExpenseCategory" ("companyId", "name", "type", "updatedAt")
+              VALUES ($1, $2, $3::"ExpenseType", NOW())
+              ON CONFLICT ("companyId", "name") DO UPDATE SET "updatedAt" = NOW()
+              RETURNING id
+            `, tenantId, targetCategoryName, targetCategoryType || 'INVENTORY');
+            category = { id: catResult[0].id };
+          }
         }
 
         const existingExpense = await tx.expense.findFirst({
@@ -4137,6 +4148,22 @@ app.post('/api/inventory/purchase-orders/:id/verify-invoice', tenantMiddleware, 
         });
         if (!targetCategory) {
           targetCategory = await tx.expenseCategory.findFirst({ where: { companyId: tenantId } });
+        }
+        if (!targetCategory) {
+          try {
+            targetCategory = await tx.expenseCategory.create({
+              data: {
+                companyId: tenantId,
+                name: 'Pembelian (Auto-PO)',
+                type: 'INVENTORY'
+              }
+            });
+          } catch (e) {
+            // in case of concurrent insert
+            targetCategory = await tx.expenseCategory.findFirst({
+              where: { companyId: tenantId, name: 'Pembelian (Auto-PO)' }
+            });
+          }
         }
         if (targetCategory) {
           await tx.expense.create({
