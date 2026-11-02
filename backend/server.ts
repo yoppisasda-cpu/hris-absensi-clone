@@ -16278,7 +16278,9 @@ app.get('/api/customers', tenantMiddleware, async (req: Request, res: Response) 
     const tenantId = Number((req as any).tenantId);
     const customers = await prisma.$queryRawUnsafe(`
       SELECT c.*, 
-        (SELECT MAX("date") FROM "Sale" WHERE "customerId" = c.id) as "lastPurchaseDate"
+        (SELECT MAX("date") FROM "Sale" WHERE "customerId" = c.id) as "lastPurchaseDate",
+        COALESCE((SELECT SUM("totalAmount") FROM "Sale" WHERE "customerId" = c.id AND "status" != 'CANCELLED'), 0)::FLOAT as "totalSpent",
+        (SELECT COUNT(*) FROM "Sale" WHERE "customerId" = c.id AND "status" != 'CANCELLED')::INT as "totalOrders"
       FROM "Customer" c 
       WHERE c."companyId" = $1 
       ORDER BY c."name" ASC
