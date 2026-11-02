@@ -311,7 +311,7 @@ class _POSScreenState extends State<POSScreen> {
   }
 
   void _addToCart(dynamic product, {List<Map<String, dynamic>>? modifiers}) {
-    bool trackStock = product['trackStock'] ?? true;
+    bool trackStock = product['trackStock'] == true;
     bool isAutoDeduct = product['isAutoDeduct'] == true;
     
     if (trackStock && (product['stock'] ?? 0) <= 0) {
@@ -352,7 +352,7 @@ class _POSScreenState extends State<POSScreen> {
           'priceTiktok': product['priceTiktok'],
           'quantity': 1,
           'maxStock': product['stock'],
-          'trackStock': product['trackStock'] ?? true,
+          'trackStock': product['trackStock'] == true,
           'isAutoDeduct': product['isAutoDeduct'] == true,
           'isDiscountable': isDisc,
           'modifiers': modifiers,
@@ -481,7 +481,7 @@ class _POSScreenState extends State<POSScreen> {
             }
           }
         } else {
-          bool trackStock = _cart[index]['trackStock'] ?? true;
+          bool trackStock = _cart[index]['trackStock'] == true;
           int maxStock = int.tryParse(_cart[index]['maxStock']?.toString() ?? '0') ?? 0;
 
           if (!trackStock || newQty <= maxStock) {

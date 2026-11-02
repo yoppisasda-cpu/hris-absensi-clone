@@ -21,7 +21,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         showInPos: true,
         type: "FINISHED_GOOD",
         fnbType: "OTHER",
-        trackStock: true,
+        trackStock: false,
         isAutoDeduct: false,
         isDiscountable: true,
         priceGofood: 0,
@@ -77,7 +77,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     showInPos: freshProduct.showInPos !== undefined ? freshProduct.showInPos : true,
                     type: freshProduct.type || "FINISHED_GOOD",
                     fnbType: freshProduct.fnbType || "OTHER",
-                    trackStock: freshProduct.trackStock !== undefined ? freshProduct.trackStock : true,
+                    trackStock: freshProduct.trackStock !== undefined ? freshProduct.trackStock : false,
                     isDiscountable: freshProduct.isDiscountable !== undefined ? freshProduct.isDiscountable : true,
                     isAutoDeduct: freshProduct.isAutoDeduct !== undefined ? freshProduct.isAutoDeduct : false,
                     priceGofood: freshProduct.priceGofood || 0,
@@ -125,7 +125,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                     showInPos: product.showInPos !== undefined ? product.showInPos : true,
                     type: product.type || "FINISHED_GOOD",
                     fnbType: product.fnbType || "OTHER",
-                    trackStock: product.trackStock !== undefined ? product.trackStock : true,
+                    trackStock: product.trackStock !== undefined ? product.trackStock : false,
                     isDiscountable: product.isDiscountable !== undefined ? product.isDiscountable : true,
                     isAutoDeduct: product.isAutoDeduct !== undefined ? product.isAutoDeduct : false,
                     priceGofood: product.priceGofood || 0,
@@ -149,7 +149,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 setVendorPrice((product.costPrice || 0) * (product.purchaseFactor || 1));
             } else {
                 setFormData({
-                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", fnbType: "OTHER", trackStock: true, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, priceTiktok: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                    name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", fnbType: "OTHER", trackStock: false, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, priceTiktok: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
                 });
                 setHasRecipe(false);
                 setRecipeItems([]);
@@ -442,7 +442,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             await api.patch(`/pos/products/${productId}/customizations`, { groupIds: selectedCustomizations });
 
             setFormData({
-                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", fnbType: "OTHER", trackStock: true, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, priceTiktok: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
+                name: "", sku: "", categoryId: "", unit: "Pcs", description: "", minStock: 5, price: 0, costPrice: 0, warehouseId: warehouses[0]?.id.toString() || "", stock: 0, showInPos: true, type: "FINISHED_GOOD", fnbType: "OTHER", trackStock: false, isAutoDeduct: false, isDiscountable: true, priceGofood: 0, priceGrabfood: 0, priceShopeefood: 0, priceQpoon: 0, priceTiktok: 0, recipeYield: 0, imageUrl: "", purchaseUnit: "Pcs", purchaseFactor: 1
             });
             setHasRecipe(false);
             setRecipeItems([]);
