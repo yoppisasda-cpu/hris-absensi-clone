@@ -349,6 +349,11 @@ class PrinterService {
         }
       }
 
+      final double pointsEarned = _parseNum(saleData['pointsEarned']);
+      if (pointsEarned > 0) {
+        bytes += generator.text('Poin Diperoleh: +${pointsEarned.toStringAsFixed(0)} Poin', styles: PosStyles(align: PosAlign.center, bold: true));
+      }
+
       bytes += generator.feed(1);
       bytes += generator.text(store['footer'] ?? '', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
       bytes += generator.feed(1);

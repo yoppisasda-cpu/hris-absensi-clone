@@ -11,6 +11,7 @@ import 'pos_closing_screen.dart';
 import 'printer_settings_screen.dart';
 import '../services/socket_service.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/pos_local_db_service.dart';
 import '../services/pos_sync_manager.dart';
 import 'qr_scanner_screen.dart';
@@ -427,6 +428,7 @@ class _POSScreenState extends State<POSScreen> {
         _customerNameController.text = res['customer']['name'];
         _customerPhoneController.text = res['customer']['phone'] ?? '';
         _activeCustomerId = res['customer']['id'];
+        _availablePoints = ((res['customer']?['points'] ?? 0) as num).toDouble();
         
         _employeeDiscountType = res['discount']['type'];
         _employeeDiscountValue = (res['discount']['value'] as num).toDouble();
@@ -436,6 +438,7 @@ class _POSScreenState extends State<POSScreen> {
         _voucherController.text = _employeeDiscountLabel!;
         _voucherDiscountAmount = 0; // Diskon karyawan sudah ditangani di _employeeDiscountAmount
       });
+      await _calculateDiscounts(setPanelState);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Diskon Karyawan Diterapkan!'), backgroundColor: Colors.green));
       setState(() {});
     } catch (e) {
@@ -1587,6 +1590,9 @@ class _POSScreenState extends State<POSScreen> {
         ? 'Take Away'
         : (_saleType == 'DINE_IN' ? 'Dine In' : (_saleType == 'WALK_IN' ? 'Walk-in' : _saleType));
 
+    final authUser = Provider.of<AuthProvider>(context, listen: false);
+    final cashierName = authUser.userName ?? 'Kasir';
+
     final saleData = {
       'invoiceNumber': generatedInvoiceNumber,
       'items': checkoutItems,
@@ -1595,6 +1601,7 @@ class _POSScreenState extends State<POSScreen> {
       'paymentMethod': _selectedPaymentMethod,
       'paymentReference': _paymentReferenceController.text.trim(),
       'customerName': _customerNameController.text.trim(),
+      'cashierName': cashierName,
       'taxRate': _globalTaxRate,
       'memberDiscountAmount': _memberDiscountAmount,
       'voucherDiscountAmount': _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount,
@@ -1602,6 +1609,7 @@ class _POSScreenState extends State<POSScreen> {
           ? _voucherController.text.trim()
           : (_employeeDiscountAmount > 0 ? (_employeeDiscountLabel ?? 'DISKON KARYAWAN') : null),
       'pointsUsed': _pointsUsed,
+      'pointsEarned': _pointsEarned,
       'subtotal': _subtotalAmount,
       'saleType': _saleType,
       'deliveryMethod': deliveryMethod,

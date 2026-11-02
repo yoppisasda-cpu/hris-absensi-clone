@@ -16264,7 +16264,9 @@ async function getFranchiseCompanyIds(tenantId: number, txClient?: any): Promise
     return [tenantId];
   }
   const sisterCompanies = await client.company.findMany({
-    where: { franchiseId: company.franchiseId },
+    where: { 
+      franchiseId: { equals: company.franchiseId, mode: 'insensitive' }
+    },
     select: { id: true }
   });
   return sisterCompanies.map((c: any) => c.id);
@@ -19486,6 +19488,22 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
     const company = await prisma.company.findUnique({ where: { id: tenantId } });
     if (!company) return res.status(404).json({ error: 'Perusahaan tidak ditemukan' });
 
+    let earnRatio = company.pointsEarnRatio || 0;
+    let redeemVal = company.pointsRedeemValue || 0;
+    if (earnRatio === 0 && company.franchiseId) {
+      const franchiseCompany = await prisma.company.findFirst({
+        where: {
+          franchiseId: { equals: company.franchiseId, mode: 'insensitive' },
+          pointsEarnRatio: { gt: 0 }
+        },
+        select: { pointsEarnRatio: true, pointsRedeemValue: true }
+      });
+      if (franchiseCompany) {
+        earnRatio = franchiseCompany.pointsEarnRatio;
+        if (redeemVal === 0) redeemVal = franchiseCompany.pointsRedeemValue;
+      }
+    }
+
     let customer = null;
     if (customerId) {
       customer = await prisma.customer.findUnique({ where: { id: Number(customerId) } });
@@ -19511,7 +19529,7 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
 
       // Point Deduction
       if (pointsUsed > 0 && customer && customer.points >= pointsUsed) {
-        const pointValue = pointsUsed * (company.pointsRedeemValue || 1);
+        const pointValue = pointsUsed * (redeemVal || company.pointsRedeemValue || 1);
         finalTotal -= pointValue;
       } else {
         pointsUsed = 0; // Reset if invalid
@@ -19571,10 +19589,9 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
     // Ensure total is not negative
     if (finalTotal < 0) finalTotal = 0;
 
-    // Calculate Points Earned based on FINAL TOTAL (Exclude Employee from earning points)
-    const isEmployee = customer?.name?.includes('(Karyawan)') || customer?.phone?.startsWith('EMP-');
-    if (customer && customer.isMember && !isEmployee && company.pointsEarnRatio > 0 && finalTotal >= company.pointsEarnRatio) {
-      pointsEarned = Math.floor(finalTotal / company.pointsEarnRatio);
+    // Calculate Points Earned based on FINAL TOTAL (Employees earn points just like normal customers)
+    if (customer && customer.isMember && earnRatio > 0 && finalTotal >= earnRatio) {
+      pointsEarned = Math.floor(finalTotal / earnRatio);
     }
 
     res.json({
@@ -19582,7 +19599,7 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
       memberDiscountAmount,
       voucherDiscountAmount,
       pointsUsed,
-      pointValueUsed: pointsUsed * (company.pointsRedeemValue || 1),
+      pointValueUsed: pointsUsed * (redeemVal || company.pointsRedeemValue || 1),
       finalTotal,
       pointsEarned,
       voucherBalanceRemaining
@@ -19690,14 +19707,56 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
     });
 
     if (!customer) {
+      // Check if sister customer exists under the same franchise to sync initial points
+      const companyIds = await getFranchiseCompanyIds(tenantId);
+      const sisterCustomer = await prisma.customer.findFirst({
+        where: {
+          companyId: { in: companyIds },
+          phone: employeePhone,
+          points: { gt: 0 }
+        },
+        select: { points: true }
+      });
+
       customer = await prisma.customer.create({
         data: {
           companyId: tenantId,
           name: employeeName + ' (Karyawan)',
           phone: employeePhone,
-          isMember: false
+          isMember: true,
+          points: sisterCustomer?.points || 0
         }
       });
+    } else {
+      let shouldUpdate = false;
+      const updateData: any = {};
+      if (!customer.isMember) {
+        updateData.isMember = true;
+        shouldUpdate = true;
+      }
+      if (customer.points === 0) {
+        const companyIds = await getFranchiseCompanyIds(tenantId);
+        if (companyIds.length > 1) {
+          const sisterWithPoints = await prisma.customer.findFirst({
+            where: {
+              companyId: { in: companyIds },
+              phone: employeePhone,
+              points: { gt: 0 }
+            },
+            select: { points: true }
+          });
+          if (sisterWithPoints && sisterWithPoints.points > 0) {
+            updateData.points = sisterWithPoints.points;
+            shouldUpdate = true;
+          }
+        }
+      }
+      if (shouldUpdate) {
+        customer = await prisma.customer.update({
+          where: { id: customer.id },
+          data: updateData
+        });
+      }
     }
 
     // Ambil setting diskon dari voucher "EMPLOYEE" (kecualikan STORED_VALUE / gift card)
@@ -20076,16 +20135,21 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       let finalPointsEarned = Number(pointsEarned) || 0;
       if (finalCustomerId) {
         const customer = await tx.customer.findUnique({ where: { id: finalCustomerId }, select: { isMember: true, name: true, phone: true } });
-        const isEmployee = customer?.name?.includes('(Karyawan)') || customer?.phone?.startsWith('EMP-');
 
-        if (isEmployee) {
-          finalPointsEarned = 0;
-        } else if (finalPointsEarned === 0) {
-          const company = await tx.company.findUnique({ where: { id: tenantId }, select: { pointsEarnRatio: true } });
-          if (company && company.pointsEarnRatio > 0 && customer && customer.isMember) {
+        if (finalPointsEarned === 0) {
+          const company = await tx.company.findUnique({ where: { id: tenantId }, select: { pointsEarnRatio: true, franchiseId: true } });
+          let earnRatio = company?.pointsEarnRatio || 0;
+          if (earnRatio === 0 && company?.franchiseId) {
+            const franchiseComp = await tx.company.findFirst({
+              where: { franchiseId: { equals: company.franchiseId, mode: 'insensitive' }, pointsEarnRatio: { gt: 0 } },
+              select: { pointsEarnRatio: true }
+            });
+            if (franchiseComp) earnRatio = franchiseComp.pointsEarnRatio;
+          }
+          if (earnRatio > 0 && customer && customer.isMember) {
             const finalTotalAmountNumber = Number(totalAmount);
-            if (finalTotalAmountNumber >= company.pointsEarnRatio) {
-              finalPointsEarned = Math.floor(finalTotalAmountNumber / company.pointsEarnRatio);
+            if (finalTotalAmountNumber >= earnRatio) {
+              finalPointsEarned = Math.floor(finalTotalAmountNumber / earnRatio);
             }
           }
         }
