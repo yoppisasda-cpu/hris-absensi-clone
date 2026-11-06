@@ -1260,14 +1260,16 @@ model SalesOrder {
 }
 
 model SalesOrderItem {
-  id           Int        @id @default(autoincrement())
-  salesOrderId Int
-  productId    Int
-  quantity     Float
-  price        Float
-  total        Float
-  product      Product    @relation(fields: [productId], references: [id])
-  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  id               Int        @id @default(autoincrement())
+  salesOrderId     Int
+  productId        Int
+  quantity         Float
+  unit             String?
+  conversionFactor Float      @default(1)
+  price            Float
+  total            Float
+  product          Product    @relation(fields: [productId], references: [id])
+  salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 }
 
 model Shareholder {
@@ -1676,15 +1678,17 @@ model B2BContract {
 }
 
 model B2BContractItem {
-  id             Int         @id @default(autoincrement())
-  contractId     Int
-  productId      Int
-  contractPrice  Float
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id               Int         @id @default(autoincrement())
+  contractId       Int
+  productId        Int
+  contractPrice    Float
+  unit             String?
+  conversionFactor Float       @default(1)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
-  contract       B2BContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  contract         B2BContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  product          Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([contractId, productId])
 }

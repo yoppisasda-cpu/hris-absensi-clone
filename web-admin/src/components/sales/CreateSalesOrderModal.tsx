@@ -45,7 +45,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
   const [productSearch, setProductSearch] = useState("");
   const [productTypeFilter, setProductTypeFilter] = useState<string>("ALL");
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
-  const [activeContractItems, setActiveContractItems] = useState<Record<number, number>>({});
+  const [activeContractItems, setActiveContractItems] = useState<Record<number, { price: number; unit: string; conversionFactor: number }>>({});
 
   const fetchData = async () => {
     try {
@@ -126,9 +126,9 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     const prod = products.find(p => p.id.toString() === pId);
     if (prod) {
       // Gunakan harga kontrak jika ada, fallback ke harga jual (price) atau harga modal (costPrice)
-      const contractPrice = activeContractItems[prod.id];
+      const contractData = activeContractItems[prod.id];
       const defaultPrice = prod.price > 0 ? prod.price : (prod.costPrice || 0);
-      setPrice(contractPrice !== undefined ? contractPrice.toString() : defaultPrice.toString());
+      setPrice(contractData ? contractData.price.toString() : defaultPrice.toString());
     } else {
       setPrice("");
     }
@@ -146,12 +146,16 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
         (c: any) => c.customerId.toString() === newCustomerId && c.status === 'ACTIVE'
       );
       if (activeContract?.items?.length) {
-        const map: Record<number, number> = {};
+        const map: Record<number, { price: number; unit: string; conversionFactor: number }> = {};
         activeContract.items.forEach((item: any) => {
-          map[item.productId] = item.contractPrice;
+          map[item.productId] = {
+            price: item.contractPrice,
+            unit: item.unit || item.product?.purchaseUnit || item.product?.unit || 'Pcs',
+            conversionFactor: Number(item.conversionFactor) || item.product?.purchaseFactor || 1
+          };
         });
         setActiveContractItems(map);
-        toast.success(`Harga Kontrak B2B "${activeContract.contractNumber}" diterapkan`);
+        toast.success(`Harga & Satuan Kontrak B2B "${activeContract.contractNumber}" diterapkan`);
       }
     } catch {}
   };
@@ -168,12 +172,14 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     const prod = products.find(p => p.id.toString() === selectedProduct);
     if (!prod) return;
 
-    const itemUnit = prod.purchaseUnit || prod.unit || 'Pcs';
+    const contractData = activeContractItems[prod.id];
+    const itemUnit = contractData?.unit || prod.purchaseUnit || prod.unit || 'Pcs';
+    const itemFactor = contractData?.conversionFactor || prod.purchaseFactor || 1;
     setItems([...items, {
       productId: prod.id,
       productName: prod.name,
       unit: itemUnit,
-      purchaseFactor: prod.purchaseFactor || 1,
+      conversionFactor: itemFactor,
       quantity: Number(quantity),
       price: Number(price),
       total: Number(quantity) * Number(price)
@@ -211,7 +217,8 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
   const totalOrder = subtotal + taxAmount;
 
   const selectedProductObj = products.find(p => p.id.toString() === selectedProduct);
-  const selectedUnit = selectedProductObj ? (selectedProductObj.purchaseUnit || selectedProductObj.unit || 'Pcs') : '';
+  const contractData = selectedProduct ? activeContractItems[Number(selectedProduct)] : null;
+  const selectedUnit = contractData?.unit || selectedProductObj?.purchaseUnit || selectedProductObj?.unit || 'Pcs';
 
   if (!isOpen) return null;
 

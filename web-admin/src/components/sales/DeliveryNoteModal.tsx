@@ -29,7 +29,7 @@ export default function DeliveryNoteModal({ isOpen, onClose, orderId }: { isOpen
                     ...item,
                     product_name: item.product?.name,
                     product_sku: item.product?.sku,
-                    product_unit: item.product?.purchaseUnit || item.product?.unit || 'Pcs'
+                    product_unit: item.unit || item.product?.purchaseUnit || item.product?.unit || 'Pcs'
                 }));
             }
             setSale(orderData);

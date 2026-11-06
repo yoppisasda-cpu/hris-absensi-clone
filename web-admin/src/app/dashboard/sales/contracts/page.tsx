@@ -14,7 +14,7 @@ export default function B2BContractsPage() {
   const [editId, setEditId] = useState<number | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [products, setProducts] = useState<any[]>([]);
-  const [contractItems, setContractItems] = useState<{ productId: string, contractPrice: string }[]>([]);
+  const [contractItems, setContractItems] = useState<{ productId: string, contractPrice: string, unit: string, conversionFactor: string }[]>([]);
   
   const [formData, setFormData] = useState({
     customerId: '',
@@ -117,7 +117,9 @@ export default function B2BContractsPage() {
     });
     setContractItems(contract.items ? contract.items.map((i: any) => ({
       productId: i.productId.toString(),
-      contractPrice: i.contractPrice.toString()
+      contractPrice: i.contractPrice.toString(),
+      unit: i.unit || i.product?.purchaseUnit || i.product?.unit || 'Pcs',
+      conversionFactor: (i.conversionFactor || i.product?.purchaseFactor || 1).toString()
     })) : []);
     setSelectedFile(null);
     setShowModal(true);
@@ -288,40 +290,76 @@ export default function B2BContractsPage() {
               <div className="pt-4 border-t border-slate-800">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-sm font-bold text-white">Daftar Produk & Harga Khusus</h3>
-                  <button type="button" onClick={() => setContractItems([...contractItems, { productId: '', contractPrice: '' }])} className="text-xs flex items-center gap-1 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-2 py-1 rounded transition-colors"><Plus className="w-3 h-3" /> Tambah Produk</button>
+                  <button type="button" onClick={() => setContractItems([...contractItems, { productId: '', contractPrice: '', unit: '', conversionFactor: '1' }])} className="text-xs flex items-center gap-1 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-2 py-1 rounded transition-colors"><Plus className="w-3 h-3" /> Tambah Produk</button>
                 </div>
                 {contractItems.length === 0 ? (
                   <div className="text-xs text-slate-500 italic text-center py-2">Belum ada produk khusus. Jika kosong, klien tetap menggunakan harga normal.</div>
                 ) : (
                   <div className="space-y-3">
-                    {contractItems.map((item, index) => (
-                      <div key={index} className="flex items-center gap-3 bg-[#0B0E14] p-3 rounded-lg border border-slate-800">
-                        <div className="flex-1">
-                          <label className="block text-[10px] font-medium text-slate-500 mb-1">Pilih Produk</label>
-                          <select required value={item.productId} className="w-full bg-transparent text-sm text-white focus:outline-none" onChange={e => {
+                    {contractItems.map((item, index) => {
+                      const p = products.find(x => x.id.toString() === item.productId);
+                      const baseUnit = p?.unit || 'Pcs';
+                      return (
+                        <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-[#0B0E14] p-3.5 rounded-xl border border-slate-800">
+                          <div className="flex-[3] w-full">
+                            <label className="block text-[10px] font-medium text-slate-500 mb-1">Pilih Produk</label>
+                            <select required value={item.productId} className="w-full bg-[#151921] border border-slate-700/60 rounded-lg p-2 text-xs text-white focus:outline-none" onChange={e => {
+                              const newItems = [...contractItems];
+                              const prodId = e.target.value;
+                              newItems[index].productId = prodId;
+                              const prod = products.find(x => x.id.toString() === prodId);
+                              if (prod) {
+                                newItems[index].unit = prod.purchaseUnit || prod.unit || 'Pcs';
+                                newItems[index].conversionFactor = (prod.purchaseFactor || 1).toString();
+                                if (!newItems[index].contractPrice) {
+                                  newItems[index].contractPrice = (prod.price > 0 ? prod.price : (prod.costPrice || 0)).toString();
+                                }
+                              }
+                              setContractItems(newItems);
+                            }}>
+                              <option value="" className="bg-[#151921]">-- Produk --</option>
+                              {products.map(p => <option key={p.id} value={p.id} className="bg-[#151921]">{p.name}</option>)}
+                            </select>
+                          </div>
+
+                          <div className="flex-[1.5] w-full">
+                            <label className="block text-[10px] font-medium text-slate-500 mb-1">Satuan Kontrak</label>
+                            <input type="text" required value={item.unit} className="w-full bg-[#151921] border border-slate-700/60 rounded-lg p-2 text-xs text-white focus:outline-none" placeholder="Kg / Pack / Botol" onChange={e => {
+                              const newItems = [...contractItems];
+                              newItems[index].unit = e.target.value;
+                              setContractItems(newItems);
+                            }} />
+                          </div>
+
+                          <div className="flex-[1.5] w-full">
+                            <label className="block text-[10px] font-medium text-slate-500 mb-1">Faktor Konversi</label>
+                            <input type="number" min="0.001" step="any" required value={item.conversionFactor} className="w-full bg-[#151921] border border-slate-700/60 rounded-lg p-2 text-xs text-indigo-400 focus:outline-none" placeholder="1" onChange={e => {
+                              const newItems = [...contractItems];
+                              newItems[index].conversionFactor = e.target.value;
+                              setContractItems(newItems);
+                            }} />
+                            <span className="text-[9px] text-slate-500 italic block mt-0.5">
+                              = {item.conversionFactor || 1} {baseUnit}
+                            </span>
+                          </div>
+
+                          <div className="flex-[2] w-full">
+                            <label className="block text-[10px] font-medium text-slate-500 mb-1">Harga Kontrak (Rp)</label>
+                            <input type="number" required value={item.contractPrice} className="w-full bg-[#151921] border border-slate-700/60 rounded-lg p-2 text-xs text-emerald-400 font-bold focus:outline-none" placeholder="25000" onChange={e => {
+                              const newItems = [...contractItems];
+                              newItems[index].contractPrice = e.target.value;
+                              setContractItems(newItems);
+                            }} />
+                          </div>
+
+                          <button type="button" onClick={() => {
                             const newItems = [...contractItems];
-                            newItems[index].productId = e.target.value;
+                            newItems.splice(index, 1);
                             setContractItems(newItems);
-                          }}>
-                            <option value="" className="bg-[#151921]">-- Produk --</option>
-                            {products.map(p => <option key={p.id} value={p.id} className="bg-[#151921]">{p.name}</option>)}
-                          </select>
+                          }} className="p-2 text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors self-end sm:self-center mt-2 sm:mt-4"><Trash2 className="w-4 h-4" /></button>
                         </div>
-                        <div className="flex-1">
-                          <label className="block text-[10px] font-medium text-slate-500 mb-1">Harga Kontrak (Rp)</label>
-                          <input type="number" required value={item.contractPrice} className="w-full bg-transparent text-sm text-white focus:outline-none" placeholder="25000" onChange={e => {
-                            const newItems = [...contractItems];
-                            newItems[index].contractPrice = e.target.value;
-                            setContractItems(newItems);
-                          }} />
-                        </div>
-                        <button type="button" onClick={() => {
-                          const newItems = [...contractItems];
-                          newItems.splice(index, 1);
-                          setContractItems(newItems);
-                        }} className="p-2 text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors self-end"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

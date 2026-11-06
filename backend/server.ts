@@ -182,6 +182,10 @@ const runAutoMigration = async () => {
     `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceNotes" TEXT`,
     `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceTotal" FLOAT DEFAULT 0`,
     `ALTER TABLE "PurchaseOrderItem" ADD COLUMN IF NOT EXISTS "initialPrice" FLOAT DEFAULT 0`,
+    `ALTER TABLE "SalesOrderItem" ADD COLUMN IF NOT EXISTS "unit" TEXT`,
+    `ALTER TABLE "SalesOrderItem" ADD COLUMN IF NOT EXISTS "conversionFactor" DOUBLE PRECISION DEFAULT 1`,
+    `ALTER TABLE "B2BContractItem" ADD COLUMN IF NOT EXISTS "unit" TEXT`,
+    `ALTER TABLE "B2BContractItem" ADD COLUMN IF NOT EXISTS "conversionFactor" DOUBLE PRECISION DEFAULT 1`,
     `ALTER TABLE "Product" ALTER COLUMN "trackStock" SET DEFAULT false`,
     // Performance indexes to prevent Disk IO exhaustion
     `CREATE INDEX IF NOT EXISTS "idx_notification_company_user_created" ON "Notification" ("companyId", "userId", "createdAt" DESC)`,
@@ -1342,6 +1346,8 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
       return {
         productId: Number(item.productId),
         quantity: q,
+        unit: item.unit ? String(item.unit) : null,
+        conversionFactor: item.conversionFactor !== undefined && item.conversionFactor !== '' ? Number(item.conversionFactor) : 1,
         price: p,
         total: t
       };
@@ -1555,7 +1561,7 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
       for (const item of order.items) {
         const product = productMap.get(item.productId);
         if (product && product.trackStock) {
-           const factor = Number(product.purchaseFactor) || 1;
+           const factor = Number((item as any).conversionFactor) || Number(product.purchaseFactor) || 1;
            const deductQty = Number(item.quantity) * factor;
 
            await tx.product.update({
@@ -1568,7 +1574,7 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
                    productId: product.id,
                    type: 'OUT',
                    quantity: deductQty,
-                   reference: `B2B Sale Order: ${order.orderNumber} (${item.quantity} ${product.purchaseUnit || product.unit || 'Pcs'})`
+                   reference: `B2B Sale Order: ${order.orderNumber} (${item.quantity} ${(item as any).unit || product.purchaseUnit || product.unit || 'Pcs'})`
                }
            });
         }
@@ -1692,7 +1698,7 @@ app.post('/api/sales/orders/:id/revert-invoice', tenantMiddleware, async (req: R
       for (const item of order.items) {
         const product = productMap.get(item.productId);
         if (product && product.trackStock) {
-           const factor = Number(product.purchaseFactor) || 1;
+           const factor = Number((item as any).conversionFactor) || Number(product.purchaseFactor) || 1;
            const reverseQty = Number(item.quantity) * factor;
 
            await tx.product.update({
@@ -1705,7 +1711,7 @@ app.post('/api/sales/orders/:id/revert-invoice', tenantMiddleware, async (req: R
                    productId: product.id,
                    type: 'IN',
                    quantity: reverseQty,
-                   reference: `Revert B2B Sale Order: ${order.orderNumber} (${item.quantity} ${product.purchaseUnit || product.unit || 'Pcs'})`
+                   reference: `Revert B2B Sale Order: ${order.orderNumber} (${item.quantity} ${(item as any).unit || product.purchaseUnit || product.unit || 'Pcs'})`
                }
            });
         }
@@ -1811,6 +1817,8 @@ app.put('/api/sales/orders/:id', tenantMiddleware, async (req: Request, res: Res
       return {
         productId: Number(item.productId),
         quantity: q,
+        unit: item.unit ? String(item.unit) : null,
+        conversionFactor: item.conversionFactor !== undefined && item.conversionFactor !== '' ? Number(item.conversionFactor) : 1,
         price: p,
         total: t
       };
@@ -22311,7 +22319,7 @@ app.get('/api/b2b-contracts', tenantMiddleware, async (req: Request, res: Respon
     const tenantId = Number((req as any).tenantId);
     const contracts = await prisma.b2BContract.findMany({
       where: { companyId: tenantId },
-      include: { customer: true, items: true },
+      include: { customer: true, items: { include: { product: true } } },
       orderBy: { createdAt: 'desc' }
     });
     res.json(contracts);
@@ -22367,11 +22375,13 @@ app.post('/api/b2b-contracts', tenantMiddleware, uploadContract.single('file'), 
         items: {
           create: parsedItems.map((item: any) => ({
             productId: Number(item.productId),
-            contractPrice: Number(item.contractPrice)
+            contractPrice: Number(item.contractPrice),
+            unit: item.unit ? String(item.unit) : null,
+            conversionFactor: item.conversionFactor !== undefined && item.conversionFactor !== '' ? Number(item.conversionFactor) : 1
           }))
         }
       },
-      include: { items: true }
+      include: { items: { include: { product: true } } }
     });
     
     await prisma.auditLog.create({
@@ -22435,11 +22445,13 @@ app.put('/api/b2b-contracts/:id', tenantMiddleware, uploadContract.single('file'
           deleteMany: {},
           create: parsedItems.map((item: any) => ({
             productId: Number(item.productId),
-            contractPrice: Number(item.contractPrice)
+            contractPrice: Number(item.contractPrice),
+            unit: item.unit ? String(item.unit) : null,
+            conversionFactor: item.conversionFactor !== undefined && item.conversionFactor !== '' ? Number(item.conversionFactor) : 1
           }))
         }
       },
-      include: { items: true }
+      include: { items: { include: { product: true } } }
     });
     
     await prisma.auditLog.create({
