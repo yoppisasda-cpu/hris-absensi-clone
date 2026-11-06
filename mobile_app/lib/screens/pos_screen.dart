@@ -48,6 +48,7 @@ class _POSScreenState extends State<POSScreen> {
   final TextEditingController _paymentReferenceController = TextEditingController();
   final TextEditingController _aivolaIdController = TextEditingController();
   double _cashReceived = 0;
+  bool _isProcessingCheckout = false;
 
   // Loyalty variables
   int? _activeCustomerId;
@@ -1416,29 +1417,47 @@ class _POSScreenState extends State<POSScreen> {
                       Expanded(
                         flex: 2,
                         child: ElevatedButton(
-                          onPressed: () {
-                            if (_selectedAccountId == null) {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text('Akun Keuangan Belum Set'),
-                                  content: Text('Silahkan buka pengaturan di Web Admin dan tambahkan Akun Keuangan (Kas/Bank) terlebih dahulu agar bisa menerima pembayaran.'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(context), child: Text('OK')),
-                                  ],
-                                ),
-                              );
-                              return;
-                            }
-                            _processCheckout(context, isModal: isModal);
-                          },
+                          onPressed: _isProcessingCheckout
+                            ? null
+                            : () {
+                              if (_selectedAccountId == null) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text('Akun Keuangan Belum Set'),
+                                    content: Text('Silahkan buka pengaturan di Web Admin dan tambahkan Akun Keuangan (Kas/Bank) terlebih dahulu agar bisa menerima pembayaran.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(context), child: Text('OK')),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+                              setPanelState(() {
+                                _isProcessingCheckout = true;
+                              });
+                              _processCheckout(context, isModal: isModal);
+                            },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue[800],
+                            backgroundColor: _isProcessingCheckout ? Colors.grey[600] : Colors.blue[800],
                             padding: EdgeInsets.symmetric(vertical: 20),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             elevation: 4,
                           ),
-                          child: Text('BAYAR SEKARANG', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                          child: _isProcessingCheckout
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text('MEMPROSES...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                                ],
+                              )
+                            : Text('BAYAR SEKARANG', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                         ),
                       ),
                     ],
@@ -1570,6 +1589,11 @@ class _POSScreenState extends State<POSScreen> {
   }
 
   Future<void> _processCheckout(BuildContext currentContext, {bool isModal = true}) async {
+    if (_isProcessingCheckout) {
+      print("[POS] Checkout already in progress, aborting duplicate attempt.");
+      return;
+    }
+    setState(() => _isProcessingCheckout = true);
     if (isModal) Navigator.pop(currentContext);
 
     // 1. Generate unique invoice number immediately on client for instant printing
@@ -1799,6 +1823,7 @@ class _POSScreenState extends State<POSScreen> {
 
   void _clearCartAndInputs() {
     setState(() {
+      _isProcessingCheckout = false;
       _cart.clear();
       _activePendingBillId = null;
       _customerNameController.clear();

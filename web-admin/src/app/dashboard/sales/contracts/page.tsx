@@ -203,7 +203,9 @@ export default function B2BContractsPage() {
                     <div className="text-sm">{format(new Date(contract.endDate), 'dd MMM yyyy')}</div>
                   </td>
                   <td className="p-4">
-                    <div className="font-medium text-emerald-400">Rp {contract.creditLimit.toLocaleString('id-ID')}</div>
+                    <div className="font-medium text-emerald-400">
+                      {contract.creditLimit > 0 ? `Rp ${contract.creditLimit.toLocaleString('id-ID')}` : 'Tanpa Batas (Unlimited)'}
+                    </div>
                     <div className="text-xs text-slate-500">Terpakai: Rp {contract.usedCredit.toLocaleString('id-ID')}</div>
                   </td>
                   <td className="p-4">
@@ -272,8 +274,10 @@ export default function B2BContractsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Limit Kredit / Piutang (Rp)</label>
-                <input type="number" value={formData.creditLimit}  required placeholder="50000000" className="w-full bg-[#0B0E14] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" onChange={e => setFormData({...formData, creditLimit: e.target.value})} />
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  Limit Kredit / Piutang (Rp) <span className="text-slate-500 font-normal">(Isi 0 jika tanpa batas / unlimited)</span>
+                </label>
+                <input type="number" value={formData.creditLimit} required placeholder="0 = Unlimited" className="w-full bg-[#0B0E14] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" onChange={e => setFormData({...formData, creditLimit: e.target.value})} />
               </div>
 
               <div>

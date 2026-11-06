@@ -84,6 +84,8 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
       setItems(order.items.map((i: any) => ({
         productId: i.productId,
         productName: i.product?.name || i.productName || "Produk",
+        unit: i.product?.purchaseUnit || i.product?.unit || "Pcs",
+        purchaseFactor: i.product?.purchaseFactor || 1,
         quantity: i.quantity,
         price: i.price,
         total: i.total
@@ -166,9 +168,12 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     const prod = products.find(p => p.id.toString() === selectedProduct);
     if (!prod) return;
 
+    const itemUnit = prod.purchaseUnit || prod.unit || 'Pcs';
     setItems([...items, {
       productId: prod.id,
       productName: prod.name,
+      unit: itemUnit,
+      purchaseFactor: prod.purchaseFactor || 1,
       quantity: Number(quantity),
       price: Number(price),
       total: Number(quantity) * Number(price)
@@ -204,6 +209,9 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const taxAmount = Math.round((subtotal * taxRate / 100) * 100) / 100;
   const totalOrder = subtotal + taxAmount;
+
+  const selectedProductObj = products.find(p => p.id.toString() === selectedProduct);
+  const selectedUnit = selectedProductObj ? (selectedProductObj.purchaseUnit || selectedProductObj.unit || 'Pcs') : '';
 
   if (!isOpen) return null;
 
@@ -428,7 +436,9 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                                     ) : null}
                                   </div>
                                   <span className="text-[8px] font-black text-slate-600 uppercase italic">
-                                    AVL: {p.stock} {p.unit || ''}
+                                    AVL: {p.purchaseFactor && p.purchaseFactor > 1 && p.purchaseUnit && p.purchaseUnit !== p.unit
+                                      ? `${((p.stock || 0) / p.purchaseFactor).toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${p.purchaseUnit} (${(p.stock || 0).toLocaleString('id-ID')} ${p.unit})`
+                                      : `${(p.stock || 0).toLocaleString('id-ID')} ${p.unit || ''}`}
                                   </span>
                                 </div>
                               </button>
@@ -440,7 +450,9 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                   </div>
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Vol</label>
+                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">
+                    Vol {selectedUnit ? `(${selectedUnit})` : ''}
+                  </label>
                   <input
                     type="number"
                     min="1"
@@ -450,7 +462,9 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">Rate</label>
+                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest italic ml-1">
+                    Rate {selectedUnit ? `/${selectedUnit}` : ''}
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -488,7 +502,9 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                       {items.map((item, idx) => (
                         <tr key={idx} className="group hover:bg-white/5 transition-colors">
                           <td className="px-8 py-5 font-black text-white text-[11px] uppercase tracking-tighter">{item.productName}</td>
-                          <td className="px-8 py-5 text-center font-black text-slate-400 text-[11px]">{item.quantity}</td>
+                          <td className="px-8 py-5 text-center font-black text-slate-400 text-[11px]">
+                            {item.quantity} <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">{item.unit || ''}</span>
+                          </td>
                           <td className="px-8 py-5 text-right font-black text-slate-500 text-[11px] tracking-widest">{formatCurrency(item.price).replace("Rp","")}</td>
                           <td className="px-8 py-5 text-right font-black text-white text-[11px] tracking-widest">{formatCurrency(item.total).replace("Rp","")}</td>
                           <td className="px-8 py-5 text-center">

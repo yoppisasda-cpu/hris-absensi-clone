@@ -1554,18 +1554,21 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
 
       for (const item of order.items) {
         const product = productMap.get(item.productId);
-        if (product && product.trackStock && (product as any).type === 'FINISHED_GOOD') {
+        if (product && product.trackStock) {
+           const factor = Number(product.purchaseFactor) || 1;
+           const deductQty = Number(item.quantity) * factor;
+
            await tx.product.update({
              where: { id: product.id },
-             data: { stock: { decrement: item.quantity } }
+             data: { stock: { decrement: deductQty } }
            });
            
            await tx.stockTransaction.create({
                data: {
                    productId: product.id,
                    type: 'OUT',
-                   quantity: item.quantity,
-                   reference: `B2B Sale Order: ${order.orderNumber}`
+                   quantity: deductQty,
+                   reference: `B2B Sale Order: ${order.orderNumber} (${item.quantity} ${product.purchaseUnit || product.unit || 'Pcs'})`
                }
            });
         }
@@ -1583,9 +1586,12 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
       });
 
       if (activeContract) {
-        const availableCredit = activeContract.creditLimit - activeContract.usedCredit;
-        if (order.totalAmount > availableCredit) {
-          throw new Error(`Limit Kredit Kontrak B2B Tidak Mencukupi! Sisa limit: Rp ${availableCredit.toLocaleString('id-ID')}`);
+        // Hanya cek sisa limit jika creditLimit > 0 (jika 0 berarti Unlimited / Tanpa Batas Limit)
+        if (activeContract.creditLimit > 0) {
+          const availableCredit = activeContract.creditLimit - activeContract.usedCredit;
+          if (order.totalAmount > availableCredit) {
+            throw new Error(`Limit Kredit Kontrak B2B Tidak Mencukupi! Sisa limit: Rp ${availableCredit.toLocaleString('id-ID')}`);
+          }
         }
         
         await tx.b2BContract.update({
@@ -1685,18 +1691,21 @@ app.post('/api/sales/orders/:id/revert-invoice', tenantMiddleware, async (req: R
 
       for (const item of order.items) {
         const product = productMap.get(item.productId);
-        if (product && product.trackStock && (product as any).type === 'FINISHED_GOOD') {
+        if (product && product.trackStock) {
+           const factor = Number(product.purchaseFactor) || 1;
+           const reverseQty = Number(item.quantity) * factor;
+
            await tx.product.update({
              where: { id: product.id },
-             data: { stock: { increment: item.quantity } }
+             data: { stock: { increment: reverseQty } }
            });
            
            await tx.stockTransaction.create({
                data: {
                    productId: product.id,
                    type: 'IN',
-                   quantity: item.quantity,
-                   reference: `Revert B2B Sale Order: ${order.orderNumber}`
+                   quantity: reverseQty,
+                   reference: `Revert B2B Sale Order: ${order.orderNumber} (${item.quantity} ${product.purchaseUnit || product.unit || 'Pcs'})`
                }
            });
         }
@@ -18821,7 +18830,7 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
     }
 
     const items = await prisma.$queryRawUnsafe(`
-      SELECT si.*, p.name as product_name, p.sku as product_sku, p.unit as product_unit
+      SELECT si.*, p.name as product_name, p.sku as product_sku, COALESCE(NULLIF(p."purchaseUnit", ''), p.unit, 'Pcs') as product_unit
       FROM "SaleItem" si
       JOIN "Product" p ON si."productId" = p.id
       WHERE si."saleId" = $1
@@ -19762,7 +19771,7 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
     }
 
     // Ambil setting diskon dari voucher "EMPLOYEE" (kecualikan STORED_VALUE / gift card)
-    const internalVoucher = await prisma.voucher.findFirst({
+    let internalVoucher = await prisma.voucher.findFirst({
       where: {
         companyId: tenantId,
         targetAudience: 'EMPLOYEE',
@@ -19771,6 +19780,22 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    // Fallback: Jika outlet belum punya voucher karyawan lokal, warisi dari grup franchise
+    if (!internalVoucher) {
+      const companyIds = await getFranchiseCompanyIds(tenantId);
+      if (companyIds.length > 1) {
+        internalVoucher = await prisma.voucher.findFirst({
+          where: {
+            companyId: { in: companyIds },
+            targetAudience: 'EMPLOYEE',
+            discountType: { not: 'STORED_VALUE' },
+            isActive: true,
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+      }
+    }
 
     res.json({
       success: true,
@@ -20098,26 +20123,26 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
       }
 
-      // B. General Rapid-Repeat / Accidental Double-Tap Deduplication Guard:
-      // Only apply when client does NOT supply a unique offlineInvoiceNumber (since offlineInvoiceNumber
-      // already deduplicates network retries/offline syncs above), and limit window to 3 seconds with matching paymentMethod.
-      if (!req.body.offlineInvoiceNumber) {
-        const threeSecondsAgo = new Date(Date.now() - 3 * 1000);
-        const recentSales = await tx.sale.findMany({
-          where: {
-            companyId: tenantId,
-            totalAmount: Number(totalAmount),
-            saleType: saleType,
-            paymentMethod: detectedNormalizedMethod,
-            createdAt: { gte: threeSecondsAgo }
-          },
-          include: { SaleItem: true },
-          orderBy: { id: 'desc' },
-          take: 5
-        });
+      // B. Universal POS Idempotency & Deduplication Guard (120-second window):
+      // Protects against accidental double-taps, network retry replays, and repeated cashier checkout attempts
+      // with identical item lists, total amount, and payment method within a 2-minute window across all tenants.
+      const twoMinutesAgo = new Date(Date.now() - 120 * 1000);
+      const recentSales = await tx.sale.findMany({
+        where: {
+          companyId: tenantId,
+          totalAmount: Number(totalAmount),
+          saleType: saleType,
+          status: { notIn: ['CANCELLED', 'VOID'] },
+          createdAt: { gte: twoMinutesAgo }
+        },
+        include: { SaleItem: true },
+        orderBy: { id: 'desc' },
+        take: 10
+      });
 
+      if (items && Array.isArray(items) && items.length > 0 && recentSales.length > 0) {
         const incomingSig = items
-          .map((i: any) => `${Number(i.productId)}:${Number(i.quantity)}:${Number(i.price)}`)
+          .map((i: any) => `${Number(i.productId || i.id)}:${Number(i.quantity || i.qty)}:${Number(i.price)}`)
           .sort()
           .join('|');
 
@@ -20128,7 +20153,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             .join('|');
 
           if (incomingSig === candidateSig) {
-            console.warn(`[POS CHECKOUT DEDUPLICATION] Blocked rapid duplicate for tenant ${tenantId} (${saleType}, Rp ${totalAmount}). Returning original sale #${candidate.id} (${candidate.invoiceNumber}).`);
+            console.warn(`[POS CHECKOUT DEDUPLICATION] Blocked duplicate checkout attempt for tenant ${tenantId} (${saleType}, Rp ${totalAmount}). Returning original sale #${candidate.id} (${candidate.invoiceNumber}).`);
             return candidate;
           }
         }
