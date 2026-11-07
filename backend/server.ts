@@ -18007,8 +18007,7 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
   // Strict isolation: POS queries, POS analytics, and cashier views must NEVER include B2B Sales Orders
   const isPosRequest = 
     req.path.startsWith('/api/pos') || 
-    query.isPos === 'true' || 
-    query.isPos === true || 
+    String(query.isPos) === 'true' || 
     query.source === 'pos' || 
     isPosViewer || 
     ['CASHIER', 'OPERATIONAL'].includes(user?.role || '');
@@ -18553,7 +18552,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const invoiceFilter = isPosViewer ? `AND (s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')` : '';
     
     let whereConditions = [`s."companyId" = ${tenantId}`, `s."status" NOT IN ('CANCELLED', 'VOID', 'RETURNED')`];
-    const isPosRequest = isPosViewer || req.query.isPos === 'true' || req.query.isPos === true || req.query.source === 'pos';
+    const isPosRequest = isPosViewer || String(req.query.isPos) === 'true' || req.query.source === 'pos';
     if (isPosRequest) {
       whereConditions.push(`s."saleType" != 'B2B'`);
       whereConditions.push(`s."invoiceNumber" NOT LIKE 'INV-PO-%'`);
