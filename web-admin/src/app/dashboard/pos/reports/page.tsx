@@ -127,7 +127,8 @@ export default function POSReportsPage() {
                     startDate,
                     endDate,
                     paymentMethod: paymentFilter,
-                    saleType: saleTypeFilter
+                    saleType: saleTypeFilter,
+                    isPos: true
                 }
             });
             setSales(salesRes.data);
@@ -224,7 +225,13 @@ export default function POSReportsPage() {
     }, [selectedBranchId, startDate, endDate, paymentFilter, saleTypeFilter]);
 
     const stats = useMemo(() => {
-        const validSales = sales.filter(s => s.status !== 'RETURNED' && s.status !== 'CANCELLED' && s.status !== 'VOID');
+        const validSales = sales.filter(s => 
+            s.status !== 'RETURNED' && 
+            s.status !== 'CANCELLED' && 
+            s.status !== 'VOID' &&
+            s.saleType !== 'B2B' &&
+            !s.invoiceNumber?.startsWith('INV-PO-')
+        );
         const gross = validSales.reduce((sum, s) => sum + Number(s.netTotalAmount !== undefined ? s.netTotalAmount : s.totalAmount), 0);
         const commission = validSales.reduce((sum, s) => sum + Number(s.totalCommission || 0), 0);
         const net = gross - commission;
@@ -298,7 +305,7 @@ export default function POSReportsPage() {
     const handleExport = () => {
         const token = localStorage.getItem('jwt_token');
         const tenantId = localStorage.getItem('currentTenantId') || '';
-        const url = `${api.defaults.baseURL}/sales/export?branchId=${selectedBranchId}&startDate=${startDate}&endDate=${endDate}&paymentMethod=${paymentFilter}&saleType=${saleTypeFilter}&token=${token}&tenantId=${tenantId}`;
+        const url = `${api.defaults.baseURL}/sales/export?isPos=true&branchId=${selectedBranchId}&startDate=${startDate}&endDate=${endDate}&paymentMethod=${paymentFilter}&saleType=${saleTypeFilter}&token=${token}&tenantId=${tenantId}`;
         window.open(url, '_blank');
     };
 

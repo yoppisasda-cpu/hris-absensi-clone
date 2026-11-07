@@ -59,8 +59,14 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
         endDate: _endDate,
       );
       
+      // Isolasi: Pastikan penjualan dari Sales Order (B2B / PO) tidak masuk ke riwayat kasir POS
+      final filteredOnline = onlineData.where((s) => 
+        s['saleType'] != 'B2B' && 
+        !(s['invoiceNumber']?.toString().startsWith('INV-PO-') ?? false)
+      ).toList();
+      
       if (mounted) {
-        setState(() => _orders = [...localData, ...onlineData]);
+        setState(() => _orders = [...localData, ...filteredOnline]);
       }
     } catch (e) {
       // Jika jaringan gagal, pastikan transaksi offline lokal tetap terlihat oleh kasir

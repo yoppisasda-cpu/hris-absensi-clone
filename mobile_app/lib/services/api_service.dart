@@ -801,7 +801,7 @@ class ApiService {
   // Tarik riwayat pesanan (Semua penjualan di cabang dengan filter tanggal / backdate)
   Future<List<dynamic>> getPosOrders({DateTime? startDate, DateTime? endDate}) async {
     try {
-      final queryParams = <String, dynamic>{};
+      final queryParams = <String, dynamic>{'isPos': 'true'};
       if (startDate != null) {
         queryParams['startDate'] = DateFormat('yyyy-MM-dd').format(startDate);
       }

@@ -206,6 +206,8 @@ const runAutoMigration = async () => {
     `CREATE INDEX IF NOT EXISTS "idx_auditlog_company_createdat" ON "AuditLog" ("companyId", "createdAt" DESC)`,
     `CREATE INDEX IF NOT EXISTS "idx_income_company_date" ON "Income" ("companyId", "date" DESC)`,
     `CREATE INDEX IF NOT EXISTS "idx_expense_company_date" ON "Expense" ("companyId", "date" DESC)`,
+    // Ensure B2B Sales Orders are never associated with a POS cashier register
+    `UPDATE "Sale" SET "cashierId" = NULL WHERE "saleType" = 'B2B' OR "invoiceNumber" LIKE 'INV-PO-%' OR id IN (SELECT "saleId" FROM "SalesOrder" WHERE "saleId" IS NOT NULL)`,
   ];
   console.log('[AUTO-MIGRATION] Checking and applying missing columns and indexes...');
   for (const sql of migrations) {
@@ -1535,7 +1537,7 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
           taxAmount: order.taxAmount || 0,
           status: 'UNPAID',
           saleType: 'B2B',
-          cashierId: userId,
+          cashierId: null, // B2B SO is a back-office/warehouse invoice, not a POS cashier register sale
           dueDate: dueDateVal,
           notes: order.notes 
             ? `${order.notes} (Dikonversi dari PO Customer: ${order.orderNumber})` 
@@ -18002,6 +18004,24 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
   let queryParams: any[] = [tenantId];
   let paramIndex = 2;
 
+  // Strict isolation: POS queries, POS analytics, and cashier views must NEVER include B2B Sales Orders
+  const isPosRequest = 
+    req.path.startsWith('/api/pos') || 
+    query.isPos === 'true' || 
+    query.isPos === true || 
+    query.source === 'pos' || 
+    isPosViewer || 
+    ['CASHIER', 'OPERATIONAL'].includes(user?.role || '');
+
+  if (isPosRequest) {
+    whereConditions.push(`(
+      s."saleType" != 'B2B' AND 
+      s."invoiceNumber" NOT LIKE 'INV-PO-%' AND 
+      (s."notes" IS NULL OR s."notes" NOT LIKE '%Dikonversi dari PO Customer%') AND
+      NOT EXISTS (SELECT 1 FROM "SalesOrder" so WHERE so."saleId" = s.id)
+    )`);
+  }
+
 
   if (status && status !== 'all') {
     const statuses = (status as string).split(',');
@@ -18533,6 +18553,13 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const invoiceFilter = isPosViewer ? `AND (s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')` : '';
     
     let whereConditions = [`s."companyId" = ${tenantId}`, `s."status" NOT IN ('CANCELLED', 'VOID', 'RETURNED')`];
+    const isPosRequest = isPosViewer || req.query.isPos === 'true' || req.query.isPos === true || req.query.source === 'pos';
+    if (isPosRequest) {
+      whereConditions.push(`s."saleType" != 'B2B'`);
+      whereConditions.push(`s."invoiceNumber" NOT LIKE 'INV-PO-%'`);
+      whereConditions.push(`(s."notes" IS NULL OR s."notes" NOT LIKE '%Dikonversi dari PO Customer%')`);
+      whereConditions.push(`NOT EXISTS (SELECT 1 FROM "SalesOrder" so WHERE so."saleId" = s.id)`);
+    }
     if (isPosViewer) {
       whereConditions.push(`(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`);
     }
@@ -19090,27 +19117,30 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
 
       await tx.$executeRawUnsafe(`UPDATE "Sale" SET "status" = $1, "updatedAt" = NOW() WHERE id = $2`, newStatus, saleId);
 
-      // 6.1 Update any Historical PosClosing covering this sale
+      // 6.1 Update any Historical PosClosing covering this sale (strictly for POS sales, not B2B/Sales Orders)
       try {
-        const saleTime = originalSale.date ? new Date(originalSale.date) : new Date(originalSale.createdAt);
-        const relatedClosings = await tx.posClosing.findMany({
-          where: {
-            companyId: tenantId,
-            startTime: { lte: saleTime },
-            endTime: { gte: saleTime }
-          }
-        });
-
-        for (const closing of relatedClosings) {
-          const isFullReturn = newStatus === 'RETURNED';
-          await tx.posClosing.update({
-            where: { id: closing.id },
-            data: {
-              totalGrossSales: Math.max(0, closing.totalGrossSales - totalRefundAmount),
-              totalNetSales: Math.max(0, closing.totalNetSales - totalRefundAmount),
-              ...(isFullReturn ? { totalTransactions: Math.max(0, closing.totalTransactions - 1) } : {})
+        const isB2bOrPo = originalSale.saleType === 'B2B' || originalSale.invoiceNumber?.startsWith('INV-PO-');
+        if (!isB2bOrPo) {
+          const saleTime = originalSale.date ? new Date(originalSale.date) : new Date(originalSale.createdAt);
+          const relatedClosings = await tx.posClosing.findMany({
+            where: {
+              companyId: tenantId,
+              startTime: { lte: saleTime },
+              endTime: { gte: saleTime }
             }
           });
+
+          for (const closing of relatedClosings) {
+            const isFullReturn = newStatus === 'RETURNED';
+            await tx.posClosing.update({
+              where: { id: closing.id },
+              data: {
+                totalGrossSales: Math.max(0, closing.totalGrossSales - totalRefundAmount),
+                totalNetSales: Math.max(0, closing.totalNetSales - totalRefundAmount),
+                ...(isFullReturn ? { totalTransactions: Math.max(0, closing.totalTransactions - 1) } : {})
+              }
+            });
+          }
         }
       } catch (closingErr) {
         console.error('Failed to adjust PosClosing during return:', closingErr);
@@ -21239,7 +21269,13 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
     const { dayStart } = getDayRange(companyTimezone);
     const startTime = lastClosing ? lastClosing.endTime : dayStart;
 
-    // 2. Find all sales since last closing
+    // 2. Find all sales since last closing (strictly POS transactions, excluding B2B Sales Orders)
+    const salesOrderSales = await prisma.salesOrder.findMany({
+      where: { companyId: tenantId, saleId: { not: null } },
+      select: { saleId: true }
+    });
+    const excludedSaleIds = salesOrderSales.map(so => so.saleId).filter(Boolean) as number[];
+
     const sales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
@@ -21247,7 +21283,13 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
           ? { OR: [{ branchId: effectiveBranchId }, { branchId: null }] }
           : {}),  // No branch filter = all company sales
         date: { gt: startTime, lte: new Date() },
-        status: { notIn: ['CANCELLED', 'VOID'] }
+        status: { notIn: ['CANCELLED', 'VOID'] },
+        saleType: { not: 'B2B' },
+        ...(excludedSaleIds.length > 0 ? { id: { notIn: excludedSaleIds } } : {}),
+        NOT: [
+          { invoiceNumber: { startsWith: 'INV-PO-' } },
+          { notes: { contains: 'Dikonversi dari PO Customer' } }
+        ]
       }
     });
 
