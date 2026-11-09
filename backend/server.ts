@@ -210,14 +210,20 @@ const runAutoMigration = async () => {
     `UPDATE "Sale" SET "cashierId" = NULL WHERE "saleType" = 'B2B' OR "invoiceNumber" LIKE 'INV-PO-%' OR id IN (SELECT "saleId" FROM "SalesOrder" WHERE "saleId" IS NOT NULL)`,
   ];
   console.log('[AUTO-MIGRATION] Checking and applying missing columns and indexes...');
+  try {
+    await prisma.$executeRawUnsafe(`SET lock_timeout = '2s'`);
+  } catch (_) { /* ignore */ }
   for (const sql of migrations) {
     try {
       await prisma.$executeRawUnsafe(sql);
     } catch (e: any) {
-      // Ignore errors (e.g., column already exists with different type)
+      // Ignore errors (e.g., column already exists with different type or locked)
       console.warn(`[AUTO-MIGRATION] Skipped: ${sql.substring(0, 60)}... | ${e.message}`);
     }
   }
+  try {
+    await prisma.$executeRawUnsafe(`SET lock_timeout = '0'`);
+  } catch (_) { /* ignore */ }
   console.log('[AUTO-MIGRATION] ✅ Done.');
 };
 
