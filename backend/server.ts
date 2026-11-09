@@ -17343,7 +17343,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           }
         }
 
-        if (voucher && voucher.isActive && isNotExpired && hasQuota && isPublicVoucher && (voucher.minPurchase === 0 || validPurchase || validQuantity)) {
+        if (voucher && voucher.isActive && isNotExpired && hasQuota && (voucher.discountType === 'STORED_VALUE' || isPublicVoucher) && (voucher.minPurchase === 0 || validPurchase || validQuantity)) {
           voucherCode = voucher.code;
           if (voucher.discountType === 'PERCENTAGE') {
             voucherDiscountAmount = discountableSubtotal * (voucher.discountValue / 100);
@@ -17351,7 +17351,8 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
               voucherDiscountAmount = voucher.maxDiscount;
             }
           } else if (voucher.discountType === 'STORED_VALUE') {
-            voucherDiscountAmount = Math.min(discountableSubtotal, voucher.currentBalance || 0);
+            // Gift card (STORED_VALUE) berlaku untuk SEMUA produk (termasuk produk no diskon / isDiscountable = false)
+            voucherDiscountAmount = Math.min(subtotal, voucher.currentBalance || 0);
           } else {
             voucherDiscountAmount = voucher.discountValue;
           }
@@ -19723,7 +19724,9 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
           voucherDiscountAmount = voucher.maxDiscount;
         }
       } else if (voucher.discountType === 'STORED_VALUE') {
-        voucherDiscountAmount = Math.min(voucher.currentBalance || 0, baseDiscountAmount);
+        // Gift card / Saldo tunai: Berlaku untuk SEMUA produk (meskipun produk disetting no diskon / isDiscountable = false).
+        // Konsepnya adalah alat bayar (tidak bayar tunai lagi), sehingga memotong hingga sisa finalTotal.
+        voucherDiscountAmount = Math.min(voucher.currentBalance || 0, finalTotal);
         voucherBalanceRemaining = (voucher.currentBalance || 0) - voucherDiscountAmount;
       } else {
         voucherDiscountAmount = Math.min(voucher.discountValue, baseDiscountAmount);
