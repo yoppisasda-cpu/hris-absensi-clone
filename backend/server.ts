@@ -4320,6 +4320,89 @@ app.post('/api/inventory/purchase-orders/:id/cancel', tenantMiddleware, async (r
   }
 });
 
+// Helper to perform safe, staged cascaded cleanup of a company and all related operational records
+async function deleteCompanyCascaded(companyId: number, tx: any) {
+  // 1. Delete child items with RESTRICT foreign keys first
+  await tx.$executeRawUnsafe(`DELETE FROM "PurchaseOrderItem" WHERE "purchaseOrderId" IN (SELECT id FROM "PurchaseOrder" WHERE "companyId" = $1) OR "productId" IN (SELECT id FROM "Product" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "SalesOrderItem" WHERE "salesOrderId" IN (SELECT id FROM "SalesOrder" WHERE "companyId" = $1) OR "productId" IN (SELECT id FROM "Product" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "SaleReturnItem" WHERE "returnId" IN (SELECT id FROM "SaleReturn" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "SaleItem" WHERE "saleId" IN (SELECT id FROM "Sale" WHERE "companyId" = $1) OR "productId" IN (SELECT id FROM "Product" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "B2BContractItem" WHERE "contractId" IN (SELECT id FROM "B2BContract" WHERE "companyId" = $1) OR "productId" IN (SELECT id FROM "Product" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "CustomerVoucher" WHERE "voucherId" IN (SELECT id FROM "Voucher" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "PointHistory" WHERE "customerId" IN (SELECT id FROM "Customer" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "CustomerAddress" WHERE "customerId" IN (SELECT id FROM "Customer" WHERE "companyId" = $1)`, companyId);
+
+  // 2. Delete Product customizations, recipes, and warehouse inventory
+  await tx.$executeRawUnsafe(`DELETE FROM "ProductRecipe" WHERE "productId" IN (SELECT id FROM "Product" WHERE "companyId" = $1) OR "materialId" IN (SELECT id FROM "Product" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "ProductCustomization" WHERE "productId" IN (SELECT id FROM "Product" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "StockTransaction" WHERE "productId" IN (SELECT id FROM "Product" WHERE "companyId" = $1)`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "WarehouseStock" WHERE "productId" IN (SELECT id FROM "Product" WHERE "companyId" = $1)`, companyId);
+
+  // 3. Delete orders, sales, closings
+  await tx.$executeRawUnsafe(`DELETE FROM "PurchaseOrder" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "SalesOrder" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "SaleReturn" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Sale" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "PendingBill" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "PosClosing" WHERE "companyId" = $1`, companyId);
+
+  // 4. Financial & Reports
+  await tx.$executeRawUnsafe(`DELETE FROM "SavedBalanceSheetReport" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Transfer" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Income" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Expense" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "FinancialAccount" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "IncomeCategory" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "ExpenseCategory" WHERE "companyId" = $1`, companyId);
+
+  // 5. Products & Categories
+  await tx.$executeRawUnsafe(`DELETE FROM "Product" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "ProductCategory" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "CustomizationGroup" WHERE "companyId" = $1`, companyId);
+
+  // 6. Warehouses, Suppliers, Customers, Contracts
+  await tx.$executeRawUnsafe(`DELETE FROM "B2BContract" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Warehouse" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Supplier" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Customer" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Voucher" WHERE "companyId" = $1`, companyId);
+
+  // 7. Users, Attendance, HR
+  await tx.$executeRawUnsafe(`DELETE FROM "Attendance" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "ShiftSchedule" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Shift" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Payroll" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Loan" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Reimbursement" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Bonus" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "OvertimeRequest" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "LeaveRequest" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "EmployeeDocument" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "EmployeeVent" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Asset" WHERE "companyId" = $1`, companyId);
+
+  // 8. Misc & Logs
+  await tx.$executeRawUnsafe(`DELETE FROM "AuditLog" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Announcement" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Banner" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Notification" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Prospect" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "IntegrationRequest" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Holiday" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "PeriodClosing" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Dividend" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Shareholder" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "ChatSession" WHERE "companyId" = $1`, companyId);
+
+  // 9. Users and Branches
+  await tx.$executeRawUnsafe(`DELETE FROM "UserAccess" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "User" WHERE "companyId" = $1`, companyId);
+  await tx.$executeRawUnsafe(`DELETE FROM "Branch" WHERE "companyId" = $1`, companyId);
+
+  // 10. Delete Company itself
+  await tx.$executeRawUnsafe(`DELETE FROM "Company" WHERE id = $1`, companyId);
+}
+
 // A2.1. Endpoint Menghapus Perusahaan (Super Admin Only)
 app.delete('/api/companies/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
@@ -4335,11 +4418,19 @@ app.delete('/api/companies/:id', tenantMiddleware, async (req: Request, res: Res
       return res.status(400).json({ error: 'Tidak dapat menghapus perusahaan sistem utama' });
     }
 
-    await prisma.company.delete({
-      where: { id: companyId }
+    const targetCompany = await prisma.company.findUnique({ where: { id: companyId } });
+    if (!targetCompany) {
+      return res.status(404).json({ error: 'Perusahaan tidak ditemukan' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await deleteCompanyCascaded(companyId, tx);
+    }, {
+      maxWait: 15000,
+      timeout: 45000
     });
 
-    res.json({ message: 'Perusahaan berhasil dihapus secara permanen' });
+    res.json({ message: `Perusahaan "${targetCompany.name}" beserta seluruh riwayat terkait berhasil dihapus secara permanen` });
   } catch (error: any) {
     console.error('Delete Company Error:', error);
     res.status(500).json({ error: 'Gagal menghapus perusahaan: ' + error.message });
@@ -18007,7 +18098,8 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
   // Strict isolation: POS queries, POS analytics, and cashier views must NEVER include B2B Sales Orders
   const isPosRequest = 
     req.path.startsWith('/api/pos') || 
-    String(query.isPos) === 'true' || 
+    query.isPos === 'true' || 
+    query.isPos === true || 
     query.source === 'pos' || 
     isPosViewer || 
     ['CASHIER', 'OPERATIONAL'].includes(user?.role || '');
