@@ -96,6 +96,7 @@ export default function POSPage() {
     const [printAgentOnline, setPrintAgentOnline] = useState(false);
     const [agentConfig, setAgentConfig] = useState<any>(null);
     const [showAgentSettingsModal, setShowAgentSettingsModal] = useState(false);
+    const showAgentSettingsModalRef = useRef(false);
     const [agentKasirIp, setAgentKasirIp] = useState("192.168.1.200");
     const [agentDapurIp, setAgentDapurIp] = useState("192.168.1.201");
     const [agentBarIp, setAgentBarIp] = useState("192.168.1.202");
@@ -289,9 +290,31 @@ export default function POSPage() {
                 const data = await res.json();
                 setPrintAgentOnline(true);
                 setAgentConfig(data.config);
-                if (data.config?.kasir?.ip) setAgentKasirIp(data.config.kasir.ip);
-                if (data.config?.dapur?.ip) setAgentDapurIp(data.config.dapur.ip);
-                if (data.config?.bar?.ip) setAgentBarIp(data.config.bar.ip);
+
+                // Jangan timpa input teks user jika user sedang membuka modal setting
+                if (!showAgentSettingsModalRef.current) {
+                    const localKasir = typeof window !== 'undefined' ? localStorage.getItem('lan_print_kasir_ip') : null;
+                    const localDapur = typeof window !== 'undefined' ? localStorage.getItem('lan_print_dapur_ip') : null;
+                    const localBar = typeof window !== 'undefined' ? localStorage.getItem('lan_print_bar_ip') : null;
+
+                    if (localKasir) {
+                        setAgentKasirIp(localKasir);
+                    } else if (data.config?.kasir?.ip) {
+                        setAgentKasirIp(data.config.kasir.ip);
+                    }
+
+                    if (localDapur) {
+                        setAgentDapurIp(localDapur);
+                    } else if (data.config?.dapur?.ip) {
+                        setAgentDapurIp(data.config.dapur.ip);
+                    }
+
+                    if (localBar) {
+                        setAgentBarIp(localBar);
+                    } else if (data.config?.bar?.ip) {
+                        setAgentBarIp(data.config.bar.ip);
+                    }
+                }
             } else {
                 setPrintAgentOnline(false);
             }
@@ -301,6 +324,14 @@ export default function POSPage() {
     };
 
     useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const localKasir = localStorage.getItem('lan_print_kasir_ip');
+            const localDapur = localStorage.getItem('lan_print_dapur_ip');
+            const localBar = localStorage.getItem('lan_print_bar_ip');
+            if (localKasir) setAgentKasirIp(localKasir);
+            if (localDapur) setAgentDapurIp(localDapur);
+            if (localBar) setAgentBarIp(localBar);
+        }
         checkPrintAgent();
         const interval = setInterval(checkPrintAgent, 12000);
         return () => clearInterval(interval);
@@ -314,6 +345,11 @@ export default function POSPage() {
                     sale: lastSale,
                     cart: lastCart,
                     companyName: companyName || "AIVOLA POS",
+                    config: {
+                        kasir: { ip: agentKasirIp.trim(), port: 9100 },
+                        dapur: { ip: agentDapurIp.trim(), port: 9100 },
+                        bar: { ip: agentBarIp.trim(), port: 9100 }
+                    }
                 };
                 const res = await fetch("http://localhost:18181/print", {
                     method: "POST",
@@ -334,16 +370,20 @@ export default function POSPage() {
     };
 
     const handleTestAgentPrint = async (target: string, ip: string) => {
+        if (!printAgentOnline) {
+            toast.error("Print Agent belum aktif. Buka folder lan-print-agent lalu jalankan start.bat / start.sh terlebih dahulu!");
+            return;
+        }
         setAgentTesting(target);
         try {
             const res = await fetch("http://localhost:18181/test-print", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ target, ip })
+                body: JSON.stringify({ target, ip: ip.trim() })
             });
             const data = await res.json();
             if (data.success) {
-                toast.success(`Test print ${target.toUpperCase()} (${ip}) berhasil!`);
+                toast.success(`Test print ${target.toUpperCase()} (${ip.trim()}) berhasil!`);
             } else {
                 toast.error(`Gagal test print: ${data.error || 'Cek koneksi printer'}`);
             }
@@ -355,27 +395,45 @@ export default function POSPage() {
     };
 
     const handleSaveAgentConfig = async () => {
-        try {
-            const newConfig = {
-                kasir: { ...agentConfig?.kasir, ip: agentKasirIp.trim() },
-                dapur: { ...agentConfig?.dapur, ip: agentDapurIp.trim() },
-                bar: { ...agentConfig?.bar, ip: agentBarIp.trim() }
-            };
-            const res = await fetch("http://localhost:18181/config", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newConfig)
-            });
-            if (res.ok) {
-                toast.success("Pengaturan IP printer berhasil disimpan!");
-                setShowAgentSettingsModal(false);
-                checkPrintAgent();
-            } else {
-                toast.error("Gagal menyimpan konfigurasi print agent");
-            }
-        } catch (e: any) {
-            toast.error(`Error: ${e.message}`);
+        const cleanKasir = agentKasirIp.trim();
+        const cleanDapur = agentDapurIp.trim();
+        const cleanBar = agentBarIp.trim();
+
+        // Selalu simpan ke localStorage browser agar tidak hilang walau agent mati / reload browser
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lan_print_kasir_ip', cleanKasir);
+            localStorage.setItem('lan_print_dapur_ip', cleanDapur);
+            localStorage.setItem('lan_print_bar_ip', cleanBar);
         }
+
+        const newConfig = {
+            kasir: { ip: cleanKasir, port: 9100, enabled: true },
+            dapur: { ip: cleanDapur, port: 9100, enabled: true },
+            bar: { ip: cleanBar, port: 9100, enabled: true }
+        };
+
+        if (printAgentOnline) {
+            try {
+                const res = await fetch("http://localhost:18181/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(newConfig)
+                });
+                if (res.ok) {
+                    toast.success("Pengaturan IP printer berhasil disimpan ke Print Agent!");
+                    setShowAgentSettingsModal(false);
+                    showAgentSettingsModalRef.current = false;
+                    checkPrintAgent();
+                    return;
+                }
+            } catch (e: any) {
+                console.error("Gagal sinkron config ke Print Agent:", e);
+            }
+        }
+
+        toast.success("Pengaturan IP printer disimpan di browser lokal!");
+        setShowAgentSettingsModal(false);
+        showAgentSettingsModalRef.current = false;
     };
 
     const fetchPendingBills = async (isSilent = false) => {
@@ -1108,8 +1166,11 @@ export default function POSPage() {
                                     <span>Customer</span>
                                 </button>
                                 <button
-                                    onClick={() => setShowAgentSettingsModal(true)}
-                                    title={printAgentOnline ? "Print Agent LAN Aktif (Klik untuk Pengaturan IP)" : "Print Agent LAN Offline (Klik untuk Petunjuk Menyalakan)"}
+                                    onClick={() => {
+                                        showAgentSettingsModalRef.current = true;
+                                        setShowAgentSettingsModal(true);
+                                    }}
+                                    title={printAgentOnline ? "Print Agent LAN Aktif (Klik untuk Pengaturan IP)" : "Print Agent LAN Offline (Klik untuk Pengaturan IP & Panduan)"}
                                     className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-[10px] font-black transition-all uppercase tracking-wider italic shadow-md active:scale-95 whitespace-nowrap ${
                                         printAgentOnline
                                             ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400 shadow-emerald-500/10"
@@ -2569,7 +2630,10 @@ export default function POSPage() {
                                 </div>
                             </div>
                             <button 
-                                onClick={() => setShowAgentSettingsModal(false)}
+                                onClick={() => {
+                                    showAgentSettingsModalRef.current = false;
+                                    setShowAgentSettingsModal(false);
+                                }}
                                 className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
                             >
                                 <X className="h-5 w-5" />
@@ -2683,18 +2747,20 @@ export default function POSPage() {
                         <div className="p-6 border-t border-white/10 bg-slate-950/70 flex items-center justify-end gap-3 shrink-0">
                             <button
                                 type="button"
-                                onClick={() => setShowAgentSettingsModal(false)}
+                                onClick={() => {
+                                    showAgentSettingsModalRef.current = false;
+                                    setShowAgentSettingsModal(false);
+                                }}
                                 className="px-5 py-2.5 rounded-xl border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 text-xs font-bold"
                             >
                                 Tutup
                             </button>
                             <button
                                 type="button"
-                                disabled={!printAgentOnline}
                                 onClick={handleSaveAgentConfig}
-                                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs disabled:opacity-50 shadow-lg shadow-blue-600/30"
+                                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
                             >
-                                Simpan Pengaturan IP
+                                <span>Simpan Pengaturan IP</span>
                             </button>
                         </div>
                     </div>

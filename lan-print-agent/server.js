@@ -32,8 +32,20 @@ function loadConfig() {
 }
 
 function saveConfig(newConfig) {
-    config = { ...config, ...newConfig };
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+    if (newConfig.kasir) config.kasir = { ...config.kasir, ...newConfig.kasir };
+    if (newConfig.dapur) config.dapur = { ...config.dapur, ...newConfig.dapur };
+    if (newConfig.bar) config.bar = { ...config.bar, ...newConfig.bar };
+    if (newConfig.port) config.port = newConfig.port;
+    try {
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+        console.log('[CONFIG] Konfigurasi IP printer diperbarui:', {
+            kasir: config.kasir?.ip,
+            dapur: config.dapur?.ip,
+            bar: config.bar?.ip
+        });
+    } catch (err) {
+        console.error('[CONFIG] Gagal menyimpan config.json:', err.message);
+    }
 }
 
 loadConfig();
@@ -139,7 +151,10 @@ const server = http.createServer((req, res) => {
 
             // 4. POST /print - 1 Button Multi-Printer Dispatch!
             if (req.url === '/print') {
-                const { sale = {}, cart = [], companyName = 'AIVOLA POS', store = {} } = payload;
+                const { sale = {}, cart = [], companyName = 'AIVOLA POS', store = {}, config: overrideConfig } = payload;
+                if (overrideConfig) {
+                    saveConfig(overrideConfig);
+                }
                 const results = {};
 
                 // A. Kasir Receipt (All Items)
