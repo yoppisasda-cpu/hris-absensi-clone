@@ -410,6 +410,7 @@ export default function POSPage() {
 
             setShowMobilePaymentModal(false);
             setSelectedMobileOrderForPayment(null);
+            setShowMobileOrdersModal(false);
             await fetchActiveMobileOrders(true);
         } catch (e: any) {
             toast.error("Gagal menyelesaikan pembayaran: " + (e.response?.data?.error || e.message));
@@ -2105,7 +2106,7 @@ export default function POSPage() {
                     </div>
 
                     {/* ON-SCREEN MODAL */}
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 animate-in fade-in duration-500 print:hidden">
+                    <div className="fixed inset-0 z-[160] flex items-center justify-center bg-[#050505]/95 backdrop-blur-2xl p-4 animate-in fade-in duration-500 print:hidden">
                     <div className="bg-slate-900 w-full max-w-sm rounded-[48px] shadow-[0_0_100px_rgba(59,130,246,0.1)] overflow-hidden animate-in zoom-in-95 duration-500 border border-white/5">
                         <div className="p-10 text-center border-b border-dashed border-white/10 bg-slate-950/30">
                             <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-[32px] border border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/10">
@@ -2603,12 +2604,26 @@ export default function POSPage() {
                                                                 Tolak
                                                             </button>
                                                             <button
+                                                                type="button"
                                                                 onClick={() => handleUpdateMobileOrderStatus(order.id, 'PROCESSING')}
                                                                 disabled={updatingOrderId === order.id}
                                                                 className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
                                                             >
                                                                 <Check className="h-3.5 w-3.5 stroke-[3px]" />
                                                                 <span>Terima Pesanan</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleOpenMobilePaymentModal(order);
+                                                                }}
+                                                                disabled={updatingOrderId === order.id}
+                                                                className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-sky-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                                                title="Bayar langsung di kasir"
+                                                            >
+                                                                <CreditCard className="h-3.5 w-3.5" />
+                                                                <span>Bayar di Kasir</span>
                                                             </button>
                                                         </>
                                                     )}
@@ -2622,7 +2637,11 @@ export default function POSPage() {
                                                                 <span>Siap Diambil</span>
                                                             </button>
                                                             <button
-                                                                onClick={() => handleOpenMobilePaymentModal(order)}
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleOpenMobilePaymentModal(order);
+                                                                }}
                                                                 disabled={updatingOrderId === order.id}
                                                                 className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
                                                             >
@@ -2633,7 +2652,11 @@ export default function POSPage() {
                                                     )}
                                                     {isReady && (
                                                         <button
-                                                            onClick={() => handleOpenMobilePaymentModal(order)}
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenMobilePaymentModal(order);
+                                                            }}
                                                             disabled={updatingOrderId === order.id}
                                                             className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
                                                         >
@@ -2643,6 +2666,7 @@ export default function POSPage() {
                                                     )}
                                                     {isPaid && (
                                                         <button
+                                                            type="button"
                                                             onClick={() => handleUpdateMobileOrderStatus(order.id, 'COMPLETED')}
                                                             disabled={updatingOrderId === order.id}
                                                             className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
@@ -2664,7 +2688,7 @@ export default function POSPage() {
 
             {/* MODAL PEMBAYARAN PESANAN MOBILE DI KASIR */}
             {showMobilePaymentModal && selectedMobileOrderForPayment && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         {/* Header */}
                         <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-slate-950/40">
