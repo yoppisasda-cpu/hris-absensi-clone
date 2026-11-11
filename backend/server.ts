@@ -17731,7 +17731,7 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
   try {
     const tenantId = Number((req as any).tenantId);
     const id = parseInt(req.params.id as string);
-    const { status, accountId } = req.body; // e.g., PROCESSING, READY, COMPLETED, CANCELLED
+    const { status, accountId, paymentMethod, paidAmount, changeAmount, paymentReference } = req.body; // e.g., PROCESSING, READY, COMPLETED, CANCELLED
 
     let sale = await prisma.sale.findUnique({
       where: { id, companyId: tenantId },
@@ -17758,19 +17758,115 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
     }
     const oldStatus = sale.status;
 
+    let finalPaymentMethod = sale.paymentMethod;
+    let normalizedMethod = 'TUNAI';
+
+    if (paymentMethod) {
+      const pmStr = String(paymentMethod).trim().toUpperCase();
+      if (pmStr.includes('QRIS')) normalizedMethod = 'QRIS';
+      else if (pmStr.includes('EDC') || pmStr.includes('DEBIT') || pmStr.includes('KREDIT') || pmStr.includes('CREDIT')) normalizedMethod = 'EDC';
+      else if (pmStr.includes('TRANSFER')) normalizedMethod = 'TRANSFER';
+      else normalizedMethod = 'TUNAI';
+      finalPaymentMethod = normalizedMethod;
+    }
+
     await prisma.$transaction(async (tx) => {
-      // 1. Update Status
+      // 0. Auto-route account if payment method changed or accountId provided
+      let finalAccountId = accountId ? parseInt(accountId) : (sale.accountId || null);
+      if (paymentMethod) {
+        let account = finalAccountId ? await tx.financialAccount.findUnique({ where: { id: finalAccountId } }) : null;
+        if (normalizedMethod === 'QRIS') {
+          const isCash = !account || account.type === 'CASH' || account.name.toLowerCase().includes('tunai') || account.name.toLowerCase().includes('cash');
+          if (isCash) {
+            const targetBankAcc = await tx.financialAccount.findFirst({
+              where: { companyId: tenantId, name: { contains: 'QRIS', mode: 'insensitive' } }
+            }) || await tx.financialAccount.findFirst({
+              where: { companyId: tenantId, type: 'BANK' }
+            });
+            if (targetBankAcc) finalAccountId = targetBankAcc.id;
+          }
+        } else if (normalizedMethod === 'EDC' || normalizedMethod === 'TRANSFER') {
+          const isCash = !account || account.type === 'CASH' || account.name.toLowerCase().includes('tunai') || account.name.toLowerCase().includes('cash');
+          if (isCash) {
+            const targetBankAcc = await tx.financialAccount.findFirst({
+              where: { companyId: tenantId, type: 'BANK' }
+            });
+            if (targetBankAcc) finalAccountId = targetBankAcc.id;
+          }
+        } else if (normalizedMethod === 'TUNAI') {
+          const isBank = account && account.type === 'BANK';
+          if (isBank || !account) {
+            const targetCashAcc = await tx.financialAccount.findFirst({
+              where: {
+                companyId: tenantId,
+                OR: [
+                  { type: 'CASH' },
+                  { name: { contains: 'Tunai', mode: 'insensitive' } },
+                  { name: { contains: 'Kas', mode: 'insensitive' } }
+                ]
+              }
+            });
+            if (targetCashAcc) finalAccountId = targetCashAcc.id;
+          }
+        }
+      }
+
+      // 0.1 Prepare updated notes with tags
+      let finalNotes = sale.notes || '';
+      if (paymentMethod) {
+        const methodTag = `[Metode: ${normalizedMethod}]`;
+        if (finalNotes.match(/\[Metode:\s*[^\]]+\]/i)) {
+          finalNotes = finalNotes.replace(/\[Metode:\s*[^\]]+\]/i, methodTag);
+        } else {
+          finalNotes = finalNotes ? `${finalNotes} ${methodTag}` : methodTag;
+        }
+
+        if (paymentReference) {
+          const refTag = `[Ref: ${String(paymentReference).trim()}]`;
+          if (finalNotes.match(/\[Ref:\s*[^\]]+\]/i)) {
+            finalNotes = finalNotes.replace(/\[Ref:\s*[^\]]+\]/i, refTag);
+          } else {
+            finalNotes = `${finalNotes} ${refTag}`;
+          }
+        }
+
+        if (paidAmount !== undefined && paidAmount !== null && paidAmount !== '') {
+          const bayarTag = `[Bayar: Rp ${Number(paidAmount).toLocaleString('id-ID')}]`;
+          if (finalNotes.match(/\[Bayar:\s*[^\]]+\]/i)) {
+            finalNotes = finalNotes.replace(/\[Bayar:\s*[^\]]+\]/i, bayarTag);
+          } else {
+            finalNotes = `${finalNotes} ${bayarTag}`;
+          }
+        }
+
+        if (changeAmount !== undefined && changeAmount !== null && changeAmount !== '') {
+          const kembaliTag = `[Kembali: Rp ${Number(changeAmount).toLocaleString('id-ID')}]`;
+          if (finalNotes.match(/\[Kembali:\s*[^\]]+\]/i)) {
+            finalNotes = finalNotes.replace(/\[Kembali:\s*[^\]]+\]/i, kembaliTag);
+          } else {
+            finalNotes = `${finalNotes} ${kembaliTag}`;
+          }
+        }
+      }
+
+      // 1. Update Status & Payment Info
       await tx.sale.update({
         where: { id },
-        data: { status, accountId: accountId ? parseInt(accountId) : sale.accountId, updatedAt: new Date() }
+        data: {
+          status,
+          accountId: finalAccountId,
+          ...(paymentMethod ? { paymentMethod: normalizedMethod } : {}),
+          ...(paymentReference ? { paymentReference: String(paymentReference).trim() } : {}),
+          notes: finalNotes,
+          updatedAt: new Date()
+        }
       });
 
-      // 2. If transitioning from PENDING to APPROVED/PROCESSING/PREPARING/PAID, run inventory & loyalty
+      // 2. If transitioning from PENDING to APPROVED/PROCESSING/PREPARING/PAID/COMPLETED, run inventory & loyalty
       if (oldStatus === 'PENDING' && ['APPROVED', 'PROCESSING', 'PREPARING', 'PAID', 'SHIPPED', 'COMPLETED'].includes(status)) {
         const totalAmount = sale.totalAmount;
         const invoiceNumber = sale.invoiceNumber;
         const finalCustomerId = sale.customerId;
-        const pointsUsedNum = (sale as any).pointsUsed || 0;
 
         // --- LOYALTY LOGIC: Earn Points on transition ---
         if (finalCustomerId) {
@@ -17785,15 +17881,40 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
             });
           }
         }
-        
-        // (Inventory already deducted at creation for PENDING orders)
+      }
 
-        // --- FINANCE LOGIC (If PAID) ---
-        const finalAccountId = accountId || sale.accountId;
-        if (status === 'PAID' && finalAccountId) {
-            // (Finance logic here if needed, similar to POST /api/sales)
+      // 3. Finance Integration on Settlement (PAID or COMPLETED with paymentMethod)
+      if (['PAID', 'COMPLETED'].includes(status) && finalAccountId) {
+        const existingIncome = await tx.income.findFirst({
+          where: { description: { contains: sale.invoiceNumber } }
+        });
+        if (!existingIncome) {
+          await tx.financialAccount.update({
+            where: { id: finalAccountId },
+            data: { balance: { increment: Number(sale.totalAmount) } }
+          });
+
+          const category = await tx.incomeCategory.upsert({
+            where: { companyId_name: { companyId: tenantId, name: 'Penjualan POS' } },
+            update: {},
+            create: { companyId: tenantId, name: 'Penjualan POS' }
+          });
+
+          await tx.income.create({
+            data: {
+              companyId: tenantId,
+              branchId: sale.branchId || null,
+              accountId: finalAccountId,
+              categoryId: category.id,
+              amount: Number(sale.totalAmount),
+              receivedFrom: `Pelanggan Mobile (${sale.invoiceNumber})`,
+              description: `Pesanan Mobile #${sale.invoiceNumber} (${paymentMethod ? normalizedMethod : (sale.paymentMethod || 'Bayar di Kasir')})`
+            }
+          });
         }
-      } else if (oldStatus !== 'CANCELLED' && oldStatus !== 'VOID' && (status === 'CANCELLED' || status === 'VOID')) {
+      }
+
+      if (oldStatus !== 'CANCELLED' && oldStatus !== 'VOID' && (status === 'CANCELLED' || status === 'VOID')) {
         // --- CANCEL/VOID LOGIC ---
         // 1. Revert Finance (Income & Balance)
         const incomes = await tx.income.findMany({ where: { description: { contains: sale.invoiceNumber } } });
@@ -17860,6 +17981,23 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
           });
       }
     });
+
+    try {
+      const updateBroadcast = {
+        id,
+        saleId: id,
+        status,
+        paymentMethod: paymentMethod ? normalizedMethod : sale.paymentMethod,
+        invoiceNumber: sale.invoiceNumber,
+        branchId: sale.branchId
+      };
+      io.to(`company_${tenantId}`).emit('mobile_order_status_updated', updateBroadcast);
+      if (sale.branchId) {
+        io.to(`branch_${sale.branchId}`).emit('mobile_order_status_updated', updateBroadcast);
+      }
+    } catch (sockErr) {
+      console.error('[Socket] Error broadcasting status update:', sockErr);
+    }
 
     res.json({ message: `Status updated to ${status}` });
   } catch (error: any) {

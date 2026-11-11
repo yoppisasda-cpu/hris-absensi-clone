@@ -34,7 +34,8 @@ import {
     PlayCircle,
     Smartphone,
     RefreshCw,
-    AlertCircle
+    AlertCircle,
+    QrCode
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -115,6 +116,15 @@ export default function POSPage() {
     const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
     const isFirstMobileFetch = useRef(true);
     const prevMobileCountRef = useRef(0);
+
+    // MOBILE ORDER PAYMENT SETTLEMENT
+    const [selectedMobileOrderForPayment, setSelectedMobileOrderForPayment] = useState<any | null>(null);
+    const [showMobilePaymentModal, setShowMobilePaymentModal] = useState(false);
+    const [mobilePaymentMethod, setMobilePaymentMethod] = useState<'TUNAI' | 'QRIS' | 'TRANSFER' | 'EDC'>('TUNAI');
+    const [mobileCashReceived, setMobileCashReceived] = useState<number | ''>('');
+    const [mobilePaymentReference, setMobilePaymentReference] = useState('');
+    const [mobileAutoPrintReceipt, setMobileAutoPrintReceipt] = useState(true);
+    const [isSubmittingMobilePayment, setIsSubmittingMobilePayment] = useState(false);
 
     // NEW EMPLOYEE DISCOUNT FIELDS
     const [employeeDiscount, setEmployeeDiscount] = useState<{type?: string, value: number, label: string} | null>(null);
@@ -316,7 +326,7 @@ export default function POSPage() {
         }
     };
 
-    const handlePrintMobileOrder = (order: any) => {
+    const handlePrintMobileOrder = (order: any, overrides?: { paymentMethod?: string; paidAmount?: number; changeAmount?: number }) => {
         const formattedCart: CartItem[] = (order.items || []).map((it: any, idx: number) => ({
             id: it.productId || it.id || idx,
             cartId: `mobile_${order.id}_${idx}`,
@@ -332,10 +342,80 @@ export default function POSPage() {
             ...order,
             items: formattedCart,
             cashierName: order.salespersonName || 'Pesanan Online',
-            paidAmount: order.totalAmount,
-            changeAmount: 0
+            paymentMethod: overrides?.paymentMethod || order.paymentMethod || 'Bayar di Kasir',
+            paidAmount: overrides?.paidAmount !== undefined ? overrides.paidAmount : order.totalAmount,
+            changeAmount: overrides?.changeAmount !== undefined ? overrides.changeAmount : 0
         });
         setShowReceipt(true);
+    };
+
+    const handleOpenMobilePaymentModal = (order: any) => {
+        setSelectedMobileOrderForPayment(order);
+        setMobilePaymentMethod('TUNAI');
+        setMobileCashReceived(Number(order.totalAmount) || 0);
+        setMobilePaymentReference('');
+        setMobileAutoPrintReceipt(true);
+        setShowMobilePaymentModal(true);
+    };
+
+    const getMobileQuickCashOptions = (total: number) => {
+        const options = [total];
+        const roundSteps = [10000, 20000, 50000, 100000];
+        for (const step of roundSteps) {
+            const rounded = Math.ceil(total / step) * step;
+            if (rounded > total && !options.includes(rounded)) {
+                options.push(rounded);
+            }
+        }
+        return options.slice(0, 4);
+    };
+
+    const handleConfirmMobilePayment = async () => {
+        if (!selectedMobileOrderForPayment) return;
+        const order = selectedMobileOrderForPayment;
+        const totalAmount = Number(order.totalAmount) || 0;
+        const cashVal = Number(mobileCashReceived) || 0;
+
+        if (mobilePaymentMethod === 'TUNAI' && cashVal < totalAmount) {
+            toast.error("Nominal uang tunai diterima kurang dari total belanja!");
+            return;
+        }
+
+        setIsSubmittingMobilePayment(true);
+        try {
+            const paidAmt = mobilePaymentMethod === 'TUNAI' ? cashVal : totalAmount;
+            const changeAmt = mobilePaymentMethod === 'TUNAI' ? Math.max(0, cashVal - totalAmount) : 0;
+
+            const payload: any = {
+                status: 'COMPLETED',
+                paymentMethod: mobilePaymentMethod,
+                paidAmount: paidAmt,
+                changeAmount: changeAmt,
+                paymentReference: mobilePaymentReference ? mobilePaymentReference.trim() : undefined
+            };
+            if (selectedAccount) {
+                payload.accountId = selectedAccount;
+            }
+
+            await api.patch(`/sales/${order.id}/status`, payload);
+            toast.success(`Pembayaran pesanan #${order.invoiceNumber} berhasil diselesaikan!`);
+
+            if (mobileAutoPrintReceipt) {
+                handlePrintMobileOrder(order, {
+                    paymentMethod: mobilePaymentMethod,
+                    paidAmount: paidAmt,
+                    changeAmount: changeAmt
+                });
+            }
+
+            setShowMobilePaymentModal(false);
+            setSelectedMobileOrderForPayment(null);
+            await fetchActiveMobileOrders(true);
+        } catch (e: any) {
+            toast.error("Gagal menyelesaikan pembayaran: " + (e.response?.data?.error || e.message));
+        } finally {
+            setIsSubmittingMobilePayment(false);
+        }
     };
 
     // Auto-sync polling every 8 detik dari tablet satelit & pesanan mobile online
@@ -2542,20 +2622,30 @@ export default function POSPage() {
                                                                 <span>Siap Diambil</span>
                                                             </button>
                                                             <button
-                                                                onClick={() => handleUpdateMobileOrderStatus(order.id, 'COMPLETED')}
+                                                                onClick={() => handleOpenMobilePaymentModal(order)}
                                                                 disabled={updatingOrderId === order.id}
                                                                 className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
                                                             >
-                                                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                <span>Selesai</span>
+                                                                <CreditCard className="h-3.5 w-3.5" />
+                                                                <span>Bayar & Selesai</span>
                                                             </button>
                                                         </>
                                                     )}
-                                                    {(isReady || isPaid) && (
+                                                    {isReady && (
+                                                        <button
+                                                            onClick={() => handleOpenMobilePaymentModal(order)}
+                                                            disabled={updatingOrderId === order.id}
+                                                            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                                        >
+                                                            <CreditCard className="h-3.5 w-3.5" />
+                                                            <span>Bayar & Selesai</span>
+                                                        </button>
+                                                    )}
+                                                    {isPaid && (
                                                         <button
                                                             onClick={() => handleUpdateMobileOrderStatus(order.id, 'COMPLETED')}
                                                             disabled={updatingOrderId === order.id}
-                                                            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                                            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
                                                         >
                                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                                             <span>Selesai / Diambil</span>
@@ -2567,6 +2657,251 @@ export default function POSPage() {
                                     );
                                 })
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL PEMBAYARAN PESANAN MOBILE DI KASIR */}
+            {showMobilePaymentModal && selectedMobileOrderForPayment && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-slate-950/40">
+                            <div>
+                                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                                    <CreditCard className="h-5 w-5 text-sky-400" />
+                                    <span>Pembayaran Pesanan Mobile</span>
+                                </h3>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Invoice #{selectedMobileOrderForPayment.invoiceNumber} &bull; {selectedMobileOrderForPayment.customerName || 'Walk-in / Guest'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => { setShowMobilePaymentModal(false); setSelectedMobileOrderForPayment(null); }}
+                                className="h-9 w-9 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl flex items-center justify-center transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 space-y-5 overflow-y-auto pos-touch-scrollbar flex-1">
+                            {/* Total Display */}
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
+                                <div>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Tagihan</span>
+                                    <div className="text-2xl font-black text-emerald-400">
+                                        Rp {Number(selectedMobileOrderForPayment.totalAmount || 0).toLocaleString('id-ID')}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                        {selectedMobileOrderForPayment.deliveryMethod || 'Dine-in'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Payment Methods Grid */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-black uppercase tracking-wider text-slate-400">Pilih Metode Pembayaran</label>
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMobilePaymentMethod('TUNAI');
+                                            setMobileCashReceived(selectedMobileOrderForPayment.totalAmount);
+                                        }}
+                                        className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all text-left ${
+                                            mobilePaymentMethod === 'TUNAI'
+                                                ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+                                                : 'bg-slate-950/60 border-white/5 text-slate-400 hover:border-white/20'
+                                        }`}
+                                    >
+                                        <div className={`p-2 rounded-xl ${mobilePaymentMethod === 'TUNAI' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+                                            <Banknote className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-black">Tunai / Cash</div>
+                                            <div className="text-[10px] text-slate-500">Bayar uang fisik</div>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setMobilePaymentMethod('QRIS')}
+                                        className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all text-left ${
+                                            mobilePaymentMethod === 'QRIS'
+                                                ? 'bg-sky-500/15 border-sky-500/50 text-white shadow-lg shadow-sky-500/10 ring-1 ring-sky-500/30'
+                                                : 'bg-slate-950/60 border-white/5 text-slate-400 hover:border-white/20'
+                                        }`}
+                                    >
+                                        <div className={`p-2 rounded-xl ${mobilePaymentMethod === 'QRIS' ? 'bg-sky-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+                                            <QrCode className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-black">QRIS</div>
+                                            <div className="text-[10px] text-slate-500">Scan QRIS kasir</div>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setMobilePaymentMethod('TRANSFER')}
+                                        className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all text-left ${
+                                            mobilePaymentMethod === 'TRANSFER'
+                                                ? 'bg-purple-500/15 border-purple-500/50 text-white shadow-lg shadow-purple-500/10 ring-1 ring-purple-500/30'
+                                                : 'bg-slate-950/60 border-white/5 text-slate-400 hover:border-white/20'
+                                        }`}
+                                    >
+                                        <div className={`p-2 rounded-xl ${mobilePaymentMethod === 'TRANSFER' ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                                            <Wallet className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-black">Transfer Bank</div>
+                                            <div className="text-[10px] text-slate-500">BCA, Mandiri, BRI, dll</div>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setMobilePaymentMethod('EDC')}
+                                        className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all text-left ${
+                                            mobilePaymentMethod === 'EDC'
+                                                ? 'bg-amber-500/15 border-amber-500/50 text-white shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/30'
+                                                : 'bg-slate-950/60 border-white/5 text-slate-400 hover:border-white/20'
+                                        }`}
+                                    >
+                                        <div className={`p-2 rounded-xl ${mobilePaymentMethod === 'EDC' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+                                            <CreditCard className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-black">Debit / EDC</div>
+                                            <div className="text-[10px] text-slate-500">Gesek kartu EDC</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Details per method */}
+                            {mobilePaymentMethod === 'TUNAI' ? (
+                                <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-white/5">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-bold text-slate-300">Uang Tunai Diterima</label>
+                                        <span className="text-[11px] text-slate-500">Pilih cepat atau ketik</span>
+                                    </div>
+
+                                    {/* Quick cash pills */}
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {getMobileQuickCashOptions(Number(selectedMobileOrderForPayment.totalAmount) || 0).map((val, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => setMobileCashReceived(val)}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                                    Number(mobileCashReceived) === val
+                                                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                                                        : 'bg-slate-900 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                                                }`}
+                                            >
+                                                {val === Number(selectedMobileOrderForPayment.totalAmount) ? 'Uang Pas' : `Rp ${val.toLocaleString('id-ID')}`}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">Rp</span>
+                                        <input
+                                            type="number"
+                                            value={mobileCashReceived}
+                                            onChange={(e) => setMobileCashReceived(e.target.value === '' ? '' : Number(e.target.value))}
+                                            placeholder="0"
+                                            className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-white font-mono font-bold text-base focus:outline-none focus:border-emerald-500/50"
+                                        />
+                                    </div>
+
+                                    {/* Kembalian */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                                        <span className="text-xs font-bold text-slate-400">Kembalian:</span>
+                                        <span className={`text-base font-black ${
+                                            Number(mobileCashReceived) >= Number(selectedMobileOrderForPayment.totalAmount)
+                                                ? 'text-emerald-400'
+                                                : 'text-red-400'
+                                        }`}>
+                                            Rp {Math.max(0, (Number(mobileCashReceived) || 0) - Number(selectedMobileOrderForPayment.totalAmount || 0)).toLocaleString('id-ID')}
+                                        </span>
+                                    </div>
+                                    {Number(mobileCashReceived) < Number(selectedMobileOrderForPayment.totalAmount) && (
+                                        <p className="text-[11px] font-semibold text-red-400">
+                                            * Uang diterima kurang dari total tagihan
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-2 bg-slate-950/60 p-4 rounded-2xl border border-white/5">
+                                    <label className="text-xs font-bold text-slate-300">
+                                        {mobilePaymentMethod === 'QRIS' 
+                                            ? 'Nomor Referensi / RRN QRIS (Opsional)' 
+                                            : mobilePaymentMethod === 'TRANSFER'
+                                                ? 'Nama Bank / No. Bukti Transfer (Opsional)'
+                                                : 'Approval Code / No. Ref Kartu (Opsional)'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={mobilePaymentReference}
+                                        onChange={(e) => setMobilePaymentReference(e.target.value)}
+                                        placeholder="Contoh: REF-123456 / BCA 0812..."
+                                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-sky-500/50"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Print Option */}
+                            <label className="flex items-center gap-2.5 cursor-pointer pt-1">
+                                <input
+                                    type="checkbox"
+                                    checked={mobileAutoPrintReceipt}
+                                    onChange={(e) => setMobileAutoPrintReceipt(e.target.checked)}
+                                    className="h-4 w-4 rounded border-white/20 bg-slate-800 text-sky-500 focus:ring-0"
+                                />
+                                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                                    <Printer className="h-3.5 w-3.5 text-sky-400" />
+                                    <span>Cetak struk otomatis setelah pembayaran dikonfirmasi</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-white/5 flex items-center justify-end gap-2.5 bg-slate-950/40">
+                            <button
+                                type="button"
+                                onClick={() => { setShowMobilePaymentModal(false); setSelectedMobileOrderForPayment(null); }}
+                                disabled={isSubmittingMobilePayment}
+                                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmMobilePayment}
+                                disabled={
+                                    isSubmittingMobilePayment || 
+                                    (mobilePaymentMethod === 'TUNAI' && Number(mobileCashReceived) < Number(selectedMobileOrderForPayment.totalAmount))
+                                }
+                                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+                            >
+                                {isSubmittingMobilePayment ? (
+                                    <>
+                                        <RefreshCw className="h-4 w-4 animate-spin" />
+                                        <span>Memproses...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        <span>Konfirmasi Bayar & Selesai</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>

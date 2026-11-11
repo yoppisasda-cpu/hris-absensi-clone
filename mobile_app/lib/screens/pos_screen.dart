@@ -15,6 +15,7 @@ import '../providers/auth_provider.dart';
 import '../services/pos_local_db_service.dart';
 import '../services/pos_sync_manager.dart';
 import 'qr_scanner_screen.dart';
+import 'package:intl/intl.dart';
 
 class POSScreen extends StatefulWidget {
   @override
@@ -2404,6 +2405,285 @@ class _POSScreenState extends State<POSScreen> {
     }
   }
 
+  void _completeMobileOrderWithPayment({
+    required Map<String, dynamic> order,
+    required String paymentMethod,
+    required double paidAmount,
+    required double changeAmount,
+    String? reference,
+    bool shouldPrint = true,
+  }) async {
+    final orderId = order['id'];
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      String normMethod = 'TUNAI';
+      final pmUpper = paymentMethod.toUpperCase();
+      if (pmUpper.contains('QRIS')) normMethod = 'QRIS';
+      else if (pmUpper.contains('TRANSFER')) normMethod = 'TRANSFER';
+      else if (pmUpper.contains('EDC')) normMethod = 'EDC';
+
+      final Map<String, dynamic> data = {
+        'status': 'COMPLETED',
+        'paymentMethod': normMethod,
+        'paidAmount': paidAmount,
+        'changeAmount': changeAmount,
+      };
+      if (reference != null && reference.isNotEmpty) {
+        data['paymentReference'] = reference;
+      }
+      if (_selectedAccountId != null) {
+        data['accountId'] = _selectedAccountId;
+      }
+
+      await _apiService.patch('/sales/$orderId/status', data);
+      Navigator.pop(context); // Close loading
+
+      final socketService = Provider.of<SocketService>(context, listen: false);
+      socketService.removeOrder(orderId);
+
+      if (shouldPrint) {
+        final printPayload = Map<String, dynamic>.from(order);
+        printPayload['paymentMethod'] = normMethod;
+        printPayload['paidAmount'] = paidAmount;
+        printPayload['changeAmount'] = changeAmount;
+        printPayload['cashierName'] = order['salespersonName'] ?? 'Kasir POS';
+        _printerService.printReceipt(printPayload);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Pembayaran #${order['invoiceNumber']} berhasil diselesaikan!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(context); // Close loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyelesaikan pembayaran: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _showMobileOrderPaymentModal(Map<String, dynamic> order) {
+    final double totalAmount = (order['totalAmount'] is num)
+        ? (order['totalAmount'] as num).toDouble()
+        : double.tryParse(order['totalAmount']?.toString() ?? '0') ?? 0;
+
+    String selectedMethod = 'Tunai';
+    double cashReceived = totalAmount;
+    final TextEditingController cashCtrl = TextEditingController(text: totalAmount.toStringAsFixed(0));
+    final TextEditingController refCtrl = TextEditingController();
+    bool autoPrint = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (modalCtx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final double change = (cashReceived - totalAmount > 0) ? (cashReceived - totalAmount) : 0;
+          final bool isCashShort = selectedMethod == 'Tunai' && cashReceived < totalAmount;
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.payment, color: Colors.blue[800]),
+                          SizedBox(width: 8),
+                          Text('Pembayaran Mobile Order', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                        ],
+                      ),
+                      IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close)),
+                    ],
+                  ),
+                  Text('Invoice #${order['invoiceNumber']} • ${order['customerName'] ?? 'Pelanggan'}', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  SizedBox(height: 16),
+
+                  // Total Tagihan Box
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(16)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('TOTAL TAGIHAN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                        Text('Rp ${NumberFormat('#,###', 'id_ID').format(totalAmount)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue[800])),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+
+                  Text('Pilih Metode Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[700])),
+                  SizedBox(height: 10),
+
+                  // Method Selection Grid
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    childAspectRatio: 2.6,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    children: ['Tunai', 'QRIS', 'Transfer', 'EDC'].map((m) {
+                      final isSelected = selectedMethod == m;
+                      return InkWell(
+                        onTap: () {
+                          setModalState(() {
+                            selectedMethod = m;
+                            if (m == 'Tunai') {
+                              cashReceived = totalAmount;
+                              cashCtrl.text = totalAmount.toStringAsFixed(0);
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: isSelected ? Colors.green[700]! : Colors.grey[300]!,
+                              width: isSelected ? 2 : 1,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            color: isSelected ? Colors.green[50] : Colors.white,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                m == 'Tunai' ? Icons.money : (m == 'QRIS' ? Icons.qr_code : (m == 'Transfer' ? Icons.account_balance : Icons.credit_card)),
+                                color: isSelected ? Colors.green[800] : Colors.grey[600],
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(m, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.w600, color: isSelected ? Colors.green[900] : Colors.black87)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  SizedBox(height: 16),
+
+                  if (selectedMethod == 'Tunai') ...[
+                    Text('Uang Tunai Diterima', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey[700])),
+                    SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: _getQuickCashOptions(totalAmount).map((val) => Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: EdgeInsets.symmetric(horizontal: 14),
+                            ),
+                            onPressed: () {
+                              setModalState(() {
+                                cashReceived = val;
+                                cashCtrl.text = val.toStringAsFixed(0);
+                              });
+                            },
+                            child: Text(val == totalAmount ? 'Uang Pas' : 'Rp ${val.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        )).toList(),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    TextField(
+                      controller: cashCtrl,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      onChanged: (val) {
+                        setModalState(() {
+                          cashReceived = double.tryParse(val) ?? 0;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        prefixText: 'Rp ',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Kembalian:', style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.bold)),
+                        Text('Rp ${change.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green[700])),
+                      ],
+                    ),
+                    if (isCashShort)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text('* Nominal uang diterima kurang dari total belanja', style: TextStyle(fontSize: 11, color: Colors.red)),
+                      ),
+                  ] else ...[
+                    Text(selectedMethod == 'QRIS' ? 'Nomor Ref / RRN QRIS (Opsional)' : (selectedMethod == 'Transfer' ? 'Nama Bank / No. Ref Transfer (Opsional)' : 'Approval Code (Opsional)'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blueGrey[700])),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: refCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Contoh: REF-123456 / BCA',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: 14),
+
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: autoPrint,
+                        activeColor: Colors.blue[800],
+                        onChanged: (val) => setModalState(() => autoPrint = val ?? true),
+                      ),
+                      Text('Cetak Struk Otomatis', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+
+                  ElevatedButton.icon(
+                    onPressed: isCashShort ? null : () {
+                      Navigator.pop(context); // Close modal
+                      _completeMobileOrderWithPayment(
+                        order: order,
+                        paymentMethod: selectedMethod,
+                        paidAmount: selectedMethod == 'Tunai' ? cashReceived : totalAmount,
+                        changeAmount: change,
+                        reference: refCtrl.text.trim(),
+                        shouldPrint: autoPrint,
+                      );
+                    },
+                    icon: Icon(Icons.check_circle, color: Colors.white),
+                    label: Text('KONFIRMASI BAYAR & SELESAI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green[700],
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showIncomingOrdersModal(BuildContext context) {
     // Auto-fetch latest active orders from API upon opening modal
     Provider.of<SocketService>(context, listen: false).fetchActiveOrders();
@@ -2547,29 +2827,119 @@ class _POSScreenState extends State<POSScreen> {
                               SizedBox(height: 16),
                               Row(
                                 children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        final printPayload = Map<String, dynamic>.from(order);
+                                        printPayload['cashierName'] = order['salespersonName'] ?? 'Kasir POS';
+                                        _printerService.printReceipt(printPayload);
+                                      },
+                                      icon: Icon(Icons.print, size: 16),
+                                      label: Text('STRUK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(vertical: 12),
+                                        foregroundColor: Colors.blueGrey[800],
+                                        side: BorderSide(color: Colors.grey[300]!),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
                                   if (status == 'PENDING') ...[
                                     Expanded(
                                       child: OutlinedButton(
                                         onPressed: () => _updateMobileOrderStatus(order['id'], 'CANCELLED'),
-                                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: BorderSide(color: Colors.red)),
-                                        child: Text('TOLAK'),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(vertical: 12),
+                                          foregroundColor: Colors.red,
+                                          side: BorderSide(color: Colors.red),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        child: Text('TOLAK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                       ),
                                     ),
-                                    SizedBox(width: 12),
+                                    SizedBox(width: 8),
                                     Expanded(
                                       child: ElevatedButton(
                                         onPressed: () => _updateMobileOrderStatus(order['id'], 'PROCESSING'),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green[700], foregroundColor: Colors.white),
-                                        child: Text('TERIMA'),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(vertical: 12),
+                                          backgroundColor: Colors.green[700],
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        child: Text('TERIMA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                       ),
                                     ),
-                                  ] else if (status == 'PROCESSING' || status == 'READY' || status == 'PAID') ...[
+                                    SizedBox(width: 8),
                                     Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () => _showMobileOrderPaymentModal(order),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(vertical: 12),
+                                          backgroundColor: Colors.blue[800],
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        child: Text('BAYAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
+                                  ] else if (status == 'PROCESSING') ...[
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => _updateMobileOrderStatus(order['id'], 'READY'),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(vertical: 12),
+                                          foregroundColor: Colors.purple,
+                                          side: BorderSide(color: Colors.purple),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        child: Text('SIAP DIAMBIL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      flex: 2,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _showMobileOrderPaymentModal(order),
+                                        icon: Icon(Icons.payment, size: 16),
+                                        label: Text('BAYAR & SELESAI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(vertical: 12),
+                                          backgroundColor: Colors.blue[800],
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                      ),
+                                    ),
+                                  ] else if (status == 'READY') ...[
+                                    Expanded(
+                                      flex: 2,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _showMobileOrderPaymentModal(order),
+                                        icon: Icon(Icons.payment, size: 16),
+                                        label: Text('BAYAR & SELESAI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(vertical: 12),
+                                          backgroundColor: Colors.blue[800],
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                      ),
+                                    ),
+                                  ] else if (status == 'PAID') ...[
+                                    Expanded(
+                                      flex: 2,
                                       child: ElevatedButton.icon(
                                         onPressed: () => _updateMobileOrderStatus(order['id'], 'COMPLETED'),
-                                        icon: Icon(Icons.check_circle),
-                                        label: Text('SELESAI / DIAMBIL'),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                                        icon: Icon(Icons.check_circle, size: 16),
+                                        label: Text('SELESAI / DIAMBIL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(vertical: 12),
+                                          backgroundColor: Colors.green[700],
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
                                       ),
                                     ),
                                   ],
