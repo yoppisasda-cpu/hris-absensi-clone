@@ -1,0 +1,22 @@
+{
+  "port": 18181,
+  "kasir": {
+    "enabled": true,
+    "ip": "192.168.1.200",
+    "port": 9100,
+    "paperWidth": 58
+  },
+  "dapur": {
+    "enabled": true,
+    "ip": "192.168.1.201",
+    "port": 9100,
+    "paperWidth": 58
+  },
+  "bar": {
+    "enabled": true,
+    "ip": "192.168.1.202",
+    "port": 9100,
+    "paperWidth": 58
+  }
+}
+

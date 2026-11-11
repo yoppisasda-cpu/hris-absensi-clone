@@ -17,12 +17,23 @@ class PrinterService {
   static const String _prefReceiptPrinterName = 'receipt_printer_name';
   static const String _prefReceiptPrinterAddress = 'receipt_printer_address';
   static const String _prefReceiptPrinterType = 'receipt_printer_type'; // 'bluetooth' or 'wifi'
+  
+  static const String _prefKitchenPrinterName = 'kitchen_printer_name';
+  static const String _prefKitchenPrinterAddress = 'kitchen_printer_address';
+  static const String _prefKitchenPrinterType = 'kitchen_printer_type'; // 'wifi' or 'bluetooth'
+
+  static const String _prefBarPrinterName = 'bar_printer_name';
+  static const String _prefBarPrinterAddress = 'bar_printer_address';
+  static const String _prefBarPrinterType = 'bar_printer_type'; // 'wifi' or 'bluetooth'
+
   static const String _prefLabelPrinterName = 'label_printer_name';
   static const String _prefLabelPrinterAddress = 'label_printer_address';
   static const String _prefLabelPrinterType = 'label_printer_type'; // 'bluetooth' or 'wifi'
+
   static const String _prefAutoPrint = 'auto_print_receipt';
-  static const String _prefAutoPrintLabel = 'auto_print_label';
   static const String _prefAutoPrintKitchen = 'auto_print_kitchen';
+  static const String _prefAutoPrintBar = 'auto_print_bar';
+  static const String _prefAutoPrintLabel = 'auto_print_label';
   
   // Store Metadata keys
   static const String prefStoreName = 'print_store_name';
@@ -54,6 +65,12 @@ class PrinterService {
       'receiptName': prefs.getString(_prefReceiptPrinterName),
       'receiptAddress': prefs.getString(_prefReceiptPrinterAddress),
       'receiptType': prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth',
+      'kitchenName': prefs.getString(_prefKitchenPrinterName),
+      'kitchenAddress': prefs.getString(_prefKitchenPrinterAddress),
+      'kitchenType': prefs.getString(_prefKitchenPrinterType) ?? 'wifi',
+      'barName': prefs.getString(_prefBarPrinterName),
+      'barAddress': prefs.getString(_prefBarPrinterAddress),
+      'barType': prefs.getString(_prefBarPrinterType) ?? 'wifi',
       'labelName': prefs.getString(_prefLabelPrinterName),
       'labelAddress': prefs.getString(_prefLabelPrinterAddress),
       'labelType': prefs.getString(_prefLabelPrinterType) ?? 'bluetooth',
@@ -109,11 +126,46 @@ class PrinterService {
     return result;
   }
 
+  Future<void> connectKitchen(String name, String address, String type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefKitchenPrinterName, name);
+    await prefs.setString(_prefKitchenPrinterAddress, address);
+    await prefs.setString(_prefKitchenPrinterType, type);
+  }
+
+  Future<void> disconnectKitchen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefKitchenPrinterName);
+    await prefs.remove(_prefKitchenPrinterAddress);
+    await prefs.remove(_prefKitchenPrinterType);
+  }
+
+  Future<void> connectBar(String name, String address, String type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefBarPrinterName, name);
+    await prefs.setString(_prefBarPrinterAddress, address);
+    await prefs.setString(_prefBarPrinterType, type);
+  }
+
+  Future<void> disconnectBar() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefBarPrinterName);
+    await prefs.remove(_prefBarPrinterAddress);
+    await prefs.remove(_prefBarPrinterType);
+  }
+
   Future<void> connectLabel(String name, String address, String type) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefLabelPrinterName, name);
     await prefs.setString(_prefLabelPrinterAddress, address);
     await prefs.setString(_prefLabelPrinterType, type);
+  }
+
+  Future<void> disconnectLabel() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefLabelPrinterName);
+    await prefs.remove(_prefLabelPrinterAddress);
+    await prefs.remove(_prefLabelPrinterType);
   }
 
   Future<void> disconnectReceipt() async {
@@ -196,26 +248,56 @@ class PrinterService {
     }
   }
 
+  Future<bool> _sendBytesToTarget(String address, String type, List<int> bytes) async {
+    if (address.trim().isEmpty) return false;
+    if (type == 'wifi') {
+      await _sendToWifiPrinter(address.trim(), bytes);
+      return true;
+    } else {
+      if (Platform.isIOS) return true;
+      try {
+        await PrintBluetoothThermal.connect(macPrinterAddress: address.trim());
+      } catch (_) {}
+      return await PrintBluetoothThermal.writeBytes(bytes);
+    }
+  }
+
+  bool _isBeverage(String name, String cat) {
+    final lowerName = name.toLowerCase();
+    final lowerCat = cat.toLowerCase();
+    final bevKeywords = [
+      'minum', 'beverage', 'drink', 'kopi', 'coffee', 'tea', 'teh', 'jus', 'juice',
+      'latte', 'espresso', 'cappuccino', 'americano', 'matcha', 'boba', 'smoothie',
+      'soda', 'syrup', 'ice', 'es ', 'shake', 'mocktail', 'cocktail', 'water', 'mineral', 'air'
+    ];
+    for (var kw in bevKeywords) {
+      if (lowerName.contains(kw) || lowerCat.contains(kw)) return true;
+    }
+    return false;
+  }
+
   double _parseNum(dynamic val) {
     if (val == null) return 0.0;
     if (val is num) return val.toDouble();
     return double.tryParse(val.toString()) ?? 0.0;
   }
 
-    Future<Map<String, bool>> getAutoPrintSettings() async {
+  Future<Map<String, bool>> getAutoPrintSettings() async {
     final prefs = await SharedPreferences.getInstance();
     return {
       'receipt': prefs.getBool(_prefAutoPrint) ?? false,
       'label': prefs.getBool(_prefAutoPrintLabel) ?? false,
       'kitchen': prefs.getBool(_prefAutoPrintKitchen) ?? false,
+      'bar': prefs.getBool(_prefAutoPrintBar) ?? false,
     };
   }
 
-  Future<void> saveAutoPrintSettings(bool receipt, bool label, bool kitchen) async {
+  Future<void> saveAutoPrintSettings(bool receipt, bool label, bool kitchen, [bool bar = false]) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefAutoPrint, receipt);
     await prefs.setBool(_prefAutoPrintLabel, label);
     await prefs.setBool(_prefAutoPrintKitchen, kitchen);
+    await prefs.setBool(_prefAutoPrintBar, bar);
   }
 
   Future<bool> printReceipt(Map<String, dynamic> saleData) async {
@@ -376,37 +458,109 @@ class PrinterService {
     }
   }
 
+  Future<bool> printTestKitchen() async {
+    final prefs = await SharedPreferences.getInstance();
+    final type = prefs.getString(_prefKitchenPrinterType) ?? 'wifi';
+    final address = prefs.getString(_prefKitchenPrinterAddress) ?? prefs.getString(_prefReceiptPrinterAddress);
+    if (address == null || address.isEmpty) return false;
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+    List<int> bytes = [];
+
+    bytes += generator.text('TEST PRINTER DAPUR', styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    bytes += generator.feed(1);
+    bytes += generator.text('Target: DAPUR (FOOD)', styles: PosStyles(align: PosAlign.center, bold: true));
+    bytes += generator.text('Koneksi: $type ($address)', styles: PosStyles(align: PosAlign.center));
+    bytes += generator.text(DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()), styles: PosStyles(align: PosAlign.center));
+    bytes += generator.feed(1);
+    bytes += generator.cut();
+
+    return await _sendBytesToTarget(address, type, bytes);
+  }
+
+  Future<bool> printTestBar() async {
+    final prefs = await SharedPreferences.getInstance();
+    final type = prefs.getString(_prefBarPrinterType) ?? 'wifi';
+    final address = prefs.getString(_prefBarPrinterAddress) ?? prefs.getString(_prefReceiptPrinterAddress);
+    if (address == null || address.isEmpty) return false;
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+    List<int> bytes = [];
+
+    bytes += generator.text('TEST PRINTER BAR', styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    bytes += generator.feed(1);
+    bytes += generator.text('Target: BAR (BEVERAGE)', styles: PosStyles(align: PosAlign.center, bold: true));
+    bytes += generator.text('Koneksi: $type ($address)', styles: PosStyles(align: PosAlign.center));
+    bytes += generator.text(DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()), styles: PosStyles(align: PosAlign.center));
+    bytes += generator.feed(1);
+    bytes += generator.cut();
+
+    return await _sendBytesToTarget(address, type, bytes);
+  }
+
   Future<bool> printKitchenReceipt(Map<String, dynamic> saleData) async {
-    if (!_isConnected) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final kitchenAddress = prefs.getString(_prefKitchenPrinterAddress);
+    final kitchenType = prefs.getString(_prefKitchenPrinterType) ?? 'wifi';
+
+    final targetAddress = (kitchenAddress != null && kitchenAddress.isNotEmpty)
+        ? kitchenAddress
+        : prefs.getString(_prefReceiptPrinterAddress);
+    final targetType = (kitchenAddress != null && kitchenAddress.isNotEmpty)
+        ? kitchenType
+        : (prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth');
+
+    if (targetAddress == null || targetAddress.isEmpty) return false;
+
+    final List allItems = saleData['items'] ?? [];
+    final List foodItems = allItems.where((item) {
+      final fnb = item['fnbType']?.toString().toUpperCase();
+      if (fnb == 'FOOD') return true;
+      if (fnb == 'BEVERAGE') return false;
+      final name = (item['name'] ?? '').toString();
+      final cat = (item['categoryName'] ?? item['category'] ?? '').toString();
+      return !_isBeverage(name, cat);
+    }).toList();
+
+    if (foodItems.isEmpty) return true;
 
     List<int> bytes = [];
     final profile = await CapabilityProfile.load();
     final generator = Generator(PaperSize.mm58, profile);
 
     // Header
-    bytes += generator.text('*** KITCHEN ORDER ***', styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    bytes += generator.text('*** DAPUR / KITCHEN ***', styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
     bytes += generator.feed(1);
     
     bytes += generator.text('Inv: ${saleData['invoiceNumber'] ?? '-'}', styles: PosStyles(bold: true));
     if (saleData['customerName'] != null && saleData['customerName'].toString().isNotEmpty) {
-      bytes += generator.text('Pelanggan: ${saleData['customerName']}');
+      bytes += generator.text('Tamu/Meja: ${saleData['customerName']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
     }
     bytes += generator.text('Waktu: ${DateFormat('dd-MM HH:mm').format(DateTime.now())}');
-    final String kitchenType = saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')));
-    bytes += generator.text('Tipe : $kitchenType', styles: PosStyles(bold: true));
+    final String kitchenTypeStr = saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')));
+    bytes += generator.text('Tipe : $kitchenTypeStr', styles: PosStyles(bold: true));
+    
+    if (saleData['notes'] != null && saleData['notes'].toString().trim().isNotEmpty) {
+      bytes += generator.feed(1);
+      bytes += generator.text('Catatan: ${saleData['notes']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    }
     bytes += generator.hr();
 
     // Items
-    final List items = saleData['items'] ?? [];
-    for (var item in items) {
+    for (var item in foodItems) {
        bytes += generator.text('${item['quantity']}x ${item['name']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
        
        // Add Modifiers
        final List? modifiers = item['modifiers'];
        if (modifiers != null && modifiers.isNotEmpty) {
          for (var mod in modifiers) {
-           bytes += generator.text('  [ ] ${mod['optionName'] ?? mod['name']}', styles: PosStyles(fontType: PosFontType.fontB));
+           bytes += generator.text('  [ ] ${mod['optionName'] ?? mod['name']}', styles: PosStyles(bold: true, fontType: PosFontType.fontB));
          }
+       }
+       if (item['notes'] != null && item['notes'].toString().trim().isNotEmpty) {
+         bytes += generator.text('  Ket: ${item['notes']}', styles: PosStyles(fontType: PosFontType.fontB));
        }
        bytes += generator.feed(1);
     }
@@ -414,18 +568,78 @@ class PrinterService {
     bytes += generator.feed(1);
     bytes += generator.cut();
 
+    return await _sendBytesToTarget(targetAddress, targetType, bytes);
+  }
+
+  Future<bool> printBarReceipt(Map<String, dynamic> saleData) async {
     final prefs = await SharedPreferences.getInstance();
-    final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
-    final address = prefs.getString(_prefReceiptPrinterAddress);
+    final barAddress = prefs.getString(_prefBarPrinterAddress);
+    final barType = prefs.getString(_prefBarPrinterType) ?? 'wifi';
+
+    final targetAddress = (barAddress != null && barAddress.isNotEmpty)
+        ? barAddress
+        : prefs.getString(_prefReceiptPrinterAddress);
+    final targetType = (barAddress != null && barAddress.isNotEmpty)
+        ? barType
+        : (prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth');
+
+    if (targetAddress == null || targetAddress.isEmpty) return false;
+
+    final List allItems = saleData['items'] ?? [];
+    final List beverageItems = allItems.where((item) {
+      final fnb = item['fnbType']?.toString().toUpperCase();
+      if (fnb == 'BEVERAGE') return true;
+      if (fnb == 'FOOD') return false;
+      final name = (item['name'] ?? '').toString();
+      final cat = (item['categoryName'] ?? item['category'] ?? '').toString();
+      return _isBeverage(name, cat);
+    }).toList();
+
+    if (beverageItems.isEmpty) return true;
+
+    List<int> bytes = [];
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+
+    // Header
+    bytes += generator.text('*** BAR / MINUMAN ***', styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    bytes += generator.feed(1);
     
-    if (type == 'wifi' && address != null) {
-      await _sendToWifiPrinter(address, bytes);
-      return true;
+    bytes += generator.text('Inv: ${saleData['invoiceNumber'] ?? '-'}', styles: PosStyles(bold: true));
+    if (saleData['customerName'] != null && saleData['customerName'].toString().isNotEmpty) {
+      bytes += generator.text('Tamu/Meja: ${saleData['customerName']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
     }
+    bytes += generator.text('Waktu: ${DateFormat('dd-MM HH:mm').format(DateTime.now())}');
+    final String barTypeStr = saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')));
+    bytes += generator.text('Tipe : $barTypeStr', styles: PosStyles(bold: true));
 
-    if (Platform.isIOS) return true; // Bypass on iOS
+    if (saleData['notes'] != null && saleData['notes'].toString().trim().isNotEmpty) {
+      bytes += generator.feed(1);
+      bytes += generator.text('Catatan: ${saleData['notes']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    }
+    bytes += generator.hr();
 
-    return await PrintBluetoothThermal.writeBytes(bytes);
+    // Items
+    for (var item in beverageItems) {
+       bytes += generator.text('${item['quantity']}x ${item['name']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+       
+       // Add Modifiers
+       final List? modifiers = item['modifiers'];
+       if (modifiers != null && modifiers.isNotEmpty) {
+         for (var mod in modifiers) {
+           bytes += generator.text('  [ ] ${mod['optionName'] ?? mod['name']}', styles: PosStyles(bold: true, fontType: PosFontType.fontB));
+         }
+       }
+       if (item['notes'] != null && item['notes'].toString().trim().isNotEmpty) {
+         bytes += generator.text('  Ket: ${item['notes']}', styles: PosStyles(fontType: PosFontType.fontB));
+       }
+       bytes += generator.feed(1);
+    }
+    bytes += generator.hr();
+    bytes += generator.feed(1);
+    bytes += generator.cut();
+
+    return await _sendBytesToTarget(targetAddress, targetType, bytes);
   }
 
 

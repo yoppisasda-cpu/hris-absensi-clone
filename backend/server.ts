@@ -19483,6 +19483,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
         priceTiktok: true,
         imageUrl: true,
         categoryId: true,
+        fnbType: true,
         trackStock: true,
         isAutoDeduct: true,
         isDiscountable: true,

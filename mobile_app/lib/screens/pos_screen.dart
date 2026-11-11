@@ -359,6 +359,8 @@ class _POSScreenState extends State<POSScreen> {
           'isAutoDeduct': product['isAutoDeduct'] == true,
           'isDiscountable': isDisc,
           'modifiers': modifiers,
+          'fnbType': product['fnbType'] ?? 'OTHER',
+          'categoryId': product['categoryId'],
         });
       }
       _recalculateEmployeeDiscount();
@@ -1640,16 +1642,19 @@ class _POSScreenState extends State<POSScreen> {
       'deliveryMethod': deliveryMethod,
     };
 
-    // 2. INSTANT PRINT: Send command immediately to thermal/label/kitchen printers (<0.1s)
+    // 2. INSTANT PRINT: Send command immediately to thermal/label/kitchen/bar printers (<0.1s)
     _printerService.getAutoPrintSettings().then((settings) {
       if (settings['receipt'] == true) {
         _printerService.printReceipt(saleData);
       }
-      if (settings['label'] == true) {
-        _printerService.printStickerLabels(saleData);
-      }
       if (settings['kitchen'] == true) {
         _printerService.printKitchenReceipt(saleData);
+      }
+      if (settings['bar'] == true) {
+        _printerService.printBarReceipt(saleData);
+      }
+      if (settings['label'] == true) {
+        _printerService.printStickerLabels(saleData);
       }
     });
 
@@ -1774,23 +1779,34 @@ class _POSScreenState extends State<POSScreen> {
                 ),
                 SizedBox(height: 8),
                 ElevatedButton.icon(
+                  onPressed: () => _printerService.printKitchenReceipt(saleData),
+                  icon: Icon(Icons.restaurant, color: Colors.white),
+                  label: Text('CETAK DAPUR (MAKANAN)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.orange[800],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                SizedBox(height: 8),
+                ElevatedButton.icon(
+                  onPressed: () => _printerService.printBarReceipt(saleData),
+                  icon: Icon(Icons.local_cafe, color: Colors.white),
+                  label: Text('CETAK BAR (MINUMAN)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.teal[800],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                SizedBox(height: 8),
+                ElevatedButton.icon(
                   onPressed: () => _printerService.printStickerLabels(saleData),
                   icon: Icon(Icons.label_important_outline, color: Colors.white),
                   label: Text('CETAK LABEL STICKER', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: Colors.amber[800],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: () => _printerService.printKitchenReceipt(saleData),
-                  icon: Icon(Icons.restaurant, color: Colors.white),
-                  label: Text('CETAK DAPUR', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.orange[800],
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),

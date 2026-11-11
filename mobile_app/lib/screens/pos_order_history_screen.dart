@@ -419,6 +419,30 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                         label: Text('DAPUR', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal[800],
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          final printData = Map<String, dynamic>.from({
+                            ...detail,
+                            'items': (detail['items'] as List).map((it) => Map<String, dynamic>.from({
+                              ...it,
+                              'name': it['product_name'],
+                              'modifiers': it['modifiers'],
+                            })).toList(),
+                          });
+                          final printer = Provider.of<PrinterService>(context, listen: false);
+                          printer.printBarReceipt(printData);
+                        },
+                        icon: Icon(Icons.local_cafe),
+                        label: Text('BAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
                     if (detail['isOffline'] != true) ...[
                       SizedBox(width: 8),
                       Expanded(
