@@ -213,7 +213,7 @@ class _CartScreenState extends State<CartScreen> {
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: primaryColor.withOpacity(0.1)),
             child: item.product.imageUrl != null
                 ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(item.product.imageUrl!, fit: BoxFit.cover))
-                : Icon(Icons.coffee, color: primaryColor),
+                : Icon(Icons.restaurant_rounded, color: primaryColor),
           ),
           SizedBox(width: 15),
           Expanded(

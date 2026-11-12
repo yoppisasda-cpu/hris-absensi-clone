@@ -140,7 +140,7 @@ class WalletScreen extends StatelessWidget {
       children: [
         Text("Recent Transactions", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         SizedBox(height: 15),
-        _buildTransactionItem("Coffee Order #8821", "- Rp 45.000", "Yesterday", Icons.shopping_bag_outlined, Colors.redAccent),
+        _buildTransactionItem("Order #8821", "- Rp 45.000", "Yesterday", Icons.shopping_bag_outlined, Colors.redAccent),
         _buildTransactionItem("Top Up via Bank Transfer", "+ Rp 500.000", "28 Apr", Icons.account_balance_wallet_outlined, Colors.greenAccent),
         _buildTransactionItem("Voucher Cashback", "+ Rp 5.000", "27 Apr", Icons.confirmation_number_outlined, Colors.orangeAccent),
       ],

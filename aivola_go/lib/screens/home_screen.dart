@@ -17,6 +17,7 @@ import 'merchant_selection_screen.dart';
 import 'login_screen.dart';
 import '../providers/branding_provider.dart';
 import 'package:flutter/gestures.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../models/voucher.dart' as model;
 
@@ -40,6 +41,27 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedCategoryId = 0; // 0 for "All"
   int _currentIndex = 0;
   final ScrollController _categoryScrollController = ScrollController();
+  String _customerGreeting = "Selamat Datang!";
+
+  Future<void> _loadCustomerGreeting() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString('userName');
+      if (name != null && name.trim().isNotEmpty && !name.toLowerCase().contains('coffee lover')) {
+        if (mounted) {
+          setState(() {
+            _customerGreeting = "Hi, ${name.trim()}!";
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _customerGreeting = "Selamat Datang!";
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -50,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _loadCustomerGreeting();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final brandingProvider = Provider.of<BrandingProvider>(context, listen: false);
       final branchProvider = Provider.of<BranchProvider>(context, listen: false);
@@ -163,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     Text(
-                      "Hi, Coffee Lover!", 
+                      _customerGreeting, 
                       style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -448,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         errorBuilder: (context, error, stackTrace) => Icon(Icons.broken_image_outlined, color: Colors.white10),
                       ),
                     ) 
-                  : Center(child: Icon(Icons.coffee, size: 30, color: primaryColor.withOpacity(0.3))),
+                  : Center(child: Icon(Icons.restaurant_rounded, size: 30, color: primaryColor.withOpacity(0.3))),
               ),
             ),
             Padding(

@@ -23,7 +23,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _userName = "Coffee Lover";
+  String _userName = "Pelanggan Setia";
   String _userEmail = "customer@aivola.id";
   String? _userAvatar;
   int _points = 0;
@@ -41,7 +41,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     // Initial load from cache
     setState(() {
-      _userName = prefs.getString('userName') ?? "Coffee Lover";
+      final cachedName = prefs.getString('userName');
+      _userName = (cachedName != null && cachedName.isNotEmpty && !cachedName.toLowerCase().contains('coffee lover'))
+          ? cachedName
+          : "Pelanggan Setia";
       _userEmail = prefs.getString('userEmail') ?? "customer@aivola.id"; 
       _userAvatar = prefs.getString('userAvatar');
       _points = prefs.getInt('userPoints') ?? 0;

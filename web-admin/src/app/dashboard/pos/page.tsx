@@ -35,7 +35,11 @@ import {
     Smartphone,
     RefreshCw,
     AlertCircle,
-    QrCode
+    QrCode,
+    Store,
+    MapPin,
+    Phone,
+    FileText
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -101,6 +105,13 @@ export default function POSPage() {
     const [agentDapurIp, setAgentDapurIp] = useState("192.168.1.201");
     const [agentBarIp, setAgentBarIp] = useState("192.168.1.202");
     const [agentTesting, setAgentTesting] = useState<string | null>(null);
+
+    // RECEIPT IDENTITY STATES
+    const [printerSettingsTab, setPrinterSettingsTab] = useState<'identity' | 'printers'>('identity');
+    const [receiptStoreName, setReceiptStoreName] = useState<string>('');
+    const [receiptStoreAddress, setReceiptStoreAddress] = useState<string>('');
+    const [receiptStorePhone, setReceiptStorePhone] = useState<string>('');
+    const [receiptStoreFooter, setReceiptStoreFooter] = useState<string>('Terima Kasih Atas Kunjungan Anda');
 
     // MODIFIER MODAL
     const [modifierProduct, setModifierProduct] = useState<Product | null>(null);
@@ -235,19 +246,39 @@ export default function POSPage() {
             // Force manual selection to prevent accidental usage of default account
             setSelectedAccount(null);
 
-            // Fetch company profile for customer display header
+            // Fetch company profile for customer display header & receipt metadata
             try {
                 const compRes = await api.get('/companies/my');
                 if (compRes.data?.name) {
                     setCompanyName(compRes.data.name);
                     setCompanyLogo(compRes.data.logoUrl || null);
+                    if (typeof window !== 'undefined' && !localStorage.getItem('pos_receipt_store_name')) {
+                        setReceiptStoreName(compRes.data.name);
+                    }
+                }
+                if (compRes.data?.address && typeof window !== 'undefined' && !localStorage.getItem('pos_receipt_store_address')) {
+                    setReceiptStoreAddress(compRes.data.address);
+                }
+                if (compRes.data?.phone && typeof window !== 'undefined' && !localStorage.getItem('pos_receipt_store_phone')) {
+                    setReceiptStorePhone(compRes.data.phone);
                 }
             } catch (e) {
                 try {
                     const compRes = await api.get('/companies/accessible');
                     const tId = localStorage.getItem('currentTenantId');
                     const currentComp = compRes.data?.find((c: any) => c.id.toString() === tId);
-                    if (currentComp?.name) setCompanyName(currentComp.name);
+                    if (currentComp?.name) {
+                        setCompanyName(currentComp.name);
+                        if (typeof window !== 'undefined' && !localStorage.getItem('pos_receipt_store_name')) {
+                            setReceiptStoreName(currentComp.name);
+                        }
+                    }
+                    if (currentComp?.address && typeof window !== 'undefined' && !localStorage.getItem('pos_receipt_store_address')) {
+                        setReceiptStoreAddress(currentComp.address);
+                    }
+                    if (currentComp?.phone && typeof window !== 'undefined' && !localStorage.getItem('pos_receipt_store_phone')) {
+                        setReceiptStorePhone(currentComp.phone);
+                    }
                 } catch (err) {}
             }
 
@@ -331,6 +362,16 @@ export default function POSPage() {
             if (localKasir) setAgentKasirIp(localKasir);
             if (localDapur) setAgentDapurIp(localDapur);
             if (localBar) setAgentBarIp(localBar);
+
+            const savedStoreName = localStorage.getItem('pos_receipt_store_name');
+            const savedStoreAddress = localStorage.getItem('pos_receipt_store_address');
+            const savedStorePhone = localStorage.getItem('pos_receipt_store_phone');
+            const savedStoreFooter = localStorage.getItem('pos_receipt_store_footer');
+
+            if (savedStoreName) setReceiptStoreName(savedStoreName);
+            if (savedStoreAddress) setReceiptStoreAddress(savedStoreAddress);
+            if (savedStorePhone) setReceiptStorePhone(savedStorePhone);
+            if (savedStoreFooter) setReceiptStoreFooter(savedStoreFooter);
         }
         checkPrintAgent();
         const interval = setInterval(checkPrintAgent, 12000);
@@ -338,13 +379,20 @@ export default function POSPage() {
     }, []);
 
     const handlePrintAll = async () => {
+        const finalDisplayName = receiptStoreName.trim() || companyName || "AIVOLA POS";
         if (printAgentOnline) {
             try {
                 toast.loading("Mengirim ke printer jaringan...", { id: "agent-print" });
                 const payload = {
                     sale: lastSale,
                     cart: lastCart,
-                    companyName: companyName || "AIVOLA POS",
+                    companyName: finalDisplayName,
+                    store: {
+                        name: finalDisplayName,
+                        address: receiptStoreAddress.trim(),
+                        phone: receiptStorePhone.trim(),
+                        footer: receiptStoreFooter.trim()
+                    },
                     config: {
                         kasir: { ip: agentKasirIp.trim(), port: 9100 },
                         dapur: { ip: agentDapurIp.trim(), port: 9100 },
@@ -398,12 +446,21 @@ export default function POSPage() {
         const cleanKasir = agentKasirIp.trim();
         const cleanDapur = agentDapurIp.trim();
         const cleanBar = agentBarIp.trim();
+        const cleanStoreName = receiptStoreName.trim();
+        const cleanStoreAddress = receiptStoreAddress.trim();
+        const cleanStorePhone = receiptStorePhone.trim();
+        const cleanStoreFooter = receiptStoreFooter.trim();
 
         // Selalu simpan ke localStorage browser agar tidak hilang walau agent mati / reload browser
         if (typeof window !== 'undefined') {
             localStorage.setItem('lan_print_kasir_ip', cleanKasir);
             localStorage.setItem('lan_print_dapur_ip', cleanDapur);
             localStorage.setItem('lan_print_bar_ip', cleanBar);
+
+            localStorage.setItem('pos_receipt_store_name', cleanStoreName);
+            localStorage.setItem('pos_receipt_store_address', cleanStoreAddress);
+            localStorage.setItem('pos_receipt_store_phone', cleanStorePhone);
+            localStorage.setItem('pos_receipt_store_footer', cleanStoreFooter);
         }
 
         const newConfig = {
@@ -420,7 +477,7 @@ export default function POSPage() {
                     body: JSON.stringify(newConfig)
                 });
                 if (res.ok) {
-                    toast.success("Pengaturan IP printer berhasil disimpan ke Print Agent!");
+                    toast.success("Pengaturan identitas struk & printer berhasil disimpan!");
                     setShowAgentSettingsModal(false);
                     showAgentSettingsModalRef.current = false;
                     checkPrintAgent();
@@ -431,7 +488,7 @@ export default function POSPage() {
             }
         }
 
-        toast.success("Pengaturan IP printer disimpan di browser lokal!");
+        toast.success("Pengaturan identitas struk berhasil disimpan!");
         setShowAgentSettingsModal(false);
         showAgentSettingsModalRef.current = false;
     };
@@ -2232,9 +2289,17 @@ export default function POSPage() {
 
                     {/* HIDDEN PRINTABLE RECEIPT */}
                     <div id="thermal-receipt" className="hidden print:block font-mono text-[11px] p-2 bg-white text-black w-[58mm] leading-tight">
-                        <div className="text-center mb-4">
-                            <h2 className="font-bold text-sm uppercase">{companyName || 'AIVOLA POS'}</h2>
-                            <p className="text-[10px]">STRUK PEMBAYARAN RESMI</p>
+                        <div className="text-center mb-3">
+                            {companyLogo && (
+                                <div className="flex justify-center mb-2">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={companyLogo} alt="Logo" className="h-10 max-w-[120px] object-contain grayscale" />
+                                </div>
+                            )}
+                            <h2 className="font-bold text-sm uppercase">{receiptStoreName || companyName || 'AIVOLA POS'}</h2>
+                            {receiptStoreAddress && <p className="text-[10px] leading-snug">{receiptStoreAddress}</p>}
+                            {receiptStorePhone && <p className="text-[10px]">Telp: {receiptStorePhone}</p>}
+                            <p className="text-[9px] mt-1 text-slate-600">STRUK PEMBAYARAN RESMI</p>
                         </div>
                         
                         <div className="border-t border-dashed border-black py-2 mb-2">
@@ -2298,8 +2363,8 @@ export default function POSPage() {
                         </div>
 
                         <div className="text-center mt-4">
-                            <p>Terima kasih atas kunjungan Anda!</p>
-                            <p className="text-[9px] mt-1">Powered by Aivola</p>
+                            <p>{receiptStoreFooter || 'Terima kasih atas kunjungan Anda!'}</p>
+                            <p className="text-[9px] mt-1 text-gray-500">Powered by Aivola</p>
                         </div>
 
                         {/* 2. TIKET DAPUR (KITCHEN) - Otomatis jika terdapat menu makanan */}
@@ -2604,7 +2669,7 @@ export default function POSPage() {
                 </div>
             )}
 
-            {/* PRINT AGENT LAN SETTINGS MODAL */}
+            {/* PRINT & RECEIPT SETTINGS MODAL */}
             {showAgentSettingsModal && (
                 <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-slate-900 border border-white/10 w-full max-w-xl max-h-[90vh] rounded-[36px] shadow-2xl flex flex-col overflow-hidden text-white animate-in zoom-in-95 duration-200">
@@ -2614,17 +2679,17 @@ export default function POSPage() {
                                 <div className={`h-11 w-11 rounded-2xl flex items-center justify-center border ${
                                     printAgentOnline
                                         ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                                        : "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                                        : "bg-blue-500/15 border-blue-500/30 text-blue-400"
                                 }`}>
                                     <Printer className="h-6 w-6" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-black uppercase tracking-wider text-white">Pengaturan Print Agent LAN</h3>
+                                    <h3 className="text-base font-black uppercase tracking-wider text-white">Pengaturan Struk & Printer</h3>
                                     <p className="text-xs text-slate-400">
-                                        Status: {printAgentOnline ? (
+                                        Agent LAN: {printAgentOnline ? (
                                             <span className="text-emerald-400 font-bold">🟢 Online (Port 18181)</span>
                                         ) : (
-                                            <span className="text-rose-400 font-bold">🔴 Offline (Belum Dinyalakan)</span>
+                                            <span className="text-slate-400 font-bold">⚪ Standby / Browser Print</span>
                                         )}
                                     </p>
                                 </div>
@@ -2640,107 +2705,221 @@ export default function POSPage() {
                             </button>
                         </div>
 
+                        {/* Tab Switcher */}
+                        <div className="px-6 pt-5 pb-1 shrink-0">
+                            <div className="flex bg-slate-950 p-1 rounded-2xl border border-white/10 gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setPrinterSettingsTab('identity')}
+                                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                                        printerSettingsTab === 'identity'
+                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    <Store className="h-4 w-4" />
+                                    <span>Identitas Struk</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPrinterSettingsTab('printers')}
+                                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                                        printerSettingsTab === 'printers'
+                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    <Printer className="h-4 w-4" />
+                                    <span>Printer LAN ({printAgentOnline ? 'Online' : 'Offline'})</span>
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Content */}
                         <div className="p-6 overflow-y-auto space-y-6">
-                            {!printAgentOnline && (
-                                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs space-y-2 text-rose-300">
-                                    <p className="font-bold flex items-center gap-2 text-rose-200">
-                                        <AlertCircle className="h-4 w-4" /> Print Agent Belum Berjalan di Komputer Ini
-                                    </p>
-                                    <p>
-                                        Untuk menyalakan, buka folder <code className="bg-black/40 px-1 py-0.5 rounded text-white font-mono">lan-print-agent</code> di komputer kasir, lalu klik dua kali file <strong className="text-white">start.bat</strong> (Windows) atau jalankan <strong className="text-white">./start.sh</strong> (Mac/Linux).
-                                    </p>
-                                    <button
-                                        type="button"
-                                        onClick={checkPrintAgent}
-                                        className="mt-2 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 rounded-xl font-bold text-[11px] text-white flex items-center gap-2"
-                                    >
-                                        <RefreshCw className="h-3.5 w-3.5" />
-                                        Cek Koneksi Ulang
-                                    </button>
+                            {/* TAB 1: IDENTITAS STRUK */}
+                            {printerSettingsTab === 'identity' && (
+                                <div className="space-y-4">
+                                    <div className="p-5 bg-slate-950/40 rounded-2xl border border-white/5 space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-1.5">
+                                                <Store className="h-3.5 w-3.5 text-blue-400" />
+                                                <span>Nama Toko / Resto</span>
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                value={receiptStoreName}
+                                                onChange={(e) => setReceiptStoreName(e.target.value)}
+                                                placeholder={companyName || "cth: 7b Cloud System"}
+                                                className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                            />
+                                            <p className="text-[11px] text-slate-500 mt-1">Dicetak sebagai nama toko utama paling atas pada struk pelanggan.</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-1.5">
+                                                <MapPin className="h-3.5 w-3.5 text-emerald-400" />
+                                                <span>Alamat Lengkap</span>
+                                            </label>
+                                            <textarea 
+                                                rows={2}
+                                                value={receiptStoreAddress}
+                                                onChange={(e) => setReceiptStoreAddress(e.target.value)}
+                                                placeholder="cth: Jl. Raya Sukses No. 123"
+                                                className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors resize-none"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-1.5">
+                                                <Phone className="h-3.5 w-3.5 text-amber-400" />
+                                                <span>Nomor Telepon</span>
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                value={receiptStorePhone}
+                                                onChange={(e) => setReceiptStorePhone(e.target.value)}
+                                                placeholder="cth: 0812-3456-7890"
+                                                className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-1.5">
+                                                <FileText className="h-3.5 w-3.5 text-purple-400" />
+                                                <span>Pesan Kaki (Footer Struk)</span>
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                value={receiptStoreFooter}
+                                                onChange={(e) => setReceiptStoreFooter(e.target.value)}
+                                                placeholder="cth: Terima Kasih Atas Kunjungan Anda"
+                                                className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+                                            />
+                                            <p className="text-[11px] text-slate-500 mt-1">Dicetak di bagian paling bawah struk pembayaran.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Preview Header Struk */}
+                                    <div className="p-4 bg-slate-950/60 rounded-2xl border border-white/5 space-y-2">
+                                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Preview Tampilan Struk:</p>
+                                        <div className="bg-white text-black p-4 rounded-xl text-center font-mono text-[11px] leading-tight shadow-md border border-slate-200">
+                                            <p className="font-bold text-xs uppercase tracking-wide">{receiptStoreName || companyName || 'AIVOLA POS'}</p>
+                                            {receiptStoreAddress && <p className="text-[9px] text-slate-600 mt-0.5">{receiptStoreAddress}</p>}
+                                            {receiptStorePhone && <p className="text-[9px] text-slate-600">Telp: {receiptStorePhone}</p>}
+                                            <div className="border-t border-dashed border-slate-400 my-2"></div>
+                                            <p className="text-[9px] text-slate-500">STRUK PEMBAYARAN RESMI</p>
+                                            <div className="border-t border-dashed border-slate-400 my-2"></div>
+                                            <p className="text-[9px] text-slate-600 italic mt-3">{receiptStoreFooter || 'Terima Kasih Atas Kunjungan Anda'}</p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="space-y-4">
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Target IP Printer Jaringan (Port 9100)</h4>
-
-                                {/* Kasir */}
-                                <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Printer className="h-4 w-4 text-blue-400" />
-                                            <span className="text-sm font-bold text-white">Printer Kasir (Struk Pelanggan)</span>
+                            {/* TAB 2: PRINTER JARINGAN (LAN) */}
+                            {printerSettingsTab === 'printers' && (
+                                <div className="space-y-6">
+                                    {!printAgentOnline && (
+                                        <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs space-y-2 text-rose-300">
+                                            <p className="font-bold flex items-center gap-2 text-rose-200">
+                                                <AlertCircle className="h-4 w-4" /> Print Agent Belum Berjalan di Komputer Ini
+                                            </p>
+                                            <p>
+                                                Untuk menyalakan, buka folder <code className="bg-black/40 px-1 py-0.5 rounded text-white font-mono">lan-print-agent</code> di komputer kasir, lalu klik dua kali file <strong className="text-white">start.bat</strong> (Windows) atau jalankan <strong className="text-white">./start.sh</strong> (Mac/Linux).
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={checkPrintAgent}
+                                                className="mt-2 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 rounded-xl font-bold text-[11px] text-white flex items-center gap-2"
+                                            >
+                                                <RefreshCw className="h-3.5 w-3.5" />
+                                                Cek Koneksi Ulang
+                                            </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            disabled={!printAgentOnline || agentTesting === "kasir"}
-                                            onClick={() => handleTestAgentPrint("kasir", agentKasirIp)}
-                                            className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
-                                        >
-                                            {agentTesting === "kasir" ? "Mencetak..." : "Test Print Kasir"}
-                                        </button>
-                                    </div>
-                                    <input 
-                                        type="text"
-                                        value={agentKasirIp}
-                                        onChange={(e) => setAgentKasirIp(e.target.value)}
-                                        placeholder="cth: 192.168.1.200"
-                                        className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-blue-500"
-                                    />
-                                </div>
+                                    )}
 
-                                {/* Dapur */}
-                                <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-lg">🍳</span>
-                                            <span className="text-sm font-bold text-white">Printer Dapur (Khusus Makanan / Food)</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            disabled={!printAgentOnline || agentTesting === "dapur"}
-                                            onClick={() => handleTestAgentPrint("dapur", agentDapurIp)}
-                                            className="px-3 py-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
-                                        >
-                                            {agentTesting === "dapur" ? "Mencetak..." : "Test Print Dapur"}
-                                        </button>
-                                    </div>
-                                    <input 
-                                        type="text"
-                                        value={agentDapurIp}
-                                        onChange={(e) => setAgentDapurIp(e.target.value)}
-                                        placeholder="cth: 192.168.1.201"
-                                        className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-orange-500"
-                                    />
-                                    <p className="text-[11px] text-slate-400">Pesanan makanan otomatis langsung dikirimkan ke IP ini.</p>
-                                </div>
+                                    <div className="space-y-4">
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Target IP Printer Jaringan (Port 9100)</h4>
 
-                                {/* Bar */}
-                                <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-lg">☕</span>
-                                            <span className="text-sm font-bold text-white">Printer Bar (Khusus Minuman / Beverage)</span>
+                                        {/* Kasir */}
+                                        <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Printer className="h-4 w-4 text-blue-400" />
+                                                    <span className="text-sm font-bold text-white">Printer Kasir (Struk Pelanggan)</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={!printAgentOnline || agentTesting === "kasir"}
+                                                    onClick={() => handleTestAgentPrint("kasir", agentKasirIp)}
+                                                    className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
+                                                >
+                                                    {agentTesting === "kasir" ? "Mencetak..." : "Test Print Kasir"}
+                                                </button>
+                                            </div>
+                                            <input 
+                                                type="text"
+                                                value={agentKasirIp}
+                                                onChange={(e) => setAgentKasirIp(e.target.value)}
+                                                placeholder="cth: 192.168.1.200"
+                                                className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-blue-500"
+                                            />
                                         </div>
-                                        <button
-                                            type="button"
-                                            disabled={!printAgentOnline || agentTesting === "bar"}
-                                            onClick={() => handleTestAgentPrint("bar", agentBarIp)}
-                                            className="px-3 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
-                                        >
-                                            {agentTesting === "bar" ? "Mencetak..." : "Test Print Bar"}
-                                        </button>
+
+                                        {/* Dapur */}
+                                        <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-lg">🍳</span>
+                                                    <span className="text-sm font-bold text-white">Printer Dapur (Khusus Makanan / Food)</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={!printAgentOnline || agentTesting === "dapur"}
+                                                    onClick={() => handleTestAgentPrint("dapur", agentDapurIp)}
+                                                    className="px-3 py-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
+                                                >
+                                                    {agentTesting === "dapur" ? "Mencetak..." : "Test Print Dapur"}
+                                                </button>
+                                            </div>
+                                            <input 
+                                                type="text"
+                                                value={agentDapurIp}
+                                                onChange={(e) => setAgentDapurIp(e.target.value)}
+                                                placeholder="cth: 192.168.1.201"
+                                                className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-orange-500"
+                                            />
+                                            <p className="text-[11px] text-slate-400">Pesanan makanan otomatis langsung dikirimkan ke IP ini.</p>
+                                        </div>
+
+                                        {/* Bar */}
+                                        <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-lg">☕</span>
+                                                    <span className="text-sm font-bold text-white">Printer Bar (Khusus Minuman / Beverage)</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={!printAgentOnline || agentTesting === "bar"}
+                                                    onClick={() => handleTestAgentPrint("bar", agentBarIp)}
+                                                    className="px-3 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
+                                                >
+                                                    {agentTesting === "bar" ? "Mencetak..." : "Test Print Bar"}
+                                                </button>
+                                            </div>
+                                            <input 
+                                                type="text"
+                                                value={agentBarIp}
+                                                onChange={(e) => setAgentBarIp(e.target.value)}
+                                                placeholder="cth: 192.168.1.202"
+                                                className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-teal-500"
+                                            />
+                                            <p className="text-[11px] text-slate-400">Pesanan minuman/kopi otomatis langsung dikirimkan ke IP ini.</p>
+                                        </div>
                                     </div>
-                                    <input 
-                                        type="text"
-                                        value={agentBarIp}
-                                        onChange={(e) => setAgentBarIp(e.target.value)}
-                                        placeholder="cth: 192.168.1.202"
-                                        className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-teal-500"
-                                    />
-                                    <p className="text-[11px] text-slate-400">Pesanan minuman/kopi otomatis langsung dikirimkan ke IP ini.</p>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Footer */}
@@ -2760,7 +2939,7 @@ export default function POSPage() {
                                 onClick={handleSaveAgentConfig}
                                 className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
                             >
-                                <span>Simpan Pengaturan IP</span>
+                                <span>Simpan Pengaturan</span>
                             </button>
                         </div>
                     </div>
