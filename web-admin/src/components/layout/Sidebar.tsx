@@ -274,8 +274,8 @@ export default function Sidebar() {
             </div>
 
             <nav className={`flex-1 overflow-y-auto no-scrollbar space-y-1 py-6 ${isCollapsed ? 'px-2' : 'px-3'} ${isCollapsed ? '[&_a]:whitespace-nowrap [&_a]:overflow-hidden [&_a]:flex-nowrap [&_a_svg]:shrink-0' : ''}`}>
-                {/* MODULE SWITCHER BUTTON (Hidden for Finance role) */}
-                {isMounted && userRole !== 'FINANCE' && (
+                {/* MODULE SWITCHER BUTTON (Hidden for Finance, Cashier, POS Viewer) */}
+                {isMounted && userRole !== 'FINANCE' && userRole !== 'CASHIER' && userRole !== 'POS_VIEWER' && (
                     <div className="px-3 mb-6">
                         <button 
                             onClick={() => {
@@ -306,34 +306,36 @@ export default function Sidebar() {
                     </div>
                 )}
 
+                {isMounted && userRole !== 'CASHIER' && userRole !== 'POS_VIEWER' && (
+                    <Link href="/dashboard/executive" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-black bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 text-blue-400 hover:text-white border border-blue-500/30 transition-all mb-2 animate-pulse shadow-lg shadow-blue-500/10">
+                        <Monitor className="h-5 w-5" />
+                        EXECUTIVE INTEL
+                    </Link>
+                )}
 
-                <Link href="/dashboard/executive" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-black bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 text-blue-400 hover:text-white border border-blue-500/30 transition-all mb-2 animate-pulse shadow-lg shadow-blue-500/10">
-                    <Monitor className="h-5 w-5" />
-                    EXECUTIVE INTEL
-                </Link>
-
-
-                <div 
-                    onClick={() => {
-                        if (!hasFeature('AI_ADVISOR')) {
-                            openUpgradeModal();
-                        } else {
-                            router.push('/dashboard');
-                        }
-                    }}
-                    className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-black transition-all mb-4 cursor-pointer group relative overflow-hidden ${
-                        hasFeature('AI_ADVISOR') 
-                        ? 'bg-gradient-to-r from-violet-600/20 to-purple-600/20 text-violet-400 border border-violet-500/30 hover:from-violet-600/40 hover:to-purple-600/40' 
-                        : 'bg-slate-800/50 text-slate-500 border border-slate-700/50'
-                    }`}
-                >
-                    <div className="flex items-center gap-3">
-                        <BrainCircuit className="h-5 w-5" />
-                        AIVOLA.ID MIND
+                {isMounted && userRole !== 'CASHIER' && userRole !== 'POS_VIEWER' && (
+                    <div 
+                        onClick={() => {
+                            if (!hasFeature('AI_ADVISOR')) {
+                                openUpgradeModal();
+                            } else {
+                                router.push('/dashboard');
+                            }
+                        }}
+                        className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-black transition-all mb-4 cursor-pointer group relative overflow-hidden ${
+                            hasFeature('AI_ADVISOR') 
+                            ? 'bg-gradient-to-r from-violet-600/20 to-purple-600/20 text-violet-400 border border-violet-500/30 hover:from-violet-600/40 hover:to-purple-600/40' 
+                            : 'bg-slate-800/50 text-slate-500 border border-slate-700/50'
+                        }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <BrainCircuit className="h-5 w-5" />
+                            AIVOLA.ID MIND
+                        </div>
+                        {!hasFeature('AI_ADVISOR') && <Lock className="h-3.5 w-3.5 text-amber-500" />}
+                        {hasFeature('AI_ADVISOR') && <div className="absolute top-0 right-0 bg-violet-500 text-white text-[7px] px-1 py-0.5 font-black uppercase tracking-tighter rounded-bl-md">Active</div>}
                     </div>
-                    {!hasFeature('AI_ADVISOR') && <Lock className="h-3.5 w-3.5 text-amber-500" />}
-                    {hasFeature('AI_ADVISOR') && <div className="absolute top-0 right-0 bg-violet-500 text-white text-[7px] px-1 py-0.5 font-black uppercase tracking-tighter rounded-bl-md">Active</div>}
-                </div>
+                )}
 
                 {userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
                     <Link href="/dashboard" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
@@ -607,10 +609,6 @@ export default function Sidebar() {
                             <Monitor className="h-5 w-5" />
                             Order Status (OSD)
                         </Link>
-                        <Link href="/dashboard/pos/reports" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors">
-                            <Monitor className="h-5 w-5" />
-                            Laporan Kasir (POS)
-                        </Link>
                     </div>
                 )}
 
@@ -682,10 +680,12 @@ export default function Sidebar() {
             </nav>
 
             <div className="mt-auto border-t border-slate-700 p-4">
-                <Link href="/dashboard/store" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-gradient-to-r from-purple-600/10 to-blue-600/10 text-purple-400 hover:bg-slate-800 transition-colors border border-purple-500/20 mb-2">
-                    <ShoppingBag className="h-5 w-5 animate-pulse" />
-                    Aivola.id Store
-                </Link>
+                {isMounted && userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
+                    <Link href="/dashboard/store" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-gradient-to-r from-purple-600/10 to-blue-600/10 text-purple-400 hover:bg-slate-800 transition-colors border border-purple-500/20 mb-2">
+                        <ShoppingBag className="h-5 w-5 animate-pulse" />
+                        Aivola.id Store
+                    </Link>
+                )}
                 {userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
                     <Link href="/dashboard/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
                         <Settings className="h-5 w-5" />
