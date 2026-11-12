@@ -26,8 +26,8 @@ export default function LoginPage() {
       const res = await api.post('/auth/login', { email, password });
       const { token, user } = res.data;
       
-      // Only allow roles that should have access to the Web Admin
-      const allowedRoles = ['OWNER', 'ADMIN', 'SUPERADMIN', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL', 'POS_VIEWER'];
+      // Only allow roles that should have access to the Web Admin or Web POS
+      const allowedRoles = ['OWNER', 'ADMIN', 'SUPERADMIN', 'MANAGER', 'FINANCE', 'PURCHASING', 'OPERATIONAL', 'SUPERVISOR', 'POS_VIEWER', 'CASHIER'];
       if (!allowedRoles.includes(user.role)) {
         setErrorMsg('Akses Web Admin Ditolak: Anda tidak memiliki izin untuk masuk ke panel ini.');
         setIsLoading(false);
@@ -46,12 +46,18 @@ export default function LoginPage() {
       // Set default activeModule based on role/plan
       // OWNER/SUPERADMIN will see module selection UI, others get ABSENSI as default
       const existingModule = localStorage.getItem('activeModule');
-      if (!existingModule) {
-        // Default to ABSENSI for first-time users; OWNER/SUPERADMIN can change later from sidebar
-        localStorage.setItem('activeModule', 'ABSENSI');
+      if (!existingModule || user.role === 'CASHIER') {
+        // Default to ABSENSI for first-time users, FINANCE for CASHIER; OWNER/SUPERADMIN can change later from sidebar
+        localStorage.setItem('activeModule', user.role === 'CASHIER' ? 'FINANCE' : 'ABSENSI');
       }
 
       // --- ULTRA FAST REDIRECT ---
+      // If user is CASHIER, directly redirect to Web POS terminal
+      if (user.role === 'CASHIER') {
+        window.location.href = '/dashboard/pos';
+        return;
+      }
+
       // Use href for a full page load to ensure all state is fresh
       window.location.href = '/dashboard';
     } catch (err: unknown) {

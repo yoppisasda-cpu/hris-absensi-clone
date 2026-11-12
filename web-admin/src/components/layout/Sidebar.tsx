@@ -335,13 +335,15 @@ export default function Sidebar() {
                     {hasFeature('AI_ADVISOR') && <div className="absolute top-0 right-0 bg-violet-500 text-white text-[7px] px-1 py-0.5 font-black uppercase tracking-tighter rounded-bl-md">Active</div>}
                 </div>
 
-                <Link href="/dashboard" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                    <LayoutDashboard className="h-5 w-5" />
-                    {t('sidebar.dashboard')}
-                </Link>
+                {userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
+                    <Link href="/dashboard" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                        <LayoutDashboard className="h-5 w-5" />
+                        {t('sidebar.dashboard')}
+                    </Link>
+                )}
 
                 {/* MODUL ABSENSI & HRIS */}
-                {activeModule === 'ABSENSI' && userRole !== 'POS_VIEWER' && (
+                {activeModule === 'ABSENSI' && userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
                         <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manajemen SDM</div>
                         {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
@@ -428,7 +430,7 @@ export default function Sidebar() {
                 )}
 
                 {/* MODUL FINANCE & AKUNTING (HANYA UNTUK STAFF FINANCE / OWNER) */}
-                {activeModule === 'FINANCE' && userRole !== 'POS_VIEWER' && (
+                {activeModule === 'FINANCE' && userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
                     <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
                         {userRole !== 'OPERATIONAL' && userRole !== 'SUPERVISOR' && (
                             <>
@@ -589,16 +591,43 @@ export default function Sidebar() {
                     </div>
                 )}
 
+                {/* CASHIER SPECIFIC MENU */}
+                {userRole === 'CASHIER' && (
+                    <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                        <div className="px-3 py-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest italic">Terminal Kasir</div>
+                        <Link href="/dashboard/pos" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
+                            <Monitor className="h-5 w-5" />
+                            POS Kasir
+                        </Link>
+                        <Link href="/dashboard/kitchen" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-amber-600/10 text-amber-400 hover:bg-slate-800 transition-colors">
+                            <Monitor className="h-5 w-5" />
+                            Kitchen Display (KDS)
+                        </Link>
+                        <Link href="/dashboard/queue-display" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-violet-600/10 text-violet-400 hover:bg-slate-800 transition-colors">
+                            <Monitor className="h-5 w-5" />
+                            Order Status (OSD)
+                        </Link>
+                        <Link href="/dashboard/pos/reports" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors">
+                            <Monitor className="h-5 w-5" />
+                            Laporan Kasir (POS)
+                        </Link>
+                    </div>
+                )}
+
                 {/* UMUM / COMMON */}
-                <div className="px-3 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lainnya</div>
-                <Link href="/dashboard/announcements" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                    <Megaphone className="h-5 w-5" />
-                    {t('sidebar.announcements')}
-                </Link>
-                <Link href="/dashboard/holidays" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                    <CalendarDays className="h-5 w-5" />
-                    Hari Libur
-                </Link>
+                {userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
+                    <>
+                        <div className="px-3 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lainnya</div>
+                        <Link href="/dashboard/announcements" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <Megaphone className="h-5 w-5" />
+                            {t('sidebar.announcements')}
+                        </Link>
+                        <Link href="/dashboard/holidays" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                            <CalendarDays className="h-5 w-5" />
+                            Hari Libur
+                        </Link>
+                    </>
+                )}
 
                 {/* HANYA MUNCUL JIKA YG LOGIN ADALAH SANG PEMILIK PLATFORM (SUPERADMIN ONLY) */}
                 {isMounted && userRole === 'SUPERADMIN' && (
@@ -657,10 +686,12 @@ export default function Sidebar() {
                     <ShoppingBag className="h-5 w-5 animate-pulse" />
                     Aivola.id Store
                 </Link>
-                <Link href="/dashboard/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
-                    <Settings className="h-5 w-5" />
-                    Pengaturan
-                </Link>
+                {userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
+                    <Link href="/dashboard/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+                        <Settings className="h-5 w-5" />
+                        Pengaturan
+                    </Link>
+                )}
                 {userRole !== 'POS_VIEWER' && userRole !== 'CASHIER' && (
                     <Link href="/dashboard/audit-log" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-800 text-rose-300 hover:text-rose-400 transition-colors">
                         <ShieldCheck className="h-5 w-5 text-rose-500" />
