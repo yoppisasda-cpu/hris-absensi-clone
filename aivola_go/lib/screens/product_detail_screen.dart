@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product.dart';
@@ -55,29 +56,57 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
     final brandingProvider = Provider.of<BrandingProvider>(context);
     final primaryColor = brandingProvider.primaryColor;
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Adapt height to 1:1 square aspect ratio on mobile, clamped for larger screens
+    final double headerHeight = screenWidth > 500 ? 400.0 : screenWidth.clamp(320.0, 450.0);
 
     return Scaffold(
       backgroundColor: brandingProvider.secondaryColor,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: headerHeight,
             pinned: true,
             backgroundColor: brandingProvider.secondaryColor,
-            leading: CircleAvatar(
-              backgroundColor: Colors.black26,
-              child: IconButton(
-                icon: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                onPressed: () => Navigator.pop(context),
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CircleAvatar(
+                backgroundColor: Colors.black45,
+                child: IconButton(
+                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ),
             ),
             flexibleSpace: FlexibleSpaceBar(
               background: widget.product.imageUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: widget.product.imageUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(color: Colors.black12),
-                      errorWidget: (context, url, error) => Icon(Icons.broken_image_outlined, color: Colors.white10),
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // 1. Ambient blurred background to fill edges smoothly if non-square
+                        CachedNetworkImage(
+                          imageUrl: widget.product.imageUrl!,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                          errorWidget: (context, url, error) => Container(color: brandingProvider.secondaryColor),
+                        ),
+                        BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                          child: Container(
+                            color: Colors.black.withOpacity(0.3),
+                          ),
+                        ),
+                        // 2. Full uncropped product photo
+                        Center(
+                          child: CachedNetworkImage(
+                            imageUrl: widget.product.imageUrl!,
+                            fit: BoxFit.contain,
+                            alignment: Alignment.center,
+                            placeholder: (context, url) => Container(color: Colors.transparent),
+                            errorWidget: (context, url, error) => Icon(Icons.broken_image_outlined, color: Colors.white10),
+                          ),
+                        ),
+                      ],
                     )
                   : Center(child: Icon(Icons.restaurant_rounded, size: 100, color: primaryColor.withOpacity(0.3))),
             ),
