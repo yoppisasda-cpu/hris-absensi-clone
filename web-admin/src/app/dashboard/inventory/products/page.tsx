@@ -382,8 +382,16 @@ export default function ProductsPage() {
                                     <tr key={product.id} className="hover:bg-slate-800/30 transition-colors group">
                                         <td className="px-4 py-6">
                                             <div className="flex items-center gap-5">
-                                                <div className="h-14 w-14 flex-shrink-0 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
-                                                    <Package className="h-6 w-6 text-indigo-500" />
+                                                <div className="h-14 w-14 flex-shrink-0 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform overflow-hidden">
+                                                    {product.imageUrl ? (
+                                                        <img 
+                                                            src={product.imageUrl.startsWith('http') || product.imageUrl.startsWith('blob:') ? product.imageUrl : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5005').replace('/api', '')}${product.imageUrl}`} 
+                                                            alt={product.name} 
+                                                            className="w-full h-full object-cover" 
+                                                        />
+                                                    ) : (
+                                                        <Package className="h-6 w-6 text-indigo-500" />
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-3 mb-2">

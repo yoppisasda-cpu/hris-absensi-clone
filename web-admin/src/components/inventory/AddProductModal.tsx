@@ -36,6 +36,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         purchaseFactor: 1
     });
     const [uploading, setUploading] = useState(false);
+    const [localPreview, setLocalPreview] = useState<string | null>(null);
     const [warehouses, setWarehouses] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [hasRecipe, setHasRecipe] = useState(false);
@@ -51,6 +52,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
     const [vendorPrice, setVendorPrice] = useState<number | string>("");
 
     const handleRefresh = async () => {
+        setLocalPreview(null);
         setLoading(true);
         try {
             await Promise.all([
@@ -157,6 +159,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                 setSelectedCustomizations([]);
                 setVendorPrice("");
             }
+            setLocalPreview(null);
         }
     }, [isOpen, product]);
 
@@ -348,6 +351,17 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             setFormData(prev => ({ ...prev, sku: suggested }));
         }
     }, [isOpen, product, productList, formData.type]);
+    const formatImageUrl = (url: string | null | undefined): string => {
+        if (!url) return "";
+        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) {
+            return url;
+        }
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5005").replace("/api", "");
+        return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+    };
+
+    const displayImageUrl = localPreview || (formData.imageUrl ? formatImageUrl(formData.imageUrl) : null);
+
     const handleImageUpload = async (e: any) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -359,6 +373,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             return;
         }
 
+        // Preview instan langsung dari file lokal agar user tidak melihat kotak kosong saat proses upload
+        const localBlob = URL.createObjectURL(file);
+        setLocalPreview(localBlob);
+
         setUploading(true);
         const loadingToast = toast.loading("Mengompresi & mengunggah foto...");
 
@@ -366,10 +384,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             // Otomatis kompresi gambar & konversi ke WebP di browser (mengecilkan file kamera 5-15MB jadi ~100KB)
             const compressedFile = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 });
 
-            const formData = new FormData();
-            formData.append('image', compressedFile);
+            const uploadData = new FormData();
+            uploadData.append('image', compressedFile);
 
-            const res = await api.post('/inventory/products/upload', formData, {
+            const res = await api.post('/inventory/products/upload', uploadData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             setFormData(prev => ({ ...prev, imageUrl: res.data.imageUrl }));
@@ -377,6 +395,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         } catch (error: any) {
             console.error("Gagal unggah foto", error);
             toast.error("Gagal mengunggah foto produk", { id: loadingToast });
+            if (localBlob) {
+                URL.revokeObjectURL(localBlob);
+            }
+            setLocalPreview(null);
         } finally {
             setUploading(false);
             e.target.value = "";
@@ -447,6 +469,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
             setHasRecipe(false);
             setRecipeItems([]);
             setSelectedCustomizations([]);
+            setLocalPreview(null);
             onSuccess();
             onClose();
             toast.success(product ? "Produk diperbarui" : "Produk ditambahkan");
@@ -496,11 +519,14 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                         <div className="flex flex-col items-center justify-center py-4 animate-in fade-in zoom-in duration-300">
                             <div className="relative group">
                                 <div className="h-40 w-40 rounded-[2.5rem] bg-slate-900 border-2 border-dashed border-slate-800 flex items-center justify-center overflow-hidden transition-all group-hover:border-indigo-500/50 shadow-2xl">
-                                    {formData.imageUrl ? (
+                                    {displayImageUrl ? (
                                         <img 
-                                            src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5005').replace('/api', '')}${formData.imageUrl}`} 
-                                            alt="Product" 
+                                            src={displayImageUrl} 
+                                            alt={formData.name || "Product"} 
                                             className="h-full w-full object-cover"
+                                            onError={() => {
+                                                console.error("Gagal memuat preview gambar produk:", displayImageUrl);
+                                            }}
                                         />
                                     ) : (
                                         <div className="text-center p-4">
@@ -523,10 +549,16 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                         </div>
                                     </label>
                                 </div>
-                                {formData.imageUrl && (
+                                {(displayImageUrl || formData.imageUrl) && (
                                     <button 
                                         type="button"
-                                        onClick={() => setFormData({...formData, imageUrl: ""})}
+                                        onClick={() => {
+                                            if (localPreview) {
+                                                URL.revokeObjectURL(localPreview);
+                                                setLocalPreview(null);
+                                            }
+                                            setFormData(prev => ({ ...prev, imageUrl: "" }));
+                                        }}
                                         className="absolute -top-2 -right-2 h-8 w-8 rounded-xl bg-red-500 text-white flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
                                     >
                                         <X className="h-4 w-4" />
