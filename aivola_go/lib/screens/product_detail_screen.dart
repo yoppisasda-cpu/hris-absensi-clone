@@ -57,8 +57,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final brandingProvider = Provider.of<BrandingProvider>(context);
     final primaryColor = brandingProvider.primaryColor;
     final screenWidth = MediaQuery.of(context).size.width;
-    // Adapt height to 1:1 square aspect ratio on mobile, clamped for larger screens
-    final double headerHeight = screenWidth > 500 ? 400.0 : screenWidth.clamp(320.0, 450.0);
+    // Adapt height with extra headroom so tall and square product photos have generous breathing room
+    final double headerHeight = screenWidth > 600 ? 480.0 : (screenWidth * 1.05).clamp(360.0, 520.0);
 
     return Scaffold(
       backgroundColor: brandingProvider.secondaryColor,
@@ -96,14 +96,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             color: Colors.black.withOpacity(0.3),
                           ),
                         ),
-                        // 2. Full uncropped product photo
-                        Center(
-                          child: CachedNetworkImage(
-                            imageUrl: widget.product.imageUrl!,
-                            fit: BoxFit.contain,
-                            alignment: Alignment.center,
-                            placeholder: (context, url) => Container(color: Colors.transparent),
-                            errorWidget: (context, url, error) => Icon(Icons.broken_image_outlined, color: Colors.white10),
+                        // 2. Full uncropped product photo with safe vertical headroom
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16.0, 38.0, 16.0, 14.0),
+                          child: Center(
+                            child: CachedNetworkImage(
+                              imageUrl: widget.product.imageUrl!,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.center,
+                              placeholder: (context, url) => Container(color: Colors.transparent),
+                              errorWidget: (context, url, error) => Icon(Icons.broken_image_outlined, color: Colors.white10),
+                            ),
                           ),
                         ),
                       ],

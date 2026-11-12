@@ -15763,13 +15763,13 @@ app.post('/api/inventory/products/upload', tenantMiddleware, uploadProduct.singl
     const filename = `${req.file.filename}.webp`;
     const outputPath = path.join(process.cwd(), 'uploads/products', filename);
 
-    // Compress & crop (1:1) to max 800x800 webp
+    // Compress & resize to max 1200x1200 webp without forced cropping
     await sharp(req.file.path)
-      .resize(800, 800, {
-        fit: sharp.fit.cover,
-        position: sharp.strategy.entropy
+      .resize(1200, 1200, {
+        fit: sharp.fit.inside,
+        withoutEnlargement: true
       })
-      .webp({ quality: 80 }) // High compression with good quality
+      .webp({ quality: 82 }) // High compression with good quality
       .toFile(outputPath);
 
     // Delete the original uncompressed file uploaded by multer
