@@ -7,7 +7,8 @@ const {
     buildReceiptBuffer,
     buildKitchenBuffer,
     buildBarBuffer,
-    buildTestBuffer
+    buildTestBuffer,
+    buildClosingBuffer
 } = require('./escpos');
 
 const CONFIG_FILE = path.join(__dirname, 'config.json');
@@ -189,6 +190,21 @@ const server = http.createServer((req, res) => {
                     success: true,
                     message: 'Perintah cetak dikirim ke printer jaringan',
                     results
+                });
+            }
+
+            // 5. POST /print-closing - Cetak Struk Closing Kasir
+            if (req.url === '/print-closing') {
+                const { closing = {}, cashierName = '-', companyName = 'AIVOLA POS', store = {} } = payload;
+                if (!config.kasir || !config.kasir.ip) {
+                    return sendJson(400, { success: false, error: 'Printer kasir belum dikonfigurasi' });
+                }
+                const buffer = buildClosingBuffer(closing, cashierName, companyName, store);
+                const result = await sendToPrinter(config.kasir.ip, config.kasir.port, buffer);
+                return sendJson(result.success ? 200 : 500, {
+                    ...result,
+                    target: 'kasir',
+                    ip: config.kasir.ip
                 });
             }
 

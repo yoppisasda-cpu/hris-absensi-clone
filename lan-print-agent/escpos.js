@@ -316,6 +316,90 @@ function buildTestBuffer(targetName, ip) {
     return Buffer.concat(buffers);
 }
 
+// 5. CLOSING SHIFT BUFFER
+function buildClosingBuffer(closing = {}, cashierName = '-', companyName = 'AIVOLA POS', store = {}) {
+    const buffers = [];
+    const width = 32;
+
+    buffers.push(CMD.INIT);
+    buffers.push(CMD.ALIGN_CENTER);
+    buffers.push(CMD.BOLD_ON);
+    buffers.push(CMD.SIZE_LARGE);
+    buffers.push(line(store.name || companyName));
+    buffers.push(CMD.SIZE_NORMAL);
+    buffers.push(CMD.BOLD_OFF);
+
+    if (store.address) buffers.push(line(store.address));
+    if (store.phone) buffers.push(line('Telp: ' + store.phone));
+    buffers.push(hr(width));
+
+    buffers.push(CMD.BOLD_ON);
+    buffers.push(line('LAPORAN TUTUP KASIR'));
+    buffers.push(line('(CLOSING SHIFT)'));
+    buffers.push(CMD.BOLD_OFF);
+    buffers.push(hr(width));
+
+    buffers.push(CMD.ALIGN_LEFT);
+    buffers.push(row('Kasir', cashierName, width));
+    if (closing.branchName) buffers.push(row('Cabang', closing.branchName, width));
+    
+    const startStr = closing.startTime ? new Date(closing.startTime).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+    const endStr = closing.endTime ? new Date(closing.endTime).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) : new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+    buffers.push(row('Mulai', startStr, width));
+    buffers.push(row('Selesai', endStr, width));
+    buffers.push(row('Transaksi', `${closing.totalTransactions || 0} Pesanan`, width));
+    buffers.push(hr(width));
+
+    buffers.push(CMD.BOLD_ON);
+    buffers.push(line('RINGKASAN PENJUALAN:'));
+    buffers.push(CMD.BOLD_OFF);
+    buffers.push(row('Penjualan Kotor', 'Rp ' + Number(closing.totalGrossSales || 0).toLocaleString('id-ID'), width));
+    if (closing.totalCommission > 0) {
+        buffers.push(row('Potongan/Komisi', '- Rp ' + Number(closing.totalCommission || 0).toLocaleString('id-ID'), width));
+    }
+    buffers.push(row('Penjualan Bersih', 'Rp ' + Number(closing.totalNetSales || 0).toLocaleString('id-ID'), width));
+    buffers.push(hr(width));
+
+    if (Array.isArray(closing.methodBreakdown) && closing.methodBreakdown.length > 0) {
+        buffers.push(CMD.BOLD_ON);
+        buffers.push(line('METODE PEMBAYARAN:'));
+        buffers.push(CMD.BOLD_OFF);
+        closing.methodBreakdown.forEach(m => {
+            buffers.push(row(m.accountName || 'Lainnya', 'Rp ' + Number(m.expectedAmount || 0).toLocaleString('id-ID'), width));
+        });
+        buffers.push(hr(width));
+    }
+
+    buffers.push(CMD.BOLD_ON);
+    buffers.push(line('REKONSILIASI KAS:'));
+    buffers.push(CMD.BOLD_OFF);
+    buffers.push(row('Kas Diharapkan', 'Rp ' + Number(closing.expectedCash || 0).toLocaleString('id-ID'), width));
+    buffers.push(row('Kas Aktual', 'Rp ' + Number(closing.actualCash || 0).toLocaleString('id-ID'), width));
+    
+    const diff = Number(closing.cashDifference || 0);
+    const diffLabel = diff === 0 ? 'PAS (Rp 0)' : (diff > 0 ? '+Rp ' + diff.toLocaleString('id-ID') : '-Rp ' + Math.abs(diff).toLocaleString('id-ID'));
+    buffers.push(CMD.BOLD_ON);
+    buffers.push(row('Selisih Kas', diffLabel, width));
+    buffers.push(CMD.BOLD_OFF);
+
+    if (closing.notes) {
+        buffers.push(hr(width));
+        buffers.push(line('Catatan: ' + closing.notes));
+    }
+
+    buffers.push(hr(width));
+    buffers.push(CMD.ALIGN_CENTER);
+    buffers.push(CMD.LF);
+    buffers.push(row('   ( Kasir )   ', ' ( Supervisor ) ', width));
+    buffers.push(CMD.LF);
+    buffers.push(CMD.LF);
+    buffers.push(line('Dicetak: ' + new Date().toLocaleString('id-ID')));
+    buffers.push(CMD.FEED_5);
+    buffers.push(CMD.CUT);
+
+    return Buffer.concat(buffers);
+}
+
 module.exports = {
     CMD,
     isBeverage,
@@ -323,5 +407,6 @@ module.exports = {
     buildKitchenBuffer,
     buildBarBuffer,
     buildTestBuffer,
+    buildClosingBuffer,
 };
 

@@ -39,7 +39,8 @@ import {
     Store,
     MapPin,
     Phone,
-    FileText
+    FileText,
+    LogOut
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -80,6 +81,7 @@ interface CartItem extends Product {
 }
 
 import QrScanner from "@/components/pos/QrScanner";
+import ShiftClosingModal from "@/components/pos/ShiftClosingModal";
 
 export default function POSPage() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -151,6 +153,9 @@ export default function POSPage() {
     const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
     const isFirstMobileFetch = useRef(true);
     const prevMobileCountRef = useRef(0);
+
+    // SHIFT CLOSING (TUTUP KASIR)
+    const [showClosingModal, setShowClosingModal] = useState(false);
 
     // MOBILE ORDER PAYMENT SETTLEMENT
     const [selectedMobileOrderForPayment, setSelectedMobileOrderForPayment] = useState<any | null>(null);
@@ -1238,6 +1243,14 @@ export default function POSPage() {
                                     <span>
                                         {printAgentOnline ? "LAN Print: ON" : "LAN Print: OFF"}
                                     </span>
+                                </button>
+                                <button
+                                    onClick={() => setShowClosingModal(true)}
+                                    title="Tutup Kasir / Closing Shift"
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-xl text-[10px] font-black text-rose-400 hover:text-rose-300 transition-all uppercase tracking-wider italic shadow-md shadow-rose-500/10 active:scale-95 whitespace-nowrap"
+                                >
+                                    <LogOut className="h-3.5 w-3.5" />
+                                    <span>Tutup Kasir</span>
                                 </button>
                             </div>
                         </div>
@@ -3556,6 +3569,24 @@ export default function POSPage() {
                     </div>
                 </div>
             )}
+
+            {/* SHIFT CLOSING MODAL */}
+            <ShiftClosingModal
+                isOpen={showClosingModal}
+                onClose={() => setShowClosingModal(false)}
+                onSuccess={() => {
+                    fetchData();
+                    fetchPendingBills();
+                    fetchActiveMobileOrders();
+                }}
+                companyName={companyName}
+                companyLogo={companyLogo}
+                receiptStoreName={receiptStoreName}
+                receiptStoreAddress={receiptStoreAddress}
+                receiptStorePhone={receiptStorePhone}
+                receiptStoreFooter={receiptStoreFooter}
+                printAgentOnline={printAgentOnline}
+            />
 
         </DashboardLayout>
     );
