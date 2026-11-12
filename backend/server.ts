@@ -137,6 +137,11 @@ const prisma = new PrismaClient({
 
 // --- AUTO-MIGRATION: Ensure critical columns exist on every startup ---
 const runAutoMigration = async () => {
+  if (process.env.RUN_AUTO_MIGRATION !== 'true') {
+    // Columns & indexes already exist in production schema.
+    // Avoid running repetitive ALTER TABLE on busy tables to prevent lock timeouts.
+    return;
+  }
   const migrations = [
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "paidAmount" FLOAT DEFAULT 0`,
     `ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "dueDate" TIMESTAMP`,
@@ -20124,6 +20129,28 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
     console.log("[DEBUG /api/pos/checkout] salespersonId received:", salespersonId);
     console.log("[DEBUG /api/pos/checkout] Full body:", req.body);
 
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Keranjang belanja tidak boleh kosong' });
+    }
+
+    // Auto-calculate and validate true totalAmount from items
+    const calculatedSubtotal = items.reduce((sum: number, item: any) => {
+      const salePrice = Number(item.price) || 0;
+      const qty = Number(item.quantity) || 0;
+      return sum + (salePrice * qty);
+    }, 0);
+
+    let effectiveTotalAmount = Number(totalAmount) || 0;
+    const totalDiscounts = Number(voucherDiscountAmount || 0) + Number(memberDiscountAmount || 0) + Number(pointsUsed || 0);
+
+    // If client sent totalAmount <= 0 or NaN, but items have positive value and discounts don't cover 100%:
+    if (effectiveTotalAmount <= 0 && calculatedSubtotal > 0 && totalDiscounts < calculatedSubtotal) {
+      const netBeforeTax = Math.max(0, calculatedSubtotal - totalDiscounts);
+      const tax = Number(taxAmount) || 0;
+      effectiveTotalAmount = netBeforeTax + tax;
+      console.warn(`[POS CHECKOUT HEALING] Corrected zero totalAmount for invoice ${req.body.offlineInvoiceNumber || 'NEW'}: items subtotal Rp ${calculatedSubtotal} -> effectiveTotal Rp ${effectiveTotalAmount}`);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       // 0. Calculate Queue Number & Handle Pending Bill
       let existingQueueNumber = null;
@@ -20298,7 +20325,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
               name: customerName || sisterCustomer?.name || 'Pelanggan',
               phone: customerPhone,
               points: sisterCustomer?.points || 0,
-              totalSpent: Number(totalAmount),
+              totalSpent: effectiveTotalAmount,
               isMember: true,
               birthDate: sisterCustomer?.birthDate || null,
               gender: sisterCustomer?.gender || null
@@ -20309,7 +20336,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             where: { id: customer.id },
             data: {
               name: customerName || undefined,
-              totalSpent: { increment: Number(totalAmount) },
+              totalSpent: { increment: effectiveTotalAmount },
               isMember: true
             }
           });
@@ -20325,14 +20352,14 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
               name: selectedCust.name,
               points: selectedCust.points,
               isMember: true,
-              totalSpent: { increment: Number(totalAmount) }
+              totalSpent: { increment: effectiveTotalAmount }
             },
             create: {
               companyId: tenantId,
               phone: selectedCust.phone,
               name: selectedCust.name,
               points: selectedCust.points,
-              totalSpent: Number(totalAmount),
+              totalSpent: effectiveTotalAmount,
               isMember: true,
               birthDate: selectedCust.birthDate,
               gender: selectedCust.gender
@@ -20506,7 +20533,8 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           customerPhone: customerPhone || null,
           accountId: finalAccountId,
           invoiceNumber,
-          totalAmount: Number(totalAmount),
+          totalAmount: effectiveTotalAmount,
+          paidAmount: effectiveTotalAmount,
           totalCommission: Number(totalCommission),
           notes: finalNotes,
           status: 'PAID',
@@ -20863,7 +20891,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       if (finalAccountId) {
         await tx.financialAccount.update({
           where: { id: finalAccountId },
-          data: { balance: { increment: Number(totalAmount) } }
+          data: { balance: { increment: effectiveTotalAmount } }
         });
 
         const category = await tx.incomeCategory.upsert({
@@ -20878,7 +20906,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             branchId: user?.branchId || null,
             accountId: finalAccountId,
             categoryId: category.id,
-            amount: Number(totalAmount),
+            amount: effectiveTotalAmount,
             receivedFrom: `Pelanggan POS (${saleType})`,
             description: `POS #${invoiceNumber} (${saleType})`
           }

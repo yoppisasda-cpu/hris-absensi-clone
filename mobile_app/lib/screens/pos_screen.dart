@@ -1613,6 +1613,12 @@ class _POSScreenState extends State<POSScreen> {
       };
     }).toList();
 
+    // Calculate fallback subtotal from items to protect against race conditions
+    double itemsTotal = 0;
+    for (final it in checkoutItems) {
+      itemsTotal += (it['total'] as num? ?? 0).toDouble();
+    }
+
     final deliveryMethod = _saleType == 'TAKE_AWAY'
         ? 'Take Away'
         : (_saleType == 'DINE_IN' ? 'Dine In' : (_saleType == 'WALK_IN' ? 'Walk-in' : _saleType));
@@ -1620,25 +1626,56 @@ class _POSScreenState extends State<POSScreen> {
     final authUser = Provider.of<AuthProvider>(context, listen: false);
     final cashierName = authUser.userName ?? 'Kasir';
 
+    // SNAPSHOT ALL VALUES IMMUTABLY to avoid race conditions when _clearCartAndInputs runs in background!
+    final double snapshotSubtotal = _subtotalAmount > 0 ? _subtotalAmount : itemsTotal;
+    final double snapshotMemberDiscount = _memberDiscountAmount;
+    final double snapshotEmployeeDiscount = _employeeDiscountAmount;
+    final String? snapshotEmployeeDiscountLabel = _employeeDiscountLabel;
+    final double snapshotVoucherDiscount = _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount;
+    final String? snapshotVoucherCode = _voucherController.text.trim().isNotEmpty
+        ? _voucherController.text.trim()
+        : (_employeeDiscountAmount > 0 ? (snapshotEmployeeDiscountLabel ?? 'DISKON KARYAWAN') : null);
+    final double snapshotPointsUsed = _pointsUsed;
+    final double snapshotPointsEarned = _pointsEarned;
+    final double snapshotTaxRate = _globalTaxRate;
+    final double snapshotTaxAmount = _taxAmount;
+    
+    // Protect against 0 total when items are present:
+    double snapshotTotalAmount = _grandTotal;
+    if (snapshotTotalAmount <= 0 && itemsTotal > 0 && snapshotMemberDiscount <= 0 && snapshotVoucherDiscount <= 0) {
+      snapshotTotalAmount = itemsTotal + snapshotTaxAmount;
+    }
+
+    final int snapshotAccountId = _selectedAccountId!;
+    final int? snapshotCustomerId = _activeCustomerId;
+    final String snapshotCustomerName = _customerNameController.text.trim();
+    final String snapshotCustomerPhone = _customerPhoneController.text.trim();
+    final String snapshotSaleType = _saleType;
+    final String snapshotPaymentMethod = _selectedPaymentMethod;
+    final String snapshotPaymentRef = _paymentReferenceController.text.trim();
+    final int? snapshotSalespersonId = _selectedSalespersonId;
+    final String? snapshotNotes = snapshotPaymentMethod != 'Tunai' ? '[Metode: $snapshotPaymentMethod]' : null;
+    final double snapshotCashReceived = _cashReceived > 0 ? _cashReceived : snapshotTotalAmount;
+    final String snapshotDate = DateTime.now().toIso8601String();
+    final int? pendingBillToDelete = _activePendingBillId;
+
     final saleData = {
       'invoiceNumber': generatedInvoiceNumber,
       'items': checkoutItems,
-      'totalAmount': _grandTotal,
-      'cashReceived': _cashReceived > 0 ? _cashReceived : _grandTotal,
-      'paymentMethod': _selectedPaymentMethod,
-      'paymentReference': _paymentReferenceController.text.trim(),
-      'customerName': _customerNameController.text.trim(),
+      'totalAmount': snapshotTotalAmount,
+      'cashReceived': snapshotCashReceived,
+      'paymentMethod': snapshotPaymentMethod,
+      'paymentReference': snapshotPaymentRef,
+      'customerName': snapshotCustomerName,
       'cashierName': cashierName,
-      'taxRate': _globalTaxRate,
-      'memberDiscountAmount': _memberDiscountAmount,
-      'voucherDiscountAmount': _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount,
-      'voucherCode': _voucherController.text.trim().isNotEmpty
-          ? _voucherController.text.trim()
-          : (_employeeDiscountAmount > 0 ? (_employeeDiscountLabel ?? 'DISKON KARYAWAN') : null),
-      'pointsUsed': _pointsUsed,
-      'pointsEarned': _pointsEarned,
-      'subtotal': _subtotalAmount,
-      'saleType': _saleType,
+      'taxRate': snapshotTaxRate,
+      'memberDiscountAmount': snapshotMemberDiscount,
+      'voucherDiscountAmount': snapshotVoucherDiscount,
+      'voucherCode': snapshotVoucherCode,
+      'pointsUsed': snapshotPointsUsed,
+      'pointsEarned': snapshotPointsEarned,
+      'subtotal': snapshotSubtotal,
+      'saleType': snapshotSaleType,
       'deliveryMethod': deliveryMethod,
     };
 
@@ -1663,35 +1700,30 @@ class _POSScreenState extends State<POSScreen> {
 
     // 3. BACKGROUND STOCK DEDUCTION & CLOUD SYNC:
     // Process server checkout and stock deduction in background so cashier is never blocked!
-    final pendingBillToDelete = _activePendingBillId;
     _apiService.checkoutPos(
       items: checkoutItems,
-      accountId: _selectedAccountId!,
-      totalAmount: _grandTotal,
-      customerId: _activeCustomerId,
-      customerName: _customerNameController.text.trim(),
-      customerPhone: _customerPhoneController.text.trim(),
-      saleType: _saleType,
+      accountId: snapshotAccountId,
+      totalAmount: snapshotTotalAmount,
+      customerId: snapshotCustomerId,
+      customerName: snapshotCustomerName,
+      customerPhone: snapshotCustomerPhone,
+      saleType: snapshotSaleType,
       deliveryMethod: deliveryMethod,
       serviceFee: 0,
       markupPercentage: 0,
-      notes: _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
-      memberDiscountAmount: _memberDiscountAmount,
-      voucherCode: _voucherController.text.trim().isNotEmpty
-          ? _voucherController.text.trim()
-          : (_employeeDiscountAmount > 0 ? (_employeeDiscountLabel ?? 'DISKON KARYAWAN') : null),
-      voucherDiscountAmount: _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount,
-      pointsUsed: _pointsUsed,
-      pointsEarned: _pointsEarned,
+      notes: snapshotNotes,
+      memberDiscountAmount: snapshotMemberDiscount,
+      voucherCode: snapshotVoucherCode,
+      voucherDiscountAmount: snapshotVoucherDiscount,
+      pointsUsed: snapshotPointsUsed,
+      pointsEarned: snapshotPointsEarned,
       offlineInvoiceNumber: generatedInvoiceNumber,
-      taxRate: _globalTaxRate,
-      taxAmount: _taxAmount,
+      taxRate: snapshotTaxRate,
+      taxAmount: snapshotTaxAmount,
       pendingBillId: pendingBillToDelete,
-      salespersonId: _selectedSalespersonId,
-      paymentMethod: _selectedPaymentMethod,
-      paymentReference: _paymentReferenceController.text.trim().isNotEmpty
-          ? _paymentReferenceController.text.trim()
-          : null,
+      salespersonId: snapshotSalespersonId,
+      paymentMethod: snapshotPaymentMethod,
+      paymentReference: snapshotPaymentRef.isNotEmpty ? snapshotPaymentRef : null,
     ).then((response) {
       print("=== [POS] BACKGROUND SYNC SUCCESS for $generatedInvoiceNumber ===");
       if (pendingBillToDelete != null) {
@@ -1703,26 +1735,25 @@ class _POSScreenState extends State<POSScreen> {
         'localInvoiceNumber': generatedInvoiceNumber,
         'invoiceNumber': generatedInvoiceNumber,
         'items': checkoutItems,
-        'accountId': _selectedAccountId!,
-        'totalAmount': _grandTotal,
-        'customerId': _activeCustomerId,
-        'customerName': _customerNameController.text.trim(),
-        'customerPhone': _customerPhoneController.text.trim(),
-        'saleType': _saleType,
-        'notes': _selectedPaymentMethod != 'Tunai' ? '[Metode: $_selectedPaymentMethod]' : null,
-        'memberDiscountAmount': _memberDiscountAmount,
-        'voucherCode': _voucherController.text.trim().isNotEmpty
-            ? _voucherController.text.trim()
-            : (_employeeDiscountAmount > 0 ? (_employeeDiscountLabel ?? 'DISKON KARYAWAN') : null),
-        'voucherDiscountAmount': _voucherDiscountAmount > 0 ? _voucherDiscountAmount : _employeeDiscountAmount,
-        'pointsUsed': _pointsUsed,
-        'pointsEarned': _pointsEarned,
-        'taxRate': _globalTaxRate,
-        'taxAmount': _taxAmount,
-        'paymentMethod': _selectedPaymentMethod,
-        'paymentReference': _paymentReferenceController.text.trim(),
-        'date': DateTime.now().toIso8601String(),
-        'salespersonId': _selectedSalespersonId,
+        'accountId': snapshotAccountId,
+        'totalAmount': snapshotTotalAmount,
+        'customerId': snapshotCustomerId,
+        'customerName': snapshotCustomerName,
+        'customerPhone': snapshotCustomerPhone,
+        'saleType': snapshotSaleType,
+        'deliveryMethod': deliveryMethod,
+        'notes': snapshotNotes,
+        'memberDiscountAmount': snapshotMemberDiscount,
+        'voucherCode': snapshotVoucherCode,
+        'voucherDiscountAmount': snapshotVoucherDiscount,
+        'pointsUsed': snapshotPointsUsed,
+        'pointsEarned': snapshotPointsEarned,
+        'taxRate': snapshotTaxRate,
+        'taxAmount': snapshotTaxAmount,
+        'paymentMethod': snapshotPaymentMethod,
+        'paymentReference': snapshotPaymentRef,
+        'date': snapshotDate,
+        'salespersonId': snapshotSalespersonId,
         'isSynced': false,
       };
       await PosLocalDbService.saveOfflineSale(offlineSaleData);

@@ -33,10 +33,31 @@ class PosSyncManager {
           return Map<String, dynamic>.from(item);
         }).toList();
 
+        double totalAmount = (sale['totalAmount'] as num?)?.toDouble() ?? 0;
+        final memberDisc = ((sale['memberDiscountAmount'] ?? 0) as num).toDouble();
+        final voucherDisc = ((sale['voucherDiscountAmount'] ?? 0) as num).toDouble();
+
+        // Safety fallback: if totalAmount was stored as 0 due to state clearing race conditions,
+        // recompute it from items so that offline sync never registers a Rp 0 sale on server!
+        if (totalAmount <= 0 && items.isNotEmpty) {
+          double calculatedSubtotal = 0;
+          for (final it in items) {
+            final double p = (it['price'] as num?)?.toDouble() ?? 0;
+            final double q = (it['quantity'] as num?)?.toDouble() ?? 1;
+            calculatedSubtotal += p * q;
+          }
+          final double tax = ((sale['taxAmount'] ?? 0) as num).toDouble();
+          final double discounts = memberDisc + voucherDisc;
+          if (calculatedSubtotal > 0 && discounts < calculatedSubtotal) {
+            totalAmount = (calculatedSubtotal - discounts) + tax;
+            print("PosSyncManager: Rescued Rp 0 totalAmount for ${sale['localInvoiceNumber'] ?? sale['invoiceNumber']} -> Rp $totalAmount");
+          }
+        }
+
         await _apiService.checkoutPos(
           items: items,
           accountId: sale['accountId'],
-          totalAmount: (sale['totalAmount'] as num).toDouble(),
+          totalAmount: totalAmount,
           customerId: sale['customerId'],
           customerName: sale['customerName'],
           customerPhone: sale['customerPhone'],
