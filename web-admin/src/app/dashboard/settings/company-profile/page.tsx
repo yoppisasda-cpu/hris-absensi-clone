@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from '@/lib/api';
 import { Building2, Save, MapPin, Navigation, Loader2, Shield, QrCode } from 'lucide-react';
+import { compressImage } from '@/lib/imageCompression';
 
 interface Company {
     id: number;
@@ -294,29 +295,26 @@ export default function CompanyProfilePage() {
             alert('Format file tidak didukung! Harap upload file gambar (JPG, PNG, dll).');
             return;
         }
-        
-        // Limit file size to 500 KB
-        const maxSize = 500 * 1024;
-        if (file.size > maxSize) {
-            alert(`Ukuran file terlalu besar! Maksimal ukuran logo adalah 500 KB. Ukuran file Anda: ${(file.size / 1024).toFixed(1)} KB.`);
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('logo', file);
 
         try {
             setIsSaving(true);
+            // Otomatis kompresi logo ke WebP beresolusi optimal (max 600px)
+            const compressedLogo = await compressImage(file, { maxWidth: 600, maxHeight: 600, quality: 0.85 });
+
+            const formData = new FormData();
+            formData.append('logo', compressedLogo);
+
             const res = await api.patch('/companies/my/logo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             setCompany(prev => prev ? { ...prev, logoUrl: res.data.logoUrl } : null);
-            alert("Logo berhasil diperbarui!");
+            alert("Logo berhasil dioptimasi & diperbarui!");
         } catch (error) {
             console.error(error);
             alert("Gagal mengupload logo.");
         } finally {
             setIsSaving(false);
+            e.target.value = '';
         }
     };
 
@@ -327,11 +325,15 @@ export default function CompanyProfilePage() {
             alert('Format file tidak didukung! Harap upload file gambar (JPG, PNG, dll).');
             return;
         }
-        const formData = new FormData();
-        formData.append('qris', file);
 
         try {
             setIsSaving(true);
+            // Otomatis kompresi gambar QRIS (max 800px)
+            const compressedQris = await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.9 });
+
+            const formData = new FormData();
+            formData.append('qris', compressedQris);
+
             const res = await api.patch('/companies/my/qris', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
@@ -342,6 +344,7 @@ export default function CompanyProfilePage() {
             alert("Gagal mengupload QRIS.");
         } finally {
             setIsSaving(false);
+            e.target.value = '';
         }
     };
 

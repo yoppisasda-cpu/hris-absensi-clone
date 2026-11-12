@@ -5,6 +5,7 @@ import { X, Package, Tag, Box, AlertCircle, Layers, Plus, Trash2, ChefHat, ScanL
 import api from "@/lib/api";
 import { toast } from "react-hot-toast";
 import SearchableSelect from "../common/SearchableSelect";
+import { compressImage } from "@/lib/imageCompression";
 
 export default function AddProductModal({ isOpen, onClose, onSuccess, product }: any) {
     const [formData, setFormData] = useState({
@@ -351,35 +352,34 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validasi Ukuran (Maks 2MB)
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error("Ukuran foto maksimal 2 MB");
-            e.target.value = "";
-            return;
-        }
-
         // Validasi Format (Hanya Gambar)
         if (!file.type.startsWith('image/')) {
-            toast.error("Format file harus berupa gambar (JPG/PNG)");
+            toast.error("Format file harus berupa gambar (JPG, PNG, atau WEBP)");
             e.target.value = "";
             return;
         }
 
         setUploading(true);
-        const formData = new FormData();
-        formData.append('image', file);
+        const loadingToast = toast.loading("Mengompresi & mengunggah foto...");
 
         try {
+            // Otomatis kompresi gambar & konversi ke WebP di browser (mengecilkan file kamera 5-15MB jadi ~100KB)
+            const compressedFile = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 });
+
+            const formData = new FormData();
+            formData.append('image', compressedFile);
+
             const res = await api.post('/inventory/products/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             setFormData(prev => ({ ...prev, imageUrl: res.data.imageUrl }));
-            toast.success("Foto berhasil diunggah");
+            toast.success("Foto berhasil dioptimasi & diunggah", { id: loadingToast });
         } catch (error: any) {
             console.error("Gagal unggah foto", error);
-            toast.error("Gagal unggah foto");
+            toast.error("Gagal mengunggah foto produk", { id: loadingToast });
         } finally {
             setUploading(false);
+            e.target.value = "";
         }
     };
 
@@ -533,7 +533,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, product }:
                                     </button>
                                 )}
                             </div>
-                            <p className="mt-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic">Rasio 1:1, Maks 2MB (JPG/PNG)</p>
+                            <p className="mt-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic">Rasio 1:1 &bull; Auto-Compress &amp; Convert ke WebP (Otomatis Ringan)</p>
                         </div>
                     )}
 
