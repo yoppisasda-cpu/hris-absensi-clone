@@ -19192,10 +19192,10 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
     const { items, accountId, notes, date } = req.body; 
     const dateVal = date ? new Date(date) : new Date();
 
-    // 1. Role Verification for Refund
+    // 1. Role Verification for Refund (Hanya SPV ke atas)
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    if (!['SUPERADMIN', 'ADMIN', 'OWNER'].includes(user?.role || '')) {
-      return res.status(403).json({ error: 'Akses Ditolak. Hanya Admin yang dapat melakukan Refund transaksi.' });
+    if (!['SUPERADMIN', 'ADMIN', 'OWNER', 'MANAGER', 'SUPERVISOR', 'FINANCE'].includes(user?.role || '')) {
+      return res.status(403).json({ error: 'Akses Ditolak. Hanya Supervisor ke atas yang dapat melakukan Refund transaksi.' });
     }
 
     // --- CHECK CLOSING ---

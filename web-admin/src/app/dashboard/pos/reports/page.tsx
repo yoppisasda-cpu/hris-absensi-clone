@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 import InvoiceModal from "@/components/sales/InvoiceModal";
+import ReturnSaleModal from "@/components/sales/ReturnSaleModal";
 import toast from "react-hot-toast";
 import { 
     Search, Monitor, Download, Eye, Printer, 
     Building2, Calendar, Filter, CreditCard, 
     TrendingUp, ShoppingCart, ArrowUpRight, ArrowDownRight,
-    Trophy, Sparkles, Receipt, BrainCircuit, Trash2, Users
+    Trophy, Sparkles, Receipt, BrainCircuit, Trash2, Users, RotateCcw
 } from "lucide-react";
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -54,6 +55,9 @@ export default function POSReportsPage() {
     const [editReferenceInput, setEditReferenceInput] = useState("");
     const [editPaymentMethod, setEditPaymentMethod] = useState<'TUNAI' | 'QRIS' | 'EDC' | 'TRANSFER'>('EDC');
     const [isSavingRef, setIsSavingRef] = useState(false);
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [selectedReturnSaleId, setSelectedReturnSaleId] = useState<number | null>(null);
+    const [userRole, setUserRole] = useState<string>('');
 
     const getPaymentMethodInfo = (sale: any): {
         method: 'TUNAI' | 'QRIS' | 'EDC' | 'TRANSFER';
@@ -99,14 +103,19 @@ export default function POSReportsPage() {
     };
 
     useEffect(() => {
-        const role = localStorage.getItem('userRole');
+        const role = localStorage.getItem('userRole') || '';
         const branchId = localStorage.getItem('userBranchId');
+        setUserRole(role.toUpperCase());
         
         if (role === 'POS_VIEWER' && branchId && branchId !== '') {
             setSelectedBranchId(branchId);
             setIsRestricted(true);
         }
     }, []);
+
+    // Hak Akses: Refund hanya untuk SPV ke atas, Delete untuk Admin/Finance/Owner
+    const canRefund = ['SUPERADMIN', 'ADMIN', 'OWNER', 'MANAGER', 'SUPERVISOR', 'FINANCE'].includes(userRole);
+    const canDelete = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(userRole);
 
     const fetchBranches = async () => {
         try {
@@ -909,13 +918,32 @@ export default function POSReportsPage() {
                                                 >
                                                     <Sparkles className="h-4 w-4" />
                                                 </button>
-                                                <button 
-                                                    onClick={() => handleDeleteSale(sale)}
-                                                    className="p-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 transition-all shadow-xl active:scale-90"
-                                                    title="Hapus Transaksi (Batalkan Transaksi Tes)"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
+                                                {canRefund && (
+                                                    <button 
+                                                        onClick={() => {
+                                                            setSelectedReturnSaleId(sale.id);
+                                                            setIsReturnModalOpen(true);
+                                                        }}
+                                                        disabled={sale.status === 'RETURNED'}
+                                                        className={`p-2 rounded-xl border transition-all shadow-xl active:scale-90 ${
+                                                            sale.status === 'RETURNED' 
+                                                                ? 'bg-slate-800/40 text-slate-600 border-slate-800 cursor-not-allowed opacity-50' 
+                                                                : 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border-orange-500/20'
+                                                        }`}
+                                                        title={sale.status === 'RETURNED' ? 'Transaksi Sudah Diretur' : 'Proses Retur / Refund (Khusus SPV ke atas)'}
+                                                    >
+                                                        <RotateCcw className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button 
+                                                        onClick={() => handleDeleteSale(sale)}
+                                                        className="p-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 transition-all shadow-xl active:scale-90"
+                                                        title="Hapus Transaksi (Batalkan Transaksi Tes)"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -1171,6 +1199,19 @@ export default function POSReportsPage() {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* Modal Retur / Refund (Khusus SPV ke atas) */}
+            {isReturnModalOpen && selectedReturnSaleId && (
+                <ReturnSaleModal 
+                    isOpen={isReturnModalOpen}
+                    onClose={() => {
+                        setIsReturnModalOpen(false);
+                        setSelectedReturnSaleId(null);
+                    }}
+                    saleId={selectedReturnSaleId}
+                    onRefresh={fetchData}
+                />
             )}
         </DashboardLayout>
     );
