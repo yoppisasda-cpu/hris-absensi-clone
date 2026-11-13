@@ -85,6 +85,7 @@ export default function Sidebar() {
     const [userRole, setUserRole] = useState<string | null>(null);
     const [activeModule, setActiveModule] = useState<'ABSENSI' | 'FINANCE' | null>(null);
     const [allowedModules, setAllowedModules] = useState<string>('BOTH');
+    const [kdsEnabled, setKdsEnabled] = useState<boolean>(false);
     const [isMounted, setIsMounted] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     
@@ -139,6 +140,7 @@ export default function Sidebar() {
                 const res = await api.get('/companies/my');
                 const modules = res.data.modules || 'BOTH';
                 setAllowedModules(modules);
+                setKdsEnabled(res.data.kdsEnabled === true);
                 setCurrentCompanyName(res.data.name);
                 
                 // Soft protection: only override if we are on a generic page (dashboard)
@@ -453,14 +455,18 @@ export default function Sidebar() {
                                     <Monitor className="h-5 w-5" />
                                     POS Kasir
                                 </Link>
-                                <Link href="/dashboard/kitchen" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-amber-600/10 text-amber-400 hover:bg-slate-800 transition-colors">
-                                    <Monitor className="h-5 w-5" />
-                                    Kitchen Display (KDS)
-                                </Link>
-                                <Link href="/dashboard/queue-display" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-violet-600/10 text-violet-400 hover:bg-slate-800 transition-colors">
-                                    <Monitor className="h-5 w-5" />
-                                    Order Status (OSD)
-                                </Link>
+                                {kdsEnabled && (
+                                    <>
+                                        <Link href="/dashboard/kitchen" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-amber-600/10 text-amber-400 hover:bg-slate-800 transition-colors">
+                                            <Monitor className="h-5 w-5" />
+                                            Kitchen Display (KDS)
+                                        </Link>
+                                        <Link href="/dashboard/queue-display" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-violet-600/10 text-violet-400 hover:bg-slate-800 transition-colors">
+                                            <Monitor className="h-5 w-5" />
+                                            Order Status (OSD)
+                                        </Link>
+                                    </>
+                                )}
                                 <Link href="/dashboard/pos/reports" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-emerald-600/10 text-emerald-400 hover:bg-slate-800 transition-colors">
                                     <Monitor className="h-5 w-5" />
                                     Laporan Kasir (POS)
@@ -601,14 +607,18 @@ export default function Sidebar() {
                             <Monitor className="h-5 w-5" />
                             POS Kasir
                         </Link>
-                        <Link href="/dashboard/kitchen" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-amber-600/10 text-amber-400 hover:bg-slate-800 transition-colors">
-                            <Monitor className="h-5 w-5" />
-                            Kitchen Display (KDS)
-                        </Link>
-                        <Link href="/dashboard/queue-display" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-violet-600/10 text-violet-400 hover:bg-slate-800 transition-colors">
-                            <Monitor className="h-5 w-5" />
-                            Order Status (OSD)
-                        </Link>
+                        {kdsEnabled && (
+                            <>
+                                <Link href="/dashboard/kitchen" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-amber-600/10 text-amber-400 hover:bg-slate-800 transition-colors">
+                                    <Monitor className="h-5 w-5" />
+                                    Kitchen Display (KDS)
+                                </Link>
+                                <Link href="/dashboard/queue-display" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-violet-600/10 text-violet-400 hover:bg-slate-800 transition-colors">
+                                    <Monitor className="h-5 w-5" />
+                                    Order Status (OSD)
+                                </Link>
+                            </>
+                        )}
                     </div>
                 )}
 

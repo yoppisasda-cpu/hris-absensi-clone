@@ -35,6 +35,7 @@ interface Company {
     primaryColor: string | null;
     secondaryColor: string | null;
     posBlindClosing: boolean;
+    kdsEnabled?: boolean;
     globalTaxRate: number;
     openTime: string | null;
     closeTime: string | null;
@@ -68,6 +69,7 @@ export default function CompanyProfilePage() {
         primaryColor: '#3B82F6',
         secondaryColor: '#1E293B',
         posBlindClosing: false,
+        kdsEnabled: false,
         globalTaxRate: 0,
         deliveryNoteTerms: '',
         paymentInstructions: '',
@@ -129,6 +131,7 @@ export default function CompanyProfilePage() {
                 primaryColor: response.data.primaryColor || '#3B82F6',
                 secondaryColor: response.data.secondaryColor || '#1E293B',
                 posBlindClosing: response.data.posBlindClosing || false,
+                kdsEnabled: response.data.kdsEnabled || false,
                 globalTaxRate: response.data.globalTaxRate || 0,
                 deliveryNoteTerms: response.data.deliveryNoteTerms || '',
                 paymentInstructions: response.data.paymentInstructions || '',
@@ -199,6 +202,7 @@ export default function CompanyProfilePage() {
                 primaryColor: formData.primaryColor,
                 secondaryColor: formData.secondaryColor,
                 posBlindClosing: formData.posBlindClosing,
+                kdsEnabled: formData.kdsEnabled,
                 globalTaxRate: formData.globalTaxRate,
                 deliveryNoteTerms: formData.deliveryNoteTerms,
                 paymentInstructions: formData.paymentInstructions,
@@ -1087,6 +1091,24 @@ export default function CompanyProfilePage() {
                                             className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none ${formData.posBlindClosing ? 'bg-rose-500' : 'bg-slate-300'}`}
                                         >
                                             <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.posBlindClosing ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mt-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-12 w-12 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 shadow-sm border border-amber-200">
+                                                <span className="font-black text-base">KDS</span>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-800">Kitchen Display System (KDS) & Layar Antrean (OSD)</h4>
+                                                <p className="text-xs text-slate-500 max-w-sm mt-0.5">Aktifkan monitor pesanan dapur (KDS) dan layar panggilan antrean. Secara default dimatikan untuk menghemat resource sistem.</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, kdsEnabled: !formData.kdsEnabled })}
+                                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none ${formData.kdsEnabled ? 'bg-amber-500' : 'bg-slate-300'}`}
+                                        >
+                                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.kdsEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                                         </button>
                                     </div>
                                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mt-4 flex items-center justify-between">

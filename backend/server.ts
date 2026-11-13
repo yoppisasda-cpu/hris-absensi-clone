@@ -180,6 +180,7 @@ const runAutoMigration = async () => {
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "openTime" TEXT DEFAULT '08:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "closeTime" TEXT DEFAULT '22:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "isOpenManual" BOOLEAN DEFAULT true`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "kdsEnabled" BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "supplierInvoiceNumber" TEXT`,
     `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceDate" TIMESTAMP`,
     `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceDueDate" TIMESTAMP`,
@@ -4480,6 +4481,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       timezone,
       addons,
       posBlindClosing,
+      kdsEnabled,
       globalTaxRate,
       deliveryNoteTerms,
       paymentInstructions,
@@ -4559,6 +4561,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         waGatewayUrl: waGatewayUrl !== undefined ? waGatewayUrl : undefined,
         waProspectTemplate: waProspectTemplate !== undefined ? waProspectTemplate : undefined,
         posBlindClosing: posBlindClosing !== undefined ? !!posBlindClosing : undefined,
+        kdsEnabled: kdsEnabled !== undefined ? (kdsEnabled === true || kdsEnabled === 'true') : undefined,
         globalTaxRate: parseNum(globalTaxRate),
         timezone: timezone || undefined,
         addons: Array.isArray(addons) ? addons : undefined,
@@ -20634,6 +20637,12 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
       }
 
+      const tenantCompanyInfo = await tx.company.findUnique({
+        where: { id: tenantId },
+        select: { kdsEnabled: true }
+      });
+      const isKdsActive = tenantCompanyInfo?.kdsEnabled === true;
+
       const sale = await tx.sale.create({
         data: {
           companyId: tenantId,
@@ -20664,7 +20673,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           pointsEarned: finalPointsEarned,
           taxRate: Number(taxRate) || 0,
           taxAmount: Number(taxAmount) || 0,
-          kitchenStatus: 'PREPARING',
+          kitchenStatus: isKdsActive ? 'PREPARING' : 'SERVED',
           queueNumber: existingQueueNumber
         }
       });
@@ -21034,8 +21043,12 @@ app.post('/api/pos/hold', tenantMiddleware, async (req: Request, res: Response) 
     const userId = Number((req as any).userId);
     const { label, items, saleType, branchId } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
+    const [user, tenantCompany] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } }),
+      prisma.company.findUnique({ where: { id: tenantId }, select: { kdsEnabled: true } })
+    ]);
     const resolvedBranchId = (branchId !== undefined && branchId !== null && branchId !== '') ? Number(branchId) : (user?.branchId || 0);
+    const isKdsActive = tenantCompany?.kdsEnabled === true;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -21059,7 +21072,7 @@ app.post('/api/pos/hold', tenantMiddleware, async (req: Request, res: Response) 
         label: label || 'Pesanan',
         items: items, // JSON
         saleType: saleType || 'DINE_IN',
-        kitchenStatus: 'PREPARING',
+        kitchenStatus: isKdsActive ? 'PREPARING' : 'SERVED',
         queueNumber: nextQueueNumber
       },
     });
@@ -21390,6 +21403,13 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
 app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const comp = await prisma.company.findUnique({
+      where: { id: tenantId },
+      select: { kdsEnabled: true }
+    });
+    if (!comp?.kdsEnabled) {
+      return res.json([]);
+    }
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     
     // Fetch from Pending Bills (active within last 24h)

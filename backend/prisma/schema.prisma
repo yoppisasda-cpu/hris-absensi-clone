@@ -75,6 +75,7 @@ model Company {
   waProspectTemplate      String?
   timezone                String                    @default("Asia/Jakarta")
   posBlindClosing         Boolean                   @default(false)
+  kdsEnabled              Boolean                   @default(false)
   openTime                String?                   @default("08:00")
   closeTime               String?                   @default("22:00")
   isOpenManual            Boolean                   @default(true)
