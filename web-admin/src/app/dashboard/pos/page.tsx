@@ -106,6 +106,14 @@ export default function POSPage() {
     const [agentKasirIp, setAgentKasirIp] = useState("192.168.1.200");
     const [agentDapurIp, setAgentDapurIp] = useState("192.168.1.201");
     const [agentBarIp, setAgentBarIp] = useState("192.168.1.202");
+    const [agentKasirEnabled, setAgentKasirEnabled] = useState(true);
+    const [agentDapurEnabled, setAgentDapurEnabled] = useState(true);
+    const [agentBarEnabled, setAgentBarEnabled] = useState(true);
+    const [agentKasirCopies, setAgentKasirCopies] = useState(1);
+    const [agentDapurCopies, setAgentDapurCopies] = useState(1);
+    const [agentBarCopies, setAgentBarCopies] = useState(1);
+    const [browserCombineTickets, setBrowserCombineTickets] = useState(false);
+    const [browserPrintTarget, setBrowserPrintTarget] = useState<'all' | 'kasir' | 'dapur' | 'bar'>('kasir');
     const [agentTesting, setAgentTesting] = useState<string | null>(null);
 
     // RECEIPT IDENTITY STATES
@@ -369,6 +377,23 @@ export default function POSPage() {
             if (localDapur) setAgentDapurIp(localDapur);
             if (localBar) setAgentBarIp(localBar);
 
+            const kEn = localStorage.getItem('lan_print_kasir_enabled');
+            const dEn = localStorage.getItem('lan_print_dapur_enabled');
+            const bEn = localStorage.getItem('lan_print_bar_enabled');
+            if (kEn !== null) setAgentKasirEnabled(kEn !== 'false');
+            if (dEn !== null) setAgentDapurEnabled(dEn !== 'false');
+            if (bEn !== null) setAgentBarEnabled(bEn !== 'false');
+
+            const kCop = localStorage.getItem('lan_print_kasir_copies');
+            const dCop = localStorage.getItem('lan_print_dapur_copies');
+            const bCop = localStorage.getItem('lan_print_bar_copies');
+            if (kCop) setAgentKasirCopies(Math.max(1, parseInt(kCop) || 1));
+            if (dCop) setAgentDapurCopies(Math.max(1, parseInt(dCop) || 1));
+            if (bCop) setAgentBarCopies(Math.max(1, parseInt(bCop) || 1));
+
+            const combine = localStorage.getItem('pos_browser_combine_tickets');
+            if (combine !== null) setBrowserCombineTickets(combine === 'true');
+
             const savedStoreName = localStorage.getItem('pos_receipt_store_name');
             const savedStoreAddress = localStorage.getItem('pos_receipt_store_address');
             const savedStorePhone = localStorage.getItem('pos_receipt_store_phone');
@@ -383,6 +408,13 @@ export default function POSPage() {
         const interval = setInterval(checkPrintAgent, 12000);
         return () => clearInterval(interval);
     }, []);
+
+    const triggerBrowserPrint = (target: 'all' | 'kasir' | 'dapur' | 'bar') => {
+        setBrowserPrintTarget(target);
+        setTimeout(() => {
+            window.print();
+        }, 80);
+    };
 
     const handlePrintAll = async () => {
         const finalDisplayName = receiptStoreName.trim() || companyName || "AIVOLA POS";
@@ -400,9 +432,9 @@ export default function POSPage() {
                         footer: receiptStoreFooter.trim()
                     },
                     config: {
-                        kasir: { ip: agentKasirIp.trim(), port: 9100 },
-                        dapur: { ip: agentDapurIp.trim(), port: 9100 },
-                        bar: { ip: agentBarIp.trim(), port: 9100 }
+                        kasir: { ip: agentKasirIp.trim(), port: 9100, enabled: agentKasirEnabled, copies: agentKasirCopies },
+                        dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: agentDapurEnabled, copies: agentDapurCopies },
+                        bar: { ip: agentBarIp.trim(), port: 9100, enabled: agentBarEnabled, copies: agentBarCopies }
                     }
                 };
                 const res = await fetch("http://localhost:18181/print", {
@@ -412,7 +444,7 @@ export default function POSPage() {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    toast.success("Pesanan sukses dikirim ke Kasir, Dapur & Bar!", { id: "agent-print" });
+                    toast.success("Pesanan sukses dikirim ke printer yang aktif!", { id: "agent-print" });
                     return;
                 }
             } catch (e) {
@@ -420,7 +452,7 @@ export default function POSPage() {
                 toast.error("Gagal koneksi ke Print Agent, membuka dialog print browser...", { id: "agent-print" });
             }
         }
-        window.print();
+        triggerBrowserPrint(browserCombineTickets ? 'all' : 'kasir');
     };
 
     const handleTestAgentPrint = async (target: string, ip: string) => {
@@ -462,6 +494,13 @@ export default function POSPage() {
             localStorage.setItem('lan_print_kasir_ip', cleanKasir);
             localStorage.setItem('lan_print_dapur_ip', cleanDapur);
             localStorage.setItem('lan_print_bar_ip', cleanBar);
+            localStorage.setItem('lan_print_kasir_enabled', String(agentKasirEnabled));
+            localStorage.setItem('lan_print_dapur_enabled', String(agentDapurEnabled));
+            localStorage.setItem('lan_print_bar_enabled', String(agentBarEnabled));
+            localStorage.setItem('lan_print_kasir_copies', String(agentKasirCopies));
+            localStorage.setItem('lan_print_dapur_copies', String(agentDapurCopies));
+            localStorage.setItem('lan_print_bar_copies', String(agentBarCopies));
+            localStorage.setItem('pos_browser_combine_tickets', String(browserCombineTickets));
 
             localStorage.setItem('pos_receipt_store_name', cleanStoreName);
             localStorage.setItem('pos_receipt_store_address', cleanStoreAddress);
@@ -470,9 +509,9 @@ export default function POSPage() {
         }
 
         const newConfig = {
-            kasir: { ip: cleanKasir, port: 9100, enabled: true },
-            dapur: { ip: cleanDapur, port: 9100, enabled: true },
-            bar: { ip: cleanBar, port: 9100, enabled: true }
+            kasir: { ip: cleanKasir, port: 9100, enabled: agentKasirEnabled, copies: agentKasirCopies },
+            dapur: { ip: cleanDapur, port: 9100, enabled: agentDapurEnabled, copies: agentDapurCopies },
+            bar: { ip: cleanBar, port: 9100, enabled: agentBarEnabled, copies: agentBarCopies }
         };
 
         if (printAgentOnline) {
@@ -2303,6 +2342,9 @@ export default function POSPage() {
 
                     {/* HIDDEN PRINTABLE RECEIPT */}
                     <div id="thermal-receipt" className="hidden print:block font-mono text-[11px] p-2 bg-white text-black w-[58mm] leading-tight">
+                        {/* 1. STRUK KASIR / PELANGGAN */}
+                        {(browserPrintTarget === 'all' || browserPrintTarget === 'kasir') && agentKasirEnabled && (
+                        <div>
                         <div className="text-center mb-3">
                             {companyLogo && (
                                 <div className="flex justify-center mb-2">
@@ -2380,13 +2422,17 @@ export default function POSPage() {
                             <p>{receiptStoreFooter || 'Terima kasih atas kunjungan Anda!'}</p>
                             <p className="text-[9px] mt-1 text-gray-500">Powered by Aivola</p>
                         </div>
+                        </div>
+                        )}
 
-                        {/* 2. TIKET DAPUR (KITCHEN) - Otomatis jika terdapat menu makanan */}
-                        {lastCart.some(it => !isBeverageItem(it)) && (
-                            <div className="mt-6 pt-4 border-t-2 border-dashed border-black">
-                                <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
-                                    - - - - ✂️ POTONG DISINI (DAPUR) ✂️ - - - -
-                                </div>
+                        {/* 2. TIKET DAPUR (KITCHEN) - Hanya jika dipilih Cetak Dapur atau Gabung Tiket aktif */}
+                        {(browserPrintTarget === 'all' || browserPrintTarget === 'dapur') && agentDapurEnabled && lastCart.some(it => !isBeverageItem(it)) && (
+                            <div className={`${browserPrintTarget === 'all' ? 'mt-6 pt-4 border-t-2 border-dashed border-black' : ''}`}>
+                                {browserPrintTarget === 'all' && (
+                                    <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
+                                        - - - - ✂️ POTONG DISINI (DAPUR) ✂️ - - - -
+                                    </div>
+                                )}
                                 <div className="text-center mb-3">
                                     <h2 className="font-black text-sm uppercase tracking-wider">*** TIKET DAPUR ***</h2>
                                     <p className="text-[10px] font-bold">KITCHEN ORDER TICKET</p>
@@ -2424,12 +2470,14 @@ export default function POSPage() {
                             </div>
                         )}
 
-                        {/* 3. TIKET BAR (MINUMAN) - Otomatis jika terdapat menu minuman */}
-                        {lastCart.some(it => isBeverageItem(it)) && (
-                            <div className="mt-6 pt-4 border-t-2 border-dashed border-black">
-                                <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
-                                    - - - - ✂️ POTONG DISINI (BAR) ✂️ - - - -
-                                </div>
+                        {/* 3. TIKET BAR (MINUMAN) - Hanya jika dipilih Cetak Bar atau Gabung Tiket aktif */}
+                        {(browserPrintTarget === 'all' || browserPrintTarget === 'bar') && agentBarEnabled && lastCart.some(it => isBeverageItem(it)) && (
+                            <div className={`${browserPrintTarget === 'all' ? 'mt-6 pt-4 border-t-2 border-dashed border-black' : ''}`}>
+                                {browserPrintTarget === 'all' && (
+                                    <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
+                                        - - - - ✂️ POTONG DISINI (BAR) ✂️ - - - -
+                                    </div>
+                                )}
                                 <div className="text-center mb-3">
                                     <h2 className="font-black text-sm uppercase tracking-wider">*** TIKET BAR ***</h2>
                                     <p className="text-[10px] font-bold">BAR / DRINKS ORDER TICKET</p>
@@ -2518,8 +2566,30 @@ export default function POSPage() {
                                     className="flex items-center justify-center gap-3 w-full py-5 bg-blue-600 text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] hover:bg-blue-500 shadow-2xl shadow-blue-500/20 transition-all active:scale-95 italic border-b-4 border-blue-900"
                                 >
                                     <Printer className="h-4 w-4 stroke-[3px]" />
-                                    {printAgentOnline ? "Cetak Otomatis (Kasir, Dapur, Bar)" : "Cetak Struk & Tiket"}
+                                    {printAgentOnline ? "Cetak Otomatis (Kasir, Dapur, Bar)" : (browserCombineTickets ? "Cetak Gabungan (Kasir+Dapur+Bar)" : "Cetak Struk Kasir")}
                                 </button>
+                                {!printAgentOnline && !browserCombineTickets && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {agentDapurEnabled && lastCart.some(it => !isBeverageItem(it)) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => triggerBrowserPrint('dapur')}
+                                                className="py-3 px-3 rounded-2xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-300 text-[10px] font-black uppercase tracking-wider transition-all"
+                                            >
+                                                🍳 Cetak Kitchen
+                                            </button>
+                                        )}
+                                        {agentBarEnabled && lastCart.some(it => isBeverageItem(it)) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => triggerBrowserPrint('bar')}
+                                                className="py-3 px-3 rounded-2xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-[10px] font-black uppercase tracking-wider transition-all"
+                                            >
+                                                ☕ Cetak Bar
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                                 <button 
                                     onClick={() => {
                                         setShowReceipt(false);
@@ -2853,23 +2923,64 @@ export default function POSPage() {
                                     )}
 
                                     <div className="space-y-4">
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Target IP Printer Jaringan (Port 9100)</h4>
+                                        {/* Pengaturan Mode Cetak Browser */}
+                                        <div className="p-4 bg-slate-950/60 rounded-2xl border border-white/10 flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-xs font-bold text-white">Gabung Tiket Dapur & Bar di Cetak Browser (1 Printer)</p>
+                                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                                    Jika <strong>Matikan (Default)</strong>, Struk Kasir, Tiket Dapur, dan Tiket Bar dicetak terpisah agar tidak keluar rangkap 3 di setiap printer. Aktifkan hanya jika 1 printer kasir dipakai untuk mencetak semua tiket sekaligus.
+                                                </p>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={browserCombineTickets}
+                                                    onChange={(e) => setBrowserCombineTickets(e.target.checked)}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                            </label>
+                                        </div>
+
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Pengaturan Printer, Status Aktif & Jumlah Rangkap</h4>
 
                                         {/* Kasir */}
                                         <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
                                                 <div className="flex items-center gap-2">
                                                     <Printer className="h-4 w-4 text-blue-400" />
                                                     <span className="text-sm font-bold text-white">Printer Kasir (Struk Pelanggan)</span>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    disabled={!printAgentOnline || agentTesting === "kasir"}
-                                                    onClick={() => handleTestAgentPrint("kasir", agentKasirIp)}
-                                                    className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
-                                                >
-                                                    {agentTesting === "kasir" ? "Mencetak..." : "Test Print Kasir"}
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    <select
+                                                        value={agentKasirCopies}
+                                                        onChange={(e) => setAgentKasirCopies(Number(e.target.value))}
+                                                        className="px-2.5 py-1 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white"
+                                                    >
+                                                        <option value={1}>Rangkap 1x</option>
+                                                        <option value={2}>Rangkap 2x</option>
+                                                        <option value={3}>Rangkap 3x</option>
+                                                    </select>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAgentKasirEnabled(!agentKasirEnabled)}
+                                                        className={`px-2.5 py-1 rounded-xl text-xs font-bold border ${
+                                                            agentKasirEnabled
+                                                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                                                : 'bg-slate-800 text-slate-400 border-white/10'
+                                                        }`}
+                                                    >
+                                                        {agentKasirEnabled ? 'Aktif' : 'Nonaktif'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={!printAgentOnline || agentTesting === "kasir"}
+                                                        onClick={() => handleTestAgentPrint("kasir", agentKasirIp)}
+                                                        className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
+                                                    >
+                                                        {agentTesting === "kasir" ? "Mencetak..." : "Test Print"}
+                                                    </button>
+                                                </div>
                                             </div>
                                             <input 
                                                 type="text"
@@ -2882,19 +2993,41 @@ export default function POSPage() {
 
                                         {/* Dapur */}
                                         <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-lg">🍳</span>
                                                     <span className="text-sm font-bold text-white">Printer Dapur (Khusus Makanan / Food)</span>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    disabled={!printAgentOnline || agentTesting === "dapur"}
-                                                    onClick={() => handleTestAgentPrint("dapur", agentDapurIp)}
-                                                    className="px-3 py-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
-                                                >
-                                                    {agentTesting === "dapur" ? "Mencetak..." : "Test Print Dapur"}
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    <select
+                                                        value={agentDapurCopies}
+                                                        onChange={(e) => setAgentDapurCopies(Number(e.target.value))}
+                                                        className="px-2.5 py-1 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white"
+                                                    >
+                                                        <option value={1}>Rangkap 1x</option>
+                                                        <option value={2}>Rangkap 2x</option>
+                                                        <option value={3}>Rangkap 3x</option>
+                                                    </select>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAgentDapurEnabled(!agentDapurEnabled)}
+                                                        className={`px-2.5 py-1 rounded-xl text-xs font-bold border ${
+                                                            agentDapurEnabled
+                                                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                                                : 'bg-slate-800 text-slate-400 border-white/10'
+                                                        }`}
+                                                    >
+                                                        {agentDapurEnabled ? 'Aktif' : 'Nonaktif'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={!printAgentOnline || agentTesting === "dapur"}
+                                                        onClick={() => handleTestAgentPrint("dapur", agentDapurIp)}
+                                                        className="px-3 py-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
+                                                    >
+                                                        {agentTesting === "dapur" ? "Mencetak..." : "Test Print"}
+                                                    </button>
+                                                </div>
                                             </div>
                                             <input 
                                                 type="text"
@@ -2908,19 +3041,41 @@ export default function POSPage() {
 
                                         {/* Bar */}
                                         <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3">
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-lg">☕</span>
                                                     <span className="text-sm font-bold text-white">Printer Bar (Khusus Minuman / Beverage)</span>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    disabled={!printAgentOnline || agentTesting === "bar"}
-                                                    onClick={() => handleTestAgentPrint("bar", agentBarIp)}
-                                                    className="px-3 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
-                                                >
-                                                    {agentTesting === "bar" ? "Mencetak..." : "Test Print Bar"}
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    <select
+                                                        value={agentBarCopies}
+                                                        onChange={(e) => setAgentBarCopies(Number(e.target.value))}
+                                                        className="px-2.5 py-1 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white"
+                                                    >
+                                                        <option value={1}>Rangkap 1x</option>
+                                                        <option value={2}>Rangkap 2x</option>
+                                                        <option value={3}>Rangkap 3x</option>
+                                                    </select>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAgentBarEnabled(!agentBarEnabled)}
+                                                        className={`px-2.5 py-1 rounded-xl text-xs font-bold border ${
+                                                            agentBarEnabled
+                                                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                                                : 'bg-slate-800 text-slate-400 border-white/10'
+                                                        }`}
+                                                    >
+                                                        {agentBarEnabled ? 'Aktif' : 'Nonaktif'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={!printAgentOnline || agentTesting === "bar"}
+                                                        onClick={() => handleTestAgentPrint("bar", agentBarIp)}
+                                                        className="px-3 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 rounded-xl text-xs font-bold disabled:opacity-50"
+                                                    >
+                                                        {agentTesting === "bar" ? "Mencetak..." : "Test Print"}
+                                                    </button>
+                                                </div>
                                             </div>
                                             <input 
                                                 type="text"

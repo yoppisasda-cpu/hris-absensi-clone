@@ -16,9 +16,9 @@ const CONFIG_FILE = path.join(__dirname, 'config.json');
 // Default Configuration
 let config = {
     port: 18181,
-    kasir: { enabled: true, ip: '192.168.1.200', port: 9100 },
-    dapur: { enabled: true, ip: '192.168.1.201', port: 9100 },
-    bar:   { enabled: true, ip: '192.168.1.202', port: 9100 }
+    kasir: { enabled: true, ip: '192.168.1.200', port: 9100, copies: 1 },
+    dapur: { enabled: true, ip: '192.168.1.201', port: 9100, copies: 1 },
+    bar:   { enabled: true, ip: '192.168.1.202', port: 9100, copies: 1 }
 };
 
 function loadConfig() {
@@ -158,18 +158,29 @@ const server = http.createServer((req, res) => {
                 }
                 const results = {};
 
+                // Helper to repeat buffer by copies count (1..5)
+                const repeatBuffer = (buf, copies = 1) => {
+                    const count = Math.max(1, Math.min(5, Number(copies) || 1));
+                    if (count === 1) return buf;
+                    return Buffer.concat(Array(count).fill(buf));
+                };
+
                 // A. Kasir Receipt (All Items)
-                if (config.kasir && config.kasir.enabled !== false) {
+                if (config.kasir && config.kasir.enabled !== false && config.kasir.ip) {
                     const receiptBuf = buildReceiptBuffer(sale, cart, companyName, store);
-                    results.kasir = await sendToPrinter(config.kasir.ip, config.kasir.port, receiptBuf);
+                    const finalBuf = repeatBuffer(receiptBuf, config.kasir.copies);
+                    results.kasir = await sendToPrinter(config.kasir.ip, config.kasir.port, finalBuf);
+                } else {
+                    results.kasir = { skipped: true, reason: 'Kasir dinonaktifkan' };
                 }
 
                 // B. Kitchen Ticket (Food Only)
                 const foodItems = cart.filter(it => !isBeverage(it));
-                if (config.dapur && config.dapur.enabled !== false && foodItems.length > 0) {
+                if (config.dapur && config.dapur.enabled !== false && config.dapur.ip && foodItems.length > 0) {
                     const kitchenBuf = buildKitchenBuffer(sale, foodItems);
                     if (kitchenBuf) {
-                        results.dapur = await sendToPrinter(config.dapur.ip, config.dapur.port, kitchenBuf);
+                        const finalBuf = repeatBuffer(kitchenBuf, config.dapur.copies);
+                        results.dapur = await sendToPrinter(config.dapur.ip, config.dapur.port, finalBuf);
                     }
                 } else {
                     results.dapur = { skipped: true, reason: foodItems.length === 0 ? 'Tidak ada makanan' : 'Dapur dinonaktifkan' };
@@ -177,10 +188,11 @@ const server = http.createServer((req, res) => {
 
                 // C. Bar Ticket (Beverage Only)
                 const beverageItems = cart.filter(it => isBeverage(it));
-                if (config.bar && config.bar.enabled !== false && beverageItems.length > 0) {
+                if (config.bar && config.bar.enabled !== false && config.bar.ip && beverageItems.length > 0) {
                     const barBuf = buildBarBuffer(sale, beverageItems);
                     if (barBuf) {
-                        results.bar = await sendToPrinter(config.bar.ip, config.bar.port, barBuf);
+                        const finalBuf = repeatBuffer(barBuf, config.bar.copies);
+                        results.bar = await sendToPrinter(config.bar.ip, config.bar.port, finalBuf);
                     }
                 } else {
                     results.bar = { skipped: true, reason: beverageItems.length === 0 ? 'Tidak ada minuman' : 'Bar dinonaktifkan' };
