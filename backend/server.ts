@@ -211,6 +211,17 @@ const runAutoMigration = async () => {
     `CREATE INDEX IF NOT EXISTS "idx_auditlog_company_createdat" ON "AuditLog" ("companyId", "createdAt" DESC)`,
     `CREATE INDEX IF NOT EXISTS "idx_income_company_date" ON "Income" ("companyId", "date" DESC)`,
     `CREATE INDEX IF NOT EXISTS "idx_expense_company_date" ON "Expense" ("companyId", "date" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_sale_customerid" ON "Sale" ("customerId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_sale_company_kitchen_created" ON "Sale" ("companyId", "kitchenStatus", "createdAt" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_sale_company_status_saletype" ON "Sale" ("companyId", "status", "saleType", "date" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_sale_salespersonid" ON "Sale" ("salespersonId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_sale_accountid" ON "Sale" ("accountId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_stocktransaction_createdat" ON "StockTransaction" ("createdAt" DESC)`,
+    `CREATE INDEX IF NOT EXISTS "idx_warehousestock_warehouseid" ON "WarehouseStock" ("warehouseId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_warehousestock_productid" ON "WarehouseStock" ("productId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_product_companyid" ON "Product" ("companyId")`,
+    `CREATE INDEX IF NOT EXISTS "idx_customer_company_phone" ON "Customer" ("companyId", "phone")`,
+    `CREATE INDEX IF NOT EXISTS "idx_pendingbill_company_kitchen" ON "PendingBill" ("companyId", "kitchenStatus", "createdAt" ASC)`,
     // Ensure B2B Sales Orders are never associated with a POS cashier register
     `UPDATE "Sale" SET "cashierId" = NULL WHERE "saleType" = 'B2B' OR "invoiceNumber" LIKE 'INV-PO-%' OR id IN (SELECT "saleId" FROM "SalesOrder" WHERE "saleId" IS NOT NULL)`,
   ];
@@ -16294,21 +16305,30 @@ app.post('/api/products/sync-bulk-stock', tenantMiddleware, async (req: Request,
 app.get('/api/inventory/transactions', tenantMiddleware, async (req: any, res) => {
   try {
     const tenantId = Number(req.tenantId);
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 500, 1), 5000);
     const transactions: any[] = await prisma.$queryRawUnsafe(`
       SELECT st.*, 
              p.name as product_name, 
              p.sku as product_sku, 
              p.unit as product_unit, 
              p."purchaseUnit" as product_purchase_unit,
-             COALESCE((SELECT SUM(ws.quantity) FROM "WarehouseStock" ws WHERE ws."productId" = p.id), p.stock) as current_stock,
+             COALESCE(ws_sum.total_qty, p.stock) as current_stock,
              p.type as product_type,
              w.name as warehouse_name
       FROM "StockTransaction" st
       JOIN "Product" p ON st."productId" = p.id
       LEFT JOIN "Warehouse" w ON st."warehouseId" = w.id
+      LEFT JOIN (
+        SELECT ws."productId", SUM(ws.quantity) as total_qty
+        FROM "WarehouseStock" ws
+        JOIN "Product" pr ON ws."productId" = pr.id
+        WHERE pr."companyId" = $1
+        GROUP BY ws."productId"
+      ) ws_sum ON ws_sum."productId" = p.id
       WHERE p."companyId" = $1
       ORDER BY st."createdAt" DESC
-    `, tenantId);
+      LIMIT $2
+    `, tenantId, limit);
     const formatted = transactions.map(t => ({
       ...t,
       quantity: t.quantity != null ? Number(t.quantity) : t.quantity
@@ -16428,10 +16448,19 @@ app.get('/api/customers', tenantMiddleware, async (req: Request, res: Response) 
     const tenantId = Number((req as any).tenantId);
     const customers = await prisma.$queryRawUnsafe(`
       SELECT c.*, 
-        (SELECT MAX("date") FROM "Sale" WHERE "customerId" = c.id) as "lastPurchaseDate",
-        COALESCE((SELECT SUM("totalAmount") FROM "Sale" WHERE "customerId" = c.id AND "status" != 'CANCELLED'), 0)::FLOAT as "totalSpent",
-        (SELECT COUNT(*) FROM "Sale" WHERE "customerId" = c.id AND "status" != 'CANCELLED')::INT as "totalOrders"
-      FROM "Customer" c 
+        s_agg."lastPurchaseDate",
+        COALESCE(s_agg."totalSpent", 0)::FLOAT as "totalSpent",
+        COALESCE(s_agg."totalOrders", 0)::INT as "totalOrders"
+      FROM "Customer" c
+      LEFT JOIN (
+        SELECT "customerId",
+               MAX("date") as "lastPurchaseDate",
+               SUM("totalAmount") FILTER (WHERE "status" != 'CANCELLED') as "totalSpent",
+               COUNT(*) FILTER (WHERE "status" != 'CANCELLED') as "totalOrders"
+        FROM "Sale"
+        WHERE "companyId" = $1 AND "customerId" IS NOT NULL
+        GROUP BY "customerId"
+      ) s_agg ON s_agg."customerId" = c.id
       WHERE c."companyId" = $1 
       ORDER BY c."name" ASC
     `, tenantId);
@@ -18476,16 +18505,11 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
              COALESCE(c.name, s."customerName") as "customerName", 
              fa.name as "accountName",
              u.name as "salespersonName",
-             (s."totalAmount" - COALESCE(sr."totalRefund", 0)) as "netTotalAmount"
+             (s."totalAmount" - COALESCE((SELECT SUM(sr."totalRefundAmount") FROM "SaleReturn" sr WHERE sr."saleId" = s.id), 0)) as "netTotalAmount"
       FROM "Sale" s
       LEFT JOIN "Customer" c ON s."customerId" = c.id
       LEFT JOIN "FinancialAccount" fa ON s."accountId" = fa.id
       LEFT JOIN "User" u ON s."salespersonId" = u.id
-      LEFT JOIN (
-        SELECT "saleId", SUM("totalRefundAmount") as "totalRefund"
-        FROM "SaleReturn"
-        GROUP BY "saleId"
-      ) sr ON sr."saleId" = s.id
       WHERE ${filterRes.whereClause}
       ORDER BY s."date" DESC
     `, ...filterRes.queryParams);
@@ -20514,38 +20538,40 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
       }
 
-      // B. Universal POS Idempotency & Deduplication Guard (120-second window):
-      // Protects against accidental double-taps, network retry replays, and repeated cashier checkout attempts
-      // with identical item lists, total amount, and payment method within a 2-minute window across all tenants.
-      const twoMinutesAgo = new Date(Date.now() - 120 * 1000);
-      const recentSales = await tx.sale.findMany({
-        where: {
-          companyId: tenantId,
-          totalAmount: Number(totalAmount),
-          saleType: saleType,
-          status: { notIn: ['CANCELLED', 'VOID'] },
-          createdAt: { gte: twoMinutesAgo }
-        },
-        include: { SaleItem: true },
-        orderBy: { id: 'desc' },
-        take: 10
-      });
+      // B. Universal POS Idempotency & Deduplication Guard:
+      // Only run when offlineInvoiceNumber is not provided (offline sync already checks unique invoiceNumber above).
+      if (!req.body.offlineInvoiceNumber) {
+        const fifteenSecondsAgo = new Date(Date.now() - 15 * 1000);
+        const recentSales = await tx.sale.findMany({
+          where: {
+            companyId: tenantId,
+            totalAmount: Number(totalAmount),
+            saleType: saleType,
+            paymentMethod: detectedNormalizedMethod,
+            status: { notIn: ['CANCELLED', 'VOID'] },
+            createdAt: { gte: fifteenSecondsAgo }
+          },
+          include: { SaleItem: true },
+          orderBy: { id: 'desc' },
+          take: 5
+        });
 
-      if (items && Array.isArray(items) && items.length > 0 && recentSales.length > 0) {
-        const incomingSig = items
-          .map((i: any) => `${Number(i.productId || i.id)}:${Number(i.quantity || i.qty)}:${Number(i.price)}`)
-          .sort()
-          .join('|');
-
-        for (const candidate of recentSales) {
-          const candidateSig = candidate.SaleItem
-            .map((i: any) => `${Number(i.productId)}:${Number(i.quantity)}:${Number(i.price)}`)
+        if (items && Array.isArray(items) && items.length > 0 && recentSales.length > 0) {
+          const incomingSig = items
+            .map((i: any) => `${Number(i.productId || i.id)}:${Number(i.quantity || i.qty)}:${Number(i.price)}`)
             .sort()
             .join('|');
 
-          if (incomingSig === candidateSig) {
-            console.warn(`[POS CHECKOUT DEDUPLICATION] Blocked duplicate checkout attempt for tenant ${tenantId} (${saleType}, Rp ${totalAmount}). Returning original sale #${candidate.id} (${candidate.invoiceNumber}).`);
-            return candidate;
+          for (const candidate of recentSales) {
+            const candidateSig = candidate.SaleItem
+              .map((i: any) => `${Number(i.productId)}:${Number(i.quantity)}:${Number(i.price)}`)
+              .sort()
+              .join('|');
+
+            if (incomingSig === candidateSig) {
+              console.warn(`[POS CHECKOUT DEDUPLICATION] Blocked duplicate checkout attempt for tenant ${tenantId} (${saleType}, Rp ${totalAmount}). Returning original sale #${candidate.id} (${candidate.invoiceNumber}).`);
+              return candidate;
+            }
           }
         }
       }
@@ -20696,20 +20722,30 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         }
       }
 
-        // 2. Pre-fetch all recipes for items in the cart using Prisma findMany (more stable than raw SQL for Supabase)
-        const productIds = items.map((i: any) => Number(i.productId));
-        const allRecipes = await tx.productRecipe.findMany({
-            where: { productId: { in: productIds } },
-            include: { Product: { select: { recipeYield: true } } }
-        });
+        // 2. Pre-fetch all products & recipes for the tenant in 2 batch queries (eliminates recursive N+1 DB queries)
+        const [tenantProducts, allRecipes] = await Promise.all([
+            tx.product.findMany({
+                where: { companyId: tenantId },
+                select: { id: true, name: true, stock: true, trackStock: true, isAutoDeduct: true, recipeYield: true }
+            }),
+            tx.productRecipe.findMany({
+                where: { Product: { companyId: tenantId } }
+            })
+        ]);
 
-        // Group recipes by productId for easy access
+        const productMap = new Map<number, any>();
+        for (const p of tenantProducts) {
+            productMap.set(p.id, p);
+        }
+
+        // Group recipes by productId for instant in-memory access
         const recipeMap: Record<number, any[]> = {};
         allRecipes.forEach((r: any) => {
             if (!recipeMap[r.productId]) recipeMap[r.productId] = [];
+            const parentProd = productMap.get(r.productId);
             recipeMap[r.productId].push({
                 ...r,
-                recipeYield: r.Product?.recipeYield || 1
+                recipeYield: parentProd?.recipeYield || 1
             });
         });
 
@@ -20723,38 +20759,32 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                 });
             }
         }
-        const linkedOptions = await tx.customizationOption.findMany({
+        const linkedOptions = optionIds.length > 0 ? await tx.customizationOption.findMany({
             where: { id: { in: optionIds }, linkedProductId: { not: null } }
-        });
+        }) : [];
         const optionMap: Record<number, any> = {};
         linkedOptions.forEach((opt: any) => optionMap[opt.id] = opt);
 
-        // 1.7 Validate Stock before proceeding (Skip validation for offline synchronized sales since they have already been finalized)
-        const productsInCart = await tx.product.findMany({
-            where: { id: { in: productIds } },
-            select: { id: true, name: true, stock: true, trackStock: true, isAutoDeduct: true }
-        });
-
-        // Helper for recursive deduction of materials (with cycle detection)
-        async function getRecursiveDeductions(productId: number, qtyNeeded: number, visited = new Set<number>()): Promise<{ id: number, qty: number }[]> {
+        // In-memory helper for recursive deduction of materials (with cycle detection, 0 DB queries)
+        function getRecursiveDeductionsSync(productId: number, qtyNeeded: number, visited = new Set<number>()): { id: number, qty: number }[] {
             if (visited.has(productId)) {
                 console.warn(`[WARNING] Cycle detected in BOM for product ID ${productId}. Breaking infinite loop.`);
                 return [];
             }
             visited.add(productId);
 
-            const product = await tx.product.findUnique({ where: { id: productId } });
+            const product = productMap.get(productId);
             if (!product) return [];
 
             // If Auto Deduct is ON, we don't deduct the parent directly, we explode its recipe
             if (product.isAutoDeduct) {
-                const recipes = await tx.productRecipe.findMany({ where: { productId }, include: { Product: { select: { recipeYield: true } } } });
+                const recipes = recipeMap[productId] || [];
                 if (recipes.length > 0) {
                     let deductions: { id: number, qty: number }[] = [];
                     for (const r of recipes) {
-                        const yieldFactor = r.Product?.recipeYield || 1;
+                        const yieldFactor = r.recipeYield || product.recipeYield || 1;
                         const matQty = (Number(r.quantity) / yieldFactor) * qtyNeeded;
-                        const childDeductions = await getRecursiveDeductions(Number(r.materialId), matQty, new Set(visited));
+                        const childDeductions = getRecursiveDeductionsSync(Number(r.materialId), matQty, new Set(visited));
                         deductions = deductions.concat(childDeductions);
                     }
                     return deductions;
@@ -20764,13 +20794,14 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             return [{ id: productId, qty: qtyNeeded }];
         }
 
+        // 1.7 Validate Stock before proceeding (Skip validation for offline synchronized sales since they have already been finalized)
         if (!req.body.offlineInvoiceNumber) {
             const requiredStock: Record<number, number> = {};
 
             for (const item of items) {
                 const productId = Number(item.productId);
                 const quantity = Number(item.quantity);
-                const product = productsInCart.find(p => p.id === productId);
+                const product = productMap.get(productId);
 
                 if (product && product.trackStock !== false) {
                     const recipes = recipeMap[productId] || [];
@@ -20778,7 +20809,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                         for (const recipe of recipes) {
                             const materialId = Number(recipe.materialId);
                             const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
-                            const deductions = await getRecursiveDeductions(materialId, materialQtyNeeded, new Set([productId]));
+                            const deductions = getRecursiveDeductionsSync(materialId, materialQtyNeeded, new Set([productId]));
                             for (const ded of deductions) {
                                 requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
                             }
@@ -20796,7 +20827,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                             const opt = optionMap[optId];
                             if (opt.linkedProductId) {
                                 const modQty = quantity * (opt.linkedQuantity || 1);
-                                const deductions = await getRecursiveDeductions(Number(opt.linkedProductId), modQty);
+                                const deductions = getRecursiveDeductionsSync(Number(opt.linkedProductId), modQty);
                                 for (const ded of deductions) {
                                     requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
                                 }
@@ -20806,30 +20837,43 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
                 }
             }
 
-            // Fetch actual stock for all required products
+            // Fetch actual warehouse stock for all required products in 1 query
             const requiredProductIds = Object.keys(requiredStock).map(Number);
             if (requiredProductIds.length > 0) {
-                const stockCheckProducts = await tx.product.findMany({
-                    where: { id: { in: requiredProductIds } },
-                    select: { 
-                        id: true, 
-                        name: true, 
-                        trackStock: true,
-                        WarehouseStock: {
-                            where: { warehouseId: warehouse.id },
-                            select: { quantity: true }
-                        }
-                    }
+                const warehouseStocks = await tx.warehouseStock.findMany({
+                    where: { warehouseId: warehouse.id, productId: { in: requiredProductIds } },
+                    select: { productId: true, quantity: true }
                 });
+                const wsMap = new Map(warehouseStocks.map(ws => [ws.productId, ws.quantity]));
 
-                for (const p of stockCheckProducts) {
-                    const availableStock = p.WarehouseStock && p.WarehouseStock.length > 0 ? p.WarehouseStock[0].quantity : 0;
-                    if (p.trackStock && availableStock < requiredStock[p.id]) {
-                        throw new Error(`Stok tidak mencukupi untuk bahan/produk: ${p.name}. Dibutuhkan: ${requiredStock[p.id]}, Tersedia: ${availableStock}`);
+                for (const reqProdId of requiredProductIds) {
+                    const p = productMap.get(reqProdId);
+                    const availableStock = wsMap.get(reqProdId) ?? 0;
+                    if (p && p.trackStock && availableStock < requiredStock[reqProdId]) {
+                        throw new Error(`Stok tidak mencukupi untuk bahan/produk: ${p.name}. Dibutuhkan: ${requiredStock[reqProdId]}, Tersedia: ${availableStock}`);
                     }
                 }
             }
         }
+
+        // 3. Prepare batched SaleItems, aggregated stock deductions, and batched StockTransactions
+        const saleItemsToCreate: any[] = [];
+        const aggregatedDeductions = new Map<number, number>();
+        const stockTransactionsToCreate: any[] = [];
+        const now = new Date();
+
+        const addDeduction = (targetProductId: number, qty: number, ref: string) => {
+            if (!qty || qty <= 0) return;
+            aggregatedDeductions.set(targetProductId, (aggregatedDeductions.get(targetProductId) || 0) + qty);
+            stockTransactionsToCreate.push({
+                productId: targetProductId,
+                warehouseId: warehouse.id,
+                type: 'OUT',
+                quantity: qty,
+                reference: ref,
+                date: now
+            });
+        };
 
         for (const item of items) {
             const productId = Number(item.productId);
@@ -20855,83 +20899,38 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             }
             const hasModifiers = Object.keys(finalModifiers).length > 0;
 
-            // Add Sale Item creation
-            await tx.saleItem.create({
-                data: {
-                    saleId: sale.id,
-                    productId: productId,
-                    quantity: quantity,
-                    price: price,
-                    originalPrice: originalPrice,
-                    total: price * quantity,
-                    modifiers: hasModifiers ? finalModifiers : null
-                }
+            saleItemsToCreate.push({
+                saleId: sale.id,
+                productId: productId,
+                quantity: quantity,
+                price: price,
+                originalPrice: originalPrice,
+                total: price * quantity,
+                modifiers: hasModifiers ? finalModifiers : null
             });
 
             // --- OPTIMIZED STOCK LOGIC ---
-            const mainProduct = productsInCart.find(p => p.id === productId);
+            const mainProduct = productMap.get(productId);
             const isAutoDeduct = mainProduct?.isAutoDeduct || false;
             const recipes = recipeMap[productId] || [];
 
             // Mode Pabrikasi (isAutoDeduct = false): HANYA potong stok produk jadi.
             // Mode Made-to-Order (isAutoDeduct = true): JANGAN potong stok produk jadi (KECUALI TIDAK ADA RESEP).
             if (!isAutoDeduct || recipes.length === 0) {
-                await tx.product.update({
-                    where: { id: productId },
-                    data: { stock: { decrement: quantity } }
-                });
-
-                await tx.warehouseStock.upsert({
-                    where: { productId_warehouseId: { productId: productId, warehouseId: warehouse.id } },
-                    update: { quantity: { decrement: quantity } },
-                    create: { productId: productId, warehouseId: warehouse.id, quantity: -quantity }
-                });
-
-                await tx.stockTransaction.create({
-                    data: {
-                        productId: productId,
-                        warehouseId: warehouse.id,
-                        type: 'OUT',
-                        quantity: quantity,
-                        reference: `POS ${invoiceNumber}`,
-                        date: new Date()
-                    }
-                });
+                addDeduction(productId, quantity, `POS ${invoiceNumber}`);
             }
 
             // --- MODIFIER STOCK DEDUCTION ---
             if (item.modifiers) {
-                // Must use for..of for await inside loop
                 for (const val of Object.values(item.modifiers) as any[]) {
                     const optId = val ? (val.optionId ?? val.id) : null;
                     if (optId && optionMap[optId]) {
                         const opt = optionMap[optId];
                         if (opt.linkedProductId) {
                             const modQty = quantity * (opt.linkedQuantity || 1);
-                            
-                            const deductions = await getRecursiveDeductions(Number(opt.linkedProductId), modQty);
+                            const deductions = getRecursiveDeductionsSync(Number(opt.linkedProductId), modQty);
                             for (const ded of deductions) {
-                                await tx.product.update({
-                                    where: { id: ded.id },
-                                    data: { stock: { decrement: ded.qty } }
-                                });
-
-                                await tx.warehouseStock.upsert({
-                                    where: { productId_warehouseId: { productId: ded.id, warehouseId: warehouse.id } },
-                                    update: { quantity: { decrement: ded.qty } },
-                                    create: { productId: ded.id, warehouseId: warehouse.id, quantity: -ded.qty }
-                                });
-
-                                await tx.stockTransaction.create({
-                                    data: {
-                                        productId: ded.id,
-                                        warehouseId: warehouse.id,
-                                        type: 'OUT',
-                                        quantity: ded.qty,
-                                        reference: `POS Add-on ${invoiceNumber}`,
-                                        date: new Date()
-                                    }
-                                });
+                                addDeduction(ded.id, ded.qty, `POS Add-on ${invoiceNumber}`);
                             }
                         }
                     }
@@ -20939,39 +20938,39 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
             }
 
             // If it has a recipe AND is Made-to-Order, decrement the MATERIALS
-            // (If it's Pabrikasi/isAutoDeduct=false, we DO NOT deduct materials here, because they were deducted during Production)
             if (isAutoDeduct && recipes.length > 0) {
                 for (const recipe of recipes) {
                     const materialId = Number(recipe.materialId);
                     const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
-
-                    const deductions = await getRecursiveDeductions(materialId, materialQtyNeeded, new Set([productId]));
-                    
+                    const deductions = getRecursiveDeductionsSync(materialId, materialQtyNeeded, new Set([productId]));
                     for (const ded of deductions) {
-                        await tx.product.update({
-                            where: { id: ded.id },
-                            data: { stock: { decrement: ded.qty } }
-                        });
-    
-                        await tx.warehouseStock.upsert({
-                            where: { productId_warehouseId: { productId: ded.id, warehouseId: warehouse.id } },
-                            update: { quantity: { decrement: ded.qty } },
-                            create: { productId: ded.id, warehouseId: warehouse.id, quantity: -ded.qty }
-                        });
-    
-                        await tx.stockTransaction.create({
-                            data: {
-                                productId: ded.id,
-                                warehouseId: warehouse.id,
-                                type: 'OUT',
-                                quantity: ded.qty,
-                                reference: `POS ${invoiceNumber} (BOM Result of ${sale.invoiceNumber})`,
-                                date: new Date()
-                            }
-                        });
+                        addDeduction(ded.id, ded.qty, `POS ${invoiceNumber} (BOM Result of ${sale.invoiceNumber})`);
                     }
                 }
             }
+        }
+
+        if (saleItemsToCreate.length > 0) {
+            await tx.saleItem.createMany({ data: saleItemsToCreate });
+        }
+
+        // Apply aggregated stock updates sorted by productId ASC to prevent deadlocks and minimize row-level IO
+        const sortedDeductionIds = Array.from(aggregatedDeductions.keys()).sort((a, b) => a - b);
+        for (const dedProdId of sortedDeductionIds) {
+            const totalQty = aggregatedDeductions.get(dedProdId)!;
+            await tx.product.update({
+                where: { id: dedProdId },
+                data: { stock: { decrement: totalQty } }
+            });
+            await tx.warehouseStock.upsert({
+                where: { productId_warehouseId: { productId: dedProdId, warehouseId: warehouse.id } },
+                update: { quantity: { decrement: totalQty } },
+                create: { productId: dedProdId, warehouseId: warehouse.id, quantity: -totalQty }
+            });
+        }
+
+        if (stockTransactionsToCreate.length > 0) {
+            await tx.stockTransaction.createMany({ data: stockTransactionsToCreate });
         }
 
       // 4. Finance
@@ -20981,11 +20980,14 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
           data: { balance: { increment: effectiveTotalAmount } }
         });
 
-        const category = await tx.incomeCategory.upsert({
-          where: { companyId_name: { companyId: tenantId, name: 'Penjualan POS' } },
-          update: {},
-          create: { companyId: tenantId, name: 'Penjualan POS' }
+        let category = await tx.incomeCategory.findUnique({
+          where: { companyId_name: { companyId: tenantId, name: 'Penjualan POS' } }
         });
+        if (!category) {
+          category = await tx.incomeCategory.create({
+            data: { companyId: tenantId, name: 'Penjualan POS' }
+          });
+        }
 
         await tx.income.create({
           data: {
@@ -21388,30 +21390,50 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
 app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     
-    // Fetch from Pending Bills
+    // Fetch from Pending Bills (active within last 24h)
     const pendingBills = await prisma.pendingBill.findMany({
-      where: { companyId: tenantId, kitchenStatus: { in: ['PREPARING', 'READY'] } },
-      orderBy: { createdAt: 'asc' }
+      where: {
+        companyId: tenantId,
+        kitchenStatus: { in: ['PREPARING', 'READY'] },
+        createdAt: { gte: twentyFourHoursAgo }
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 100
     });
     
-    // Fetch from Sales
+    // Fetch from Sales (active within last 24h, bounded by take: 100 to prevent full-history scan)
     const sales = await prisma.sale.findMany({
-      where: { companyId: tenantId, kitchenStatus: { in: ['PREPARING', 'READY'] } },
+      where: {
+        companyId: tenantId,
+        kitchenStatus: { in: ['PREPARING', 'READY'] },
+        createdAt: { gte: twentyFourHoursAgo }
+      },
       orderBy: { createdAt: 'asc' },
+      take: 100,
       include: {
         SaleItem: {
-          include: { product: true }
+          include: { product: { select: { id: true, name: true, fnbType: true } } }
         }
       }
     });
 
-    // Create a map for product fnbType for pending bills
-    const allProducts = await prisma.product.findMany({ 
-      where: { companyId: tenantId }, 
+    // Only fetch fnbType for products actually referenced in pendingBills
+    const pendingProductIds = new Set<number>();
+    for (const pb of pendingBills) {
+      const parsedItems = typeof pb.items === 'string' ? JSON.parse(pb.items) : pb.items;
+      if (Array.isArray(parsedItems)) {
+        for (const it of parsedItems) {
+          if (it.productId) pendingProductIds.add(Number(it.productId));
+        }
+      }
+    }
+    const pendingProducts = pendingProductIds.size > 0 ? await prisma.product.findMany({ 
+      where: { id: { in: Array.from(pendingProductIds) } }, 
       select: { id: true, fnbType: true } 
-    });
-    const productFnbMap = new Map(allProducts.map(p => [p.id, p.fnbType]));
+    }) : [];
+    const productFnbMap = new Map(pendingProducts.map(p => [p.id, p.fnbType]));
 
     const formattedPending = pendingBills.map(pb => {
       const parsedItems = typeof pb.items === 'string' ? JSON.parse(pb.items) : pb.items;

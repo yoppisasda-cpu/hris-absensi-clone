@@ -700,13 +700,14 @@ export default function POSPage() {
         }
     };
 
-    // Auto-sync polling every 8 detik dari tablet satelit & pesanan mobile online
+    // Auto-sync polling every 15 detik dari tablet satelit & pesanan mobile online (hanya saat tab aktif)
     useEffect(() => {
         fetchActiveMobileOrders(true);
         const timer = setInterval(() => {
+            if (typeof document !== 'undefined' && document.hidden) return;
             fetchPendingBills(true);
             fetchActiveMobileOrders(true);
-        }, 8000);
+        }, 15000);
         return () => clearInterval(timer);
     }, []);
 
