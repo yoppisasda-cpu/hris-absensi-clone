@@ -88,6 +88,17 @@ export default function AccountsPage() {
         }
     };
 
+    const handleToggleShowInPos = async (id: number, currentVal: boolean) => {
+        try {
+            const newVal = !currentVal;
+            setAccounts(prev => prev.map(a => a.id === id ? { ...a, showInPos: newVal } : a));
+            await api.patch(`/finance/accounts/${id}`, { showInPos: newVal });
+        } catch (error) {
+            console.error("Gagal mengubah status POS akun:", error);
+            fetchAccounts(selectedBranchId);
+        }
+    };
+
     const openEditModal = (acc: any) => {
         setEditingAccount(acc);
         setIsModalOpen(true);
@@ -225,7 +236,35 @@ export default function AccountsPage() {
                                 </div>
                             </div>
 
-                            <div className="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
+                            {/* Status POS & Quick Toggle */}
+                            <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-slate-100">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                    acc.showInPos !== false 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                                }`}>
+                                    <span className={`h-1.5 w-1.5 rounded-full ${acc.showInPos !== false ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                                    {acc.showInPos !== false ? 'POS Aktif' : 'Non-POS'}
+                                </span>
+
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleShowInPos(acc.id, acc.showInPos !== false);
+                                    }}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${
+                                        acc.showInPos !== false
+                                        ? 'text-slate-500 hover:text-red-600 hover:bg-red-50'
+                                        : 'text-emerald-600 hover:bg-emerald-50 bg-emerald-50/50'
+                                    }`}
+                                    title={acc.showInPos !== false ? "Klik untuk sembunyikan dari sistem pembayaran POS" : "Klik untuk munculkan di sistem pembayaran POS"}
+                                >
+                                    {acc.showInPos !== false ? 'Sembunyikan di POS' : 'Tampilkan di POS'}
+                                </button>
+                            </div>
+
+                            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                                 <div className="text-lg font-black text-slate-900">
                                     Rp {acc.balance.toLocaleString()}
                                 </div>

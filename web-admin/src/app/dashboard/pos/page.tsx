@@ -240,12 +240,13 @@ export default function POSPage() {
             const [prodRes, catRes, accRes, usersRes] = await Promise.all([
                 api.get('/pos/products'),
                 api.get('/pos/categories'),
-                api.get('/finance/accounts'),
+                api.get('/finance/accounts?forPos=true'),
                 api.get('/users')
             ]);
             setProducts(prodRes.data);
             setCategories(catRes.data);
-            setAccounts(accRes.data);
+            const posAccounts = (accRes.data || []).filter((acc: any) => acc.showInPos !== false);
+            setAccounts(posAccounts);
             setSalespersons(usersRes.data);
             
             // Force manual selection to prevent accidental usage of default account
@@ -1601,7 +1602,7 @@ export default function POSPage() {
                                         <span className="text-[9px] font-bold text-slate-500">Pilih salah satu</span>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {accounts.map(acc => {
+                                        {accounts.filter(acc => acc.showInPos !== false).map(acc => {
                                             let icon = <Banknote className="h-4 w-4" />;
                                             let badgeText = "Tunai";
                                             const isSelected = selectedAccount === acc.id;
@@ -1973,7 +1974,7 @@ export default function POSPage() {
                                 <div className="space-y-3 bg-slate-900/80 p-4 rounded-3xl border border-white/5">
                                     <label className="text-xs font-black uppercase tracking-widest text-slate-300">Pilih Metode Pembayaran</label>
                                     <div className="grid grid-cols-2 gap-2.5">
-                                        {accounts.map(acc => {
+                                        {accounts.filter(acc => acc.showInPos !== false).map(acc => {
                                             let icon = <Banknote className="h-5 w-5" />;
                                             let badgeText = "Tunai";
                                             const isSelected = selectedAccount === acc.id;

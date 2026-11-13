@@ -145,6 +145,7 @@ model FinancialAccount {
   balance       Float      @default(0)
   bankName      String?
   accountNumber String?
+  showInPos     Boolean    @default(true)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   branchId      Int?

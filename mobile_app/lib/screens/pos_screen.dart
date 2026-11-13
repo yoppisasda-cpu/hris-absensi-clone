@@ -137,7 +137,7 @@ class _POSScreenState extends State<POSScreen> {
         setState(() {
           _products = cachedProducts;
           _categories = cachedCategories;
-          _accounts = cachedAccounts;
+          _accounts = cachedAccounts.where((a) => a['showInPos'] != false).toList();
           _salespersons = cachedUsers;
           if (_accounts.isNotEmpty) {
              _selectedPaymentMethod = 'Tunai';
@@ -185,7 +185,7 @@ class _POSScreenState extends State<POSScreen> {
       setState(() {
         _products = prods;
         _categories = cats;
-        _accounts = accs;
+        _accounts = accs.where((a) => a['showInPos'] != false).toList();
         _salespersons = users;
         if (_accounts.isNotEmpty) {
            _selectedPaymentMethod = 'Tunai';

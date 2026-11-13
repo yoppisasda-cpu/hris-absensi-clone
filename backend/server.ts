@@ -11489,11 +11489,15 @@ app.get('/api/chat/admin/sessions/:id', tenantMiddleware, async (req: Request, r
 // F1.1. Get Accounts
 app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { branchId } = req.query;
+    const { branchId, forPos } = req.query;
     const where: any = { companyId: (req as any).tenantId };
     
     if (branchId && branchId !== 'all') {
       where.branchId = parseInt(branchId as string);
+    }
+
+    if (String(forPos) === 'true') {
+      where.showInPos = true;
     }
 
     const accounts = await prisma.financialAccount.findMany({
@@ -11511,7 +11515,7 @@ app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Res
 // F1.2. Create Account
 app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, type, balance, branchId, bankName, accountNumber } = req.body;
+    const { name, type, balance, branchId, bankName, accountNumber, showInPos } = req.body;
     const tenantId = Number((req as any).tenantId);
 
     if (!name || !type) {
@@ -11530,7 +11534,8 @@ app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Re
         type: type.toString(),
         balance: balance ? parseFloat(balance.toString()) : 0,
         bankName: type === 'BANK' ? (bankName?.toString() || null) : null,
-        accountNumber: type === 'BANK' ? (accountNumber?.toString() || null) : null
+        accountNumber: type === 'BANK' ? (accountNumber?.toString() || null) : null,
+        showInPos: showInPos !== undefined ? Boolean(showInPos) : true
       }
     });
 
@@ -11546,17 +11551,26 @@ app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Re
 app.patch('/api/finance/accounts/:id', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, type, bankName, accountNumber } = req.body;
+    const { name, type, bankName, accountNumber, showInPos } = req.body;
     const tenantId = (req as any).tenantId;
+
+    const data: any = {};
+    if (name !== undefined) data.name = name;
+    if (type !== undefined) {
+      data.type = type;
+      data.bankName = type === 'BANK' ? (bankName || null) : null;
+      data.accountNumber = type === 'BANK' ? (accountNumber || null) : null;
+    } else {
+      if (bankName !== undefined) data.bankName = bankName || null;
+      if (accountNumber !== undefined) data.accountNumber = accountNumber || null;
+    }
+    if (showInPos !== undefined) {
+      data.showInPos = Boolean(showInPos);
+    }
 
     const account = await prisma.financialAccount.update({
       where: { id: parseInt(id as string), companyId: tenantId },
-      data: { 
-        name, 
-        type,
-        bankName: type === 'BANK' ? (bankName || null) : null,
-        accountNumber: type === 'BANK' ? (accountNumber || null) : null
-      }
+      data
     });
     res.json(account);
   } catch (error: any) {
@@ -18146,29 +18160,47 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
       }
 
       // 3.5. Kembalikan Stok Barang & Bahan Baku (BOM)
+      const targetWarehouse = await tx.warehouse.findFirst({
+        where: { companyId: tenantId, branchId: sale.branchId, type: 'STORE' }
+      }) || await tx.warehouse.findFirst({
+        where: { companyId: tenantId, isMain: true }
+      }) || await tx.warehouse.findFirst({
+        where: { companyId: tenantId }
+      });
+
       const saleItems = await tx.saleItem.findMany({ 
         where: { saleId },
-        include: { product: { select: { name: true, sku: true } } }
+        include: { product: { select: { name: true, sku: true, trackStock: true, type: true } } }
       });
       for (const item of saleItems) {
+        if (!item.productId) continue;
+        const productId = item.productId;
         const qty = parseFloat(item.quantity as any);
         
         // Return product stock
         await tx.$executeRawUnsafe(`
           UPDATE "Product" SET "stock" = "stock" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3
-        `, qty, item.productId, tenantId);
+        `, qty, productId, tenantId);
+
+        if (targetWarehouse && (item.product?.trackStock || item.product?.type !== 'FINISHED_GOOD')) {
+          await tx.warehouseStock.upsert({
+            where: { productId_warehouseId: { productId: productId, warehouseId: targetWarehouse.id } },
+            update: { quantity: { increment: qty } },
+            create: { productId: productId, warehouseId: targetWarehouse.id, quantity: qty }
+          });
+        }
 
         await tx.$executeRawUnsafe(`
-          INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
-          VALUES ($1, 'IN', $2, $3, NOW())
-        `, item.productId, qty, `Pembatalan Penjualan Inv ${sale.invoiceNumber}`);
+          INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "warehouseId")
+          VALUES ($1, 'IN', $2, $3, NOW(), $4)
+        `, productId, qty, `Pembatalan Penjualan Inv ${sale.invoiceNumber}`, targetWarehouse ? targetWarehouse.id : null);
 
         // Return materials stock if it has a recipe
         const recipes: any[] = await tx.$queryRawUnsafe(`
           SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr
           JOIN "Product" p ON pr."productId" = p.id
           WHERE pr."productId" = $1
-        `, item.productId);
+        `, productId);
 
         if (recipes.length > 0) {
           const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
@@ -18181,10 +18213,18 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
               UPDATE "Product" SET "stock" = "stock" + $1, "updatedAt" = NOW() WHERE "id" = $2
             `, totalMaterialNeeded, materialId);
 
+            if (targetWarehouse) {
+              await tx.warehouseStock.upsert({
+                where: { productId_warehouseId: { productId: materialId, warehouseId: targetWarehouse.id } },
+                update: { quantity: { increment: totalMaterialNeeded } },
+                create: { productId: materialId, warehouseId: targetWarehouse.id, quantity: totalMaterialNeeded }
+              });
+            }
+
             await tx.$executeRawUnsafe(`
-              INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date")
-              VALUES ($1, 'IN', $2, $3, NOW())
-            `, materialId, totalMaterialNeeded, `Pembatalan Penjualan (BOM) Inv ${sale.invoiceNumber}`);
+              INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "warehouseId")
+              VALUES ($1, 'IN', $2, $3, NOW(), $4)
+            `, materialId, totalMaterialNeeded, `Pembatalan Penjualan (BOM) Inv ${sale.invoiceNumber}`, targetWarehouse ? targetWarehouse.id : null);
           }
         }
       }
@@ -18258,6 +18298,7 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
     whereConditions.push(`(
       s."saleType" != 'B2B' AND 
       s."invoiceNumber" NOT LIKE 'INV-PO-%' AND 
+      s."invoiceNumber" NOT LIKE 'INV-OFFLINE-%' AND 
       (s."notes" IS NULL OR s."notes" NOT LIKE '%Dikonversi dari PO Customer%') AND
       NOT EXISTS (SELECT 1 FROM "SalesOrder" so WHERE so."saleId" = s.id)
     )`);
@@ -18798,8 +18839,11 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     if (isPosRequest) {
       whereConditions.push(`s."saleType" != 'B2B'`);
       whereConditions.push(`s."invoiceNumber" NOT LIKE 'INV-PO-%'`);
+      whereConditions.push(`s."invoiceNumber" NOT LIKE 'INV-OFFLINE-%'`);
       whereConditions.push(`(s."notes" IS NULL OR s."notes" NOT LIKE '%Dikonversi dari PO Customer%')`);
       whereConditions.push(`NOT EXISTS (SELECT 1 FROM "SalesOrder" so WHERE so."saleId" = s.id)`);
+    } else {
+      whereConditions.push(`s."invoiceNumber" NOT LIKE 'INV-OFFLINE-%'`);
     }
     if (isPosViewer) {
       whereConditions.push(`(s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')`);

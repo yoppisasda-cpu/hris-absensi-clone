@@ -16,6 +16,7 @@ interface AddAccountModalProps {
         branchId?: number | null;
         bankName?: string | null;
         accountNumber?: string | null;
+        showInPos?: boolean;
     } | null;
 }
 
@@ -26,7 +27,8 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
         balance: initialData?.balance.toString() || '0',
         branchId: initialData?.branchId?.toString() || '',
         bankName: initialData?.bankName || '',
-        accountNumber: initialData?.accountNumber || ''
+        accountNumber: initialData?.accountNumber || '',
+        showInPos: initialData?.showInPos !== undefined ? initialData.showInPos : true
     });
     const [branches, setBranches] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -53,10 +55,11 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
                 balance: initialData.balance.toString(),
                 branchId: initialData.branchId?.toString() || '',
                 bankName: initialData.bankName || '',
-                accountNumber: initialData.accountNumber || ''
+                accountNumber: initialData.accountNumber || '',
+                showInPos: initialData.showInPos !== undefined ? initialData.showInPos : true
             });
         } else {
-            setFormData({ name: '', type: 'BANK', balance: '0', branchId: '', bankName: '', accountNumber: '' });
+            setFormData({ name: '', type: 'BANK', balance: '0', branchId: '', bankName: '', accountNumber: '', showInPos: true });
         }
     }, [initialData, isOpen]);
 
@@ -70,7 +73,8 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
                 balance: formData.balance,
                 branchId: formData.branchId ? parseInt(formData.branchId) : null,
                 bankName: formData.type === 'BANK' ? formData.bankName : null,
-                accountNumber: formData.type === 'BANK' ? formData.accountNumber : null
+                accountNumber: formData.type === 'BANK' ? formData.accountNumber : null,
+                showInPos: formData.showInPos
             };
 
             if (initialData) {
@@ -82,7 +86,7 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
             }
             onSuccess();
             onClose();
-            if (!initialData) setFormData({ name: '', type: 'BANK', balance: '0', branchId: '', bankName: '', accountNumber: '' });
+            if (!initialData) setFormData({ name: '', type: 'BANK', balance: '0', branchId: '', bankName: '', accountNumber: '', showInPos: true });
         } catch (error: any) {
             console.error("Gagal menyimpan akun", error);
             alert(error.response?.data?.error || "Gagal menyimpan akun keuangan.");
@@ -215,6 +219,27 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess, initialDat
                             {initialData && (
                                 <p className="text-[8px] text-slate-600 italic ml-1 tracking-widest uppercase font-black uppercase">* Balance adjustments must be finalized via Journal Entries protocol.</p>
                             )}
+                        </div>
+
+                        {/* Checkbox / Toggle Muncul di POS */}
+                        <div className="flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-2xl">
+                            <div className="space-y-1 pr-3">
+                                <label className="text-xs font-black text-white uppercase tracking-wider italic flex items-center gap-2">
+                                    Muncul di Sistem Pembayaran (POS)
+                                </label>
+                                <p className="text-[9px] text-slate-400 font-medium leading-relaxed">
+                                    Aktifkan jika akun ini digunakan sebagai pilihan metode pembayaran saat transaksi kasir di POS. Matikan untuk kas operasional/purchasing/spv internal.
+                                </p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input 
+                                    type="checkbox" 
+                                    checked={formData.showInPos}
+                                    onChange={(e) => setFormData({ ...formData, showInPos: e.target.checked })}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </label>
                         </div>
                     </div>
 

@@ -679,9 +679,9 @@ class ApiService {
   }
 
   // Tarik daftar akun keuangan (untuk metode pembayaran)
-  Future<List<dynamic>> getFinancialAccounts() async {
+  Future<List<dynamic>> getFinancialAccounts({bool forPos = true}) async {
     try {
-      final response = await _dio.get('/finance/accounts');
+      final response = await _dio.get('/finance/accounts', queryParameters: forPos ? {'forPos': 'true'} : null);
       return response.data as List<dynamic>;
     } on DioException catch (e) {
       final errMsg = e.response?.data['error'] ?? e.message ?? e.toString();
