@@ -12830,11 +12830,13 @@ async function calculatePreviousYearsRetainedEarnings(tenantId: number, startOfY
 
   // 1. Sales Revenue
   const prevSales = await prisma.sale.findMany({
-    where: { companyId: tenantId, date: { lt: startOfYear }, status: { notIn: ['CANCELLED', 'PENDING'] } }
+    where: { companyId: tenantId, date: { lt: startOfYear }, status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] } },
+    include: { SaleReturn: true }
   });
   let prevRevenue = 0;
   prevSales.forEach((sale: any) => {
-    let amount = sale.totalAmount;
+    const refundedAmount = sale.SaleReturn?.reduce((sum: number, r: any) => sum + (Number(r.totalRefundAmount) || 0), 0) || 0;
+    let amount = Math.max(0, (Number(sale.totalAmount) || 0) - refundedAmount);
     if (sale.taxRate && sale.taxRate > 0) {
       if (sale.taxAmount && sale.taxAmount > 0) amount -= sale.taxAmount;
       else amount -= (amount * (sale.taxRate / (100 + sale.taxRate)));
@@ -12864,7 +12866,8 @@ async function calculatePreviousYearsRetainedEarnings(tenantId: number, startOfY
     const isCapex = exp.category?.type === 'CAPEX';
     const isInventory = exp.category?.type === 'INVENTORY';
     const isSystem = exp.category?.name?.startsWith('[SYSTEM]');
-    if (!isCapex && !isInventory && !isSystem) prevExpense += exp.amount;
+    const isSalesRefund = exp.category?.name === 'Refund Penjualan';
+    if (!isCapex && !isInventory && !isSystem && !isSalesRefund) prevExpense += exp.amount;
   });
 
   // 4. COGS
@@ -12941,14 +12944,16 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
         status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] },
         ...branchFilter
       },
-      include: { SaleItem: true }
+      include: { SaleItem: true, SaleReturn: true }
     });
 
     accrualSales.forEach(sale => {
-      // Calculate omzet as sum of items total (to exactly match POS Profitability)
-      let amount = sale.SaleItem && sale.SaleItem.length > 0 
+      // Calculate omzet as sum of items total (to exactly match POS Profitability) minus any partial returns
+      const rawAmount = sale.SaleItem && sale.SaleItem.length > 0 
         ? sale.SaleItem.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0) 
         : sale.totalAmount; // fallback
+      const refundedAmount = sale.SaleReturn?.reduce((sum: number, r: any) => sum + (Number(r.totalRefundAmount) || 0), 0) || 0;
+      let amount = Math.max(0, rawAmount - refundedAmount);
 
       const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
       
@@ -12996,9 +13001,10 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       const isCapex = exp.category?.type === 'CAPEX';
       const isInventory = exp.category?.type === 'INVENTORY';
       const isSystem = exp.category?.name.startsWith('[SYSTEM]');
+      const isSalesRefund = exp.category?.name === 'Refund Penjualan';
       
-      if (isCapex || isInventory || isSystem) {
-        // Exclude CAPEX, INVENTORY, and SYSTEM from P&L completely
+      if (isCapex || isInventory || isSystem || isSalesRefund) {
+        // Exclude CAPEX, INVENTORY, SYSTEM, and Refund Penjualan (already netted in accrualSales) from P&L
       } else if (isCOGS) {
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
@@ -13154,14 +13160,16 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
         status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] },
         ...branchFilter
       },
-      include: { SaleItem: true }
+      include: { SaleItem: true, SaleReturn: true }
     });
 
     accrualSales.forEach(sale => {
-      // Calculate omzet as sum of items total (to exactly match POS Profitability)
-      let amount = sale.SaleItem && sale.SaleItem.length > 0 
+      // Calculate omzet as sum of items total (to exactly match POS Profitability) minus any partial returns
+      const rawAmount = sale.SaleItem && sale.SaleItem.length > 0 
         ? sale.SaleItem.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0) 
         : sale.totalAmount; // fallback
+      const refundedAmount = sale.SaleReturn?.reduce((sum: number, r: any) => sum + (Number(r.totalRefundAmount) || 0), 0) || 0;
+      let amount = Math.max(0, rawAmount - refundedAmount);
 
       const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
       
@@ -13208,9 +13216,10 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       const isCapex = exp.category?.type === 'CAPEX';
       const isInventory = exp.category?.type === 'INVENTORY';
       const isSystem = exp.category?.name.startsWith('[SYSTEM]');
+      const isSalesRefund = exp.category?.name === 'Refund Penjualan';
       
-      if (isCapex || isInventory || isSystem) {
-        // Exclude CAPEX, INVENTORY, and SYSTEM from P&L completely
+      if (isCapex || isInventory || isSystem || isSalesRefund) {
+        // Exclude CAPEX, INVENTORY, SYSTEM, and Refund Penjualan (already netted in accrualSales) from P&L
       } else if (isCOGS) {
         cogsByCategory[catName] = (cogsByCategory[catName] || 0) + exp.amount;
         manualCOGS += exp.amount;
@@ -13538,13 +13547,15 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       where: {
         companyId: tenantId,
         date: { gte: startOfYear, lte: endOfToday },
-        status: { notIn: ['CANCELLED', 'PENDING'] }
-      }
+        status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] }
+      },
+      include: { SaleReturn: true }
     });
 
     let ytdTotalSalesRevenue = 0;
     ytdAccrualSales.forEach(sale => {
-      let amount = sale.totalAmount;
+      const refundedAmount = sale.SaleReturn?.reduce((sum: number, r: any) => sum + (Number(r.totalRefundAmount) || 0), 0) || 0;
+      let amount = Math.max(0, (Number(sale.totalAmount) || 0) - refundedAmount);
       if (sale.taxRate && sale.taxRate > 0) {
         if (sale.taxAmount && sale.taxAmount > 0) {
           amount -= sale.taxAmount;
@@ -13589,7 +13600,8 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       const isCapex = exp.category?.type === 'CAPEX';
       const isInventory = exp.category?.type === 'INVENTORY';
       const isSystem = exp.category?.name.startsWith('[SYSTEM]');
-      if (!isCapex && !isInventory && !isSystem) {
+      const isSalesRefund = exp.category?.name === 'Refund Penjualan';
+      if (!isCapex && !isInventory && !isSystem && !isSalesRefund) {
         ytdExpense += exp.amount;
       }
     });
@@ -13772,13 +13784,15 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       where: {
         companyId: tenantId,
         date: { gte: startOfYear, lte: endOfToday },
-        status: { notIn: ['CANCELLED', 'PENDING'] }
-      }
+        status: { notIn: ['CANCELLED', 'PENDING', 'RETURNED', 'VOID'] }
+      },
+      include: { SaleReturn: true }
     });
 
     let ytdTotalSalesRevenue = 0;
     ytdAccrualSales.forEach(sale => {
-      let amount = sale.totalAmount;
+      const refundedAmount = sale.SaleReturn?.reduce((sum: number, r: any) => sum + (Number(r.totalRefundAmount) || 0), 0) || 0;
+      let amount = Math.max(0, (Number(sale.totalAmount) || 0) - refundedAmount);
       if (sale.taxRate && sale.taxRate > 0) {
         if (sale.taxAmount && sale.taxAmount > 0) {
           amount -= sale.taxAmount;
@@ -13823,7 +13837,8 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       const isCapex = exp.category?.type === 'CAPEX';
       const isInventory = exp.category?.type === 'INVENTORY';
       const isSystem = exp.category?.name.startsWith('[SYSTEM]');
-      if (!isCapex && !isInventory && !isSystem) {
+      const isSalesRefund = exp.category?.name === 'Refund Penjualan';
+      if (!isCapex && !isInventory && !isSystem && !isSalesRefund) {
         ytdExpense += exp.amount;
       }
     });
@@ -18152,14 +18167,39 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
       // (Untuk penyederhanaan, kita abaikan pengembalian poin ke user, hanya menghapus record transaksinya agar database tidak kotor)
       await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
 
-      // 3. Hapus SaleReturnItem dan SaleReturn (Jika pernah diretur)
+      // 3. Hapus SaleReturnItem, SaleReturn, dan Expense Refund Penjualan (Jika pernah diretur)
+      const returnedQtyByProduct: Record<number, number> = {};
       const returns = await tx.saleReturn.findMany({ where: { saleId }});
       for (const r of returns) {
+         const returnItems: any[] = await tx.$queryRawUnsafe(`
+           SELECT "productId", "quantity" FROM "SaleReturnItem" WHERE "returnId" = $1
+         `, r.id);
+         for (const ri of returnItems) {
+           if (ri.productId) {
+             returnedQtyByProduct[ri.productId] = (returnedQtyByProduct[ri.productId] || 0) + (parseFloat(ri.quantity) || 0);
+           }
+         }
          await tx.saleReturnItem.deleteMany({ where: { returnId: r.id }});
          await tx.saleReturn.delete({ where: { id: r.id }});
       }
 
-      // 3.5. Kembalikan Stok Barang & Bahan Baku (BOM)
+      // Hapus Expense Refund terkait & kembalikan saldo akun yang sempat terpotong refund
+      const refundExpenses = await tx.expense.findMany({
+        where: { companyId: tenantId, description: { contains: sale.invoiceNumber } }
+      });
+      for (const exp of refundExpenses) {
+        if (exp.accountId) {
+          await tx.financialAccount.update({
+            where: { id: exp.accountId },
+            data: { balance: { increment: exp.amount } }
+          });
+        }
+      }
+      await tx.expense.deleteMany({
+        where: { companyId: tenantId, description: { contains: sale.invoiceNumber } }
+      });
+
+      // 3.5. Kembalikan Stok Barang & Bahan Baku (BOM) hanya untuk porsi yang belum diretur
       const targetWarehouse = await tx.warehouse.findFirst({
         where: { companyId: tenantId, branchId: sale.branchId, type: 'STORE' }
       }) || await tx.warehouse.findFirst({
@@ -18175,7 +18215,10 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
       for (const item of saleItems) {
         if (!item.productId) continue;
         const productId = item.productId;
-        const qty = parseFloat(item.quantity as any);
+        const rawQty = parseFloat(item.quantity as any);
+        const alreadyReturned = returnedQtyByProduct[productId] || 0;
+        const qty = Math.max(0, rawQty - alreadyReturned);
+        if (qty <= 0) continue;
         
         // Return product stock
         await tx.$executeRawUnsafe(`
