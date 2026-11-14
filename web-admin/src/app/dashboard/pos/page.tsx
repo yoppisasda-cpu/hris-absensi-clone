@@ -428,21 +428,23 @@ export default function POSPage() {
         if (printAgentOnline) {
             try {
                 toast.loading("Mengirim ke printer jaringan...", { id: "agent-print" });
+                const baseStore = {
+                    name: finalDisplayName,
+                    address: receiptStoreAddress.trim(),
+                    phone: receiptStorePhone.trim(),
+                    footer: receiptStoreFooter.trim()
+                };
+                const fullConfig = {
+                    kasir: { ip: agentKasirIp.trim(), port: 9100, enabled: agentKasirEnabled, copies: agentKasirCopies },
+                    dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: agentDapurEnabled, copies: agentDapurCopies },
+                    bar: { ip: agentBarIp.trim(), port: 9100, enabled: agentBarEnabled, copies: agentBarCopies }
+                };
                 const payload = {
                     sale: lastSale,
                     cart: lastCart,
                     companyName: finalDisplayName,
-                    store: {
-                        name: finalDisplayName,
-                        address: receiptStoreAddress.trim(),
-                        phone: receiptStorePhone.trim(),
-                        footer: receiptStoreFooter.trim()
-                    },
-                    config: {
-                        kasir: { ip: agentKasirIp.trim(), port: 9100, enabled: agentKasirEnabled, copies: agentKasirCopies },
-                        dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: agentDapurEnabled, copies: agentDapurCopies },
-                        bar: { ip: agentBarIp.trim(), port: 9100, enabled: agentBarEnabled, copies: agentBarCopies }
-                    }
+                    store: baseStore,
+                    config: fullConfig
                 };
                 const res = await fetch("http://localhost:18181/print", {
                     method: "POST",
@@ -451,6 +453,45 @@ export default function POSPage() {
                 });
                 const data = await res.json();
                 if (data.success) {
+                    // Fallback otomatis jika LAN Print Agent di PC kasir masih versi lama (belum support copiesPrinted)
+                    const isLegacyAgent =
+                        !data.results?.kasir?.copiesPrinted &&
+                        !data.results?.dapur?.copiesPrinted &&
+                        !data.results?.bar?.copiesPrinted;
+
+                    const maxCopies = Math.max(
+                        agentKasirEnabled ? agentKasirCopies : 1,
+                        agentDapurEnabled ? agentDapurCopies : 1,
+                        agentBarEnabled ? agentBarCopies : 1
+                    );
+
+                    if (isLegacyAgent && maxCopies > 1) {
+                        for (let round = 2; round <= maxCopies; round++) {
+                            await new Promise(r => setTimeout(r, 400));
+                            await fetch("http://localhost:18181/print", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    sale: lastSale,
+                                    cart: lastCart,
+                                    companyName: finalDisplayName,
+                                    store: baseStore,
+                                    config: {
+                                        kasir: { ip: agentKasirIp.trim(), port: 9100, enabled: agentKasirEnabled && agentKasirCopies >= round, copies: 1 },
+                                        dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: agentDapurEnabled && agentDapurCopies >= round, copies: 1 },
+                                        bar: { ip: agentBarIp.trim(), port: 9100, enabled: agentBarEnabled && agentBarCopies >= round, copies: 1 }
+                                    }
+                                })
+                            });
+                        }
+                        // Kembalikan config enabled asli ke agent
+                        await fetch("http://localhost:18181/config", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(fullConfig)
+                        }).catch(() => {});
+                    }
+
                     toast.success("Pesanan sukses dikirim ke printer yang aktif!", { id: "agent-print" });
                     return;
                 }
@@ -477,6 +518,17 @@ export default function POSPage() {
             });
             const data = await res.json();
             if (data.success) {
+                // Fallback otomatis jika LAN Print Agent di PC kasir masih versi lama (belum support copiesPrinted)
+                if (!data.copiesPrinted && copies > 1) {
+                    for (let i = 2; i <= copies; i++) {
+                        await new Promise(r => setTimeout(r, 350));
+                        await fetch("http://localhost:18181/test-print", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ target, ip: ip.trim(), copies: 1 })
+                        });
+                    }
+                }
                 toast.success(`Test print ${target.toUpperCase()} (${ip.trim()}) ${copies}x berhasil!`);
             } else {
                 toast.error(`Gagal test print: ${data.error || 'Cek koneksi printer'}`);
