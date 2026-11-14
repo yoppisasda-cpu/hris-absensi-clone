@@ -359,6 +359,13 @@ export default function POSPage() {
                     } else if (data.config?.bar?.ip) {
                         setAgentBarIp(data.config.bar.ip);
                     }
+
+                    const localKasirCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_kasir_copies') : null;
+                    const localDapurCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_dapur_copies') : null;
+                    const localBarCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_bar_copies') : null;
+                    if (!localKasirCop && data.config?.kasir?.copies) setAgentKasirCopies(Math.max(1, Number(data.config.kasir.copies) || 1));
+                    if (!localDapurCop && data.config?.dapur?.copies) setAgentDapurCopies(Math.max(1, Number(data.config.dapur.copies) || 1));
+                    if (!localBarCop && data.config?.bar?.copies) setAgentBarCopies(Math.max(1, Number(data.config.bar.copies) || 1));
                 }
             } else {
                 setPrintAgentOnline(false);
@@ -460,16 +467,17 @@ export default function POSPage() {
             toast.error("Print Agent belum aktif. Buka folder lan-print-agent lalu jalankan start.bat / start.sh terlebih dahulu!");
             return;
         }
+        const copies = target === 'kasir' ? agentKasirCopies : (target === 'dapur' ? agentDapurCopies : agentBarCopies);
         setAgentTesting(target);
         try {
             const res = await fetch("http://localhost:18181/test-print", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ target, ip: ip.trim() })
+                body: JSON.stringify({ target, ip: ip.trim(), copies })
             });
             const data = await res.json();
             if (data.success) {
-                toast.success(`Test print ${target.toUpperCase()} (${ip.trim()}) berhasil!`);
+                toast.success(`Test print ${target.toUpperCase()} (${ip.trim()}) ${copies}x berhasil!`);
             } else {
                 toast.error(`Gagal test print: ${data.error || 'Cek koneksi printer'}`);
             }
@@ -2319,6 +2327,11 @@ export default function POSPage() {
                     {/* CSS khusus untuk print struk Thermal */}
                     <style dangerouslySetInnerHTML={{__html: `
                         @media print {
+                            html, body {
+                                height: auto !important;
+                                overflow: visible !important;
+                                background: white !important;
+                            }
                             body * {
                                 visibility: hidden;
                             }
@@ -2343,177 +2356,203 @@ export default function POSPage() {
 
                     {/* HIDDEN PRINTABLE RECEIPT */}
                     <div id="thermal-receipt" className="hidden print:block font-mono text-[11px] p-2 bg-white text-black w-[58mm] leading-tight">
-                        {/* 1. STRUK KASIR / PELANGGAN */}
+                        {/* 1. STRUK KASIR / PELANGGAN (Sesuai jumlah rangkap agentKasirCopies) */}
                         {(browserPrintTarget === 'all' || browserPrintTarget === 'kasir') && agentKasirEnabled && (
-                        <div>
-                        <div className="text-center mb-3">
-                            {companyLogo && (
-                                <div className="flex justify-center mb-2">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={companyLogo} alt="Logo" className="h-10 max-w-[120px] object-contain grayscale" />
-                                </div>
-                            )}
-                            <h2 className="font-bold text-sm uppercase">{receiptStoreName || companyName || 'AIVOLA POS'}</h2>
-                            {receiptStoreAddress && <p className="text-[10px] leading-snug">{receiptStoreAddress}</p>}
-                            {receiptStorePhone && <p className="text-[10px]">Telp: {receiptStorePhone}</p>}
-                            <p className="text-[9px] mt-1 text-slate-600">STRUK PEMBAYARAN RESMI</p>
-                        </div>
-                        
-                        <div className="border-t border-dashed border-black py-2 mb-2">
-                            <div className="flex justify-between">
-                                <span>Tgl: {new Date(lastSale.createdAt).toLocaleDateString('id-ID')}</span>
-                                <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
-                            </div>
-                            <div>No: {lastSale.invoiceNumber}</div>
-                            <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : (lastSale.saleType === 'WALK_IN' ? 'Walk-in' : lastSale.saleType))}</div>
-                            {lastSale.customerName && <div>Plg: {lastSale.customerName}</div>}
-                        </div>
-
-                        <div className="border-t border-b border-dashed border-black py-2 mb-2">
-                            {lastCart.map((item, idx) => (
-                                <div key={idx} className="mb-2">
-                                    <div className="font-bold">{item.name}</div>
-                                    {item.modifiers && Object.keys(item.modifiers).length > 0 && (
-                                        <div className="text-[9px] pl-2 text-gray-700 italic">
-                                            {Object.entries(item.modifiers).map(([k, v]: [string, any]) => `${k}: ${v.name || v}`).join(', ')}
+                            Array.from({ length: Math.max(1, agentKasirCopies) }).map((_, copyIdx) => (
+                                <div
+                                    key={`kasir-copy-${copyIdx}`}
+                                    className={copyIdx > 0 ? 'mt-6 pt-4 border-t-2 border-dashed border-black' : ''}
+                                >
+                                    {copyIdx > 0 && (
+                                        <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
+                                            - - - - ✂️ POTONG DISINI (COPY #{copyIdx + 1}) ✂️ - - - -
                                         </div>
                                     )}
-                                    <div className="flex justify-between">
-                                        <span>{item.qty} x {item.price.toLocaleString()}</span>
-                                        <span>{(item.qty * item.price).toLocaleString()}</span>
+                                    <div className="text-center mb-3">
+                                        {companyLogo && (
+                                            <div className="flex justify-center mb-2">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={companyLogo} alt="Logo" className="h-10 max-w-[120px] object-contain grayscale" />
+                                            </div>
+                                        )}
+                                        <h2 className="font-bold text-sm uppercase">{receiptStoreName || companyName || 'AIVOLA POS'}</h2>
+                                        {receiptStoreAddress && <p className="text-[10px] leading-snug">{receiptStoreAddress}</p>}
+                                        {receiptStorePhone && <p className="text-[10px]">Telp: {receiptStorePhone}</p>}
+                                        <p className="text-[9px] mt-1 text-slate-600">
+                                            STRUK PEMBAYARAN RESMI {agentKasirCopies > 1 ? `(${copyIdx + 1}/${agentKasirCopies})` : ''}
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="border-t border-dashed border-black py-2 mb-2">
+                                        <div className="flex justify-between">
+                                            <span>Tgl: {new Date(lastSale.createdAt).toLocaleDateString('id-ID')}</span>
+                                            <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
+                                        </div>
+                                        <div>No: {lastSale.invoiceNumber}</div>
+                                        <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : (lastSale.saleType === 'WALK_IN' ? 'Walk-in' : lastSale.saleType))}</div>
+                                        {lastSale.customerName && <div>Plg: {lastSale.customerName}</div>}
+                                    </div>
+
+                                    <div className="border-t border-b border-dashed border-black py-2 mb-2">
+                                        {lastCart.map((item, idx) => (
+                                            <div key={idx} className="mb-2">
+                                                <div className="font-bold">{item.name}</div>
+                                                {item.modifiers && Object.keys(item.modifiers).length > 0 && (
+                                                    <div className="text-[9px] pl-2 text-gray-700 italic">
+                                                        {Object.entries(item.modifiers).map(([k, v]: [string, any]) => `${k}: ${v.name || v}`).join(', ')}
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between">
+                                                    <span>{item.qty} x {item.price.toLocaleString()}</span>
+                                                    <span>{(item.qty * item.price).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="space-y-1 mb-2">
+                                        <div className="flex justify-between">
+                                            <span>Subtotal</span>
+                                            <span>Rp {(lastSale.totalAmount - lastSale.taxAmount).toLocaleString()}</span>
+                                        </div>
+                                        {lastSale.taxAmount > 0 && (
+                                            <div className="flex justify-between">
+                                                <span>Pajak ({lastSale.taxRate}%)</span>
+                                                <span>Rp {lastSale.taxAmount.toLocaleString()}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between font-bold text-[12px] pt-1 border-t border-dashed border-black">
+                                            <span>TOTAL</span>
+                                            <span>Rp {lastSale.totalAmount.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-dashed border-black py-2 mt-4 text-center">
+                                        <p>Metode Pembayaran:</p>
+                                        <p className="font-bold">{lastSale.paymentMethod || accounts.find(a => a.id === selectedAccount)?.name}</p>
+                                        {lastSale?.paidAmount && (
+                                            <div className="text-[11px] mt-1 space-y-0.5">
+                                                <div>Tunai Diterima: Rp {Number(lastSale.paidAmount).toLocaleString('id-ID')}</div>
+                                                {lastSale.changeAmount > 0 && (
+                                                    <div className="font-bold">Kembalian: Rp {Number(lastSale.changeAmount).toLocaleString('id-ID')}</div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {lastSale?.paymentReference && (
+                                            <p className="text-[10px] mt-1 font-bold">REF/EDC: {lastSale.paymentReference}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="text-center mt-4">
+                                        <p>{receiptStoreFooter || 'Terima kasih atas kunjungan Anda!'}</p>
+                                        <p className="text-[9px] mt-1 text-gray-500">Powered by Aivola</p>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-
-                        <div className="space-y-1 mb-2">
-                            <div className="flex justify-between">
-                                <span>Subtotal</span>
-                                <span>Rp {(lastSale.totalAmount - lastSale.taxAmount).toLocaleString()}</span>
-                            </div>
-                            {lastSale.taxAmount > 0 && (
-                                <div className="flex justify-between">
-                                    <span>Pajak ({lastSale.taxRate}%)</span>
-                                    <span>Rp {lastSale.taxAmount.toLocaleString()}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between font-bold text-[12px] pt-1 border-t border-dashed border-black">
-                                <span>TOTAL</span>
-                                <span>Rp {lastSale.totalAmount.toLocaleString()}</span>
-                            </div>
-                        </div>
-
-                        <div className="border-t border-dashed border-black py-2 mt-4 text-center">
-                            <p>Metode Pembayaran:</p>
-                            <p className="font-bold">{lastSale.paymentMethod || accounts.find(a => a.id === selectedAccount)?.name}</p>
-                            {lastSale?.paidAmount && (
-                                <div className="text-[11px] mt-1 space-y-0.5">
-                                    <div>Tunai Diterima: Rp {Number(lastSale.paidAmount).toLocaleString('id-ID')}</div>
-                                    {lastSale.changeAmount > 0 && (
-                                        <div className="font-bold">Kembalian: Rp {Number(lastSale.changeAmount).toLocaleString('id-ID')}</div>
-                                    )}
-                                </div>
-                            )}
-                            {lastSale?.paymentReference && (
-                                <p className="text-[10px] mt-1 font-bold">REF/EDC: {lastSale.paymentReference}</p>
-                            )}
-                        </div>
-
-                        <div className="text-center mt-4">
-                            <p>{receiptStoreFooter || 'Terima kasih atas kunjungan Anda!'}</p>
-                            <p className="text-[9px] mt-1 text-gray-500">Powered by Aivola</p>
-                        </div>
-                        </div>
+                            ))
                         )}
 
-                        {/* 2. TIKET DAPUR (KITCHEN) - Hanya jika dipilih Cetak Dapur atau Gabung Tiket aktif */}
+                        {/* 2. TIKET DAPUR (KITCHEN) - Sesuai jumlah rangkap agentDapurCopies */}
                         {(browserPrintTarget === 'all' || browserPrintTarget === 'dapur') && agentDapurEnabled && lastCart.some(it => !isBeverageItem(it)) && (
-                            <div className={`${browserPrintTarget === 'all' ? 'mt-6 pt-4 border-t-2 border-dashed border-black' : ''}`}>
-                                {browserPrintTarget === 'all' && (
-                                    <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
-                                        - - - - ✂️ POTONG DISINI (DAPUR) ✂️ - - - -
-                                    </div>
-                                )}
-                                <div className="text-center mb-3">
-                                    <h2 className="font-black text-sm uppercase tracking-wider">*** TIKET DAPUR ***</h2>
-                                    <p className="text-[10px] font-bold">KITCHEN ORDER TICKET</p>
-                                </div>
-
-                                <div className="border-t border-b border-dashed border-black py-1.5 mb-2 text-[10px]">
-                                    <div className="flex justify-between">
-                                        <span>No: {lastSale.invoiceNumber}</span>
-                                        <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
-                                    </div>
-                                    {lastSale.customerName && (
-                                        <div className="font-bold text-[11px] mt-0.5">Meja / Tamu: {lastSale.customerName}</div>
-                                    )}
-                                    <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : lastSale.saleType)}</div>
-                                    {lastSale.notes && (
-                                        <div className="font-bold text-[11px] mt-1 bg-gray-100 p-1 border border-black">
-                                            NOTE: {lastSale.notes}
+                            Array.from({ length: Math.max(1, agentDapurCopies) }).map((_, copyIdx) => (
+                                <div
+                                    key={`dapur-copy-${copyIdx}`}
+                                    className={`${(browserPrintTarget === 'all' || copyIdx > 0) ? 'mt-6 pt-4 border-t-2 border-dashed border-black' : ''}`}
+                                >
+                                    {(browserPrintTarget === 'all' || copyIdx > 0) && (
+                                        <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
+                                            - - - - ✂️ POTONG DISINI (DAPUR {agentDapurCopies > 1 ? `#${copyIdx + 1}` : ''}) ✂️ - - - -
                                         </div>
                                     )}
-                                </div>
+                                    <div className="text-center mb-3">
+                                        <h2 className="font-black text-sm uppercase tracking-wider">*** TIKET DAPUR ***</h2>
+                                        <p className="text-[10px] font-bold">
+                                            KITCHEN ORDER TICKET {agentDapurCopies > 1 ? `(${copyIdx + 1}/${agentDapurCopies})` : ''}
+                                        </p>
+                                    </div>
 
-                                <div className="space-y-2 mb-3">
-                                    {lastCart.filter(it => !isBeverageItem(it)).map((item, idx) => (
-                                        <div key={idx} className="border-b border-dotted border-gray-400 pb-1.5">
-                                            <div className="font-black text-[12px]">{item.qty}x {item.name}</div>
-                                            {item.modifiers && Object.keys(item.modifiers).length > 0 && (
-                                                <div className="text-[9px] pl-2 text-gray-800 font-semibold italic">
-                                                    [ ] {Object.entries(item.modifiers).map(([k, v]: [string, any]) => `${k}: ${v.name || v}`).join(', ')}
-                                                </div>
-                                            )}
+                                    <div className="border-t border-b border-dashed border-black py-1.5 mb-2 text-[10px]">
+                                        <div className="flex justify-between">
+                                            <span>No: {lastSale.invoiceNumber}</span>
+                                            <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
                                         </div>
-                                    ))}
+                                        {lastSale.customerName && (
+                                            <div className="font-bold text-[11px] mt-0.5">Meja / Tamu: {lastSale.customerName}</div>
+                                        )}
+                                        <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : lastSale.saleType)}</div>
+                                        {lastSale.notes && (
+                                            <div className="font-bold text-[11px] mt-1 bg-gray-100 p-1 border border-black">
+                                                NOTE: {lastSale.notes}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2 mb-3">
+                                        {lastCart.filter(it => !isBeverageItem(it)).map((item, idx) => (
+                                            <div key={idx} className="border-b border-dotted border-gray-400 pb-1.5">
+                                                <div className="font-black text-[12px]">{item.qty}x {item.name}</div>
+                                                {item.modifiers && Object.keys(item.modifiers).length > 0 && (
+                                                    <div className="text-[9px] pl-2 text-gray-800 font-semibold italic">
+                                                        [ ] {Object.entries(item.modifiers).map(([k, v]: [string, any]) => `${k}: ${v.name || v}`).join(', ')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="text-center text-[9px] text-gray-600">--- Akhir Tiket Dapur ---</div>
                                 </div>
-                                <div className="text-center text-[9px] text-gray-600">--- Akhir Tiket Dapur ---</div>
-                            </div>
+                            ))
                         )}
 
-                        {/* 3. TIKET BAR (MINUMAN) - Hanya jika dipilih Cetak Bar atau Gabung Tiket aktif */}
+                        {/* 3. TIKET BAR (MINUMAN) - Sesuai jumlah rangkap agentBarCopies */}
                         {(browserPrintTarget === 'all' || browserPrintTarget === 'bar') && agentBarEnabled && lastCart.some(it => isBeverageItem(it)) && (
-                            <div className={`${browserPrintTarget === 'all' ? 'mt-6 pt-4 border-t-2 border-dashed border-black' : ''}`}>
-                                {browserPrintTarget === 'all' && (
-                                    <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
-                                        - - - - ✂️ POTONG DISINI (BAR) ✂️ - - - -
-                                    </div>
-                                )}
-                                <div className="text-center mb-3">
-                                    <h2 className="font-black text-sm uppercase tracking-wider">*** TIKET BAR ***</h2>
-                                    <p className="text-[10px] font-bold">BAR / DRINKS ORDER TICKET</p>
-                                </div>
-
-                                <div className="border-t border-b border-dashed border-black py-1.5 mb-2 text-[10px]">
-                                    <div className="flex justify-between">
-                                        <span>No: {lastSale.invoiceNumber}</span>
-                                        <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
-                                    </div>
-                                    {lastSale.customerName && (
-                                        <div className="font-bold text-[11px] mt-0.5">Meja / Tamu: {lastSale.customerName}</div>
-                                    )}
-                                    <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : lastSale.saleType)}</div>
-                                    {lastSale.notes && (
-                                        <div className="font-bold text-[11px] mt-1 bg-gray-100 p-1 border border-black">
-                                            NOTE: {lastSale.notes}
+                            Array.from({ length: Math.max(1, agentBarCopies) }).map((_, copyIdx) => (
+                                <div
+                                    key={`bar-copy-${copyIdx}`}
+                                    className={`${(browserPrintTarget === 'all' || copyIdx > 0) ? 'mt-6 pt-4 border-t-2 border-dashed border-black' : ''}`}
+                                >
+                                    {(browserPrintTarget === 'all' || copyIdx > 0) && (
+                                        <div className="text-center font-bold text-[10px] mb-2 tracking-wider">
+                                            - - - - ✂️ POTONG DISINI (BAR {agentBarCopies > 1 ? `#${copyIdx + 1}` : ''}) ✂️ - - - -
                                         </div>
                                     )}
-                                </div>
+                                    <div className="text-center mb-3">
+                                        <h2 className="font-black text-sm uppercase tracking-wider">*** TIKET BAR ***</h2>
+                                        <p className="text-[10px] font-bold">
+                                            BAR / DRINKS ORDER TICKET {agentBarCopies > 1 ? `(${copyIdx + 1}/${agentBarCopies})` : ''}
+                                        </p>
+                                    </div>
 
-                                <div className="space-y-2 mb-3">
-                                    {lastCart.filter(it => isBeverageItem(it)).map((item, idx) => (
-                                        <div key={idx} className="border-b border-dotted border-gray-400 pb-1.5">
-                                            <div className="font-black text-[12px]">{item.qty}x {item.name}</div>
-                                            {item.modifiers && Object.keys(item.modifiers).length > 0 && (
-                                                <div className="text-[9px] pl-2 text-gray-800 font-semibold italic">
-                                                    [ ] {Object.entries(item.modifiers).map(([k, v]: [string, any]) => `${k}: ${v.name || v}`).join(', ')}
-                                                </div>
-                                            )}
+                                    <div className="border-t border-b border-dashed border-black py-1.5 mb-2 text-[10px]">
+                                        <div className="flex justify-between">
+                                            <span>No: {lastSale.invoiceNumber}</span>
+                                            <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
                                         </div>
-                                    ))}
+                                        {lastSale.customerName && (
+                                            <div className="font-bold text-[11px] mt-0.5">Meja / Tamu: {lastSale.customerName}</div>
+                                        )}
+                                        <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : lastSale.saleType)}</div>
+                                        {lastSale.notes && (
+                                            <div className="font-bold text-[11px] mt-1 bg-gray-100 p-1 border border-black">
+                                                NOTE: {lastSale.notes}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2 mb-3">
+                                        {lastCart.filter(it => isBeverageItem(it)).map((item, idx) => (
+                                            <div key={idx} className="border-b border-dotted border-gray-400 pb-1.5">
+                                                <div className="font-black text-[12px]">{item.qty}x {item.name}</div>
+                                                {item.modifiers && Object.keys(item.modifiers).length > 0 && (
+                                                    <div className="text-[9px] pl-2 text-gray-800 font-semibold italic">
+                                                        [ ] {Object.entries(item.modifiers).map(([k, v]: [string, any]) => `${k}: ${v.name || v}`).join(', ')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="text-center text-[9px] text-gray-600">--- Akhir Tiket Bar ---</div>
                                 </div>
-                                <div className="text-center text-[9px] text-gray-600">--- Akhir Tiket Bar ---</div>
-                            </div>
+                            ))
                         )}
                     </div>
 
@@ -2936,7 +2975,11 @@ export default function POSPage() {
                                                 <input
                                                     type="checkbox"
                                                     checked={browserCombineTickets}
-                                                    onChange={(e) => setBrowserCombineTickets(e.target.checked)}
+                                                    onChange={(e) => {
+                                                        const val = e.target.checked;
+                                                        setBrowserCombineTickets(val);
+                                                        if (typeof window !== 'undefined') localStorage.setItem('pos_browser_combine_tickets', String(val));
+                                                    }}
                                                     className="sr-only peer"
                                                 />
                                                 <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
@@ -2955,7 +2998,11 @@ export default function POSPage() {
                                                 <div className="flex items-center gap-2">
                                                     <select
                                                         value={agentKasirCopies}
-                                                        onChange={(e) => setAgentKasirCopies(Number(e.target.value))}
+                                                        onChange={(e) => {
+                                                            const val = Number(e.target.value);
+                                                            setAgentKasirCopies(val);
+                                                            if (typeof window !== 'undefined') localStorage.setItem('lan_print_kasir_copies', String(val));
+                                                        }}
                                                         className="px-2.5 py-1 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white"
                                                     >
                                                         <option value={1}>Rangkap 1x</option>
@@ -2964,7 +3011,11 @@ export default function POSPage() {
                                                     </select>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setAgentKasirEnabled(!agentKasirEnabled)}
+                                                        onClick={() => {
+                                                            const next = !agentKasirEnabled;
+                                                            setAgentKasirEnabled(next);
+                                                            if (typeof window !== 'undefined') localStorage.setItem('lan_print_kasir_enabled', String(next));
+                                                        }}
                                                         className={`px-2.5 py-1 rounded-xl text-xs font-bold border ${
                                                             agentKasirEnabled
                                                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
@@ -3002,7 +3053,11 @@ export default function POSPage() {
                                                 <div className="flex items-center gap-2">
                                                     <select
                                                         value={agentDapurCopies}
-                                                        onChange={(e) => setAgentDapurCopies(Number(e.target.value))}
+                                                        onChange={(e) => {
+                                                            const val = Number(e.target.value);
+                                                            setAgentDapurCopies(val);
+                                                            if (typeof window !== 'undefined') localStorage.setItem('lan_print_dapur_copies', String(val));
+                                                        }}
                                                         className="px-2.5 py-1 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white"
                                                     >
                                                         <option value={1}>Rangkap 1x</option>
@@ -3011,7 +3066,11 @@ export default function POSPage() {
                                                     </select>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setAgentDapurEnabled(!agentDapurEnabled)}
+                                                        onClick={() => {
+                                                            const next = !agentDapurEnabled;
+                                                            setAgentDapurEnabled(next);
+                                                            if (typeof window !== 'undefined') localStorage.setItem('lan_print_dapur_enabled', String(next));
+                                                        }}
                                                         className={`px-2.5 py-1 rounded-xl text-xs font-bold border ${
                                                             agentDapurEnabled
                                                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
@@ -3050,7 +3109,11 @@ export default function POSPage() {
                                                 <div className="flex items-center gap-2">
                                                     <select
                                                         value={agentBarCopies}
-                                                        onChange={(e) => setAgentBarCopies(Number(e.target.value))}
+                                                        onChange={(e) => {
+                                                            const val = Number(e.target.value);
+                                                            setAgentBarCopies(val);
+                                                            if (typeof window !== 'undefined') localStorage.setItem('lan_print_bar_copies', String(val));
+                                                        }}
                                                         className="px-2.5 py-1 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white"
                                                     >
                                                         <option value={1}>Rangkap 1x</option>
@@ -3059,7 +3122,11 @@ export default function POSPage() {
                                                     </select>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setAgentBarEnabled(!agentBarEnabled)}
+                                                        onClick={() => {
+                                                            const next = !agentBarEnabled;
+                                                            setAgentBarEnabled(next);
+                                                            if (typeof window !== 'undefined') localStorage.setItem('lan_print_bar_enabled', String(next));
+                                                        }}
                                                         className={`px-2.5 py-1 rounded-xl text-xs font-bold border ${
                                                             agentBarEnabled
                                                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'

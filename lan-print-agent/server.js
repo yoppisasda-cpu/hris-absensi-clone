@@ -138,15 +138,30 @@ const server = http.createServer((req, res) => {
                 return sendJson(200, { success: true, message: 'Konfigurasi disimpan', config });
             }
 
+            // Helper to send buffer N times sequentially with a short delay between cuts
+            const sendCopiesToPrinter = async (ip, port, buf, copies = 1) => {
+                const count = Math.max(1, Math.min(5, Number(copies) || 1));
+                let lastResult = { success: false };
+                for (let i = 0; i < count; i++) {
+                    lastResult = await sendToPrinter(ip, port, buf);
+                    if (!lastResult.success) return lastResult;
+                    if (i < count - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 350));
+                    }
+                }
+                return { ...lastResult, copiesPrinted: count };
+            };
+
             // 3. POST /test-print - Test Print per Target
             if (req.url === '/test-print') {
                 const target = payload.target || 'kasir'; // 'kasir' | 'dapur' | 'bar'
                 const targetConfig = config[target] || {};
                 const ip = payload.ip || targetConfig.ip;
                 const port = payload.port || targetConfig.port || 9100;
+                const copies = payload.copies || targetConfig.copies || 1;
 
                 const buffer = buildTestBuffer(target.toUpperCase(), ip);
-                const result = await sendToPrinter(ip, port, buffer);
+                const result = await sendCopiesToPrinter(ip, port, buffer, copies);
                 return sendJson(result.success ? 200 : 500, { ...result, target, ip });
             }
 
@@ -158,18 +173,10 @@ const server = http.createServer((req, res) => {
                 }
                 const results = {};
 
-                // Helper to repeat buffer by copies count (1..5)
-                const repeatBuffer = (buf, copies = 1) => {
-                    const count = Math.max(1, Math.min(5, Number(copies) || 1));
-                    if (count === 1) return buf;
-                    return Buffer.concat(Array(count).fill(buf));
-                };
-
                 // A. Kasir Receipt (All Items)
                 if (config.kasir && config.kasir.enabled !== false && config.kasir.ip) {
                     const receiptBuf = buildReceiptBuffer(sale, cart, companyName, store);
-                    const finalBuf = repeatBuffer(receiptBuf, config.kasir.copies);
-                    results.kasir = await sendToPrinter(config.kasir.ip, config.kasir.port, finalBuf);
+                    results.kasir = await sendCopiesToPrinter(config.kasir.ip, config.kasir.port, receiptBuf, config.kasir.copies);
                 } else {
                     results.kasir = { skipped: true, reason: 'Kasir dinonaktifkan' };
                 }
@@ -179,8 +186,7 @@ const server = http.createServer((req, res) => {
                 if (config.dapur && config.dapur.enabled !== false && config.dapur.ip && foodItems.length > 0) {
                     const kitchenBuf = buildKitchenBuffer(sale, foodItems);
                     if (kitchenBuf) {
-                        const finalBuf = repeatBuffer(kitchenBuf, config.dapur.copies);
-                        results.dapur = await sendToPrinter(config.dapur.ip, config.dapur.port, finalBuf);
+                        results.dapur = await sendCopiesToPrinter(config.dapur.ip, config.dapur.port, kitchenBuf, config.dapur.copies);
                     }
                 } else {
                     results.dapur = { skipped: true, reason: foodItems.length === 0 ? 'Tidak ada makanan' : 'Dapur dinonaktifkan' };
@@ -191,8 +197,7 @@ const server = http.createServer((req, res) => {
                 if (config.bar && config.bar.enabled !== false && config.bar.ip && beverageItems.length > 0) {
                     const barBuf = buildBarBuffer(sale, beverageItems);
                     if (barBuf) {
-                        const finalBuf = repeatBuffer(barBuf, config.bar.copies);
-                        results.bar = await sendToPrinter(config.bar.ip, config.bar.port, finalBuf);
+                        results.bar = await sendCopiesToPrinter(config.bar.ip, config.bar.port, barBuf, config.bar.copies);
                     }
                 } else {
                     results.bar = { skipped: true, reason: beverageItems.length === 0 ? 'Tidak ada minuman' : 'Bar dinonaktifkan' };
