@@ -82,6 +82,7 @@ export default function CustomerDisplayPage() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [successDismissTimer, setSuccessDismissTimer] = useState<number>(7);
     const itemsEndRef = useRef<HTMLDivElement>(null);
+    const itemsContainerRef = useRef<HTMLDivElement>(null);
 
     // Live Clock
     useEffect(() => {
@@ -148,12 +149,34 @@ export default function CustomerDisplayPage() {
         fetchInitialProfile();
     }, []);
 
-    // Scroll to bottom when items change
+    // Scroll to bottom when items change, plus auto-scroll ping-pong when items overflow screen
     useEffect(() => {
         if (state.items.length > 0) {
             itemsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
     }, [state.items.length]);
+
+    useEffect(() => {
+        const el = itemsContainerRef.current;
+        if (!el || state.items.length <= 10 || state.isCompleted) return;
+
+        let direction: 'up' | 'down' = 'up';
+        const interval = setInterval(() => {
+            if (!el) return;
+            const maxScroll = el.scrollHeight - el.clientHeight;
+            if (maxScroll <= 10) return;
+
+            if (direction === 'up') {
+                el.scrollTo({ top: 0, behavior: 'smooth' });
+                direction = 'down';
+            } else {
+                el.scrollTo({ top: maxScroll, behavior: 'smooth' });
+                direction = 'up';
+            }
+        }, 4500);
+
+        return () => clearInterval(interval);
+    }, [state.items.length, state.isCompleted]);
 
     // Dual Sync: BroadcastChannel + LocalStorage
     useEffect(() => {
@@ -451,73 +474,102 @@ export default function CustomerDisplayPage() {
 
                 {/* STATE 2: ACTIVE ORDER (Cart has items) */}
                 {hasItems && !state.isCompleted && (
-                    <div className="flex-1 flex gap-6 animate-in fade-in duration-300">
+                    <div className="flex-1 flex min-h-0 gap-6 animate-in fade-in duration-300">
                         {/* LEFT COLUMN: ITEM LIST (60%) */}
-                        <div className="flex-[3] rounded-[36px] bg-[#0C101C]/80 border border-white/10 flex flex-col overflow-hidden backdrop-blur-xl shadow-2xl">
+                        <div className="flex-[3] min-h-0 rounded-[36px] bg-[#0C101C]/80 border border-white/10 flex flex-col overflow-hidden backdrop-blur-xl shadow-2xl">
                             {/* Table Header */}
-                            <div className="p-6 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
+                            <div className="px-6 py-4 border-b border-white/10 bg-white/[0.02] flex items-center justify-between shrink-0">
                                 <div className="flex items-center gap-3">
                                     <ShoppingBag className="h-5 w-5 text-blue-400" />
                                     <h3 className="text-base font-black italic tracking-tight uppercase text-white">
                                         Daftar Pesanan Anda
                                     </h3>
                                     <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[11px] font-black font-mono">
-                                        {state.items.reduce((s, i) => s + i.qty, 0)} Item
+                                        {state.items.length} Menu ({state.items.reduce((s, i) => s + i.qty, 0)} Qty)
                                     </span>
                                 </div>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                    Live Cart Synchronization
+                                    {state.items.length >= 6 ? 'Mode Tampilan Padat (Multi-Kolom)' : 'Live Cart Synchronization'}
                                 </span>
                             </div>
 
-                            {/* Scrollable Item Rows */}
-                            <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
-                                {state.items.map((item, idx) => (
-                                    <div 
-                                        key={item.cartId || idx}
-                                        className="p-5 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-4 transition-all hover:bg-white/[0.05]"
-                                    >
-                                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                                            {/* Quantity Pill */}
-                                            <div className="h-11 w-11 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-lg shadow-blue-500/20 font-mono">
-                                                {item.qty}x
+                            {/* Adaptive Scrollable Item Rows (1 Column for <=5 items, 2 Columns for >=6 items) */}
+                            <div
+                                ref={itemsContainerRef}
+                                className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar ${
+                                    state.items.length > 10
+                                        ? 'p-4 grid grid-cols-2 gap-2 content-start'
+                                        : state.items.length >= 6
+                                        ? 'p-5 grid grid-cols-2 gap-3 content-start'
+                                        : 'p-6 space-y-3'
+                                }`}
+                            >
+                                {state.items.map((item, idx) => {
+                                    const isCompact = state.items.length >= 6;
+                                    const isUltraCompact = state.items.length > 10;
+                                    return (
+                                        <div 
+                                            key={item.cartId || idx}
+                                            className={`${
+                                                isUltraCompact
+                                                    ? 'px-3 py-2 rounded-xl'
+                                                    : isCompact
+                                                    ? 'p-3.5 rounded-2xl'
+                                                    : 'p-5 rounded-2xl'
+                                            } bg-white/[0.03] border border-white/5 flex items-center justify-between gap-3 transition-all hover:bg-white/[0.05]`}
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                {/* Quantity Pill */}
+                                                <div className={`${
+                                                    isUltraCompact
+                                                        ? 'h-8 w-8 rounded-lg text-xs'
+                                                        : isCompact
+                                                        ? 'h-9 w-9 rounded-xl text-xs'
+                                                        : 'h-11 w-11 rounded-xl text-sm'
+                                                } bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black shrink-0 shadow-lg shadow-blue-500/20 font-mono`}>
+                                                    {item.qty}x
+                                                </div>
+
+                                                {/* Name & Modifiers */}
+                                                <div className="min-w-0 flex-1">
+                                                    <p className={`${
+                                                        isUltraCompact ? 'text-xs' : isCompact ? 'text-sm' : 'text-base'
+                                                    } font-black uppercase tracking-tight text-white truncate`}>
+                                                        {item.name}
+                                                    </p>
+                                                    {item.modifiers && Object.keys(item.modifiers).length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {Object.values(item.modifiers).flat().map((m: any, mIdx: number) => (
+                                                                <span 
+                                                                    key={mIdx}
+                                                                    className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[9px] font-bold uppercase tracking-wider truncate max-w-full"
+                                                                >
+                                                                    {typeof m === 'string' ? m : m.name}
+                                                                    {m.price ? ` (+Rp ${Number(m.price).toLocaleString('id-ID')})` : ''}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            {/* Name & Modifiers */}
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-base font-black uppercase tracking-tight text-white truncate">
-                                                    {item.name}
+                                            {/* Price Info */}
+                                            <div className="text-right shrink-0">
+                                                <p className={`${
+                                                    isUltraCompact ? 'text-xs' : isCompact ? 'text-sm' : 'text-base'
+                                                } font-black text-white font-mono tracking-tight`}>
+                                                    Rp {(item.price * item.qty).toLocaleString('id-ID')}
                                                 </p>
-                                                {item.modifiers && Object.keys(item.modifiers).length > 0 && (
-                                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                                        {Object.values(item.modifiers).flat().map((m: any, mIdx: number) => (
-                                                            <span 
-                                                                key={mIdx}
-                                                                className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-wider"
-                                                            >
-                                                                {typeof m === 'string' ? m : m.name}
-                                                                {m.price ? ` (+Rp ${Number(m.price).toLocaleString('id-ID')})` : ''}
-                                                            </span>
-                                                        ))}
-                                                    </div>
+                                                {item.qty > 1 && !isUltraCompact && (
+                                                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono mt-0.5">
+                                                        @ Rp {item.price.toLocaleString('id-ID')}
+                                                    </p>
                                                 )}
                                             </div>
                                         </div>
-
-                                        {/* Price Info */}
-                                        <div className="text-right shrink-0">
-                                            <p className="text-base font-black text-white font-mono tracking-tight">
-                                                Rp {(item.price * item.qty).toLocaleString('id-ID')}
-                                            </p>
-                                            {item.qty > 1 && (
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono mt-0.5">
-                                                    @ Rp {item.price.toLocaleString('id-ID')}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                <div ref={itemsEndRef} />
+                                    );
+                                })}
+                                <div ref={itemsEndRef} className="col-span-full" />
                             </div>
                         </div>
 

@@ -439,6 +439,14 @@ export default function POSPage() {
                     dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: agentDapurEnabled, copies: agentDapurCopies },
                     bar: { ip: agentBarIp.trim(), port: 9100, enabled: agentBarEnabled, copies: agentBarCopies }
                 };
+
+                // Sinkronkan config ke agent terlebih dahulu (penting untuk agent versi lama yang membaca config global dari POST /config)
+                await fetch("http://localhost:18181/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(fullConfig)
+                }).catch(() => {});
+
                 const payload = {
                     sale: lastSale,
                     cart: lastCart,
@@ -466,30 +474,49 @@ export default function POSPage() {
                     );
 
                     if (isLegacyAgent && maxCopies > 1) {
-                        for (let round = 2; round <= maxCopies; round++) {
-                            await new Promise(r => setTimeout(r, 400));
-                            await fetch("http://localhost:18181/print", {
+                        try {
+                            for (let round = 2; round <= maxCopies; round++) {
+                                const needKasir = agentKasirEnabled && agentKasirCopies >= round;
+                                const needDapur = agentDapurEnabled && agentDapurCopies >= round;
+                                const needBar = agentBarEnabled && agentBarCopies >= round;
+
+                                if (!needKasir && !needDapur && !needBar) continue;
+
+                                const roundConfig = {
+                                    kasir: { ip: needKasir ? agentKasirIp.trim() : '', port: 9100, enabled: needKasir, copies: 1 },
+                                    dapur: { ip: needDapur ? agentDapurIp.trim() : '', port: 9100, enabled: needDapur, copies: 1 },
+                                    bar: { ip: needBar ? agentBarIp.trim() : '', port: 9100, enabled: needBar, copies: 1 }
+                                };
+
+                                // Wajib update POST /config dulu karena agent versi lama mengabaikan payload.config di dalam POST /print!
+                                await fetch("http://localhost:18181/config", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify(roundConfig)
+                                }).catch(() => {});
+
+                                await new Promise(r => setTimeout(r, 350));
+
+                                await fetch("http://localhost:18181/print", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                        sale: lastSale,
+                                        cart: lastCart,
+                                        companyName: finalDisplayName,
+                                        store: baseStore,
+                                        config: roundConfig
+                                    })
+                                });
+                            }
+                        } finally {
+                            // Kembalikan config asli ke agent setelah semua round selesai
+                            await fetch("http://localhost:18181/config", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    sale: lastSale,
-                                    cart: lastCart,
-                                    companyName: finalDisplayName,
-                                    store: baseStore,
-                                    config: {
-                                        kasir: { ip: agentKasirIp.trim(), port: 9100, enabled: agentKasirEnabled && agentKasirCopies >= round, copies: 1 },
-                                        dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: agentDapurEnabled && agentDapurCopies >= round, copies: 1 },
-                                        bar: { ip: agentBarIp.trim(), port: 9100, enabled: agentBarEnabled && agentBarCopies >= round, copies: 1 }
-                                    }
-                                })
-                            });
+                                body: JSON.stringify(fullConfig)
+                            }).catch(() => {});
                         }
-                        // Kembalikan config enabled asli ke agent
-                        await fetch("http://localhost:18181/config", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(fullConfig)
-                        }).catch(() => {});
                     }
 
                     toast.success("Pesanan sukses dikirim ke printer yang aktif!", { id: "agent-print" });
