@@ -66,12 +66,12 @@ const isBeverageItem = (item: any) => {
     if (item.fnbType === 'FOOD') return false;
     const name = (item.name || '').toLowerCase();
     const cat = (item.category?.name || item.categoryName || '').toLowerCase();
-    const bevKeywords = [
-        'minum', 'beverage', 'drink', 'kopi', 'coffee', 'tea', 'teh', 'jus', 'juice',
-        'latte', 'espresso', 'cappuccino', 'americano', 'matcha', 'boba', 'smoothie',
-        'soda', 'syrup', 'ice', 'es ', 'shake', 'mocktail', 'cocktail', 'water', 'mineral', 'air'
-    ];
-    return bevKeywords.some(kw => name.includes(kw) || cat.includes(kw));
+    // Cek kategori dulu
+    const bevCatKeywords = ['minum', 'beverage', 'drink', 'kopi', 'coffee', 'tea', 'teh', 'jus', 'juice', 'milk', 'susu', 'bar'];
+    if (bevCatKeywords.some(kw => cat.includes(kw))) return true;
+    // Cek kata utuh pada nama produk agar "rice" tidak terkena "ice", "steak" tidak terkena "tea", "fries" tidak terkena "es "
+    const bevWordRegex = /\b(minum|minuman|beverage|drink|kopi|coffee|tea|teh|jus|juice|latte|espresso|cappuccino|americano|matcha|boba|smoothie|soda|syrup|ice|iced|es|shake|mocktail|cocktail|water|mineral|air|susu|milk)\b/i;
+    return bevWordRegex.test(name);
 };
 
 interface CartItem extends Product {
@@ -447,9 +447,15 @@ export default function POSPage() {
                     body: JSON.stringify(fullConfig)
                 }).catch(() => {});
 
+                // Jika Printer Bar dinonaktifkan (outlet hanya memakai Printer Kasir + Dapur),
+                // arahkan semua item ke Dapur (fnbType: 'FOOD') agar pesanan minuman tetap tercetak di Dapur.
+                const cartForAgent = (!agentBarEnabled || !agentBarIp.trim()) && agentDapurEnabled
+                    ? lastCart.map(it => ({ ...it, fnbType: 'FOOD' }))
+                    : lastCart;
+
                 const payload = {
                     sale: lastSale,
-                    cart: lastCart,
+                    cart: cartForAgent,
                     companyName: finalDisplayName,
                     store: baseStore,
                     config: fullConfig
@@ -483,9 +489,9 @@ export default function POSPage() {
                                 if (!needKasir && !needDapur && !needBar) continue;
 
                                 const roundConfig = {
-                                    kasir: { ip: needKasir ? agentKasirIp.trim() : '', port: 9100, enabled: needKasir, copies: 1 },
-                                    dapur: { ip: needDapur ? agentDapurIp.trim() : '', port: 9100, enabled: needDapur, copies: 1 },
-                                    bar: { ip: needBar ? agentBarIp.trim() : '', port: 9100, enabled: needBar, copies: 1 }
+                                    kasir: { ip: agentKasirIp.trim(), port: 9100, enabled: needKasir, copies: 1 },
+                                    dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: needDapur, copies: 1 },
+                                    bar: { ip: agentBarIp.trim(), port: 9100, enabled: needBar, copies: 1 }
                                 };
 
                                 // Wajib update POST /config dulu karena agent versi lama mengabaikan payload.config di dalam POST /print!
@@ -502,7 +508,7 @@ export default function POSPage() {
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({
                                         sale: lastSale,
-                                        cart: lastCart,
+                                        cart: cartForAgent,
                                         companyName: finalDisplayName,
                                         store: baseStore,
                                         config: roundConfig
@@ -519,7 +525,28 @@ export default function POSPage() {
                         }
                     }
 
-                    toast.success("Pesanan sukses dikirim ke printer yang aktif!", { id: "agent-print" });
+                    // Tampilkan info detail hasil cetak per printer (Kasir, Dapur, Bar)
+                    const infoParts: string[] = [];
+                    if (data.results?.kasir?.success) infoParts.push(`Kasir (${agentKasirCopies}x)`);
+                    if (data.results?.dapur?.success) {
+                        infoParts.push(`Dapur (${agentDapurCopies}x)`);
+                    } else if (agentDapurEnabled && data.results?.dapur?.skipped) {
+                        infoParts.push(`Dapur dilewati (${data.results.dapur.reason || 'Bukan menu makanan'})`);
+                    } else if (agentDapurEnabled && data.results?.dapur?.error) {
+                        toast.error(`Printer Dapur (${agentDapurIp}) gagal: ${data.results.dapur.error}`);
+                    }
+                    if (data.results?.bar?.success) {
+                        infoParts.push(`Bar (${agentBarCopies}x)`);
+                    } else if (agentBarEnabled && data.results?.bar?.error) {
+                        toast.error(`Printer Bar (${agentBarIp}) gagal: ${data.results.bar.error}`);
+                    }
+
+                    toast.success(
+                        infoParts.length > 0
+                            ? `Terkirim: ${infoParts.join(' • ')}`
+                            : "Pesanan sukses dikirim ke printer yang aktif!",
+                        { id: "agent-print", duration: 4000 }
+                    );
                     return;
                 }
             } catch (e) {

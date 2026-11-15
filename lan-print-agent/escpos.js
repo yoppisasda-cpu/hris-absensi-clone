@@ -47,12 +47,10 @@ function isBeverage(item) {
     if (item.fnbType === 'FOOD') return false;
     const name = (item.name || '').toLowerCase();
     const cat = (item.category?.name || item.categoryName || '').toLowerCase();
-    const bevKeywords = [
-        'minum', 'beverage', 'drink', 'kopi', 'coffee', 'tea', 'teh', 'jus', 'juice',
-        'latte', 'espresso', 'cappuccino', 'americano', 'matcha', 'boba', 'smoothie',
-        'soda', 'syrup', 'ice', 'es ', 'shake', 'mocktail', 'cocktail', 'water', 'mineral', 'air'
-    ];
-    return bevKeywords.some(kw => name.includes(kw) || cat.includes(kw));
+    const bevCatKeywords = ['minum', 'beverage', 'drink', 'kopi', 'coffee', 'tea', 'teh', 'jus', 'juice', 'milk', 'susu', 'bar'];
+    if (bevCatKeywords.some(kw => cat.includes(kw))) return true;
+    const bevWordRegex = /\b(minum|minuman|beverage|drink|kopi|coffee|tea|teh|jus|juice|latte|espresso|cappuccino|americano|matcha|boba|smoothie|soda|syrup|ice|iced|es|shake|mocktail|cocktail|water|mineral|air|susu|milk)\b/i;
+    return bevWordRegex.test(name);
 }
 
 // 1. RECEIPT PRINTER BUFFER (Kasir & Pelanggan)

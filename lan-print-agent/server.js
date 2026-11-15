@@ -181,8 +181,9 @@ const server = http.createServer((req, res) => {
                     results.kasir = { skipped: true, reason: 'Kasir dinonaktifkan' };
                 }
 
-                // B. Kitchen Ticket (Food Only)
-                const foodItems = cart.filter(it => !isBeverage(it));
+                // B. Kitchen Ticket (Food Only, atau Semua Item jika Printer Bar dinonaktifkan)
+                const barActive = config.bar && config.bar.enabled !== false && Boolean(config.bar.ip);
+                const foodItems = barActive ? cart.filter(it => !isBeverage(it)) : cart;
                 if (config.dapur && config.dapur.enabled !== false && config.dapur.ip && foodItems.length > 0) {
                     const kitchenBuf = buildKitchenBuffer(sale, foodItems);
                     if (kitchenBuf) {
