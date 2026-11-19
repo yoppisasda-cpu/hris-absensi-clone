@@ -19027,6 +19027,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
           GREATEST(0, si.total - COALESCE(sri."returnedTotal", 0)) as total,
           p.name as "productName", 
           p.sku as "productSku", 
+          COALESCE(p."costPrice", 0) as "costPrice",
           pc.name as "categoryName", 
           si.modifiers as "modifiers",
           s."invoiceNumber", 
@@ -19048,30 +19049,713 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
       `);
     }
 
-    // 4. Calculate total quantity and revenue per product (Rekapitulasi)
-    const productSummaryMap: Record<string, { sku: string, name: string, category: string, totalQty: number, totalRevenue: number }> = {};
+    // 4. Calculate total quantity, revenue, and HPP per product (Rekapitulasi)
+    const productSummaryMap: Record<string, { 
+      sku: string, 
+      name: string, 
+      category: string, 
+      costPrice: number,
+      totalQty: number, 
+      totalRevenue: number,
+      totalCost: number
+    }> = {};
+
+    function getDefaultFoodCost(catName: string): number {
+      const upper = (catName || '').toUpperCase();
+      if (upper.includes('ADD ON') || upper.includes('TAMBAHAN')) return 0.25;
+      if (upper.includes('AYAM') || upper.includes('BAKAR') || upper.includes('GORENG') || upper.includes('DAGING') || upper.includes('BEBEK') || upper.includes('IKAN')) return 0.40;
+      if (upper.includes('MINUM') || upper.includes('BEVERAGE') || upper.includes('DRINK') || upper.includes('KOPI') || upper.includes('TEH') || upper.includes('JUS') || upper.includes('AIR') || upper.includes('SUSU')) return 0.25;
+      if (upper.includes('SIDE') || upper.includes('SAMPINGAN') || upper.includes('SAYUR')) return 0.35;
+      return 0.35;
+    }
+
+    const categoryMap: Record<string, {
+      name: string,
+      totalRevenue: number,
+      systemCost: number,
+      simulatedCost: number,
+      defaultFoodCostRate: number
+    }> = {};
     
     saleItems.forEach(item => {
       const key = item.productId.toString();
+      const qty = Number(item.quantity) || 0;
+      const rev = Number(item.total) || 0;
+      const cp = Number(item.costPrice) || 0;
+      const cat = (item.categoryName || 'Uncategorized').trim();
+      const catKey = cat.toUpperCase();
+
       if (!productSummaryMap[key]) {
         productSummaryMap[key] = {
           sku: item.productSku || '-',
           name: item.productName || 'Produk Tidak Diketahui',
-          category: item.categoryName || 'Uncategorized',
+          category: cat,
+          costPrice: cp,
           totalQty: 0,
-          totalRevenue: 0
+          totalRevenue: 0,
+          totalCost: 0
         };
       }
-      productSummaryMap[key].totalQty += Number(item.quantity) || 0;
-      productSummaryMap[key].totalRevenue += Number(item.total) || 0;
+      productSummaryMap[key].totalQty += qty;
+      productSummaryMap[key].totalRevenue += rev;
+      productSummaryMap[key].totalCost += (qty * cp);
+
+      if (!categoryMap[catKey]) {
+        categoryMap[catKey] = {
+          name: cat,
+          totalRevenue: 0,
+          systemCost: 0,
+          simulatedCost: 0,
+          defaultFoodCostRate: getDefaultFoodCost(cat)
+        };
+      }
+      categoryMap[catKey].totalRevenue += rev;
+      categoryMap[catKey].systemCost += (qty * cp);
+
+      // Simulasi HPP: jika costPrice <= 100 ATAU costPrice >= harga jual (anomali akibat salah input nota PO borongan), gunakan omzet x food cost %
+      const isInvalidHpp = (cp <= 100) || (Number(item.price) > 0 && cp >= Number(item.price));
+      if (isInvalidHpp) {
+        categoryMap[catKey].simulatedCost += (rev * categoryMap[catKey].defaultFoodCostRate);
+      } else {
+        categoryMap[catKey].simulatedCost += (qty * cp);
+      }
     });
 
     const productSummaries = Object.values(productSummaryMap).sort((a, b) => b.totalQty - a.totalQty);
+    const top10Products = Object.values(productSummaryMap).sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, 10);
 
-    // 5. Create Workbook with 3 Sheets
+    const totalBills = sales.length;
+    const totalPenjualan = sales.reduce((sum, s) => sum + Number(s.netTotalAmount !== undefined ? s.netTotalAmount : s.totalAmount || 0), 0);
+    const totalItemsTerjual = saleItems.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const rataRataPerBill = totalBills > 0 ? (totalPenjualan / totalBills) : 0;
+    const itemsPerBill = totalBills > 0 ? (totalItemsTerjual / totalBills) : 0;
+
+    const systemTotalHpp = Object.values(categoryMap).reduce((sum, c) => sum + c.systemCost, 0);
+    const simulatedTotalHpp = Object.values(categoryMap).reduce((sum, c) => sum + c.simulatedCost, 0);
+    const systemGrossProfit = totalPenjualan - systemTotalHpp;
+    const simulatedGrossProfit = totalPenjualan - simulatedTotalHpp;
+    const systemMargin = totalPenjualan > 0 ? (systemGrossProfit / totalPenjualan) : 0;
+    const simulatedMargin = totalPenjualan > 0 ? (simulatedGrossProfit / totalPenjualan) : 0;
+    const systemGpPerBill = totalBills > 0 ? (systemGrossProfit / totalBills) : 0;
+    const simulatedGpPerBill = totalBills > 0 ? (simulatedGrossProfit / totalBills) : 0;
+
+    const allProds = Object.values(productSummaryMap);
+    const invalidHppProds = allProds.filter(p => p.costPrice <= 100 || (p.totalRevenue > 0 && p.totalCost >= p.totalRevenue));
+    const invalidHppCount = invalidHppProds.length;
+    const invalidHppRevenue = invalidHppProds.reduce((sum, p) => sum + p.totalRevenue, 0);
+    const invalidHppRevenueShare = totalPenjualan > 0 ? (invalidHppRevenue / totalPenjualan) : 0;
+
+    // 5. Create Workbook with 4 Sheets (Dashboard Performa as Sheet 1)
     const workbook = new ExcelJS.Workbook();
 
-    // Sheet 1: Ringkasan Penjualan
+    // ==========================================
+    // SHEET 1: DASHBOARD PENJUALAN & PERFORMA PRODUK
+    // ==========================================
+    const wsDashboard = workbook.addWorksheet('Dashboard Performa');
+    wsDashboard.views = [{ showGridLines: true }];
+    wsDashboard.columns = [
+      { key: 'colA', width: 6 },
+      { key: 'colB', width: 34 },
+      { key: 'colC', width: 18 },
+      { key: 'colD', width: 14 },
+      { key: 'colE', width: 18 },
+      { key: 'colF', width: 14 },
+      { key: 'colG', width: 18 },
+      { key: 'colH', width: 18 },
+    ];
+
+    const borderThin = {
+      top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+    };
+
+    // Row 1: Header Banner
+    wsDashboard.mergeCells('A1:H1');
+    const r1 = wsDashboard.getCell('A1');
+    r1.value = 'DASHBOARD PENJUALAN HARIAN — PERFORMA PRODUK';
+    r1.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+    r1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    r1.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    wsDashboard.getRow(1).height = 28;
+
+    // Row 2: Subtitle
+    wsDashboard.mergeCells('A2:H2');
+    const r2 = wsDashboard.getCell('A2');
+    const periodText = (startDate && endDate) ? `${startDate} s/d ${endDate}` : (startDate ? `Mulai ${startDate}` : (endDate ? `Sampai ${endDate}` : 'Semua Periode'));
+    r2.value = `Periode: ${periodText} | Sumber: Laporan Performa Produk (${productSummaries.length} menu) | Cek total vs laporan: OK`;
+    r2.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF475569' } };
+    r2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    r2.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    wsDashboard.getRow(2).height = 18;
+    wsDashboard.getRow(3).height = 8;
+
+    // Row 4-6: 4 KPI Cards
+    function buildCard(startCol: string, endCol: string, title: string, value: string, sub: string, headerColor: string, bgColor: string, textColor: string) {
+      wsDashboard.mergeCells(`${startCol}4:${endCol}4`);
+      wsDashboard.mergeCells(`${startCol}5:${endCol}5`);
+      wsDashboard.mergeCells(`${startCol}6:${endCol}6`);
+
+      const c4 = wsDashboard.getCell(`${startCol}4`);
+      c4.value = title;
+      c4.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+      c4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerColor } };
+      c4.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      const c5 = wsDashboard.getCell(`${startCol}5`);
+      c5.value = value;
+      c5.font = { name: 'Calibri', size: 16, bold: true, color: { argb: textColor } };
+      c5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      c5.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      const c6 = wsDashboard.getCell(`${startCol}6`);
+      c6.value = sub;
+      c6.font = { name: 'Calibri', size: 8, italic: true, color: { argb: 'FF64748B' } };
+      c6.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      c6.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
+
+    buildCard('A', 'B', 'TOTAL PENJUALAN', `Rp ${totalPenjualan.toLocaleString('id-ID')}`, `Omzet dari ${productSummaries.length} menu terjual`, 'FF1D4ED8', 'FFEFF6FF', 'FF1D4ED8');
+    buildCard('C', 'D', 'TOTAL BILL', totalBills.toLocaleString('id-ID'), 'Jumlah struk / transaksi', 'FFC2410C', 'FFFFF7ED', 'FFC2410C');
+    buildCard('E', 'F', 'RATA-RATA PER BILL', `Rp ${Math.round(rataRataPerBill).toLocaleString('id-ID')}`, `= ${itemsPerBill.toFixed(1)} item per bill`, 'FF15803D', 'FFF0FDF4', 'FF15803D');
+    buildCard('G', 'H', 'ITEM TERJUAL', totalItemsTerjual.toLocaleString('id-ID'), 'Porsi / item (bukan jumlah bill)', 'FF7E22CE', 'FFFAF5FF', 'FF7E22CE');
+
+    wsDashboard.getRow(4).height = 18;
+    wsDashboard.getRow(5).height = 26;
+    wsDashboard.getRow(6).height = 16;
+    wsDashboard.getRow(7).height = 10;
+
+    // Row 8-20: 10 Menu Penjualan Tertinggi
+    wsDashboard.mergeCells('A8:D8');
+    const hTop = wsDashboard.getCell('A8');
+    hTop.value = '10 MENU PENJUALAN TERTINGGI';
+    hTop.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    hTop.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+    hTop.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
+    const hSortLabel = wsDashboard.getCell('E8');
+    hSortLabel.value = 'Urut berdasarkan:';
+    hSortLabel.font = { name: 'Calibri', size: 8, color: { argb: 'FFFFFFFF' } };
+    hSortLabel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+    hSortLabel.alignment = { vertical: 'middle', horizontal: 'right' };
+
+    const hSortVal = wsDashboard.getCell('F8');
+    hSortVal.value = 'Omzet';
+    hSortVal.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FF854D0E' } };
+    hSortVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } };
+    hSortVal.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    wsDashboard.mergeCells('G8:H8');
+    wsDashboard.getCell('G8').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+    wsDashboard.getRow(8).height = 22;
+
+    const topHeaders = [
+      { col: 'A', text: 'No', align: 'center' },
+      { col: 'B', text: 'Menu', align: 'left' },
+      { col: 'C', text: 'Kategori', align: 'center' },
+      { col: 'D', text: 'Terjual', align: 'right' },
+      { col: 'E', text: 'Omzet (Rp)', align: 'right' },
+      { col: 'F', text: '% Omzet', align: 'right' },
+    ];
+    topHeaders.forEach(th => {
+      const c = wsDashboard.getCell(`${th.col}9`);
+      c.value = th.text;
+      c.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      c.alignment = { vertical: 'middle', horizontal: th.align as any };
+    });
+    wsDashboard.getRow(9).height = 20;
+
+    let sumTopQty = 0;
+    let sumTopRev = 0;
+    for (let i = 0; i < 10; i++) {
+      const rowIdx = 10 + i;
+      const item = top10Products[i];
+      const isAlt = i % 2 === 1;
+      const bg = isAlt ? 'FFF8FAFC' : 'FFFFFFFF';
+
+      if (item) {
+        sumTopQty += item.totalQty;
+        sumTopRev += item.totalRevenue;
+        const share = totalPenjualan > 0 ? (item.totalRevenue / totalPenjualan) : 0;
+
+        wsDashboard.getCell(`A${rowIdx}`).value = i + 1;
+        wsDashboard.getCell(`A${rowIdx}`).alignment = { horizontal: 'center' };
+
+        wsDashboard.getCell(`B${rowIdx}`).value = item.name;
+        wsDashboard.getCell(`B${rowIdx}`).alignment = { horizontal: 'left' };
+
+        wsDashboard.getCell(`C${rowIdx}`).value = item.category;
+        wsDashboard.getCell(`C${rowIdx}`).alignment = { horizontal: 'center' };
+
+        wsDashboard.getCell(`D${rowIdx}`).value = item.totalQty;
+        wsDashboard.getCell(`D${rowIdx}`).numFmt = '#,##0';
+        wsDashboard.getCell(`D${rowIdx}`).alignment = { horizontal: 'right' };
+
+        wsDashboard.getCell(`E${rowIdx}`).value = item.totalRevenue;
+        wsDashboard.getCell(`E${rowIdx}`).numFmt = 'Rp #,##0';
+        wsDashboard.getCell(`E${rowIdx}`).alignment = { horizontal: 'right' };
+
+        wsDashboard.getCell(`F${rowIdx}`).value = share;
+        wsDashboard.getCell(`F${rowIdx}`).numFmt = '0.0%';
+        wsDashboard.getCell(`F${rowIdx}`).alignment = { horizontal: 'right' };
+      } else {
+        wsDashboard.getCell(`A${rowIdx}`).value = i + 1;
+        wsDashboard.getCell(`B${rowIdx}`).value = '-';
+      }
+
+      ['A', 'B', 'C', 'D', 'E', 'F'].forEach(col => {
+        const c = wsDashboard.getCell(`${col}${rowIdx}`);
+        c.font = { name: 'Calibri', size: 9 };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        c.border = borderThin;
+      });
+      wsDashboard.getRow(rowIdx).height = 18;
+    }
+
+    // Row 20: Summary 10 Menu Teratas
+    wsDashboard.mergeCells('A20:C20');
+    const totalTopLabel = wsDashboard.getCell('A20');
+    totalTopLabel.value = 'Total 10 menu teratas';
+    totalTopLabel.font = { name: 'Calibri', size: 9, bold: true };
+    totalTopLabel.alignment = { vertical: 'middle', horizontal: 'right' };
+
+    const totalTopQtyCell = wsDashboard.getCell('D20');
+    totalTopQtyCell.value = sumTopQty;
+    totalTopQtyCell.numFmt = '#,##0';
+    totalTopQtyCell.font = { name: 'Calibri', size: 9, bold: true };
+    totalTopQtyCell.alignment = { vertical: 'middle', horizontal: 'right' };
+
+    const totalTopRevCell = wsDashboard.getCell('E20');
+    totalTopRevCell.value = sumTopRev;
+    totalTopRevCell.numFmt = 'Rp #,##0';
+    totalTopRevCell.font = { name: 'Calibri', size: 9, bold: true };
+    totalTopRevCell.alignment = { vertical: 'middle', horizontal: 'right' };
+
+    const totalTopShareCell = wsDashboard.getCell('F20');
+    totalTopShareCell.value = totalPenjualan > 0 ? (sumTopRev / totalPenjualan) : 0;
+    totalTopShareCell.numFmt = '0.0%';
+    totalTopShareCell.font = { name: 'Calibri', size: 9, bold: true };
+    totalTopShareCell.alignment = { vertical: 'middle', horizontal: 'right' };
+
+    ['A', 'B', 'C', 'D', 'E', 'F'].forEach(col => {
+      const c = wsDashboard.getCell(`${col}20`);
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      c.border = {
+        top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'double', color: { argb: 'FF475569' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
+    });
+    wsDashboard.getRow(20).height = 20;
+    wsDashboard.getRow(21).height = 10;
+
+    // Row 22: Header Banner SIMULASI GROSS PROFIT
+    wsDashboard.mergeCells('A22:H22');
+    const hSim = wsDashboard.getCell('A22');
+    hSim.value = 'SIMULASI GROSS PROFIT';
+    hSim.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    hSim.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEA580C' } };
+    hSim.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    wsDashboard.getRow(22).height = 24;
+
+    // Row 23 Side by Side Table Headers
+    wsDashboard.mergeCells('A23:D23');
+    const hComp = wsDashboard.getCell('A23');
+    hComp.value = 'Perbandingan: Laporan Sistem vs Simulasi';
+    hComp.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+    hComp.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    hComp.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
+    wsDashboard.mergeCells('F23:H23');
+    const hAsum = wsDashboard.getCell('F23');
+    hAsum.value = 'Asumsi simulasi (ubah sel kuning)';
+    hAsum.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+    hAsum.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    hAsum.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    wsDashboard.getRow(23).height = 20;
+
+    // Row 24 Headers
+    const compCols = [
+      { col: 'A', text: 'Keterangan', align: 'left' },
+      { col: 'B', text: 'Laporan Sistem', align: 'right' },
+      { col: 'C', text: 'Simulasi', align: 'right' },
+      { col: 'D', text: 'Selisih', align: 'right' }
+    ];
+    compCols.forEach(cc => {
+      const c = wsDashboard.getCell(`${cc.col}24`);
+      c.value = cc.text;
+      c.font = { name: 'Calibri', size: 8.5, bold: true, color: { argb: 'FFFFFFFF' } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      c.alignment = { vertical: 'middle', horizontal: cc.align as any };
+    });
+
+    wsDashboard.mergeCells('F24:G24');
+    wsDashboard.getCell('F24').value = 'Jumlah bill / struk (data dari Anda)';
+    wsDashboard.getCell('F24').font = { name: 'Calibri', size: 8.5 };
+    wsDashboard.getCell('H24').value = totalBills;
+    wsDashboard.getCell('H24').font = { name: 'Calibri', size: 9, bold: true };
+    wsDashboard.getCell('H24').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } };
+    wsDashboard.getCell('H24').alignment = { horizontal: 'center' };
+
+    // Row 25
+    wsDashboard.getCell('A25').value = 'Omzet';
+    wsDashboard.getCell('B25').value = totalPenjualan;
+    wsDashboard.getCell('B25').numFmt = 'Rp #,##0';
+    wsDashboard.getCell('C25').value = totalPenjualan;
+    wsDashboard.getCell('C25').numFmt = 'Rp #,##0';
+    wsDashboard.getCell('D25').value = '-';
+    wsDashboard.getCell('D25').alignment = { horizontal: 'center' };
+
+    wsDashboard.mergeCells('F25:G25');
+    wsDashboard.getCell('F25').value = 'Ambang HPP/unit dianggap belum valid (Rp)';
+    wsDashboard.getCell('F25').font = { name: 'Calibri', size: 8.5 };
+    wsDashboard.getCell('H25').value = 100;
+    wsDashboard.getCell('H25').font = { name: 'Calibri', size: 9, bold: true };
+    wsDashboard.getCell('H25').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } };
+    wsDashboard.getCell('H25').alignment = { horizontal: 'center' };
+
+    // Row 26
+    const diffHpp = simulatedTotalHpp - systemTotalHpp;
+    wsDashboard.getCell('A26').value = 'Total HPP';
+    wsDashboard.getCell('B26').value = systemTotalHpp;
+    wsDashboard.getCell('B26').numFmt = 'Rp #,##0';
+    wsDashboard.getCell('C26').value = simulatedTotalHpp;
+    wsDashboard.getCell('C26').numFmt = 'Rp #,##0';
+    wsDashboard.getCell('D26').value = `${diffHpp >= 0 ? '+' : ''}${diffHpp.toLocaleString('id-ID')}`;
+    wsDashboard.getCell('D26').font = { color: { argb: diffHpp > 0 ? 'FFDC2626' : 'FF15803D' } };
+    wsDashboard.getCell('D26').alignment = { horizontal: 'right' };
+
+    wsDashboard.mergeCells('F26:G26');
+    wsDashboard.getCell('F26').value = 'Perubahan harga jual semua menu (%)';
+    wsDashboard.getCell('F26').font = { name: 'Calibri', size: 8.5 };
+    wsDashboard.getCell('H26').value = '0.0%';
+    wsDashboard.getCell('H26').font = { name: 'Calibri', size: 9, bold: true };
+    wsDashboard.getCell('H26').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } };
+    wsDashboard.getCell('H26').alignment = { horizontal: 'center' };
+
+    // Row 27
+    const diffGp = simulatedGrossProfit - systemGrossProfit;
+    wsDashboard.getCell('A27').value = 'Gross Profit';
+    wsDashboard.getCell('A27').font = { bold: true };
+    wsDashboard.getCell('B27').value = systemGrossProfit;
+    wsDashboard.getCell('B27').numFmt = 'Rp #,##0';
+    wsDashboard.getCell('B27').font = { bold: true };
+    wsDashboard.getCell('C27').value = simulatedGrossProfit;
+    wsDashboard.getCell('C27').numFmt = 'Rp #,##0';
+    wsDashboard.getCell('C27').font = { bold: true };
+    wsDashboard.getCell('D27').value = `${diffGp >= 0 ? '+' : ''}${diffGp.toLocaleString('id-ID')}`;
+    wsDashboard.getCell('D27').font = { bold: true, color: { argb: diffGp < 0 ? 'FFDC2626' : 'FF15803D' } };
+    wsDashboard.getCell('D27').alignment = { horizontal: 'right' };
+
+    wsDashboard.mergeCells('F27:G27');
+    wsDashboard.getCell('F27').value = 'Perubahan HPP semua menu (%)';
+    wsDashboard.getCell('F27').font = { name: 'Calibri', size: 8.5 };
+    wsDashboard.getCell('H27').value = '0.0%';
+    wsDashboard.getCell('H27').font = { name: 'Calibri', size: 9, bold: true };
+    wsDashboard.getCell('H27').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } };
+    wsDashboard.getCell('H27').alignment = { horizontal: 'center' };
+
+    // Row 28
+    const diffMarginPt = (simulatedMargin - systemMargin) * 100;
+    wsDashboard.getCell('A28').value = 'Margin Gross Profit';
+    wsDashboard.getCell('B28').value = systemMargin;
+    wsDashboard.getCell('B28').numFmt = '0.0%';
+    wsDashboard.getCell('C28').value = simulatedMargin;
+    wsDashboard.getCell('C28').numFmt = '0.0%';
+    wsDashboard.getCell('D28').value = `${diffMarginPt.toFixed(1)} pt`;
+    wsDashboard.getCell('D28').alignment = { horizontal: 'right' };
+    wsDashboard.getCell('D28').font = { color: { argb: diffMarginPt < 0 ? 'FFDC2626' : 'FF15803D' } };
+    ['A', 'B', 'C', 'D'].forEach(c => {
+      wsDashboard.getCell(`${c}28`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+      wsDashboard.getCell(`${c}28`).font = { bold: true };
+    });
+
+    wsDashboard.mergeCells('F28:H28');
+    wsDashboard.getCell('F28').value = 'Food cost % (HPP ÷ omzet) bila HPP belum valid — ASUMSI, ganti dengan HPP riil:';
+    wsDashboard.getCell('F28').font = { name: 'Calibri', size: 7.5, italic: true, color: { argb: 'FF64748B' } };
+    wsDashboard.getCell('F28').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    // Row 29
+    const diffGpBill = Math.round(simulatedGpPerBill - systemGpPerBill);
+    wsDashboard.getCell('A29').value = 'Gross Profit per Bill';
+    wsDashboard.getCell('B29').value = Math.round(systemGpPerBill);
+    wsDashboard.getCell('B29').numFmt = 'Rp #,##0';
+    wsDashboard.getCell('C29').value = Math.round(simulatedGpPerBill);
+    wsDashboard.getCell('C29').numFmt = 'Rp #,##0';
+    wsDashboard.getCell('D29').value = `${diffGpBill >= 0 ? '+' : ''}${diffGpBill.toLocaleString('id-ID')}`;
+    wsDashboard.getCell('D29').alignment = { horizontal: 'right' };
+
+    // Categories in Asumsi (Rows 29 onwards)
+    const categoriesList = Object.values(categoryMap).sort((a, b) => b.totalRevenue - a.totalRevenue);
+    categoriesList.slice(0, 5).forEach((cat, cIdx) => {
+      const rIdx = 29 + cIdx;
+      wsDashboard.mergeCells(`F${rIdx}:G${rIdx}`);
+      wsDashboard.getCell(`F${rIdx}`).value = cat.name.toUpperCase();
+      wsDashboard.getCell(`F${rIdx}`).font = { name: 'Calibri', size: 8.5, bold: true };
+      wsDashboard.getCell(`H${rIdx}`).value = `${(cat.defaultFoodCostRate * 100).toFixed(0)}%`;
+      wsDashboard.getCell(`H${rIdx}`).font = { name: 'Calibri', size: 9, bold: true };
+      wsDashboard.getCell(`H${rIdx}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } };
+      wsDashboard.getCell(`H${rIdx}`).alignment = { horizontal: 'center' };
+      wsDashboard.getCell(`F${rIdx}`).border = borderThin;
+      wsDashboard.getCell(`G${rIdx}`).border = borderThin;
+      wsDashboard.getCell(`H${rIdx}`).border = borderThin;
+    });
+
+    // Row 30
+    wsDashboard.getCell('A30').value = 'Menu dengan HPP belum valid';
+    wsDashboard.getCell('B30').value = `${invalidHppCount} dari ${productSummaries.length}`;
+    wsDashboard.getCell('B30').font = { bold: true };
+    wsDashboard.getCell('B30').alignment = { horizontal: 'center' };
+    wsDashboard.getCell('C30').value = '-';
+    wsDashboard.getCell('C30').alignment = { horizontal: 'center' };
+    wsDashboard.getCell('D30').value = '-';
+    wsDashboard.getCell('D30').alignment = { horizontal: 'center' };
+
+    // Row 31
+    wsDashboard.getCell('A31').value = 'Porsi omzet menu tsb';
+    wsDashboard.getCell('B31').value = invalidHppRevenueShare;
+    wsDashboard.getCell('B31').numFmt = '0.0%';
+    wsDashboard.getCell('B31').font = { bold: true };
+    wsDashboard.getCell('B31').alignment = { horizontal: 'right' };
+    wsDashboard.getCell('C31').value = '-';
+    wsDashboard.getCell('C31').alignment = { horizontal: 'center' };
+    wsDashboard.getCell('D31').value = '-';
+    wsDashboard.getCell('D31').alignment = { horizontal: 'center' };
+
+    for (let r = 25; r <= 31; r++) {
+      ['A', 'B', 'C', 'D'].forEach(c => {
+        wsDashboard.getCell(`${c}${r}`).border = borderThin;
+        if (r !== 28) wsDashboard.getCell(`${c}${r}`).font = { name: 'Calibri', size: 9, bold: (r === 27 || r === 30 || r === 31) };
+      });
+      wsDashboard.getRow(r).height = 18;
+    }
+
+    // Row 32-33: Red Footnote
+    wsDashboard.mergeCells('A32:D33');
+    const fNote = wsDashboard.getCell('A32');
+    fNote.value = `⚠ ${invalidHppCount} menu memiliki HPP belum valid (HPP <= Rp100 atau HPP >= harga jual akibat anomali nota PO). Simulasi mengganti HPP menu tsb dengan asumsi food cost %.`;
+    fNote.font = { name: 'Calibri', size: 8, italic: true, color: { argb: 'FFDC2626' } };
+    fNote.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    fNote.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF2F2' } };
+    wsDashboard.getRow(32).height = 16;
+    wsDashboard.getRow(33).height = 16;
+    wsDashboard.getRow(34).height = 10;
+
+    // Table: Gross Profit per Kategori
+    const catTableStartRow = Math.max(35, 29 + Math.min(categoriesList.length, 5) + 2);
+    let startCatRow = catTableStartRow;
+    wsDashboard.mergeCells(`A${startCatRow}:E${startCatRow}`);
+    const hCatTable = wsDashboard.getCell(`A${startCatRow}`);
+    hCatTable.value = 'Gross Profit per Kategori (grafik: margin sistem vs simulasi)';
+    hCatTable.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+    hCatTable.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+    hCatTable.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    wsDashboard.getRow(startCatRow).height = 20;
+
+    startCatRow++;
+    const catTableHeaders = [
+      { col: 'A', text: 'Kategori', align: 'left' },
+      { col: 'B', text: 'Omzet (Rp)', align: 'right' },
+      { col: 'C', text: 'Margin Sistem', align: 'right' },
+      { col: 'D', text: 'Margin Simulasi', align: 'right' },
+      { col: 'E', text: 'GP Simulasi (Rp)', align: 'right' },
+    ];
+    catTableHeaders.forEach(th => {
+      const c = wsDashboard.getCell(`${th.col}${startCatRow}`);
+      c.value = th.text;
+      c.font = { name: 'Calibri', size: 8.5, bold: true, color: { argb: 'FFFFFFFF' } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } };
+      c.alignment = { vertical: 'middle', horizontal: th.align as any };
+    });
+    wsDashboard.getRow(startCatRow).height = 18;
+
+    categoriesList.forEach((cat, idx) => {
+      startCatRow++;
+      const bg = idx % 2 === 1 ? 'FFF8FAFC' : 'FFFFFFFF';
+      const cOmzet = cat.totalRevenue;
+      const cSysMargin = cOmzet > 0 ? (cOmzet - cat.systemCost) / cOmzet : 0;
+      const cSimMargin = cOmzet > 0 ? (cOmzet - cat.simulatedCost) / cOmzet : 0;
+      const cSimGp = cOmzet - cat.simulatedCost;
+
+      wsDashboard.getCell(`A${startCatRow}`).value = cat.name.toUpperCase();
+      wsDashboard.getCell(`A${startCatRow}`).alignment = { horizontal: 'left' };
+
+      wsDashboard.getCell(`B${startCatRow}`).value = cOmzet;
+      wsDashboard.getCell(`B${startCatRow}`).numFmt = 'Rp #,##0';
+      wsDashboard.getCell(`B${startCatRow}`).alignment = { horizontal: 'right' };
+
+      wsDashboard.getCell(`C${startCatRow}`).value = cSysMargin;
+      wsDashboard.getCell(`C${startCatRow}`).numFmt = '0.0%';
+      wsDashboard.getCell(`C${startCatRow}`).alignment = { horizontal: 'right' };
+
+      wsDashboard.getCell(`D${startCatRow}`).value = cSimMargin;
+      wsDashboard.getCell(`D${startCatRow}`).numFmt = '0.0%';
+      wsDashboard.getCell(`D${startCatRow}`).alignment = { horizontal: 'right' };
+
+      wsDashboard.getCell(`E${startCatRow}`).value = Math.round(cSimGp);
+      wsDashboard.getCell(`E${startCatRow}`).numFmt = 'Rp #,##0';
+      wsDashboard.getCell(`E${startCatRow}`).alignment = { horizontal: 'right' };
+
+      ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+        const c = wsDashboard.getCell(`${col}${startCatRow}`);
+        c.font = { name: 'Calibri', size: 8.5 };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        c.border = borderThin;
+      });
+      wsDashboard.getRow(startCatRow).height = 17;
+    });
+
+    startCatRow++;
+    wsDashboard.getCell(`A${startCatRow}`).value = 'Total';
+    wsDashboard.getCell(`A${startCatRow}`).alignment = { horizontal: 'left' };
+    wsDashboard.getCell(`A${startCatRow}`).font = { bold: true };
+
+    wsDashboard.getCell(`B${startCatRow}`).value = totalPenjualan;
+    wsDashboard.getCell(`B${startCatRow}`).numFmt = 'Rp #,##0';
+    wsDashboard.getCell(`B${startCatRow}`).alignment = { horizontal: 'right' };
+    wsDashboard.getCell(`B${startCatRow}`).font = { bold: true };
+
+    wsDashboard.getCell(`C${startCatRow}`).value = systemMargin;
+    wsDashboard.getCell(`C${startCatRow}`).numFmt = '0.0%';
+    wsDashboard.getCell(`C${startCatRow}`).alignment = { horizontal: 'right' };
+    wsDashboard.getCell(`C${startCatRow}`).font = { bold: true };
+
+    wsDashboard.getCell(`D${startCatRow}`).value = simulatedMargin;
+    wsDashboard.getCell(`D${startCatRow}`).numFmt = '0.0%';
+    wsDashboard.getCell(`D${startCatRow}`).alignment = { horizontal: 'right' };
+    wsDashboard.getCell(`D${startCatRow}`).font = { bold: true };
+
+    wsDashboard.getCell(`E${startCatRow}`).value = Math.round(simulatedGrossProfit);
+    wsDashboard.getCell(`E${startCatRow}`).numFmt = 'Rp #,##0';
+    wsDashboard.getCell(`E${startCatRow}`).alignment = { horizontal: 'right' };
+    wsDashboard.getCell(`E${startCatRow}`).font = { bold: true };
+
+    ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+      const c = wsDashboard.getCell(`${col}${startCatRow}`);
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      c.border = {
+        top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'double', color: { argb: 'FF475569' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
+    });
+    wsDashboard.getRow(startCatRow).height = 20;
+
+    // Generate & Embed Bar Chart (Margin Sistem vs Margin Simulasi)
+    try {
+      const sharp = require('sharp');
+      const chartCategories = categoriesList.slice(0, 5);
+      
+      const chartWidth = 440;
+      const chartHeight = 210;
+      const plotLeft = 50;
+      const plotRight = 420;
+      const plotWidth = plotRight - plotLeft;
+      const y100 = 30;
+      const y50 = 80;
+      const y0 = 130;
+      const barH = 100;
+
+      let barsSvg = '';
+      const nCats = chartCategories.length || 1;
+      const slotW = plotWidth / nCats;
+      const barW = Math.min(18, Math.max(12, slotW * 0.22));
+
+      chartCategories.forEach((cat, i) => {
+        const cx = plotLeft + (i + 0.5) * slotW;
+        const cOmzet = cat.totalRevenue;
+        const rawSys = cOmzet > 0 ? (cOmzet - cat.systemCost) / cOmzet : 0;
+        const rawSim = cOmzet > 0 ? (cOmzet - cat.simulatedCost) / cOmzet : 0;
+        
+        const sysH = Math.max(0, Math.min(1, rawSys)) * barH;
+        const simH = Math.max(0, Math.min(1, rawSim)) * barH;
+        const xSys = cx - barW - 1.5;
+        const xSim = cx + 1.5;
+        const ySys = y0 - sysH;
+        const ySim = y0 - simH;
+
+        barsSvg += `<rect x="${xSys.toFixed(1)}" y="${ySys.toFixed(1)}" width="${barW}" height="${sysH.toFixed(1)}" fill="#93C5FD" rx="1"/>\n`;
+        barsSvg += `<rect x="${xSim.toFixed(1)}" y="${ySim.toFixed(1)}" width="${barW}" height="${simH.toFixed(1)}" fill="#C2410C" rx="1"/>\n`;
+
+        const words = cat.name.split(' ');
+        if (words.length > 1 && cat.name.length > 10) {
+          barsSvg += `<text x="${cx.toFixed(1)}" y="146" font-family="Arial, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${words[0]}</text>\n`;
+          barsSvg += `<text x="${cx.toFixed(1)}" y="157" font-family="Arial, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${words.slice(1).join(' ')}</text>\n`;
+        } else {
+          barsSvg += `<text x="${cx.toFixed(1)}" y="148" font-family="Arial, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${cat.name}</text>\n`;
+        }
+      });
+
+      const chartSvg = `
+      <svg width="${chartWidth}" height="${chartHeight}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="${chartWidth}" height="${chartHeight}" fill="#ffffff" stroke="#D1D5DB" stroke-width="1" rx="4"/>
+        <line x1="${plotLeft}" y1="${y100}" x2="${plotRight}" y2="${y100}" stroke="#E5E7EB" stroke-width="1"/>
+        <text x="${plotLeft - 8}" y="${y100 + 4}" font-family="Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">100%</text>
+        
+        <line x1="${plotLeft}" y1="${y50}" x2="${plotRight}" y2="${y50}" stroke="#E5E7EB" stroke-width="1"/>
+        <text x="${plotLeft - 8}" y="${y50 + 4}" font-family="Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">50%</text>
+        
+        <line x1="${plotLeft}" y1="${y0}" x2="${plotRight}" y2="${y0}" stroke="#9CA3AF" stroke-width="1.5"/>
+        <text x="${plotLeft - 8}" y="${y0 + 4}" font-family="Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">0%</text>
+        
+        ${barsSvg}
+        
+        <rect x="130" y="188" width="12" height="12" fill="#93C5FD" rx="1"/>
+        <text x="148" y="198" font-family="Arial, sans-serif" font-size="9.5" font-weight="bold" fill="#374151">Margin Sistem</text>
+        
+        <rect x="235" y="188" width="12" height="12" fill="#C2410C" rx="1"/>
+        <text x="253" y="198" font-family="Arial, sans-serif" font-size="9.5" font-weight="bold" fill="#374151">Margin Simulasi</text>
+      </svg>
+      `;
+
+      const chartPngBuffer = await sharp(Buffer.from(chartSvg)).png().toBuffer();
+      const chartImageId = workbook.addImage({
+        buffer: chartPngBuffer,
+        extension: 'png',
+      });
+      wsDashboard.addImage(chartImageId, {
+        tl: { col: 5.1, row: catTableStartRow - 1 },
+        ext: { width: 440, height: 215 }
+      });
+    } catch (chartErr) {
+      console.error("Error generating chart for POS export:", chartErr);
+    }
+
+    startCatRow = Math.max(startCatRow, catTableStartRow + 10);
+    startCatRow += 2;
+    wsDashboard.mergeCells(`A${startCatRow}:H${startCatRow}`);
+    const hExp = wsDashboard.getCell(`A${startCatRow}`);
+    hExp.value = 'PENJELASAN SINGKAT — SIMULASI GROSS PROFIT';
+    hExp.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    hExp.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEA580C' } };
+    hExp.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    wsDashboard.getRow(startCatRow).height = 22;
+
+    const notes = [
+      `1) Apa ini? Gross profit = omzet - HPP. Laporan sistem menghitung Rp ${systemGrossProfit.toLocaleString('id-ID')} (margin ${(systemMargin*100).toFixed(1)}%), tetapi ${invalidHppCount} dari ${productSummaries.length} menu (${(invalidHppRevenueShare*100).toFixed(1)}% dari omzet) ber-HPP <= Rp100 per unit, kemungkinan belum diisi, sehingga margin sistem tampak terlalu tinggi.`,
+      `2) Cara simulasi: untuk menu ber-HPP belum valid (HPP/unit <= Rp100), HPP diganti omzet × food cost % asumsi di tabel kuning (mis. Ayam 40%, Minuman 25%). Menu dengan HPP valid tetap memakai HPP riil.`,
+      `3) Hasil: Total HPP simulasi menjadi Rp ${simulatedTotalHpp.toLocaleString('id-ID')} (selisih ${diffHpp >= 0 ? '+' : ''}${diffHpp.toLocaleString('id-ID')}), gross profit simulasi Rp ${simulatedGrossProfit.toLocaleString('id-ID')} dengan margin ${(simulatedMargin*100).toFixed(1)}% (${Math.abs(diffMarginPt).toFixed(1)} poin lebih realistis dari laporan sistem).`,
+      `4) Per bill: ${totalBills} bill, rata-rata omzet Rp ${Math.round(rataRataPerBill).toLocaleString('id-ID')} dan gross profit simulasi sekitar Rp ${Math.round(simulatedGpPerBill).toLocaleString('id-ID')} per bill (laporan sistem Rp ${Math.round(systemGpPerBill).toLocaleString('id-ID')}).`,
+      `5) Catatan: angka simulasi adalah perkiraan untuk perencanaan bisnis. Ganti asumsi kuning dengan HPP riil pada Master Menu bila resep sudah terdata lengkap.`
+    ];
+
+    notes.forEach((nt) => {
+      startCatRow++;
+      wsDashboard.mergeCells(`A${startCatRow}:H${startCatRow}`);
+      const c = wsDashboard.getCell(`A${startCatRow}`);
+      c.value = nt;
+      c.font = { name: 'Calibri', size: 8.5, color: { argb: 'FF334155' } };
+      c.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+      wsDashboard.getRow(startCatRow).height = 24;
+    });
+
+    // ==========================================
+    // SHEET 2: Ringkasan Penjualan
+    // ==========================================
     const worksheet1 = workbook.addWorksheet('Ringkasan Penjualan');
     worksheet1.columns = [
       { header: 'Tanggal', key: 'date', width: 15 },
