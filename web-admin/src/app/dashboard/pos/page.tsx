@@ -2495,7 +2495,7 @@ export default function POSPage() {
                                             <span>{new Date(lastSale.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
                                         </div>
                                         <div>No: {lastSale.invoiceNumber}</div>
-                                        <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : (lastSale.saleType === 'WALK_IN' ? 'Walk-in' : lastSale.saleType))}</div>
+                                        <div className="font-extrabold text-[14px] leading-tight my-0.5">Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'TAKE AWAY' : (lastSale.saleType === 'DINE_IN' ? 'DINE IN' : (lastSale.saleType === 'WALK_IN' ? 'WALK-IN' : String(lastSale.saleType || '').toUpperCase()))}</div>
                                         {lastSale.customerName && <div>Plg: {lastSale.customerName}</div>}
                                     </div>
 
@@ -2584,7 +2584,7 @@ export default function POSPage() {
                                         {lastSale.customerName && (
                                             <div className="font-bold text-[11px] mt-0.5">Meja / Tamu: {lastSale.customerName}</div>
                                         )}
-                                        <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : lastSale.saleType)}</div>
+                                        <div className="font-extrabold text-[14px] leading-tight my-0.5">Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'TAKE AWAY' : (lastSale.saleType === 'DINE_IN' ? 'DINE IN' : String(lastSale.saleType || '').toUpperCase())}</div>
                                         {lastSale.notes && (
                                             <div className="font-bold text-[11px] mt-1 bg-gray-100 p-1 border border-black">
                                                 NOTE: {lastSale.notes}
@@ -2636,7 +2636,7 @@ export default function POSPage() {
                                         {lastSale.customerName && (
                                             <div className="font-bold text-[11px] mt-0.5">Meja / Tamu: {lastSale.customerName}</div>
                                         )}
-                                        <div>Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'Take Away' : (lastSale.saleType === 'DINE_IN' ? 'Dine In' : lastSale.saleType)}</div>
+                                        <div className="font-extrabold text-[14px] leading-tight my-0.5">Tipe: {lastSale.saleType === 'TAKE_AWAY' ? 'TAKE AWAY' : (lastSale.saleType === 'DINE_IN' ? 'DINE IN' : String(lastSale.saleType || '').toUpperCase())}</div>
                                         {lastSale.notes && (
                                             <div className="font-bold text-[11px] mt-1 bg-gray-100 p-1 border border-black">
                                                 NOTE: {lastSale.notes}

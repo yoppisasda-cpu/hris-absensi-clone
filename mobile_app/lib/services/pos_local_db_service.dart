@@ -71,7 +71,19 @@ class PosLocalDbService {
   static Future<void> saveOfflineSale(Map<String, dynamic> saleJson) async {
     final box = Hive.box(_offlineSalesBoxName);
     final List<dynamic> currentSales = List.from(getOfflineSales());
-    currentSales.add(saleJson);
+    final String invNum = (saleJson['localInvoiceNumber'] ?? saleJson['invoiceNumber'] ?? '').toString();
+    if (invNum.isNotEmpty) {
+      final existingIdx = currentSales.indexWhere((item) =>
+          (item['localInvoiceNumber'] != null && item['localInvoiceNumber'] == invNum) ||
+          (item['invoiceNumber'] != null && item['invoiceNumber'] == invNum));
+      if (existingIdx >= 0) {
+        currentSales[existingIdx] = saleJson;
+      } else {
+        currentSales.add(saleJson);
+      }
+    } else {
+      currentSales.add(saleJson);
+    }
     await box.put('sales', currentSales);
   }
 

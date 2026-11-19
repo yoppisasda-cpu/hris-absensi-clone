@@ -4,12 +4,30 @@ import 'pos_local_db_service.dart';
 class PosSyncManager {
   static final ApiService _apiService = ApiService();
   static bool _isSyncing = false;
+  static final Set<String> _inFlightInvoices = <String>{};
 
   static bool get isSyncing => _isSyncing;
 
-  // Mendapatkan jumlah transaksi offline yang belum sinkron
+  static void markInFlight(String invoiceNumber) {
+    if (invoiceNumber.isNotEmpty) {
+      _inFlightInvoices.add(invoiceNumber);
+    }
+  }
+
+  static void unmarkInFlight(String invoiceNumber) {
+    if (invoiceNumber.isNotEmpty) {
+      _inFlightInvoices.remove(invoiceNumber);
+    }
+  }
+
+  // Mendapatkan jumlah transaksi offline yang belum sinkron (di luar yang sedang aktif dikirim detik ini)
   static int getPendingCount() {
-    return PosLocalDbService.getOfflineSales().length;
+    final all = PosLocalDbService.getOfflineSales();
+    if (_inFlightInvoices.isEmpty) return all.length;
+    return all.where((item) {
+      final inv = (item['localInvoiceNumber'] ?? item['invoiceNumber'] ?? '').toString();
+      return !_inFlightInvoices.contains(inv);
+    }).length;
   }
 
   // Menjalankan proses sinkronisasi transaksi offline ke server
@@ -28,6 +46,11 @@ class PosSyncManager {
     String? lastError;
 
     for (var sale in List.from(offlineSales)) {
+      final invNum = (sale['localInvoiceNumber'] ?? sale['invoiceNumber'] ?? '').toString();
+      if (!force && invNum.isNotEmpty && _inFlightInvoices.contains(invNum)) {
+        // Transaksi ini baru saja di-checkout dan sedang dalam proses pengiriman utama
+        continue;
+      }
       try {
         final List<Map<String, dynamic>> items = (sale['items'] as List).map((item) {
           return Map<String, dynamic>.from(item);
@@ -76,7 +99,7 @@ class PosSyncManager {
         );
 
         // Jika berhasil, hapus transaksi dari antrean lokal
-        final invNum = (sale['localInvoiceNumber'] ?? sale['invoiceNumber'] ?? '').toString();
+        PosSyncManager.unmarkInFlight(invNum);
         await PosLocalDbService.removeOfflineSale(invNum);
         print("PosSyncManager: Transaksi $invNum sukses disinkronkan ke server.");
       } catch (e) {
@@ -84,7 +107,8 @@ class PosSyncManager {
         lastError = e.toString();
         
         // Hentikan sinkronisasi HANYA jika ada kegagalan jaringan sejati (karena transaksi berikutnya juga pasti gagal)
-        if (e.toString().contains('SocketException') || 
+        if (e.toString().contains('NETWORK_ERROR') ||
+            e.toString().contains('SocketException') || 
             e.toString().contains('TimeoutException') || 
             e.toString().contains('Failed host lookup') ||
             e.toString().contains('Connection refused')) {

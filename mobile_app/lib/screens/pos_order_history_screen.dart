@@ -388,7 +388,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                               'modifiers': it['modifiers'],
                             })).toList(),
                           });
-                          final printer = Provider.of<PrinterService>(context, listen: false);
+                          final printer = PrinterService();
                           printer.printReceipt(printData);
                         },
                         icon: Icon(Icons.print),
@@ -412,7 +412,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                               'modifiers': it['modifiers'],
                             })).toList(),
                           });
-                          final printer = Provider.of<PrinterService>(context, listen: false);
+                          final printer = PrinterService();
                           printer.printKitchenReceipt(printData);
                         },
                         icon: Icon(Icons.restaurant),
@@ -436,7 +436,7 @@ class _PosOrderHistoryScreenState extends State<PosOrderHistoryScreen> {
                               'modifiers': it['modifiers'],
                             })).toList(),
                           });
-                          final printer = Provider.of<PrinterService>(context, listen: false);
+                          final printer = PrinterService();
                           printer.printBarReceipt(printData);
                         },
                         icon: Icon(Icons.local_cafe),

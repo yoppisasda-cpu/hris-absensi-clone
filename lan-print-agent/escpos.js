@@ -76,8 +76,13 @@ function buildReceiptBuffer(sale, cart, companyName = 'AIVOLA POS', store = {}) 
     const timeStr = sale.createdAt ? new Date(sale.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     buffers.push(row('Tgl: ' + dateStr, timeStr, width));
     buffers.push(line('No  : ' + (sale.invoiceNumber || '-')));
-    const saleTypeStr = sale.saleType === 'TAKE_AWAY' ? 'Take Away' : (sale.saleType === 'DINE_IN' ? 'Dine In' : (sale.saleType || 'Dine In'));
-    buffers.push(row('Tipe: ' + saleTypeStr, sale.cashierName ? 'Kasir: ' + sale.cashierName : '', width));
+    const saleTypeStr = sale.saleType === 'TAKE_AWAY' ? 'TAKE AWAY' : (sale.saleType === 'DINE_IN' ? 'DINE IN' : String(sale.saleType || 'DINE IN').toUpperCase());
+    buffers.push(CMD.BOLD_ON);
+    buffers.push(CMD.SIZE_MEDIUM);
+    buffers.push(line('Tipe: ' + saleTypeStr));
+    buffers.push(CMD.SIZE_NORMAL);
+    buffers.push(CMD.BOLD_OFF);
+    if (sale.cashierName) buffers.push(line('Kasir: ' + sale.cashierName));
     if (sale.customerName) buffers.push(line('Plg : ' + sale.customerName));
     buffers.push(hr(width));
 
@@ -175,8 +180,12 @@ function buildKitchenBuffer(sale, foodItems) {
         buffers.push(CMD.BOLD_OFF);
     }
 
-    const saleTypeStr = sale.saleType === 'TAKE_AWAY' ? 'Take Away' : (sale.saleType === 'DINE_IN' ? 'Dine In' : (sale.saleType || 'Dine In'));
+    const saleTypeStr = sale.saleType === 'TAKE_AWAY' ? 'TAKE AWAY' : (sale.saleType === 'DINE_IN' ? 'DINE IN' : String(sale.saleType || 'DINE IN').toUpperCase());
+    buffers.push(CMD.BOLD_ON);
+    buffers.push(CMD.SIZE_MEDIUM);
     buffers.push(line('Tipe: ' + saleTypeStr));
+    buffers.push(CMD.SIZE_NORMAL);
+    buffers.push(CMD.BOLD_OFF);
 
     if (sale.notes) {
         buffers.push(CMD.BOLD_ON);
@@ -245,8 +254,12 @@ function buildBarBuffer(sale, beverageItems) {
         buffers.push(CMD.BOLD_OFF);
     }
 
-    const saleTypeStr = sale.saleType === 'TAKE_AWAY' ? 'Take Away' : (sale.saleType === 'DINE_IN' ? 'Dine In' : (sale.saleType || 'Dine In'));
+    const saleTypeStr = sale.saleType === 'TAKE_AWAY' ? 'TAKE AWAY' : (sale.saleType === 'DINE_IN' ? 'DINE IN' : String(sale.saleType || 'DINE IN').toUpperCase());
+    buffers.push(CMD.BOLD_ON);
+    buffers.push(CMD.SIZE_MEDIUM);
     buffers.push(line('Tipe: ' + saleTypeStr));
+    buffers.push(CMD.SIZE_NORMAL);
+    buffers.push(CMD.BOLD_OFF);
 
     if (sale.notes) {
         buffers.push(CMD.BOLD_ON);

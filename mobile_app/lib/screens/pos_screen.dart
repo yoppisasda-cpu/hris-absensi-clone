@@ -1436,10 +1436,7 @@ class _POSScreenState extends State<POSScreen> {
                                 );
                                 return;
                               }
-                              setPanelState(() {
-                                _isProcessingCheckout = true;
-                              });
-                              _processCheckout(context, isModal: isModal);
+                              _processCheckout(context, isModal: isModal, setPanelState: setPanelState);
                             },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isProcessingCheckout ? Colors.grey[600] : Colors.blue[800],
@@ -1591,12 +1588,17 @@ class _POSScreenState extends State<POSScreen> {
     );
   }
 
-  Future<void> _processCheckout(BuildContext currentContext, {bool isModal = true}) async {
+  Future<void> _processCheckout(BuildContext currentContext, {bool isModal = true, StateSetter? setPanelState}) async {
     if (_isProcessingCheckout) {
       print("[POS] Checkout already in progress, aborting duplicate attempt.");
       return;
     }
     setState(() => _isProcessingCheckout = true);
+    if (setPanelState != null) {
+      try {
+        setPanelState(() => _isProcessingCheckout = true);
+      } catch (_) {}
+    }
     if (isModal) Navigator.pop(currentContext);
 
     // 1. Generate unique invoice number immediately on client for instant printing
@@ -1680,25 +1682,63 @@ class _POSScreenState extends State<POSScreen> {
     };
 
     // 2. INSTANT PRINT: Send command immediately to thermal/label/kitchen/bar printers (<0.1s)
-    _printerService.getAutoPrintSettings().then((settings) {
+    // Jalankan secara berurutan (sequential) agar tidak terjadi tabrakan koneksi Bluetooth jika mencetak lebih dari 1 tiket.
+    _printerService.getAutoPrintSettings().then((settings) async {
       if (settings['receipt'] == true) {
-        _printerService.printReceipt(saleData);
+        await _printerService.printReceipt(saleData);
       }
       if (settings['kitchen'] == true) {
-        _printerService.printKitchenReceipt(saleData);
+        if (settings['receipt'] == true) await Future.delayed(const Duration(milliseconds: 350));
+        await _printerService.printKitchenReceipt(saleData);
       }
       if (settings['bar'] == true) {
-        _printerService.printBarReceipt(saleData);
+        if (settings['receipt'] == true || settings['kitchen'] == true) {
+          await Future.delayed(const Duration(milliseconds: 350));
+        }
+        await _printerService.printBarReceipt(saleData);
       }
       if (settings['label'] == true) {
-        _printerService.printStickerLabels(saleData);
+        await Future.delayed(const Duration(milliseconds: 350));
+        await _printerService.printStickerLabels(saleData);
       }
     });
 
     // Unfocus any active text fields to prevent keyboard lag
     FocusScope.of(context).unfocus();
 
-    // 3. BACKGROUND STOCK DEDUCTION & CLOUD SYNC:
+    // 3. WRITE-AHEAD OFFLINE SAFEGUARD:
+    // Simpan transaksi ke memori lokal tablet (Hive) TERLEBIH DAHULU sebelum kirim ke server!
+    // Jika koneksi internet gantung, tablet mati mendadak, atau aplikasi ditutup paksa sebelum server merespon,
+    // transaksi sudah terkunci aman di penyimpanan lokal dan pasti tersinkronisasi otomatis.
+    final offlineSaleData = {
+      'localInvoiceNumber': generatedInvoiceNumber,
+      'invoiceNumber': generatedInvoiceNumber,
+      'items': checkoutItems,
+      'accountId': snapshotAccountId,
+      'totalAmount': snapshotTotalAmount,
+      'customerId': snapshotCustomerId,
+      'customerName': snapshotCustomerName,
+      'customerPhone': snapshotCustomerPhone,
+      'saleType': snapshotSaleType,
+      'deliveryMethod': deliveryMethod,
+      'notes': snapshotNotes,
+      'memberDiscountAmount': snapshotMemberDiscount,
+      'voucherCode': snapshotVoucherCode,
+      'voucherDiscountAmount': snapshotVoucherDiscount,
+      'pointsUsed': snapshotPointsUsed,
+      'pointsEarned': snapshotPointsEarned,
+      'taxRate': snapshotTaxRate,
+      'taxAmount': snapshotTaxAmount,
+      'paymentMethod': snapshotPaymentMethod,
+      'paymentReference': snapshotPaymentRef,
+      'date': snapshotDate,
+      'salespersonId': snapshotSalespersonId,
+      'isSynced': false,
+    };
+    PosSyncManager.markInFlight(generatedInvoiceNumber);
+    PosLocalDbService.saveOfflineSale(offlineSaleData);
+
+    // 4. BACKGROUND STOCK DEDUCTION & CLOUD SYNC:
     // Process server checkout and stock deduction in background so cashier is never blocked!
     _apiService.checkoutPos(
       items: checkoutItems,
@@ -1724,38 +1764,19 @@ class _POSScreenState extends State<POSScreen> {
       salespersonId: snapshotSalespersonId,
       paymentMethod: snapshotPaymentMethod,
       paymentReference: snapshotPaymentRef.isNotEmpty ? snapshotPaymentRef : null,
-    ).then((response) {
+    ).then((response) async {
       print("=== [POS] BACKGROUND SYNC SUCCESS for $generatedInvoiceNumber ===");
+      PosSyncManager.unmarkInFlight(generatedInvoiceNumber);
+      await PosLocalDbService.removeOfflineSale(generatedInvoiceNumber);
       if (pendingBillToDelete != null) {
         _apiService.deletePendingPosBill(pendingBillToDelete).catchError((_) {});
       }
+      if (mounted) {
+        setState(() {});
+      }
     }).catchError((e) async {
-      print("=== [POS] SYNC FAILED, SAVING TO OFFLINE QUEUE: $e ===");
-      final offlineSaleData = {
-        'localInvoiceNumber': generatedInvoiceNumber,
-        'invoiceNumber': generatedInvoiceNumber,
-        'items': checkoutItems,
-        'accountId': snapshotAccountId,
-        'totalAmount': snapshotTotalAmount,
-        'customerId': snapshotCustomerId,
-        'customerName': snapshotCustomerName,
-        'customerPhone': snapshotCustomerPhone,
-        'saleType': snapshotSaleType,
-        'deliveryMethod': deliveryMethod,
-        'notes': snapshotNotes,
-        'memberDiscountAmount': snapshotMemberDiscount,
-        'voucherCode': snapshotVoucherCode,
-        'voucherDiscountAmount': snapshotVoucherDiscount,
-        'pointsUsed': snapshotPointsUsed,
-        'pointsEarned': snapshotPointsEarned,
-        'taxRate': snapshotTaxRate,
-        'taxAmount': snapshotTaxAmount,
-        'paymentMethod': snapshotPaymentMethod,
-        'paymentReference': snapshotPaymentRef,
-        'date': snapshotDate,
-        'salespersonId': snapshotSalespersonId,
-        'isSynced': false,
-      };
+      print("=== [POS] SYNC FAILED, KEEPING IN OFFLINE QUEUE: $e ===");
+      PosSyncManager.unmarkInFlight(generatedInvoiceNumber);
       await PosLocalDbService.saveOfflineSale(offlineSaleData);
       if (mounted) {
         setState(() {}); // refresh badge di icon cloud

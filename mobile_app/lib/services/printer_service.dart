@@ -44,6 +44,7 @@ class PrinterService {
 
   bool _isConnected = false;
   String? _connectedName;
+  String? _activeBtAddress;
 
   bool get isConnected => _isConnected;
   String? get connectedName => _connectedName;
@@ -122,6 +123,7 @@ class PrinterService {
     if (result) {
       _isConnected = true;
       _connectedName = name;
+      _activeBtAddress = address.trim();
     }
     return result;
   }
@@ -249,14 +251,22 @@ class PrinterService {
   }
 
   Future<bool> _sendBytesToTarget(String address, String type, List<int> bytes) async {
-    if (address.trim().isEmpty) return false;
+    final cleanAddr = address.trim();
+    if (cleanAddr.isEmpty) return false;
     if (type == 'wifi') {
-      await _sendToWifiPrinter(address.trim(), bytes);
+      await _sendToWifiPrinter(cleanAddr, bytes);
       return true;
     } else {
       if (Platform.isIOS) return true;
       try {
-        await PrintBluetoothThermal.connect(macPrinterAddress: address.trim());
+        final bool isBtConnected = await PrintBluetoothThermal.connectionStatus;
+        if (!isBtConnected || _activeBtAddress != cleanAddr) {
+          final bool connected = await PrintBluetoothThermal.connect(macPrinterAddress: cleanAddr);
+          if (connected) {
+            _isConnected = true;
+            _activeBtAddress = cleanAddr;
+          }
+        }
       } catch (_) {}
       return await PrintBluetoothThermal.writeBytes(bytes);
     }
@@ -265,15 +275,17 @@ class PrinterService {
   bool _isBeverage(String name, String cat) {
     final lowerName = name.toLowerCase();
     final lowerCat = cat.toLowerCase();
-    final bevKeywords = [
-      'minum', 'beverage', 'drink', 'kopi', 'coffee', 'tea', 'teh', 'jus', 'juice',
-      'latte', 'espresso', 'cappuccino', 'americano', 'matcha', 'boba', 'smoothie',
-      'soda', 'syrup', 'ice', 'es ', 'shake', 'mocktail', 'cocktail', 'water', 'mineral', 'air'
+    final bevCatKeywords = [
+      'minum', 'beverage', 'drink', 'kopi', 'coffee', 'tea', 'teh', 'jus', 'juice', 'milk', 'susu', 'bar'
     ];
-    for (var kw in bevKeywords) {
-      if (lowerName.contains(kw) || lowerCat.contains(kw)) return true;
+    for (var kw in bevCatKeywords) {
+      if (lowerCat.contains(kw)) return true;
     }
-    return false;
+    final bevWordRegex = RegExp(
+      r'\b(minum|minuman|beverage|drink|kopi|coffee|tea|teh|jus|juice|latte|espresso|cappuccino|americano|matcha|boba|smoothie|soda|syrup|ice|iced|es|shake|mocktail|cocktail|water|mineral|air|susu|milk)\b',
+      caseSensitive: false,
+    );
+    return bevWordRegex.hasMatch(lowerName);
   }
 
   double _parseNum(dynamic val) {
@@ -301,7 +313,10 @@ class PrinterService {
   }
 
   Future<bool> printReceipt(Map<String, dynamic> saleData) async {
-    if (!_isConnected) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final savedAddress = prefs.getString(_prefReceiptPrinterAddress);
+    final savedType = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
+    if (!_isConnected && (savedAddress == null || savedAddress.isEmpty)) return false;
 
     try {
       final store = await getStoreData();
@@ -338,8 +353,10 @@ class PrinterService {
       }
       bytes += generator.text('Tanggal: ${DateFormat('dd-MM-yyyy HH:mm').format(DateTime.now())}');
       bytes += generator.text('Kasir  : ${saleData['cashierName'] ?? 'Admin'}');
-      final String orderType = saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')));
-      bytes += generator.text('Tipe   : $orderType', styles: PosStyles(bold: true));
+      final String orderType = (saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'TAKE AWAY' : (saleData['saleType'] == 'DINE_IN' ? 'DINE IN' : (saleData['saleType'] ?? 'DINE IN')))).toString().toUpperCase();
+      bytes += generator.feed(1);
+      bytes += generator.text('TIPE: $orderType', styles: const PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2, align: PosAlign.center));
+      bytes += generator.feed(1);
       bytes += generator.hr();
 
       // Items
@@ -441,17 +458,11 @@ class PrinterService {
       bytes += generator.feed(1);
       bytes += generator.cut();
 
-      final prefs = await SharedPreferences.getInstance();
-      final type = prefs.getString(_prefReceiptPrinterType) ?? 'bluetooth';
-      final address = prefs.getString(_prefReceiptPrinterAddress);
-      
-      if (type == 'wifi' && address != null && address.isNotEmpty) {
-        await _sendToWifiPrinter(address, bytes);
-        return true;
-      } else {
-        if (Platform.isIOS) return true;
-        return await PrintBluetoothThermal.writeBytes(bytes);
-      }
+      final type = savedType;
+      final address = savedAddress;
+      if (address == null || address.isEmpty) return false;
+
+      return await _sendBytesToTarget(address, type, bytes);
     } catch (e) {
       print('Exception in printReceipt: $e');
       return false;
@@ -515,14 +526,20 @@ class PrinterService {
     if (targetAddress == null || targetAddress.isEmpty) return false;
 
     final List allItems = saleData['items'] ?? [];
-    final List foodItems = allItems.where((item) {
-      final fnb = item['fnbType']?.toString().toUpperCase();
-      if (fnb == 'FOOD') return true;
-      if (fnb == 'BEVERAGE') return false;
-      final name = (item['name'] ?? '').toString();
-      final cat = (item['categoryName'] ?? item['category'] ?? '').toString();
-      return !_isBeverage(name, cat);
-    }).toList();
+    final barAddress = prefs.getString(_prefBarPrinterAddress);
+    final autoPrintBar = prefs.getBool(_prefAutoPrintBar) ?? false;
+    final bool hasSeparateBarPrinter = autoPrintBar || (barAddress != null && barAddress.trim().isNotEmpty);
+
+    final List foodItems = hasSeparateBarPrinter
+        ? allItems.where((item) {
+            final fnb = item['fnbType']?.toString().toUpperCase();
+            if (fnb == 'FOOD') return true;
+            if (fnb == 'BEVERAGE') return false;
+            final name = (item['name'] ?? '').toString();
+            final cat = (item['categoryName'] ?? item['category'] ?? '').toString();
+            return !_isBeverage(name, cat);
+          }).toList()
+        : allItems;
 
     if (foodItems.isEmpty) return true;
 
@@ -539,8 +556,10 @@ class PrinterService {
       bytes += generator.text('Tamu/Meja: ${saleData['customerName']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
     }
     bytes += generator.text('Waktu: ${DateFormat('dd-MM HH:mm').format(DateTime.now())}');
-    final String kitchenTypeStr = saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')));
-    bytes += generator.text('Tipe : $kitchenTypeStr', styles: PosStyles(bold: true));
+    final String kitchenTypeStr = (saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'TAKE AWAY' : (saleData['saleType'] == 'DINE_IN' ? 'DINE IN' : (saleData['saleType'] ?? 'DINE IN')))).toString().toUpperCase();
+    bytes += generator.feed(1);
+    bytes += generator.text('TIPE: $kitchenTypeStr', styles: const PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    bytes += generator.feed(1);
     
     if (saleData['notes'] != null && saleData['notes'].toString().trim().isNotEmpty) {
       bytes += generator.feed(1);
@@ -610,8 +629,10 @@ class PrinterService {
       bytes += generator.text('Tamu/Meja: ${saleData['customerName']}', styles: PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
     }
     bytes += generator.text('Waktu: ${DateFormat('dd-MM HH:mm').format(DateTime.now())}');
-    final String barTypeStr = saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')));
-    bytes += generator.text('Tipe : $barTypeStr', styles: PosStyles(bold: true));
+    final String barTypeStr = (saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'TAKE AWAY' : (saleData['saleType'] == 'DINE_IN' ? 'DINE IN' : (saleData['saleType'] ?? 'DINE IN')))).toString().toUpperCase();
+    bytes += generator.feed(1);
+    bytes += generator.text('TIPE: $barTypeStr', styles: const PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+    bytes += generator.feed(1);
 
     if (saleData['notes'] != null && saleData['notes'].toString().trim().isNotEmpty) {
       bytes += generator.feed(1);
@@ -648,53 +669,69 @@ class PrinterService {
     final type = prefs.getString(_prefLabelPrinterType) ?? 'bluetooth';
     final address = prefs.getString(_prefLabelPrinterAddress);
 
-    if (address == null) return false;
+    if (address == null || address.trim().isEmpty) return false;
 
     List<int> bytes = [];
     final profile = await CapabilityProfile.load();
     final generator = Generator(PaperSize.mm58, profile);
 
     final List items = saleData['items'] ?? [];
-    final String invoice = saleData['invoiceNumber'] ?? '-';
+    final String invoice = (saleData['invoiceNumber'] ?? '-').toString();
     final String customerName = saleData['customerName']?.toString().trim() ?? '';
     final String time = DateFormat('HH:mm').format(DateTime.now());
+    final String stickerOrderType = (saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'TAKE AWAY' : (saleData['saleType'] == 'DINE_IN' ? 'DINE IN' : (saleData['saleType'] ?? '')))).toString().trim().toUpperCase();
 
     for (var item in items) {
       final int qty = (item['quantity'] ?? 1).toInt();
-      
+      final String itemName = (item['name'] ?? '').toString();
+      final List? modifiers = item['modifiers'];
+
       for (int i = 1; i <= qty; i++) {
-        bytes += generator.text('--------------------------------', styles: PosStyles(align: PosAlign.center));
-        bytes += generator.text('Order: $invoice', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
+        // 1. Order / Invoice & Tipe Penjualan (FontB ringkas)
+        final String orderHeader = stickerOrderType.isNotEmpty ? 'Order: $invoice [$stickerOrderType]' : 'Order: $invoice';
+        bytes += generator.text(
+          orderHeader,
+          styles: const PosStyles(align: PosAlign.center, bold: true, fontType: PosFontType.fontB),
+        );
+
+        // 2. Nama Pelanggan (jika ada)
         if (customerName.isNotEmpty) {
-          bytes += generator.text('Nama: $customerName', styles: PosStyles(align: PosAlign.center, bold: true, fontType: PosFontType.fontB));
+          bytes += generator.text(
+            'Nama: $customerName',
+            styles: const PosStyles(align: PosAlign.center, bold: true, fontType: PosFontType.fontB),
+          );
         }
-        bytes += generator.text(item['name'], styles: PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
-        
-        final List? modifiers = item['modifiers'];
+
+        // 3. Nama Produk: Dibuat ukuran standar (size1) dan bold untuk memangkas tinggi stiker 50%
+        bytes += generator.text(
+          itemName,
+          styles: const PosStyles(align: PosAlign.center, bold: true),
+        );
+
+        // 4. Modifiers / Detail Item
         if (modifiers != null && modifiers.isNotEmpty) {
           for (var mod in modifiers) {
-            bytes += generator.text('- ${mod['optionName'] ?? mod['name']}', styles: PosStyles(align: PosAlign.left, fontType: PosFontType.fontB));
+            bytes += generator.text(
+              '- ${mod['optionName'] ?? mod['name']}',
+              styles: const PosStyles(align: PosAlign.center, fontType: PosFontType.fontB),
+            );
           }
         }
-        
-        bytes += generator.text('($i/$qty) - $time', styles: PosStyles(align: PosAlign.center, fontType: PosFontType.fontB));
-        bytes += generator.text('--------------------------------', styles: PosStyles(align: PosAlign.center));
-        bytes += generator.cut();
+
+        // 5. Nomor item & waktu ringkas
+        bytes += generator.text(
+          '[$i/$qty]  $time',
+          styles: const PosStyles(align: PosAlign.center, fontType: PosFontType.fontB),
+        );
+
+        // 6. Feed 1 baris minimal (hindari generator.cut() yang otomatis menambahkan 5 baris kosong)
+        bytes += generator.feed(1);
+        // Perintah potong opsional jika printer mendukung (tanpa buang margin atas)
+        bytes += [29, 86, 66, 0];
       }
     }
 
-    if (type == 'wifi') {
-      await _sendToWifiPrinter(address, bytes);
-      return true;
-    } else {
-      // For bluetooth, try to connect if not already
-      if (!_isConnected) {
-        final r = await connectReceipt("Label Printer", address);
-        if (!r) return false;
-      }
-      if (Platform.isIOS) return true;
-      return await PrintBluetoothThermal.writeBytes(bytes);
-    }
+    return await _sendBytesToTarget(address, type, bytes);
   }
 
   Future<void> generateReceiptPreview(Map<String, dynamic> saleData) async {
@@ -732,7 +769,7 @@ class PrinterService {
                 pw.Text('Pelanggan: ${saleData['customerName']}', style: pw.TextStyle(fontSize: 8)),
               pw.Text('Tanggal: ${DateFormat('dd-MM-yyyy HH:mm').format(DateTime.now())}', style: pw.TextStyle(fontSize: 8)),
               pw.Text('Kasir  : ${saleData['cashierName'] ?? 'Admin'}', style: pw.TextStyle(fontSize: 8)),
-              pw.Text('Tipe   : ${saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'Take Away' : (saleData['saleType'] == 'DINE_IN' ? 'Dine In' : (saleData['saleType'] ?? 'Dine In')))}', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Tipe   : ${saleData['deliveryMethod'] ?? (saleData['saleType'] == 'TAKE_AWAY' ? 'TAKE AWAY' : (saleData['saleType'] == 'DINE_IN' ? 'DINE IN' : (saleData['saleType'] ?? 'DINE IN')))}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
               pw.Divider(thickness: 0.5),
               ...((saleData['items'] as List?) ?? []).map((item) {
                 return pw.Column(

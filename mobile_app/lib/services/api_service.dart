@@ -750,7 +750,13 @@ class ApiService {
     String? deliveryMethod,
   }) async {
     try {
-      final response = await _dio.post('/pos/checkout', data: {
+      final response = await _dio.post(
+        '/pos/checkout',
+        options: Options(
+          sendTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 15),
+        ),
+        data: {
         'items': items,
         'accountId': accountId,
         'totalAmount': totalAmount,
