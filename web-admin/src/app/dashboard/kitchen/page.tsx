@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { ChefHat, Check, Clock, UtensilsCrossed, AlertCircle, BarChart3, Play, Pause } from 'lucide-react';
+import { ChefHat, Check, Clock, UtensilsCrossed, AlertCircle, BarChart3, RotateCw } from 'lucide-react';
 import Link from 'next/link';
 
 export default function KitchenDisplay() {
@@ -12,6 +12,7 @@ export default function KitchenDisplay() {
     const [selectedStaffs, setSelectedStaffs] = useState<Record<string, string>>({});
     const [kdsFilter, setKdsFilter] = useState<'ALL' | 'FOOD' | 'BEVERAGE'>('ALL');
     const [isPolling, setIsPolling] = useState(false);
+    const [realtimeConnected, setRealtimeConnected] = useState(false);
 
     const fetchOrders = async () => {
         try {
@@ -49,12 +50,48 @@ export default function KitchenDisplay() {
     useEffect(() => {
         fetchOrders();
         fetchStaffs();
-        let interval: any;
-        if (isPolling) {
-            interval = setInterval(fetchOrders, 10000); // Polling every 10 seconds
+
+        // 1. Setup Server-Sent Events (SSE) Realtime Stream (0 Database Load saat idle)
+        let eventSource: EventSource | null = null;
+        try {
+            const token = localStorage.getItem('jwt_token');
+            const tenantId = localStorage.getItem('currentTenantId');
+            const streamUrl = `${process.env.NEXT_PUBLIC_API_URL}/kitchen/stream?tenantId=${tenantId || ''}&token=${token || ''}`;
+            
+            eventSource = new EventSource(streamUrl);
+            
+            eventSource.onopen = () => {
+                setRealtimeConnected(true);
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type !== 'CONNECTED') {
+                        // Event masuk dari kasir/POS, update data instan
+                        fetchOrders();
+                    }
+                } catch (e) {}
+            };
+
+            eventSource.onerror = () => {
+                setRealtimeConnected(false);
+            };
+        } catch (err) {
+            console.warn('Kitchen Realtime SSE error:', err);
         }
-        return () => clearInterval(interval);
-    }, [isPolling]);
+
+        // 2. Fallback polling HANYA jika realtime terputus dan user mengaktifkan polling manual
+        let interval: any;
+        if (isPolling && !realtimeConnected) {
+            interval = setInterval(fetchOrders, 60000);
+        }
+
+        return () => {
+            if (eventSource) eventSource.close();
+            if (interval) clearInterval(interval);
+        };
+    }, [isPolling, realtimeConnected]);
 
     const markAsReady = async (type: string, id: number) => {
         try {
@@ -63,21 +100,16 @@ export default function KitchenDisplay() {
             const orderKey = `${type}-${id}`;
             const staffId = selectedStaffs[orderKey];
 
-            if (!staffId) {
-                toast.error('Mohon pilih staf yang mengerjakan terlebih dahulu!');
-                return;
-            }
-
-            const staffName = staffs.find(s => s.id.toString() === staffId)?.name || '';
+            const staffName = staffId ? (staffs.find(s => s.id.toString() === staffId)?.name || '') : null;
 
             await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/kitchen/orders/${type}/${id}/ready`, 
-            { staffId: Number(staffId), staffName }, {
+            { staffId: staffId ? Number(staffId) : null, staffName }, {
                 headers: { 
                     Authorization: `Bearer ${token}`,
                     ...(tenantId ? { 'x-tenant-id': tenantId } : {})
                 }
             });
-            toast.success('Pesanan selesai dimasak!');
+            toast.success('Pesanan telah selesai!');
             fetchOrders();
         } catch (error: any) {
             toast.error('Gagal menyelesaikan pesanan');
@@ -160,16 +192,23 @@ export default function KitchenDisplay() {
                         <BarChart3 size={18} />
                         Laporan Produksi
                     </Link>
+                    {realtimeConnected ? (
+                        <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-bold shadow-sm">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Live Sync (0 Load DB)
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 bg-amber-500/10 text-amber-400 border border-amber-500/30 px-3 py-2 rounded-xl text-xs font-bold shadow-sm">
+                            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                            Menghubungkan...
+                        </div>
+                    )}
                     <button
-                        onClick={() => setIsPolling(!isPolling)}
-                        className={`flex items-center justify-center w-10 h-10 rounded-xl font-bold transition-all ${
-                            isPolling 
-                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                            : 'bg-slate-800 text-slate-400 border border-slate-700'
-                        }`}
-                        title={isPolling ? "Auto-Refresh Aktif" : "Auto-Refresh Mati"}
+                        onClick={fetchOrders}
+                        className="flex items-center justify-center w-10 h-10 rounded-xl font-bold bg-slate-800 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600 transition-all active:scale-95 shadow-sm"
+                        title="Muat Ulang Pesanan Manual"
                     >
-                        {isPolling ? <Pause size={18} /> : <Play size={18} />}
+                        <RotateCw size={18} />
                     </button>
                 </div>
             </div>
@@ -199,7 +238,20 @@ export default function KitchenDisplay() {
                                                 <div className="bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold">
                                                     #{order.queueNumber || order.id}
                                                 </div>
-                                                <h3 className="font-bold text-lg text-white">{order.label}</h3>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h3 className="font-bold text-lg text-white">{order.label}</h3>
+                                                    {order.saleType && (
+                                                        <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider ${
+                                                            order.saleType === 'TAKE_AWAY'
+                                                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                                            : order.saleType === 'DINE_IN'
+                                                            ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                                                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                                        }`}>
+                                                            {order.saleType.replace('_', ' ')}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className={`flex items-center gap-2 text-sm font-medium ${isDelayed ? 'text-red-400' : 'text-white/60'}`}>
                                                 {isDelayed ? <AlertCircle size={16} /> : <Clock size={16} />}
@@ -237,9 +289,9 @@ export default function KitchenDisplay() {
                                                 <select
                                                     value={selectedStaffs[`${order.type}-${order.id}`] || ''}
                                                     onChange={(e) => setSelectedStaffs({...selectedStaffs, [`${order.type}-${order.id}`]: e.target.value})}
-                                                    className="w-full bg-slate-800 text-white text-sm font-bold border border-slate-700 rounded-lg p-2 outline-none focus:border-amber-500"
+                                                    className="w-full bg-slate-800 text-white text-sm font-bold border border-slate-700 rounded-lg p-2 outline-none focus:border-amber-500 cursor-pointer"
                                                 >
-                                                    <option value="" disabled>-- Pilih Staf --</option>
+                                                    <option value="">-- Pilih Staf (Opsional) --</option>
                                                     {staffs.map(staff => (
                                                         <option key={staff.id} value={staff.id.toString()}>{staff.name}</option>
                                                     ))}
@@ -247,8 +299,8 @@ export default function KitchenDisplay() {
                                             </div>
                                             <button 
                                                 onClick={() => markAsReady(order.type, order.id)}
-                                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                                <Check size={20} /> Selesai Dimasak
+                                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors active:scale-95 shadow-lg shadow-emerald-500/20">
+                                                <Check size={20} /> Selesai
                                             </button>
                                         </div>
                                     </div>
@@ -279,7 +331,20 @@ export default function KitchenDisplay() {
                                             #{order.queueNumber || order.id}
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-xl text-white">{order.label}</h3>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h3 className="font-bold text-xl text-white">{order.label}</h3>
+                                                {order.saleType && (
+                                                    <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider ${
+                                                        order.saleType === 'TAKE_AWAY'
+                                                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                                        : order.saleType === 'DINE_IN'
+                                                        ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                                                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                                    }`}>
+                                                        {order.saleType.replace('_', ' ')}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="text-sm text-emerald-400/80 mt-1">Selesai: {formatTime(order.preparedAt)}</p>
                                             {order.notes && (
                                                 <p className="text-sm font-semibold text-amber-400 mt-1 bg-amber-500/10 px-2 py-0.5 rounded inline-block">📝 {order.notes}</p>

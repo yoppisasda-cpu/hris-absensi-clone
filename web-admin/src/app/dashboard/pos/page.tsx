@@ -416,6 +416,41 @@ export default function POSPage() {
         return () => clearInterval(interval);
     }, []);
 
+    // Audio Alert saat printer gagal mencetak (Web Audio API)
+    const playPrinterAlertSound = () => {
+        try {
+            if (typeof window === 'undefined') return;
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const now = ctx.currentTime;
+            
+            // Double warning beep (520Hz & 880Hz)
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            
+            // Beep 1
+            osc.frequency.setValueAtTime(520, now);
+            osc.frequency.setValueAtTime(880, now + 0.12);
+            gain.gain.setValueAtTime(0.35, now);
+            gain.gain.setValueAtTime(0.01, now + 0.25);
+            
+            // Beep 2
+            osc.frequency.setValueAtTime(520, now + 0.35);
+            osc.frequency.setValueAtTime(880, now + 0.47);
+            gain.gain.setValueAtTime(0.35, now + 0.35);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.75);
+        } catch (e) {
+            console.warn("Audio alert error", e);
+        }
+    };
+
     const triggerBrowserPrint = (target: 'all' | 'kasir' | 'dapur' | 'bar') => {
         setBrowserPrintTarget(target);
         setTimeout(() => {
@@ -527,18 +562,33 @@ export default function POSPage() {
 
                     // Tampilkan info detail hasil cetak per printer (Kasir, Dapur, Bar)
                     const infoParts: string[] = [];
+                    let hasError = false;
+
                     if (data.results?.kasir?.success) infoParts.push(`Kasir (${agentKasirCopies}x)`);
+                    else if (agentKasirEnabled && data.results?.kasir?.error) {
+                        hasError = true;
+                        toast.error(`⚠️ Printer Kasir (${agentKasirIp}) gagal: ${data.results.kasir.error}`, { duration: 8000 });
+                    }
+
                     if (data.results?.dapur?.success) {
                         infoParts.push(`Dapur (${agentDapurCopies}x)`);
                     } else if (agentDapurEnabled && data.results?.dapur?.skipped) {
                         infoParts.push(`Dapur dilewati (${data.results.dapur.reason || 'Bukan menu makanan'})`);
                     } else if (agentDapurEnabled && data.results?.dapur?.error) {
-                        toast.error(`Printer Dapur (${agentDapurIp}) gagal: ${data.results.dapur.error}`);
+                        hasError = true;
+                        toast.error(`⚠️ Printer Dapur (${agentDapurIp}) GAGAL: ${data.results.dapur.error}`, { duration: 9000 });
                     }
+
                     if (data.results?.bar?.success) {
                         infoParts.push(`Bar (${agentBarCopies}x)`);
                     } else if (agentBarEnabled && data.results?.bar?.error) {
-                        toast.error(`Printer Bar (${agentBarIp}) gagal: ${data.results.bar.error}`);
+                        hasError = true;
+                        toast.error(`⚠️ Printer Bar (${agentBarIp}) GAGAL: ${data.results.bar.error}`, { duration: 9000 });
+                    }
+
+                    // Bunyikan audio alarm jika ada printer dapur/bar/kasir yang gagal cetak
+                    if (hasError) {
+                        playPrinterAlertSound();
                     }
 
                     toast.success(
@@ -549,12 +599,84 @@ export default function POSPage() {
                     );
                     return;
                 }
-            } catch (e) {
+            } catch (e: any) {
                 console.error("Print agent error:", e);
-                toast.error("Gagal koneksi ke Print Agent, membuka dialog print browser...", { id: "agent-print" });
+                playPrinterAlertSound();
+                toast.error("Gagal koneksi ke Print Agent, membuka dialog print browser...", { id: "agent-print", duration: 6000 });
             }
         }
         triggerBrowserPrint(browserCombineTickets ? 'all' : 'kasir');
+    };
+
+    // Cetak ulang khusus satu target printer (Kasir, Dapur, atau Bar)
+    const handlePrintTarget = async (target: 'all' | 'kasir' | 'dapur' | 'bar') => {
+        if (target === 'all') {
+            return handlePrintAll();
+        }
+        const finalDisplayName = receiptStoreName.trim() || companyName || "AIVOLA POS";
+        if (printAgentOnline) {
+            try {
+                toast.loading(`Mengirim ke printer ${target.toUpperCase()}...`, { id: `agent-print-${target}` });
+                const baseStore = {
+                    name: finalDisplayName,
+                    address: receiptStoreAddress.trim(),
+                    phone: receiptStorePhone.trim(),
+                    footer: receiptStoreFooter.trim()
+                };
+                const fullConfig = {
+                    kasir: { ip: agentKasirIp.trim(), port: 9100, enabled: agentKasirEnabled, copies: agentKasirCopies },
+                    dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: agentDapurEnabled, copies: agentDapurCopies },
+                    bar: { ip: agentBarIp.trim(), port: 9100, enabled: agentBarEnabled, copies: agentBarCopies }
+                };
+
+                const cartForAgent = (!agentBarEnabled || !agentBarIp.trim()) && agentDapurEnabled
+                    ? lastCart.map(it => ({ ...it, fnbType: 'FOOD' }))
+                    : lastCart;
+
+                const payload = {
+                    sale: lastSale,
+                    cart: cartForAgent,
+                    companyName: finalDisplayName,
+                    store: baseStore,
+                    config: fullConfig,
+                    targets: [target]
+                };
+
+                const res = await fetch("http://localhost:18181/print", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                const targetResult = data.results?.[target];
+
+                if (targetResult?.success) {
+                    toast.success(`Tiket ${target.toUpperCase()} berhasil dicetak! (${targetResult.copiesPrinted || 1}x)`, { 
+                        id: `agent-print-${target}`, 
+                        duration: 4000 
+                    });
+                } else if (targetResult?.skipped) {
+                    toast(`Tiket ${target.toUpperCase()} dilewati: ${targetResult.reason || 'Tidak ada item'}`, { 
+                        id: `agent-print-${target}`, 
+                        duration: 4000 
+                    });
+                } else if (targetResult?.error) {
+                    playPrinterAlertSound();
+                    toast.error(`⚠️ Printer ${target.toUpperCase()} GAGAL: ${targetResult.error}`, { 
+                        id: `agent-print-${target}`, 
+                        duration: 8000 
+                    });
+                } else {
+                    toast.success(`Perintah cetak ${target.toUpperCase()} terkirim`, { id: `agent-print-${target}` });
+                }
+                return;
+            } catch (e: any) {
+                console.error("Print agent target error:", e);
+                playPrinterAlertSound();
+                toast.error(`Gagal koneksi ke Print Agent: ${e.message}`, { id: `agent-print-${target}` });
+            }
+        }
+        triggerBrowserPrint(target);
     };
 
     const handleTestAgentPrint = async (target: string, ip: string) => {
@@ -2712,30 +2834,56 @@ export default function POSPage() {
                                     className="flex items-center justify-center gap-3 w-full py-5 bg-blue-600 text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] hover:bg-blue-500 shadow-2xl shadow-blue-500/20 transition-all active:scale-95 italic border-b-4 border-blue-900"
                                 >
                                     <Printer className="h-4 w-4 stroke-[3px]" />
-                                    {printAgentOnline ? "Cetak Otomatis (Kasir, Dapur, Bar)" : (browserCombineTickets ? "Cetak Gabungan (Kasir+Dapur+Bar)" : "Cetak Struk Kasir")}
+                                    {printAgentOnline ? "Cetak Otomatis (Semua Printer)" : (browserCombineTickets ? "Cetak Gabungan (Kasir+Dapur+Bar)" : "Cetak Struk Kasir")}
                                 </button>
-                                {!printAgentOnline && !browserCombineTickets && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {agentDapurEnabled && lastCart.some(it => !isBeverageItem(it)) && (
-                                            <button
-                                                type="button"
-                                                onClick={() => triggerBrowserPrint('dapur')}
-                                                className="py-3 px-3 rounded-2xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-300 text-[10px] font-black uppercase tracking-wider transition-all"
-                                            >
-                                                🍳 Cetak Kitchen
-                                            </button>
-                                        )}
-                                        {agentBarEnabled && lastCart.some(it => isBeverageItem(it)) && (
-                                            <button
-                                                type="button"
-                                                onClick={() => triggerBrowserPrint('bar')}
-                                                className="py-3 px-3 rounded-2xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-[10px] font-black uppercase tracking-wider transition-all"
-                                            >
-                                                ☕ Cetak Bar
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
+                                
+                                {/* Tombol Cetak Ulang Satuan / Spesifik per Printer */}
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handlePrintTarget('kasir')}
+                                        className="py-3 px-2 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-slate-200 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                        title="Cetak ulang struk kasir saja"
+                                    >
+                                        <Printer className="h-3.5 w-3.5 text-blue-400" /> Kasir
+                                    </button>
+                                    {agentDapurEnabled && lastCart.some(it => !isBeverageItem(it)) ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => handlePrintTarget('dapur')}
+                                            className="py-3 px-2 rounded-2xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/40 text-orange-300 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                            title="Cetak ulang tiket pesanan ke printer dapur"
+                                        >
+                                            🍳 Dapur
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className="py-3 px-2 rounded-2xl bg-slate-900/50 border border-slate-800/40 text-slate-600 text-[10px] font-bold uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-1.5"
+                                        >
+                                            🍳 Dapur
+                                        </button>
+                                    )}
+                                    {agentBarEnabled && lastCart.some(it => isBeverageItem(it)) ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => handlePrintTarget('bar')}
+                                            className="py-3 px-2 rounded-2xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/40 text-teal-300 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                            title="Cetak ulang tiket pesanan ke printer bar"
+                                        >
+                                            ☕ Bar
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className="py-3 px-2 rounded-2xl bg-slate-900/50 border border-slate-800/40 text-slate-600 text-[10px] font-bold uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-1.5"
+                                        >
+                                            ☕ Bar
+                                        </button>
+                                    )}
+                                </div>
                                 <button 
                                     onClick={() => {
                                         setShowReceipt(false);

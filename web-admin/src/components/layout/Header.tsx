@@ -66,8 +66,8 @@ export default function Header() {
         fetchCompany();
         fetchNotifications();
 
-        // Refresh notifications every 2 minutes only when tab is visible
-        const interval = setInterval(fetchNotifications, 120000);
+        // Refresh notifications every 5 minutes only when tab is visible
+        const interval = setInterval(fetchNotifications, 300000);
 
         const onVisibilityChange = () => {
             if (!document.hidden) fetchNotifications();

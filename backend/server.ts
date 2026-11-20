@@ -6139,9 +6139,9 @@ async function clockInHandler(req: Request, res: Response) {
         })();
     }
 
-    // TRIGGER NOTIFIKASI KE ADMIN
-    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
-    await notifyAdmins(tenantId, 'Clock-In Baru', `${targetUser?.name || 'Seorang karyawan'} melakukan clock-in.`);
+    // NOTIFIKASI CLOCK-IN KE ADMIN DINONAKTIFKAN (Mencegah lonjakan Disk IO dan beban DB)
+    // const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    // await notifyAdmins(tenantId, 'Clock-In Baru', `${targetUser?.name || 'Seorang karyawan'} melakukan clock-in.`);
 
     res.json({ message: 'Absent Berhasil (Clock In)', attendance });
   } catch (error: any) {
@@ -20893,6 +20893,92 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
   }
 });
 
+// --- REAL-TIME KITCHEN & ORDER STATUS (SSE & SOCKET.IO) ---
+type KitchenSseClient = {
+  id: string;
+  tenantId: number;
+  branchId?: number;
+  res: Response;
+};
+const kitchenSseClients = new Map<string, KitchenSseClient>();
+
+const notifyKitchenUpdate = (tenantId: number, branchId?: number, eventType: string = 'UPDATE') => {
+  const payload = JSON.stringify({ type: eventType, tenantId, branchId, timestamp: Date.now() });
+  const msg = `data: ${payload}\n\n`;
+
+  for (const [id, client] of kitchenSseClients.entries()) {
+    if (client.tenantId === tenantId) {
+      if (!branchId || !client.branchId || client.branchId === branchId) {
+        try {
+          client.res.write(msg);
+        } catch (err) {
+          kitchenSseClients.delete(id);
+        }
+      }
+    }
+  }
+
+  // Also emit to Socket.io for company / branch rooms
+  try {
+    io.to(`company_${tenantId}`).emit('kitchen_update', { type: eventType, tenantId, branchId });
+    if (branchId) {
+      io.to(`branch_${branchId}`).emit('kitchen_update', { type: eventType, tenantId, branchId });
+    }
+  } catch (e) {}
+};
+
+app.get('/api/kitchen/stream', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.substring(7) : (req.query.token as string);
+    const tenantHeader = req.headers['x-tenant-id'];
+    let tenantId = tenantHeader ? Number(tenantHeader) : Number(req.query.tenantId || 0);
+    let branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+
+    if (token) {
+      try {
+        const decoded: any = jwt.verify(token, JWT_SECRET);
+        tenantId = Number(decoded.companyId || decoded.tenantId || tenantId);
+        if (decoded.branchId) branchId = Number(decoded.branchId);
+      } catch (e) {}
+    }
+
+    if (!tenantId) {
+      return res.status(401).json({ error: 'Tenant ID required for kitchen stream' });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders?.();
+
+    const clientId = `${tenantId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    kitchenSseClients.set(clientId, { id: clientId, tenantId, branchId, res });
+
+    // Initial handshake event
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', clientId })}\n\n`);
+
+    // Keep-alive heartbeat every 25 seconds
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(': keep-alive\n\n');
+      } catch (err) {
+        clearInterval(heartbeat);
+        kitchenSseClients.delete(clientId);
+      }
+    }, 25000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      kitchenSseClients.delete(clientId);
+    });
+  } catch (error: any) {
+    console.error('Kitchen SSE Stream error:', error);
+    res.status(500).end();
+  }
+});
+
 // POS 1. Checkout (Hybrid Sync & Online)
 app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Response) => {
   console.log("=== CHECKOUT REACHED ===", req.body?.offlineInvoiceNumber ? "[OFFLINE SYNC]" : "[ONLINE CHECKOUT]");
@@ -21701,6 +21787,10 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
 
     res.json(result);
 
+    if (result && result.kitchenStatus === 'PREPARING') {
+      notifyKitchenUpdate(tenantId, result.branchId || undefined, 'NEW_ORDER');
+    }
+
     // Calculate COGS asynchronously in background without delaying POS response
     setImmediate(async () => {
       try {
@@ -21763,6 +21853,10 @@ app.post('/api/pos/hold', tenantMiddleware, async (req: Request, res: Response) 
     });
 
     res.json(pendingBill);
+
+    if (isKdsActive) {
+      notifyKitchenUpdate(tenantId, resolvedBranchId, 'NEW_ORDER');
+    }
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal menyimpan bill: ' + error.message });
   }
@@ -22146,6 +22240,7 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
         id: pb.id,
         type: 'pending',
         label: pb.label || 'Pesanan ' + pb.id,
+        saleType: pb.saleType || 'DINE_IN',
         items: parsedItems.map((item: any) => ({
           ...item,
           fnbType: productFnbMap.get(item.productId) || 'OTHER'
@@ -22161,6 +22256,7 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
       id: s.id,
       type: 'sale',
       label: s.customerName ? `${s.customerName} (${s.invoiceNumber})` : s.invoiceNumber,
+      saleType: s.saleType || 'DINE_IN',
       items: s.SaleItem.map((si: any) => ({
         productId: si.productId,
         name: si.product?.name || 'Item Terhapus',
@@ -22287,6 +22383,8 @@ app.patch('/api/kitchen/orders/:type/:id/ready', tenantMiddleware, async (req: R
         });
     }
 
+    notifyKitchenUpdate(tenantId, undefined, 'ORDER_READY');
+
     res.json({ message: 'Status diubah ke READY' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal update status: ' + error.message });
@@ -22309,6 +22407,9 @@ app.patch('/api/kitchen/orders/:type/:id/serve', tenantMiddleware, async (req: R
         data: { kitchenStatus: 'SERVED' }
       });
     }
+
+    notifyKitchenUpdate(tenantId, undefined, 'ORDER_SERVED');
+
     res.json({ message: 'Status diubah ke SERVED' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal update status: ' + error.message });

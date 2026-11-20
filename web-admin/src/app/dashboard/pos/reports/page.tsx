@@ -318,6 +318,40 @@ export default function POSReportsPage() {
         window.open(url, '_blank');
     };
 
+    const renderGrowthBadge = (current: number, previous: number) => {
+        const curr = Number(current) || 0;
+        const prev = Number(previous) || 0;
+
+        if (prev <= 0) {
+            if (curr > 0) {
+                return (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500/10 text-emerald-400">
+                        <ArrowUpRight className="h-3 w-3" />
+                        +100%
+                    </div>
+                );
+            }
+            return (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-slate-800 text-slate-400">
+                    0.0%
+                </div>
+            );
+        }
+
+        const isUp = curr >= prev;
+        const diff = Math.abs(curr - prev);
+        const pct = ((diff / prev) * 100).toFixed(1);
+
+        return (
+            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black ${
+                isUp ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+            }`}>
+                {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                {isUp ? `+${pct}%` : `-${pct}%`}
+            </div>
+        );
+    };
+
     const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
     return (
@@ -367,16 +401,7 @@ export default function POSReportsPage() {
                             <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" />
                             Total Omzet
                         </div>
-                        {comprehensive && (
-                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black ${
-                                comprehensive.summary.current.revenue >= comprehensive.summary.previous.revenue 
-                                ? 'bg-emerald-500/10 text-emerald-400' 
-                                : 'bg-red-500/10 text-red-400'
-                            }`}>
-                                {comprehensive.summary.current.revenue >= comprehensive.summary.previous.revenue ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                                {Math.abs(((comprehensive.summary.current.revenue - comprehensive.summary.previous.revenue) / (comprehensive.summary.previous.revenue || 1)) * 100).toFixed(1)}%
-                            </div>
-                        )}
+                        {comprehensive && renderGrowthBadge(comprehensive.summary.current.revenue, comprehensive.summary.previous.revenue)}
                     </div>
                     <p className="text-3xl font-black text-white tracking-tight leading-none mb-2">Rp {stats.gross.toLocaleString()}</p>
                     <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
@@ -431,16 +456,7 @@ export default function POSReportsPage() {
                             <div className="h-2 w-2 rounded-full bg-purple-500 shadow-[0_0_8px_#8b5cf6]" />
                             Average Order Value
                         </div>
-                        {comprehensive && (
-                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black ${
-                                comprehensive.summary.current.aov >= comprehensive.summary.previous.aov 
-                                ? 'bg-emerald-500/10 text-emerald-400' 
-                                : 'bg-red-500/10 text-red-400'
-                            }`}>
-                                {comprehensive.summary.current.aov >= comprehensive.summary.previous.aov ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                                {Math.abs(((comprehensive.summary.current.aov - comprehensive.summary.previous.aov) / (comprehensive.summary.previous.aov || 1)) * 100).toFixed(1)}%
-                            </div>
-                        )}
+                        {comprehensive && renderGrowthBadge(comprehensive.summary.current.aov, comprehensive.summary.previous.aov)}
                     </div>
                     <p className="text-3xl font-black text-white tracking-tight leading-none mb-2">Rp {Math.round(stats.avgValue).toLocaleString()}</p>
                     <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">

@@ -1,12 +1,13 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Utensils, CheckCircle, Volume2, VolumeX, Play, Pause } from 'lucide-react';
+import { Utensils, CheckCircle, Volume2, VolumeX, RotateCw } from 'lucide-react';
 
 export default function QueueDisplay() {
     const [orders, setOrders] = useState<any[]>([]);
     const [soundEnabled, setSoundEnabled] = useState(false);
     const [isPolling, setIsPolling] = useState(false); // Default to false to save railway usage
+    const [realtimeConnected, setRealtimeConnected] = useState(false);
     const soundEnabledRef = useRef(false);
     const announcedOrdersRef = useRef<Set<string>>(new Set());
     const isFirstLoad = useRef(true);
@@ -65,12 +66,47 @@ export default function QueueDisplay() {
 
     useEffect(() => {
         fetchOrders();
-        let interval: any;
-        if (isPolling) {
-            interval = setInterval(fetchOrders, 5000); // Polling faster for TV (every 5 seconds)
+
+        // 1. Setup Server-Sent Events (SSE) Realtime Stream (0 Load DB saat diam)
+        let eventSource: EventSource | null = null;
+        try {
+            const token = localStorage.getItem('jwt_token');
+            const tenantId = localStorage.getItem('currentTenantId');
+            const streamUrl = `${process.env.NEXT_PUBLIC_API_URL}/kitchen/stream?tenantId=${tenantId || ''}&token=${token || ''}`;
+
+            eventSource = new EventSource(streamUrl);
+
+            eventSource.onopen = () => {
+                setRealtimeConnected(true);
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type !== 'CONNECTED') {
+                        fetchOrders();
+                    }
+                } catch (e) {}
+            };
+
+            eventSource.onerror = () => {
+                setRealtimeConnected(false);
+            };
+        } catch (err) {
+            console.warn('Queue Realtime SSE error:', err);
         }
-        return () => clearInterval(interval);
-    }, [isPolling]);
+
+        // 2. Fallback polling HANYA jika realtime disconnect
+        let interval: any;
+        if (isPolling && !realtimeConnected) {
+            interval = setInterval(fetchOrders, 60000);
+        }
+
+        return () => {
+            if (eventSource) eventSource.close();
+            if (interval) clearInterval(interval);
+        };
+    }, [isPolling, realtimeConnected]);
 
     const preparingOrders = orders.filter(o => o.status === 'PREPARING').sort((a, b) => b.id - a.id);
     const readyOrders = orders.filter(o => o.status === 'READY').sort((a, b) => b.id - a.id);
@@ -83,17 +119,25 @@ export default function QueueDisplay() {
                     <h1 className="text-4xl font-black tracking-widest text-emerald-400">ORDER STATUS</h1>
                     <p className="text-white/50 text-lg tracking-wider mt-2">Silakan tunggu nomor pesanan Anda dipanggil</p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex gap-4 items-center">
+                    {realtimeConnected ? (
+                        <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-5 py-3 rounded-2xl font-bold text-sm shadow-sm">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            LIVE SYNC AKTIF (0% LOAD)
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 bg-amber-500/10 text-amber-400 border border-amber-500/30 px-5 py-3 rounded-2xl font-bold text-sm shadow-sm">
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                            MENGHUBUNGKAN...
+                        </div>
+                    )}
                     <button
-                        onClick={() => setIsPolling(!isPolling)}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all ${
-                            isPolling 
-                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                            : 'bg-slate-800 text-slate-400 border border-slate-700'
-                        }`}
+                        onClick={fetchOrders}
+                        className="flex items-center gap-2 px-5 py-3 rounded-2xl font-bold bg-slate-800 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600 transition-all active:scale-95 text-sm shadow-sm"
+                        title="Muat Ulang Antrean Manual"
                     >
-                        {isPolling ? <Pause size={24} /> : <Play size={24} />}
-                        {isPolling ? 'AUTO-REFRESH AKTIF' : 'AUTO-REFRESH MATI'}
+                        <RotateCw size={18} />
+                        REFRESH
                     </button>
                     <button
                         onClick={() => {
@@ -137,7 +181,20 @@ export default function QueueDisplay() {
                         {preparingOrders.slice(0, 3).map(order => (
                             <div key={`${order.type}-${order.id}`} className="bg-slate-900/80 border border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500">
                                 <span className="text-4xl font-black text-white">#{order.queueNumber || order.id}</span>
-                                <span className="text-white/60 font-medium mt-2 truncate w-full">{order.label}</span>
+                                <div className="flex items-center justify-center gap-2 mt-2 flex-wrap max-w-full">
+                                    <span className="text-white/80 font-medium truncate">{order.label}</span>
+                                    {order.saleType && (
+                                        <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black uppercase tracking-wider ${
+                                            order.saleType === 'TAKE_AWAY'
+                                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                                : order.saleType === 'DINE_IN'
+                                                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                        }`}>
+                                            {order.saleType.replace('_', ' ')}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         ))}
                         {preparingOrders.length > 3 && (
@@ -159,7 +216,20 @@ export default function QueueDisplay() {
                         {readyOrders.slice(0, 3).map(order => (
                             <div key={`${order.type}-${order.id}`} className="bg-emerald-600 border border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)] rounded-2xl p-6 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500">
                                 <span className="text-5xl font-black text-white">#{order.queueNumber || order.id}</span>
-                                <span className="text-emerald-100 font-bold mt-2 truncate w-full">{order.label}</span>
+                                <div className="flex items-center justify-center gap-2 mt-2 flex-wrap max-w-full">
+                                    <span className="text-white font-bold truncate">{order.label}</span>
+                                    {order.saleType && (
+                                        <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black uppercase tracking-wider ${
+                                            order.saleType === 'TAKE_AWAY'
+                                                ? 'bg-rose-950/60 text-rose-200 border border-rose-300/40'
+                                                : order.saleType === 'DINE_IN'
+                                                ? 'bg-sky-950/60 text-sky-200 border border-sky-300/40'
+                                                : 'bg-amber-950/60 text-amber-200 border border-amber-300/40'
+                                        }`}>
+                                            {order.saleType.replace('_', ' ')}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         ))}
                         {readyOrders.length > 3 && (

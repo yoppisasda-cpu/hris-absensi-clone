@@ -18,7 +18,7 @@ let config = {
     port: 18181,
     kasir: { enabled: true, ip: '192.168.1.200', port: 9100, copies: 1 },
     dapur: { enabled: true, ip: '192.168.1.201', port: 9100, copies: 1 },
-    bar:   { enabled: true, ip: '192.168.1.202', port: 9100, copies: 1 }
+    bar: { enabled: true, ip: '192.168.1.202', port: 9100, copies: 1 }
 };
 
 function loadConfig() {
@@ -51,8 +51,8 @@ function saveConfig(newConfig) {
 
 loadConfig();
 
-// Send raw ESC/POS Buffer to TCP/IP Thermal Printer
-function sendToPrinter(ip, port = 9100, buffer, timeoutMs = 4000) {
+// Send raw ESC/POS Buffer to TCP/IP Thermal Printer (Single attempt)
+function sendToPrinterOnce(ip, port = 9100, buffer, timeoutMs = 3500) {
     return new Promise((resolve) => {
         if (!ip || ip === '0.0.0.0') {
             return resolve({ success: false, error: 'IP printer belum disetel' });
@@ -88,10 +88,30 @@ function sendToPrinter(ip, port = 9100, buffer, timeoutMs = 4000) {
             if (!isDone) {
                 isDone = true;
                 socket.destroy();
-                resolve({ success: false, error: 'Koneksi timeout (Printer mati / IP salah)' });
+                resolve({ success: false, error: 'Koneksi timeout (Printer mati / kabel LAN kendor)' });
             }
         });
     });
+}
+
+// Send raw ESC/POS Buffer with Auto-Retry (Up to maxRetries attempts)
+async function sendToPrinter(ip, port = 9100, buffer, timeoutMs = 3500, maxRetries = 2) {
+    let lastResult = { success: false, error: 'Unknown' };
+    for (let attempt = 1; attempt <= 1 + maxRetries; attempt++) {
+        lastResult = await sendToPrinterOnce(ip, port, buffer, timeoutMs);
+        if (lastResult.success) {
+            if (attempt > 1) {
+                console.log(`[Print Agent] Sukses kirim ke ${ip}:${port} pada percobaan ke-${attempt}`);
+            }
+            return { ...lastResult, attempts: attempt };
+        }
+        if (attempt <= maxRetries) {
+            console.warn(`[Print Agent] Percobaan ke-${attempt} ke ${ip}:${port} gagal (${lastResult.error}), mengulang dalam 400ms...`);
+            await new Promise(r => setTimeout(r, 400));
+        }
+    }
+    console.error(`[Print Agent] Gagal kirim ke ${ip}:${port} setelah ${1 + maxRetries} percobaan: ${lastResult.error}`);
+    return { ...lastResult, attempts: 1 + maxRetries };
 }
 
 const server = http.createServer((req, res) => {
@@ -167,41 +187,53 @@ const server = http.createServer((req, res) => {
 
             // 4. POST /print - 1 Button Multi-Printer Dispatch!
             if (req.url === '/print') {
-                const { sale = {}, cart = [], companyName = 'AIVOLA POS', store = {}, config: overrideConfig } = payload;
+                const { sale = {}, cart = [], companyName = 'AIVOLA POS', store = {}, config: overrideConfig, targets = null } = payload;
                 if (overrideConfig) {
                     saveConfig(overrideConfig);
                 }
                 const results = {};
 
+                // Filter target spesifik jika diminta (contoh: ['dapur'] atau ['bar'] atau ['kasir'])
+                const shouldPrint = (targetName) => {
+                    if (!Array.isArray(targets) || targets.length === 0) return true;
+                    return targets.includes(targetName);
+                };
+
                 // A. Kasir Receipt (All Items)
-                if (config.kasir && config.kasir.enabled !== false && config.kasir.ip) {
-                    const receiptBuf = buildReceiptBuffer(sale, cart, companyName, store);
-                    results.kasir = await sendCopiesToPrinter(config.kasir.ip, config.kasir.port, receiptBuf, config.kasir.copies);
-                } else {
-                    results.kasir = { skipped: true, reason: 'Kasir dinonaktifkan' };
+                if (shouldPrint('kasir')) {
+                    if (config.kasir && config.kasir.enabled !== false && config.kasir.ip) {
+                        const receiptBuf = buildReceiptBuffer(sale, cart, companyName, store);
+                        results.kasir = await sendCopiesToPrinter(config.kasir.ip, config.kasir.port, receiptBuf, config.kasir.copies);
+                    } else {
+                        results.kasir = { skipped: true, reason: 'Kasir dinonaktifkan' };
+                    }
                 }
 
                 // B. Kitchen Ticket (Food Only, atau Semua Item jika Printer Bar dinonaktifkan)
-                const barActive = config.bar && config.bar.enabled !== false && Boolean(config.bar.ip);
-                const foodItems = barActive ? cart.filter(it => !isBeverage(it)) : cart;
-                if (config.dapur && config.dapur.enabled !== false && config.dapur.ip && foodItems.length > 0) {
-                    const kitchenBuf = buildKitchenBuffer(sale, foodItems);
-                    if (kitchenBuf) {
-                        results.dapur = await sendCopiesToPrinter(config.dapur.ip, config.dapur.port, kitchenBuf, config.dapur.copies);
+                if (shouldPrint('dapur')) {
+                    const barActive = config.bar && config.bar.enabled !== false && Boolean(config.bar.ip);
+                    const foodItems = barActive ? cart.filter(it => !isBeverage(it)) : cart;
+                    if (config.dapur && config.dapur.enabled !== false && config.dapur.ip && foodItems.length > 0) {
+                        const kitchenBuf = buildKitchenBuffer(sale, foodItems);
+                        if (kitchenBuf) {
+                            results.dapur = await sendCopiesToPrinter(config.dapur.ip, config.dapur.port, kitchenBuf, config.dapur.copies);
+                        }
+                    } else {
+                        results.dapur = { skipped: true, reason: foodItems.length === 0 ? 'Tidak ada makanan' : 'Dapur dinonaktifkan' };
                     }
-                } else {
-                    results.dapur = { skipped: true, reason: foodItems.length === 0 ? 'Tidak ada makanan' : 'Dapur dinonaktifkan' };
                 }
 
                 // C. Bar Ticket (Beverage Only)
-                const beverageItems = cart.filter(it => isBeverage(it));
-                if (config.bar && config.bar.enabled !== false && config.bar.ip && beverageItems.length > 0) {
-                    const barBuf = buildBarBuffer(sale, beverageItems);
-                    if (barBuf) {
-                        results.bar = await sendCopiesToPrinter(config.bar.ip, config.bar.port, barBuf, config.bar.copies);
+                if (shouldPrint('bar')) {
+                    const beverageItems = cart.filter(it => isBeverage(it));
+                    if (config.bar && config.bar.enabled !== false && config.bar.ip && beverageItems.length > 0) {
+                        const barBuf = buildBarBuffer(sale, beverageItems);
+                        if (barBuf) {
+                            results.bar = await sendCopiesToPrinter(config.bar.ip, config.bar.port, barBuf, config.bar.copies);
+                        }
+                    } else {
+                        results.bar = { skipped: true, reason: beverageItems.length === 0 ? 'Tidak ada minuman' : 'Bar dinonaktifkan' };
                     }
-                } else {
-                    results.bar = { skipped: true, reason: beverageItems.length === 0 ? 'Tidak ada minuman' : 'Bar dinonaktifkan' };
                 }
 
                 return sendJson(200, {
