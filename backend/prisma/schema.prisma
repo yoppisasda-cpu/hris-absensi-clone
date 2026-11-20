@@ -1043,6 +1043,21 @@ model StockTransaction {
   @@index([warehouseId])
 }
 
+model StockTransactionArchive {
+  id          Int       @id
+  productId   Int
+  type        String
+  quantity    Float
+  reference   String?
+  date        DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  warehouseId Int?
+  supplierId  Int?
+
+  @@index([productId, date(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}
+
 model Warehouse {
   id             Int                @id @default(autoincrement())
   companyId      Int
