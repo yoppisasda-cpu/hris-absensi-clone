@@ -28,11 +28,14 @@ function AdjustmentsContent() {
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
     const [modalSearchTerm, setModalSearchTerm] = useState("");
     const [modalTimeFilter, setModalTimeFilter] = useState<"ALL" | "TODAY" | "7DAYS" | "30DAYS">("ALL");
+    const [periodFilter, setPeriodFilter] = useState<"CURRENT_MONTH" | "PREVIOUS_MONTH" | "ALL">("CURRENT_MONTH");
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = async (period = periodFilter) => {
         setLoading(true);
         try {
-            const res = await api.get('/inventory/transactions');
+            const res = await api.get('/inventory/transactions', {
+                params: { period }
+            });
             setTransactions(res.data);
         } catch (error) {
             console.error("Gagal mengambil histori stok", error);
@@ -40,6 +43,11 @@ function AdjustmentsContent() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePeriodChange = (newPeriod: "CURRENT_MONTH" | "PREVIOUS_MONTH" | "ALL") => {
+        setPeriodFilter(newPeriod);
+        fetchTransactions(newPeriod);
     };
 
     useEffect(() => {
@@ -308,10 +316,44 @@ function AdjustmentsContent() {
                         </div>
                     </div>
 
-                    {/* Action Buttons: Export Excel & Refresh */}
-                    <div className="flex items-center gap-3">
+                    {/* Action Buttons: Period Filter, Export Excel & Refresh */}
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Period Filter Pills */}
+                        <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-inner">
+                            <button
+                                onClick={() => handlePeriodChange("CURRENT_MONTH")}
+                                className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider italic transition-all ${
+                                    periodFilter === "CURRENT_MONTH"
+                                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                                        : "text-slate-400 hover:text-white"
+                                }`}
+                            >
+                                Bulan Berjalan
+                            </button>
+                            <button
+                                onClick={() => handlePeriodChange("PREVIOUS_MONTH")}
+                                className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider italic transition-all ${
+                                    periodFilter === "PREVIOUS_MONTH"
+                                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                                        : "text-slate-400 hover:text-white"
+                                }`}
+                            >
+                                Bulan Lalu
+                            </button>
+                            <button
+                                onClick={() => handlePeriodChange("ALL")}
+                                className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider italic transition-all ${
+                                    periodFilter === "ALL"
+                                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                                        : "text-slate-400 hover:text-white"
+                                }`}
+                            >
+                                Semua
+                            </button>
+                        </div>
+
                         <button
-                            onClick={fetchTransactions}
+                            onClick={() => fetchTransactions()}
                             disabled={loading}
                             className="p-3 rounded-2xl border border-slate-800 bg-slate-900/50 text-slate-400 hover:text-white hover:bg-slate-800 transition-all shadow-inner"
                             title="Refresh Data"
@@ -341,7 +383,7 @@ function AdjustmentsContent() {
                             {summaryStats.totalLogs.toLocaleString('id-ID')} <span className="text-xs text-slate-500 font-normal">transaksi</span>
                         </div>
                         <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">
-                            {searchTerm ? `Hasil filter pencarian` : `Seluruh mutasi tercatat`}
+                            {searchTerm ? `Hasil filter pencarian` : periodFilter === 'CURRENT_MONTH' ? 'Mutasi Bulan Berjalan' : periodFilter === 'PREVIOUS_MONTH' ? 'Mutasi Bulan Lalu' : 'Seluruh Riwayat Mutasi'}
                         </div>
                     </div>
 

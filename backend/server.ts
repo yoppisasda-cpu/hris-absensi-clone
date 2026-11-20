@@ -122,7 +122,7 @@ const prisma = new PrismaClient({
     const code = e?.meta?.code || e?.code;
     const isPreparedStmtError =
       code === '42P05' || code === '26000' ||
-      (e?.message && (e.message.includes('prepared statement') && 
+      (e?.message && (e.message.includes('prepared statement') &&
         (e.message.includes('already exists') || e.message.includes('does not exist'))));
     if (isPreparedStmtError) {
       console.warn('[DB] Prepared statement conflict detected. Running DEALLOCATE ALL and retrying...');
@@ -321,11 +321,11 @@ app.use('/uploads', express.static(uploadsDir));
 
 
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     version: 'v1.0.9-dedup-routing',
     env: process.env.NODE_ENV,
-    time: new Date().toISOString() 
+    time: new Date().toISOString()
   });
 });
 
@@ -345,17 +345,17 @@ app.get('/api/test-wablas', async (req, res) => {
   try {
     const { sendWhatsAppImage, sendWhatsAppMessage } = require('./whatsappAPI');
     const phone = req.query.phone as string || '6287882716935';
-    
+
     // 1. Test Text
     const textRes = await sendWhatsAppMessage(phone, "Test dari backend /api/test-wablas");
-    
+
     // 2. Test Image
     const qrisUrl = "https://pstyjgaopsourwruhszf.supabase.co/storage/v1/object/public/hris-uploads/logos/3bea54a101eb3c6925265f70f95f8b6c.jpg";
     const imgRes = await sendWhatsAppImage(phone, qrisUrl, "Test QRIS Image");
-    
+
     res.json({
-        textResult: textRes,
-        imageResult: imgRes
+      textResult: textRes,
+      imageResult: imgRes
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -447,181 +447,181 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
     } else if (body.phone || body.sender) {
       from = body.phone || body.sender;
       text = body.message || body.text || '';
-      
+
       // If Wablas sends media (image/document) without a caption, the text will be empty.
       if (!text) {
-          text = "[User mengirimkan gambar/bukti transfer]";
+        text = "[User mengirimkan gambar/bukti transfer]";
       }
     }
 
     if (text && from) {
-        console.log(`🤖 [WA AI] Memproses pesan dari ${from}: "${text}"`);
-        const senderPhone = from.replace(/\D/g, '');
+      console.log(`🤖 [WA AI] Memproses pesan dari ${from}: "${text}"`);
+      const senderPhone = from.replace(/\D/g, '');
 
-        // A. Identifikasi Tenant/Perusahaan
-        const prospect = await prisma.prospect.findFirst({
-            where: { phone: { contains: senderPhone.slice(-8) } },
-        });
-        const customer = await prisma.customer.findFirst({
-            where: { phone: { contains: senderPhone.slice(-8) } },
-        });
-        
-        // Prioritaskan tenantId dari URL Webhook Wablas (misal: ?tenantId=31) jika ada pelanggan baru
-        const queryTenantId = req.query.tenantId ? Number(req.query.tenantId) : null;
-        const targetCompanyId = queryTenantId || prospect?.companyId || customer?.companyId || 1;
-        const targetName = prospect?.name || customer?.name || pushName;
+      // A. Identifikasi Tenant/Perusahaan
+      const prospect = await prisma.prospect.findFirst({
+        where: { phone: { contains: senderPhone.slice(-8) } },
+      });
+      const customer = await prisma.customer.findFirst({
+        where: { phone: { contains: senderPhone.slice(-8) } },
+      });
 
-        // B. Cari atau Buat ChatSession
-        let session = await prisma.chatSession.findFirst({
-            where: { 
-                id: `wa-${targetCompanyId}-${senderPhone}`
-            }
-        });
+      // Prioritaskan tenantId dari URL Webhook Wablas (misal: ?tenantId=31) jika ada pelanggan baru
+      const queryTenantId = req.query.tenantId ? Number(req.query.tenantId) : null;
+      const targetCompanyId = queryTenantId || prospect?.companyId || customer?.companyId || 1;
+      const targetName = prospect?.name || customer?.name || pushName;
 
-        if (!session) {
-            session = await prisma.chatSession.create({
-                data: {
-                    id: `wa-${targetCompanyId}-${senderPhone}`,
-                    companyId: targetCompanyId,
-                    visitorName: targetName,
-                    phone: senderPhone,
-                    isWhatsApp: true
-                }
-            });
+      // B. Cari atau Buat ChatSession
+      let session = await prisma.chatSession.findFirst({
+        where: {
+          id: `wa-${targetCompanyId}-${senderPhone}`
         }
+      });
 
-        // C. Simpan Pesan Pengguna ke Database
-        await prisma.chatMessage.create({
-            data: {
-                sessionId: session.id,
-                sender: 'USER',
-                content: text
-            }
+      if (!session) {
+        session = await prisma.chatSession.create({
+          data: {
+            id: `wa-${targetCompanyId}-${senderPhone}`,
+            companyId: targetCompanyId,
+            visitorName: targetName,
+            phone: senderPhone,
+            isWhatsApp: true
+          }
         });
+      }
 
-        // D. Dapatkan Balasan dari AI
-        let aiResponse = '';
-        if (targetCompanyId !== 1) {
-            const company = await prisma.company.findUnique({ 
-                where: { id: targetCompanyId }, 
-                select: { name: true, address: true, qrisUrl: true, paymentInstructions: true } 
-            });
-            // Ambil rekening bank dari modul Kas & Bank (FinancialAccount type BANK)
-            const bankAccounts = await prisma.financialAccount.findMany({
-                where: { companyId: targetCompanyId, type: 'BANK' },
-                select: { bankName: true, accountNumber: true, name: true },
-                take: 3
-            });
-            let paymentInstructions = company?.paymentInstructions || null;
-            if (!paymentInstructions && bankAccounts.length > 0) {
-                const bankList = bankAccounts
-                    .filter(b => b.accountNumber)
-                    .map(b => `transfer ke rekening ${b.name} ${b.accountNumber} a.n ${b.bankName}`)
-                    .join(' atau ');
-                if (bankList) paymentInstructions = bankList + ' dan kirimkan bukti transfer ke chat ini';
-            }
-            const products = await prisma.product.findMany({ 
-                where: { companyId: targetCompanyId, showInPos: true },
-                select: { id: true, name: true, price: true }
-            });
-            const recentHistory = await prisma.chatMessage.findMany({
-                where: { sessionId: session.id },
-                orderBy: { createdAt: 'desc' },
-                take: 10
-            });
-            const chatHistory = recentHistory.reverse();
-            
-            const aiResult = await processWhatsAppOrder(
-                text, 
-                company?.name || 'Perusahaan', 
-                products, 
-                chatHistory.map((h: any) => ({ role: h.sender as 'USER' | 'AI', content: h.content })),
-                company?.qrisUrl || null,
-                paymentInstructions,
-                company?.address || null
-            );
-            
-            aiResponse = aiResult.text;
-
-            if (aiResult.orderPayload) {
-                // Buat Order di Kasir!
-                try {
-                    const items = aiResult.orderPayload.items;
-                    let totalAmount = 0;
-                    
-                    const posItems = items.map((item: any) => {
-                        const price = Number(item.price) || 0;
-                        const qty = Number(item.quantity) || 1;
-                        totalAmount += price * qty;
-                        
-                        // Cari nama produk yang asli dari database
-                        const matchedProduct = products.find(p => p.id === item.productId);
-                        const productName = matchedProduct ? matchedProduct.name : (item.name || 'Produk AI');
-
-                        return {
-                            productId: item.productId,
-                            id: item.productId,
-                            name: productName,
-                            price: price,
-                            qty: qty,
-                            quantity: qty,
-                            subtotal: price * qty
-                        };
-                    });
-
-                    // Cari branch & admin pertama untuk menampung order ini
-                    const defaultBranch = await prisma.branch.findFirst({ where: { companyId: targetCompanyId } });
-                    const defaultAdmin = await prisma.user.findFirst({ where: { companyId: targetCompanyId } });
-
-                    const queueLabel = `${aiResult.orderPayload.customerName || targetName} (+${senderPhone})`;
-                    
-                    await prisma.pendingBill.create({
-                        data: {
-                            companyId: targetCompanyId,
-                            branchId: defaultBranch?.id || 0,
-                            cashierId: defaultAdmin?.id || 0,
-                            label: queueLabel,
-                            items: posItems,
-                            saleType: 'PRE_ORDER',
-                            kitchenStatus: 'PENDING',
-                            queueNumber: Math.floor(Math.random() * 900) + 100 // random queue for now
-                        }
-                    });
-                    
-                    console.log(`✅ [WA AI] Pesanan berhasil masuk ke Pending Bills: ${queueLabel}`);
-                } catch (err: any) {
-                    console.error("Gagal membuat order dari AI:", err.message);
-                }
-            }
-        } else {
-            aiResponse = await getAIChatResponse(text, []);
+      // C. Simpan Pesan Pengguna ke Database
+      await prisma.chatMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'USER',
+          content: text
         }
+      });
 
-        // E. Simpan Pesan AI ke Database
-        await prisma.chatMessage.create({
-            data: {
-                sessionId: session.id,
-                sender: 'AI',
-                content: aiResponse
-            }
+      // D. Dapatkan Balasan dari AI
+      let aiResponse = '';
+      if (targetCompanyId !== 1) {
+        const company = await prisma.company.findUnique({
+          where: { id: targetCompanyId },
+          select: { name: true, address: true, qrisUrl: true, paymentInstructions: true }
         });
-
-        // F. Update Timestamp Sesi
-        await prisma.chatSession.update({
-            where: { id: session.id },
-            data: { updatedAt: new Date() }
+        // Ambil rekening bank dari modul Kas & Bank (FinancialAccount type BANK)
+        const bankAccounts = await prisma.financialAccount.findMany({
+          where: { companyId: targetCompanyId, type: 'BANK' },
+          select: { bankName: true, accountNumber: true, name: true },
+          take: 3
         });
+        let paymentInstructions = company?.paymentInstructions || null;
+        if (!paymentInstructions && bankAccounts.length > 0) {
+          const bankList = bankAccounts
+            .filter(b => b.accountNumber)
+            .map(b => `transfer ke rekening ${b.name} ${b.accountNumber} a.n ${b.bankName}`)
+            .join(' atau ');
+          if (bankList) paymentInstructions = bankList + ' dan kirimkan bukti transfer ke chat ini';
+        }
+        const products = await prisma.product.findMany({
+          where: { companyId: targetCompanyId, showInPos: true },
+          select: { id: true, name: true, price: true }
+        });
+        const recentHistory = await prisma.chatMessage.findMany({
+          where: { sessionId: session.id },
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        });
+        const chatHistory = recentHistory.reverse();
 
-        // G. (Di-comment karena Wablas akan auto-reply dari return response kita, mencegah double message)
-        // await sendWhatsAppMessage(senderPhone, aiResponse);
-        console.log(`✅ [WA AI] Balasan otomatis tersimpan di CRM (dikirim via webhook auto-reply) ke ${from}`);
+        const aiResult = await processWhatsAppOrder(
+          text,
+          company?.name || 'Perusahaan',
+          products,
+          chatHistory.map((h: any) => ({ role: h.sender as 'USER' | 'AI', content: h.content })),
+          company?.qrisUrl || null,
+          paymentInstructions,
+          company?.address || null
+        );
 
-        // Catatan: Karena tier Wablas pengguna (Rp 22k) tidak mendukung pengiriman media (gambar),
-        // QRIS disertakan sebagai link langsung di dalam teks balasan AI.
+        aiResponse = aiResult.text;
 
-        // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send(aiResponse);
+        if (aiResult.orderPayload) {
+          // Buat Order di Kasir!
+          try {
+            const items = aiResult.orderPayload.items;
+            let totalAmount = 0;
+
+            const posItems = items.map((item: any) => {
+              const price = Number(item.price) || 0;
+              const qty = Number(item.quantity) || 1;
+              totalAmount += price * qty;
+
+              // Cari nama produk yang asli dari database
+              const matchedProduct = products.find(p => p.id === item.productId);
+              const productName = matchedProduct ? matchedProduct.name : (item.name || 'Produk AI');
+
+              return {
+                productId: item.productId,
+                id: item.productId,
+                name: productName,
+                price: price,
+                qty: qty,
+                quantity: qty,
+                subtotal: price * qty
+              };
+            });
+
+            // Cari branch & admin pertama untuk menampung order ini
+            const defaultBranch = await prisma.branch.findFirst({ where: { companyId: targetCompanyId } });
+            const defaultAdmin = await prisma.user.findFirst({ where: { companyId: targetCompanyId } });
+
+            const queueLabel = `${aiResult.orderPayload.customerName || targetName} (+${senderPhone})`;
+
+            await prisma.pendingBill.create({
+              data: {
+                companyId: targetCompanyId,
+                branchId: defaultBranch?.id || 0,
+                cashierId: defaultAdmin?.id || 0,
+                label: queueLabel,
+                items: posItems,
+                saleType: 'PRE_ORDER',
+                kitchenStatus: 'PENDING',
+                queueNumber: Math.floor(Math.random() * 900) + 100 // random queue for now
+              }
+            });
+
+            console.log(`✅ [WA AI] Pesanan berhasil masuk ke Pending Bills: ${queueLabel}`);
+          } catch (err: any) {
+            console.error("Gagal membuat order dari AI:", err.message);
+          }
+        }
+      } else {
+        aiResponse = await getAIChatResponse(text, []);
+      }
+
+      // E. Simpan Pesan AI ke Database
+      await prisma.chatMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'AI',
+          content: aiResponse
+        }
+      });
+
+      // F. Update Timestamp Sesi
+      await prisma.chatSession.update({
+        where: { id: session.id },
+        data: { updatedAt: new Date() }
+      });
+
+      // G. (Di-comment karena Wablas akan auto-reply dari return response kita, mencegah double message)
+      // await sendWhatsAppMessage(senderPhone, aiResponse);
+      console.log(`✅ [WA AI] Balasan otomatis tersimpan di CRM (dikirim via webhook auto-reply) ke ${from}`);
+
+      // Catatan: Karena tier Wablas pengguna (Rp 22k) tidak mendukung pengiriman media (gambar),
+      // QRIS disertakan sebagai link langsung di dalam teks balasan AI.
+
+      // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
+      res.setHeader('Content-Type', 'text/plain');
+      return res.status(200).send(aiResponse);
     }
 
     // Hindari mengirimkan teks 'EVENT_RECEIVED' karena akan dibalas ke user oleh Wablas
@@ -635,97 +635,97 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
 
 // --- WABLAS WEBHOOK (INBOUND MESSAGES) ---
 app.post('/api/webhook/wablas', async (req: Request, res: Response) => {
-    try {
-        const body = req.body;
-        console.log(`📩 [WABLAS WEBHOOK] Inbound Payload:`, JSON.stringify(body));
+  try {
+    const body = req.body;
+    console.log(`📩 [WABLAS WEBHOOK] Inbound Payload:`, JSON.stringify(body));
 
-        // Wablas payload: phone, message, pushName, type, etc.
-        const phone = body.phone || body.sender;
-        const message = body.message || body.text;
-        const pushName = body.pushName || body.name;
+    // Wablas payload: phone, message, pushName, type, etc.
+    const phone = body.phone || body.sender;
+    const message = body.message || body.text;
+    const pushName = body.pushName || body.name;
 
-        if (!phone || !message) {
-            return res.sendStatus(200); // Silent ignore
-        }
-
-        const senderPhone = phone.replace(/\D/g, '');
-
-        // 1. Identify Tenant/Company
-        // Try to find in Prospects first
-        const prospect = await prisma.prospect.findFirst({
-            where: { phone: { contains: senderPhone.slice(-8) } }, // Match last 8 digits for safety
-        });
-
-        // Try to find in Customers
-        const customer = await prisma.customer.findFirst({
-            where: { phone: { contains: senderPhone.slice(-8) } },
-        });
-
-        const targetCompanyId = prospect?.companyId || customer?.companyId || 1; // Default to central
-        const targetName = pushName || prospect?.name || customer?.name || 'WhatsApp User';
-
-        // 2. Find or Create ChatSession
-        let session = await prisma.chatSession.findFirst({
-            where: { 
-                phone: senderPhone,
-                companyId: targetCompanyId,
-                isWhatsApp: true
-            }
-        });
-
-        if (!session) {
-            session = await prisma.chatSession.create({
-                data: {
-                    id: `wa-${senderPhone}`,
-                    companyId: targetCompanyId,
-                    visitorName: targetName,
-                    phone: senderPhone,
-                    isWhatsApp: true
-                }
-            });
-        }
-
-        // 3. Save Message
-        await prisma.chatMessage.create({
-            data: {
-                sessionId: session.id,
-                sender: 'USER',
-                content: message
-            }
-        });
-
-        // 4. Update session timestamp
-        await prisma.chatSession.update({
-            where: { id: session.id },
-            data: { updatedAt: new Date() }
-        });
-
-        console.log(`✅ [WABLAS WEBHOOK] Message saved for ${targetName} (${senderPhone}) at Tenant: ${targetCompanyId}`);
-
-        // 5. LOGIKA AI AUTO-REPLY
-        // Ambil respon dari AI
-        const aiResponse = await getAIChatResponse(message, []);
-
-        // Simpan pesan AI ke database
-        await prisma.chatMessage.create({
-            data: {
-                sessionId: session.id,
-                sender: 'AI',
-                content: aiResponse
-            }
-        });
-
-        // Kirim kembali ke WhatsApp klien via Wablas
-        await sendWhatsAppMessage(senderPhone, aiResponse);
-        console.log(`🤖 [WABLAS AI] Balasan otomatis terkirim ke ${targetName} (${senderPhone})`);
-
-        // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send(aiResponse);
-    } catch (error: any) {
-        console.error('❌ [WABLAS WEBHOOK Error]:', error.message);
-        res.status(200).send(error.message);
+    if (!phone || !message) {
+      return res.sendStatus(200); // Silent ignore
     }
+
+    const senderPhone = phone.replace(/\D/g, '');
+
+    // 1. Identify Tenant/Company
+    // Try to find in Prospects first
+    const prospect = await prisma.prospect.findFirst({
+      where: { phone: { contains: senderPhone.slice(-8) } }, // Match last 8 digits for safety
+    });
+
+    // Try to find in Customers
+    const customer = await prisma.customer.findFirst({
+      where: { phone: { contains: senderPhone.slice(-8) } },
+    });
+
+    const targetCompanyId = prospect?.companyId || customer?.companyId || 1; // Default to central
+    const targetName = pushName || prospect?.name || customer?.name || 'WhatsApp User';
+
+    // 2. Find or Create ChatSession
+    let session = await prisma.chatSession.findFirst({
+      where: {
+        phone: senderPhone,
+        companyId: targetCompanyId,
+        isWhatsApp: true
+      }
+    });
+
+    if (!session) {
+      session = await prisma.chatSession.create({
+        data: {
+          id: `wa-${senderPhone}`,
+          companyId: targetCompanyId,
+          visitorName: targetName,
+          phone: senderPhone,
+          isWhatsApp: true
+        }
+      });
+    }
+
+    // 3. Save Message
+    await prisma.chatMessage.create({
+      data: {
+        sessionId: session.id,
+        sender: 'USER',
+        content: message
+      }
+    });
+
+    // 4. Update session timestamp
+    await prisma.chatSession.update({
+      where: { id: session.id },
+      data: { updatedAt: new Date() }
+    });
+
+    console.log(`✅ [WABLAS WEBHOOK] Message saved for ${targetName} (${senderPhone}) at Tenant: ${targetCompanyId}`);
+
+    // 5. LOGIKA AI AUTO-REPLY
+    // Ambil respon dari AI
+    const aiResponse = await getAIChatResponse(message, []);
+
+    // Simpan pesan AI ke database
+    await prisma.chatMessage.create({
+      data: {
+        sessionId: session.id,
+        sender: 'AI',
+        content: aiResponse
+      }
+    });
+
+    // Kirim kembali ke WhatsApp klien via Wablas
+    await sendWhatsAppMessage(senderPhone, aiResponse);
+    console.log(`🤖 [WABLAS AI] Balasan otomatis terkirim ke ${targetName} (${senderPhone})`);
+
+    // Return direct plain text response for Wablas "Get Auto Reply From Webhook"
+    res.setHeader('Content-Type', 'text/plain');
+    return res.status(200).send(aiResponse);
+  } catch (error: any) {
+    console.error('❌ [WABLAS WEBHOOK Error]:', error.message);
+    res.status(200).send(error.message);
+  }
 });
 
 app.get('/api/setup-master', async (req: Request, res: Response) => {
@@ -733,7 +733,7 @@ app.get('/api/setup-master', async (req: Request, res: Response) => {
   try {
     console.log('--- Temporary Setup Master Triggered ---');
     const hashedPassword = await bcrypt.hash('admin123', 10);
-    
+
     // Try to find if system owner exists, otherwise create it
     let company = await prisma.company.findFirst({
       where: { name: 'Aivola System Owner' }
@@ -748,9 +748,9 @@ app.get('/api/setup-master', async (req: Request, res: Response) => {
 
     const superAdmin = await prisma.user.upsert({
       where: { email: 'owner@aivola.id' },
-      update: { 
-        role: 'SUPERADMIN' as any, 
-        password: hashedPassword 
+      update: {
+        role: 'SUPERADMIN' as any,
+        password: hashedPassword
       },
       create: {
         companyId: company.id,
@@ -760,36 +760,36 @@ app.get('/api/setup-master', async (req: Request, res: Response) => {
         role: 'SUPERADMIN' as any
       }
     });
-    
+
     console.log('--- SuperAdmin Created Successfully ---');
-    res.json({ 
-      message: 'SuperAdmin created successfully', 
+    res.json({
+      message: 'SuperAdmin created successfully',
       email: superAdmin.email,
       companyId: company.id
     });
   } catch (error: any) {
     fs.writeFileSync('setup_error.txt', error.stack || error.message);
     console.error('Setup Master Error:', error);
-    res.status(500).json({ 
-      error: error.message, 
-      details: error.stack 
+    res.status(500).json({
+      error: error.message,
+      details: error.stack
     });
   }
 });
 
 app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     version: 'v1.0.8-qris-image',
     env: process.env.NODE_ENV,
-    time: new Date().toISOString() 
+    time: new Date().toISOString()
   });
 });
 
 app.get('/api/setup-sales', async (req: Request, res: Response) => {
   try {
     console.log('--- Sales Module Setup Triggered ---');
-    
+
     // 1. Create Sale Table
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "Sale" (
@@ -869,7 +869,7 @@ app.get('/api/setup-sales', async (req: Request, res: Response) => {
 app.get('/api/setup-customers', async (req: Request, res: Response) => {
   try {
     console.log('--- Customer Module Setup Triggered ---');
-    
+
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "Customer" (
         "id" SERIAL PRIMARY KEY,
@@ -896,7 +896,7 @@ app.get('/api/setup-customers', async (req: Request, res: Response) => {
 app.get('/api/setup-suppliers', async (req: Request, res: Response) => {
   try {
     console.log('--- Supplier Module Setup Triggered ---');
-    
+
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "Supplier" (
         "id" SERIAL PRIMARY KEY,
@@ -1029,15 +1029,15 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
   const apiKey = req.headers['x-api-key'];
 
   const isPublicOnlineOrder = req.method === 'POST' && (
-    req.path === '/api/sales' || 
-    req.path === '/sales' || 
-    req.path === '/api/sales/orders' || 
+    req.path === '/api/sales' ||
+    req.path === '/sales' ||
+    req.path === '/api/sales/orders' ||
     req.path === '/sales/orders'
   ) && (
-    req.body?.saleType === 'ONLINE' || 
-    req.body?.saleType === 'PRE_ORDER' ||
-    (typeof req.body?.notes === 'string' && (req.body.notes.includes('Aivola GO') || req.body.notes.includes('Guest Name:')))
-  );
+      req.body?.saleType === 'ONLINE' ||
+      req.body?.saleType === 'PRE_ORDER' ||
+      (typeof req.body?.notes === 'string' && (req.body.notes.includes('Aivola GO') || req.body.notes.includes('Guest Name:')))
+    );
 
   const targetTenantId = req.headers['x-tenant-id'] || req.body?.companyId || req.query.tenantId;
 
@@ -1058,44 +1058,44 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
       (req as any).primaryCompanyId = Number(decoded.companyId);
 
       if (targetTenantId) {
-          const requestedTenantId = parseInt(targetTenantId as string);
-          
-          if (!isNaN(requestedTenantId)) {
-            // 1. SuperAdmin can switch to ANY tenant
-            if (decoded.role === 'SUPERADMIN') {
-                (req as any).tenantId = requestedTenantId;
-            } 
-            // 2. Customers can switch to any tenant (since they buy from merchants in the ecosystem)
-            else if (decoded.role === 'CUSTOMER') {
-                (req as any).tenantId = requestedTenantId;
-            }
-            // 3. Owner or Manager can switch if they have access in UserAccess table
-            else if ((decoded.role === 'OWNER' || decoded.role === 'MANAGER') && requestedTenantId !== Number(decoded.companyId)) {
-                const access = await prisma.userAccess.findUnique({
-                    where: {
-                        userId_companyId: {
-                            userId: Number(decoded.userId),
-                            companyId: requestedTenantId
-                        }
-                    }
-                });
-                if (access) {
-                    (req as any).tenantId = requestedTenantId;
-                    console.log(`[AUTH] ${decoded.role} ${decoded.userId} authorized Switch to Tenant ${requestedTenantId}`);
-                } else {
-                    console.warn(`[AUTH] Unauthorized Tenant Switch attempt by ${decoded.role} ${decoded.userId} to Tenant ${requestedTenantId}`);
-                    return res.status(403).json({ 
-                      error: 'Akses Ditolak: Anda tidak memiliki izin akses untuk perusahaan ini. Hubungi pusat untuk menghubungkan akun.' 
-                    });
+        const requestedTenantId = parseInt(targetTenantId as string);
+
+        if (!isNaN(requestedTenantId)) {
+          // 1. SuperAdmin can switch to ANY tenant
+          if (decoded.role === 'SUPERADMIN') {
+            (req as any).tenantId = requestedTenantId;
+          }
+          // 2. Customers can switch to any tenant (since they buy from merchants in the ecosystem)
+          else if (decoded.role === 'CUSTOMER') {
+            (req as any).tenantId = requestedTenantId;
+          }
+          // 3. Owner or Manager can switch if they have access in UserAccess table
+          else if ((decoded.role === 'OWNER' || decoded.role === 'MANAGER') && requestedTenantId !== Number(decoded.companyId)) {
+            const access = await prisma.userAccess.findUnique({
+              where: {
+                userId_companyId: {
+                  userId: Number(decoded.userId),
+                  companyId: requestedTenantId
                 }
+              }
+            });
+            if (access) {
+              (req as any).tenantId = requestedTenantId;
+              console.log(`[AUTH] ${decoded.role} ${decoded.userId} authorized Switch to Tenant ${requestedTenantId}`);
+            } else {
+              console.warn(`[AUTH] Unauthorized Tenant Switch attempt by ${decoded.role} ${decoded.userId} to Tenant ${requestedTenantId}`);
+              return res.status(403).json({
+                error: 'Akses Ditolak: Anda tidak memiliki izin akses untuk perusahaan ini. Hubungi pusat untuk menghubungkan akun.'
+              });
             }
           }
+        }
       }
 
       // Final Sanity Check for tenantId (Must be a Number and > 0)
       if (isNaN((req as any).tenantId) || (req as any).tenantId === 0) {
-          // If no tenant assigned yet, default to their decoded companyId or fallback to 1
-          (req as any).tenantId = Number(decoded.companyId) || 1;
+        // If no tenant assigned yet, default to their decoded companyId or fallback to 1
+        (req as any).tenantId = Number(decoded.companyId) || 1;
       }
 
       return next();
@@ -1128,27 +1128,27 @@ const tenantMiddleware = async (req: Request, res: Response, next: NextFunction)
   // 2. API KEY PATH (Integrasi Dashboard Eksternal)
   if (apiKey) {
     try {
-        const company = await prisma.company.findUnique({
-            where: { integrationApiKey: apiKey as string }
-        });
+      const company = await prisma.company.findUnique({
+        where: { integrationApiKey: apiKey as string }
+      });
 
-        if (!company) {
-            console.warn(`[AUTH] API Key NOT FOUND in DB: ${apiKey}`);
-            return res.status(401).json({ error: 'API Key TIDAK terdaftar di database Aivola (Periksa Profil).' });
-        }
+      if (!company) {
+        console.warn(`[AUTH] API Key NOT FOUND in DB: ${apiKey}`);
+        return res.status(401).json({ error: 'API Key TIDAK terdaftar di database Aivola (Periksa Profil).' });
+      }
 
-        if (!company.isApiEnabled) {
-            console.warn(`[AUTH] API Integration DISABLED for: ${company.name}`);
-            return res.status(401).json({ error: 'Fitur API belum diaktifkan (isApiEnabled: false) untuk perusahaan ini.' });
-        }
+      if (!company.isApiEnabled) {
+        console.warn(`[AUTH] API Integration DISABLED for: ${company.name}`);
+        return res.status(401).json({ error: 'Fitur API belum diaktifkan (isApiEnabled: false) untuk perusahaan ini.' });
+      }
 
-        (req as any).tenantId = company.id;
-        (req as any).userId = 0; // System/API User
-        (req as any).userRole = 'API_USER';
-        return next();
+      (req as any).tenantId = company.id;
+      (req as any).userId = 0; // System/API User
+      (req as any).userRole = 'API_USER';
+      return next();
     } catch (error: any) {
-        console.error(`[AUTH ERROR] API Key verify failed:`, error);
-        return res.status(500).json({ error: 'Gagal memverifikasi API Key.', details: error.message });
+      console.error(`[AUTH ERROR] API Key verify failed:`, error);
+      return res.status(500).json({ error: 'Gagal memverifikasi API Key.', details: error.message });
     }
   }
 
@@ -1181,27 +1181,27 @@ app.get('/api/companies/accessible', tenantMiddleware, async (req: Request, res:
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const formatLogoUrl = (url: string | null) => {
-        if (url && url.startsWith('/uploads')) {
-            return `${baseUrl}${url}`;
-        }
-        return url;
+      if (url && url.startsWith('/uploads')) {
+        return `${baseUrl}${url}`;
+      }
+      return url;
     };
 
     const results = [];
     if (primaryCompany) {
-        results.push({ 
-            ...primaryCompany, 
-            logoUrl: formatLogoUrl(primaryCompany.logoUrl),
-            isPrimary: true 
-        });
+      results.push({
+        ...primaryCompany,
+        logoUrl: formatLogoUrl(primaryCompany.logoUrl),
+        isPrimary: true
+      });
     }
-    
+
     accessList.forEach(acc => {
       if (acc.companyId !== primaryCompanyId) {
-        results.push({ 
-            ...acc.company, 
-            logoUrl: formatLogoUrl(acc.company.logoUrl),
-            isPrimary: false 
+        results.push({
+          ...acc.company,
+          logoUrl: formatLogoUrl(acc.company.logoUrl),
+          isPrimary: false
         });
       }
     });
@@ -1290,7 +1290,7 @@ app.get('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respons
       const endDate = new Date(y, m, 0, 23, 59, 59);
       dateFilter = { date: { gte: startDate, lte: endDate } };
     }
-    
+
     const orders = await prisma.salesOrder.findMany({
       where: { companyId: tenantId, ...dateFilter },
       include: {
@@ -1321,7 +1321,7 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
     let finalCustomerId = customerId ? Number(customerId) : null;
     const userId = Number((req as any).userId);
     const userRole = (req as any).userRole;
-    
+
     if (userRole === 'CUSTOMER' && userId) {
       finalCustomerId = userId;
     } else if (!finalCustomerId && userId) {
@@ -1329,15 +1329,15 @@ app.post('/api/sales/orders', tenantMiddleware, async (req: Request, res: Respon
       if (user) {
         let linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
         if (!linkedCustomer) {
-           linkedCustomer = await prisma.customer.create({
-             data: {
-               companyId: user.companyId,
-               name: user.name,
-               email: user.email,
-               phone: '00' + user.id.toString() + Math.floor(Math.random() * 1000).toString(),
-               isActive: true,
-             }
-           });
+          linkedCustomer = await prisma.customer.create({
+            data: {
+              companyId: user.companyId,
+              name: user.name,
+              email: user.email,
+              phone: '00' + user.id.toString() + Math.floor(Math.random() * 1000).toString(),
+              isActive: true,
+            }
+          });
         }
         if (linkedCustomer) finalCustomerId = linkedCustomer.id;
       }
@@ -1529,7 +1529,7 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
     const orderId = Number(req.params.id);
     const userId = Number((req as any).userId);
     const { dueDate } = req.body;
-    
+
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
 
     const order = await prisma.salesOrder.findFirst({
@@ -1562,16 +1562,16 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
           saleType: 'B2B',
           cashierId: null, // B2B SO is a back-office/warehouse invoice, not a POS cashier register sale
           dueDate: dueDateVal,
-          notes: order.notes 
-            ? `${order.notes} (Dikonversi dari PO Customer: ${order.orderNumber})` 
+          notes: order.notes
+            ? `${order.notes} (Dikonversi dari PO Customer: ${order.orderNumber})`
             : `Dikonversi dari PO Customer: ${order.orderNumber}`,
           SaleItem: {
-             create: order.items.map((i: any) => ({
-               productId: i.productId,
-               quantity: i.quantity,
-               price: i.price,
-               total: i.total
-             }))
+            create: order.items.map((i: any) => ({
+              productId: i.productId,
+              quantity: i.quantity,
+              price: i.price,
+              total: i.total
+            }))
           }
         }
       });
@@ -1586,22 +1586,22 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
       for (const item of order.items) {
         const product = productMap.get(item.productId);
         if (product && product.trackStock) {
-           const factor = Number((item as any).conversionFactor) || Number(product.purchaseFactor) || 1;
-           const deductQty = Number(item.quantity) * factor;
+          const factor = Number((item as any).conversionFactor) || Number(product.purchaseFactor) || 1;
+          const deductQty = Number(item.quantity) * factor;
 
-           await tx.product.update({
-             where: { id: product.id },
-             data: { stock: { decrement: deductQty } }
-           });
-           
-           await tx.stockTransaction.create({
-               data: {
-                   productId: product.id,
-                   type: 'OUT',
-                   quantity: deductQty,
-                   reference: `B2B Sale Order: ${order.orderNumber} (${item.quantity} ${(item as any).unit || product.purchaseUnit || product.unit || 'Pcs'})`
-               }
-           });
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: { decrement: deductQty } }
+          });
+
+          await tx.stockTransaction.create({
+            data: {
+              productId: product.id,
+              type: 'OUT',
+              quantity: deductQty,
+              reference: `B2B Sale Order: ${order.orderNumber} (${item.quantity} ${(item as any).unit || product.purchaseUnit || product.unit || 'Pcs'})`
+            }
+          });
         }
       }
 
@@ -1624,7 +1624,7 @@ app.post('/api/sales/orders/:id/convert', tenantMiddleware, async (req: Request,
             throw new Error(`Limit Kredit Kontrak B2B Tidak Mencukupi! Sisa limit: Rp ${availableCredit.toLocaleString('id-ID')}`);
           }
         }
-        
+
         await tx.b2BContract.update({
           where: { id: activeContract.id },
           data: { usedCredit: { increment: order.totalAmount } }
@@ -1698,20 +1698,20 @@ app.post('/api/sales/orders/:id/revert-invoice', tenantMiddleware, async (req: R
 
     await prisma.$transaction(async (tx) => {
       // 1. Hapus Pemasukan (Income) terkait
-      await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+      await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } } });
 
       // 2. Hapus Riwayat Poin 
-      await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+      await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } } });
 
       // 3. Hapus SaleReturnItem dan SaleReturn (Jika pernah diretur)
-      const returns = await tx.saleReturn.findMany({ where: { saleId }});
+      const returns = await tx.saleReturn.findMany({ where: { saleId } });
       for (const r of returns) {
-         await tx.saleReturnItem.deleteMany({ where: { returnId: r.id }});
-         await tx.saleReturn.delete({ where: { id: r.id }});
+        await tx.saleReturnItem.deleteMany({ where: { returnId: r.id } });
+        await tx.saleReturn.delete({ where: { id: r.id } });
       }
 
       // 4. Hapus SaleItem (Detail barang di invoice)
-      await tx.saleItem.deleteMany({ where: { saleId }});
+      await tx.saleItem.deleteMany({ where: { saleId } });
 
       // 5. Kembalikan stok untuk trackable items
       const productIds = order.items.map((item: any) => item.productId);
@@ -1723,27 +1723,27 @@ app.post('/api/sales/orders/:id/revert-invoice', tenantMiddleware, async (req: R
       for (const item of order.items) {
         const product = productMap.get(item.productId);
         if (product && product.trackStock) {
-           const factor = Number((item as any).conversionFactor) || Number(product.purchaseFactor) || 1;
-           const reverseQty = Number(item.quantity) * factor;
+          const factor = Number((item as any).conversionFactor) || Number(product.purchaseFactor) || 1;
+          const reverseQty = Number(item.quantity) * factor;
 
-           await tx.product.update({
-             where: { id: product.id },
-             data: { stock: { increment: reverseQty } }
-           });
-           
-           await tx.stockTransaction.create({
-               data: {
-                   productId: product.id,
-                   type: 'IN',
-                   quantity: reverseQty,
-                   reference: `Revert B2B Sale Order: ${order.orderNumber} (${item.quantity} ${(item as any).unit || product.purchaseUnit || product.unit || 'Pcs'})`
-               }
-           });
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: { increment: reverseQty } }
+          });
+
+          await tx.stockTransaction.create({
+            data: {
+              productId: product.id,
+              type: 'IN',
+              quantity: reverseQty,
+              reference: `Revert B2B Sale Order: ${order.orderNumber} (${item.quantity} ${(item as any).unit || product.purchaseUnit || product.unit || 'Pcs'})`
+            }
+          });
         }
       }
 
       // 6. Hapus Penjualan Utama (Invoice)
-      await tx.sale.delete({ where: { id: saleId }});
+      await tx.sale.delete({ where: { id: saleId } });
 
       // --- RESTORE B2B CONTRACT CREDIT ---
       const activeContract = await tx.b2BContract.findFirst({
@@ -1802,8 +1802,8 @@ app.get('/api/sales/orders/:id', tenantMiddleware, async (req: Request, res: Res
     // Include company for delivery note / printing
     const company = await prisma.company.findUnique({ where: { id: tenantId } });
     if (company && company.logoUrl && company.logoUrl.startsWith('/uploads')) {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        company.logoUrl = `${baseUrl}${company.logoUrl}`;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      company.logoUrl = `${baseUrl}${company.logoUrl}`;
     }
 
     res.json({ ...order, company });
@@ -1941,33 +1941,33 @@ function deg2rad(deg: number) {
 
 // --- FUNGSI HELPER SAAS (FRAUD DETECTION) ---
 function calculateFraudScore(params: {
-    faceScore: number | null,
-    isDeviceMatch: boolean,
-    isBorderlineLocation: boolean,
-    userHasRegisteredDevice: boolean
+  faceScore: number | null,
+  isDeviceMatch: boolean,
+  isBorderlineLocation: boolean,
+  userHasRegisteredDevice: boolean
 }): { score: number, isSuspicious: boolean } {
-    let score = 0;
+  let score = 0;
 
-    // 1. Face Score Analysis (Weight: 40%)
-    if (params.faceScore !== null) {
-        if (params.faceScore < 0.8) score += 30; // Very borderline
-        else if (params.faceScore < 0.9) score += 10;
-    }
+  // 1. Face Score Analysis (Weight: 40%)
+  if (params.faceScore !== null) {
+    if (params.faceScore < 0.8) score += 30; // Very borderline
+    else if (params.faceScore < 0.9) score += 10;
+  }
 
-    // 2. Device Fingerprint Analysis (Weight: 50%)
-    if (params.userHasRegisteredDevice && !params.isDeviceMatch) {
-        score += 50; // High risk - someone else's phone?
-    }
+  // 2. Device Fingerprint Analysis (Weight: 50%)
+  if (params.userHasRegisteredDevice && !params.isDeviceMatch) {
+    score += 50; // High risk - someone else's phone?
+  }
 
-    // 3. Location Borderline (Weight: 10%)
-    if (params.isBorderlineLocation) {
-        score += 15;
-    }
+  // 3. Location Borderline (Weight: 10%)
+  if (params.isBorderlineLocation) {
+    score += 15;
+  }
 
-    return {
-        score,
-        isSuspicious: score >= 60
-    };
+  return {
+    score,
+    isSuspicious: score >= 60
+  };
 }
 
 // --- FUNGSI HELPER SAAS (CONTRACT ENFORCEMENT) ---
@@ -2139,8 +2139,8 @@ app.get('/api/diag/ip', async (req: Request, res: Response) => {
   try {
     const axios = require('axios');
     const response = await axios.get('https://api.ipify.org?format=json');
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       server_public_ip: response.data.ip,
       note: "Gunakan IP ini untuk daftar putih (whitelist) di dashboard Wablas."
     });
@@ -2168,7 +2168,7 @@ app.post('/api/customer/send-otp', async (req: Request, res: Response) => {
 
     // Kirim via WhatsApp (Wablas)
     const message = `🔐 *Kode OTP Aivola Anda*\n\nKode: *${otp}*\n\nBerlaku 5 menit. Jangan bagikan kode ini kepada siapapun.`;
-    
+
     if (!process.env.WA_GATEWAY_URL || !process.env.WA_API_KEY) {
       console.error('❌ [Customer OTP] WA_GATEWAY_URL atau WA_API_KEY belum diset di .env');
       return res.status(500).json({ error: 'Sistem WhatsApp belum dikonfigurasi oleh Admin.' });
@@ -2331,7 +2331,7 @@ app.post('/api/customer/register', async (req: Request, res: Response) => {
 
     // Buat customer baru (companyId = fallback ke company pertama jika ID 1 tidak ada)
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     let targetCompanyId = 1;
     const checkCompany = await prisma.company.findUnique({ where: { id: 1 } });
     if (!checkCompany) {
@@ -2385,20 +2385,20 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     const trimmedEmail = email.trim();
     console.log(`[LOGIN ATTEMPT] Email: ${trimmedEmail}`);
 
-    let user = await prisma.user.findFirst({ 
+    let user = await prisma.user.findFirst({
       where: { email: { equals: trimmedEmail, mode: 'insensitive' } },
-      include: { 
-        company: { 
-          select: { 
+      include: {
+        company: {
+          select: {
             name: true,
             logoUrl: true,
             primaryColor: true,
             secondaryColor: true,
-            plan: true, 
+            plan: true,
             addons: true,
             globalTaxRate: true
-          } 
-        } 
+          }
+        }
       }
     });
 
@@ -2488,10 +2488,10 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     console.log(`[LOGIN SUCCESS] ${finalAuthData.role}: ${finalAuthData.email}`);
 
     const token = jwt.sign(
-      { 
-        userId: finalAuthData.id, 
-        companyId: finalAuthData.companyId, 
-        role: finalAuthData.role, 
+      {
+        userId: finalAuthData.id,
+        companyId: finalAuthData.companyId,
+        role: finalAuthData.role,
         name: finalAuthData.name,
         plan: finalAuthData.company?.plan,
         addons: finalAuthData.company?.addons || []
@@ -2508,7 +2508,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 
   } catch (error: any) {
     console.error('!!! LOGIN CRASH !!!', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Terjadi kesalahan pada server saat login (DIAGNOSTIC v1.0.3): ' + (error.message || 'Unknown Error'),
       details: error.stack,
       env_db: !!process.env.DATABASE_URL,
@@ -2553,7 +2553,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
           lateGracePeriod: 15,
           workDaysPerMonth: 25,
           crmEnabled: true,
-          purchasedInsights: ['KPI', 'LEARNING', 'AI_ADVISOR', 'PULSE'] 
+          purchasedInsights: ['KPI', 'LEARNING', 'AI_ADVISOR', 'PULSE']
         }
       });
 
@@ -2598,9 +2598,9 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 
   } catch (error: any) {
     console.error('!!! REGISTRATION ERROR !!!', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Gagal melakukan registrasi. Silakan coba beberapa saat lagi.',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -2637,7 +2637,7 @@ app.patch('/api/auth/change-password', tenantMiddleware, async (req: Request, re
 app.get('/api/companies/public', async (req: Request, res: Response) => {
   try {
     const companies = await prisma.company.findMany({
-      where: { 
+      where: {
         isActive: true,
         addons: {
           has: 'AIVOLA_GO'
@@ -2766,8 +2766,8 @@ app.get('/api/companies/public/:id/products', async (req: Request, res: Response
     const { branchId } = req.query;
 
     const products = await prisma.product.findMany({
-      where: { 
-        companyId, 
+      where: {
+        companyId,
         showInPos: true,
         // Only show products if company is active and has GO addon (additional safety)
         Company: {
@@ -2775,7 +2775,7 @@ app.get('/api/companies/public/:id/products', async (req: Request, res: Response
           addons: { has: 'AIVOLA_GO' }
         }
       },
-      include: { 
+      include: {
         category: true,
         WarehouseStock: {
           include: { warehouse: true }
@@ -2807,7 +2807,7 @@ app.get('/api/companies/public/:id/products', async (req: Request, res: Response
         // it might be better to stay as is (global).
         displayStock = p.stock;
       }
-      
+
       // Clean up the response
       const { WarehouseStock, ...cleanProduct } = p as any;
       return { ...cleanProduct, stock: displayStock };
@@ -2825,7 +2825,7 @@ app.get('/api/companies/public/:id/categories', async (req: Request, res: Respon
   try {
     const companyId = parseInt(req.params.id as string);
     const categories = await prisma.productCategory.findMany({
-      where: { 
+      where: {
         companyId,
         company: {
           isActive: true,
@@ -2845,7 +2845,7 @@ app.get('/api/companies/public/:id/branches', async (req: Request, res: Response
   try {
     const companyId = parseInt(req.params.id as string);
     const branches = await prisma.branch.findMany({
-      where: { 
+      where: {
         companyId,
         company: {
           isActive: true,
@@ -2865,7 +2865,7 @@ app.get('/api/companies/public/:id/banners', async (req: Request, res: Response)
   try {
     const companyId = parseInt(req.params.id as string);
     const banners = await prisma.banner.findMany({
-      where: { 
+      where: {
         companyId,
         isActive: true
       },
@@ -2902,14 +2902,14 @@ app.post('/api/banners', tenantMiddleware, uploadBanner.single('image'), async (
         const fullLocalPath = path.join(process.cwd(), 'uploads/banners', req.file.filename);
         // Use 'announcements' bucket as a safer default if 'banners' bucket doesn't exist
         imageUrl = await uploadToSupabase(fullLocalPath, 'announcements');
-        
+
         // If uploadToSupabase returned a relative local path (fallback), prepend the host
         if (imageUrl.startsWith('/uploads/')) {
-           const protocol = req.protocol;
-           const host = req.get('host');
-           imageUrl = `${protocol}://${host}${imageUrl}`;
+          const protocol = req.protocol;
+          const host = req.get('host');
+          imageUrl = `${protocol}://${host}${imageUrl}`;
         }
-        
+
         cleanupLocalFile(fullLocalPath);
       } catch (uploadError) {
         console.error('Failed to upload banner image:', uploadError);
@@ -2948,13 +2948,13 @@ app.patch('/api/banners/:id', tenantMiddleware, uploadBanner.single('image'), as
       try {
         const fullLocalPath = path.join(process.cwd(), 'uploads/banners', req.file.filename);
         imageUrl = await uploadToSupabase(fullLocalPath, 'announcements');
-        
+
         if (imageUrl.startsWith('/uploads/')) {
-           const protocol = req.protocol;
-           const host = req.get('host');
-           imageUrl = `${protocol}://${host}${imageUrl}`;
+          const protocol = req.protocol;
+          const host = req.get('host');
+          imageUrl = `${protocol}://${host}${imageUrl}`;
         }
-        
+
         cleanupLocalFile(fullLocalPath);
       } catch (uploadError) {
         console.error('Failed to upload banner image:', uploadError);
@@ -3087,7 +3087,7 @@ app.post('/api/companies', tenantMiddleware, async (req: Request, res: Response)
     if (userRole !== 'SUPERADMIN') {
       return res.status(403).json({ error: 'Akses Ditolak: Hanya Super Admin yang dapat mendaftarkan klien baru' });
     }
-    const { 
+    const {
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractDuration, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
@@ -3151,14 +3151,14 @@ app.post('/api/companies', tenantMiddleware, async (req: Request, res: Response)
       return { company, adminUser };
     });
 
-    res.json({ 
-      message: 'Perusahaan ' + (result.adminUser ? 'dan Admin ' : '') + 'berhasil didaftarkan', 
+    res.json({
+      message: 'Perusahaan ' + (result.adminUser ? 'dan Admin ' : '') + 'berhasil didaftarkan',
       company: result.company,
       admin: result.adminUser ? { email: result.adminUser.email, name: result.adminUser.name } : null
     });
   } catch (error: any) {
     console.error('Error creating company/admin:', error);
-    
+
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'Email admin sudah terdaftar di sistem. Gunakan email lain.' });
     }
@@ -3189,13 +3189,13 @@ app.get('/api/companies', tenantMiddleware, async (req: Request, res: Response) 
     });
 
     const mappedCompanies = companies.map(c => {
-        const { users, ...rest } = c;
-        const mainAdmin = users && users.length > 0 ? users[0] : null;
-        return {
-            ...rest,
-            adminEmail: mainAdmin?.email || '',
-            adminName: mainAdmin?.name || ''
-        };
+      const { users, ...rest } = c;
+      const mainAdmin = users && users.length > 0 ? users[0] : null;
+      return {
+        ...rest,
+        adminEmail: mainAdmin?.email || '',
+        adminName: mainAdmin?.name || ''
+      };
     });
 
     res.json(mappedCompanies);
@@ -3254,7 +3254,7 @@ app.get('/api/admin/backup', tenantMiddleware, async (req: Request, res: Respons
 // --- RESTORE DATABASE (SUPERADMIN ONLY) ---
 app.post('/api/admin/restore', tenantMiddleware, uploadRestore.single('backup'), async (req: Request, res: Response) => {
   const filePath = req.file?.path;
-  
+
   try {
     const userRole = (req as any).userRole;
     if (userRole !== 'SUPERADMIN') {
@@ -3275,23 +3275,23 @@ app.post('/api/admin/restore', tenantMiddleware, uploadRestore.single('backup'),
     // Extract password for PGPASSWORD
     let pgPassword = '';
     try {
-        const urlObj = new URL(dbUrl);
-        pgPassword = decodeURIComponent(urlObj.password);
+      const urlObj = new URL(dbUrl);
+      pgPassword = decodeURIComponent(urlObj.password);
     } catch (e) {
-        console.warn("[RESTORE] Failed to parse DATABASE_URL for password extraction");
+      console.warn("[RESTORE] Failed to parse DATABASE_URL for password extraction");
     }
 
     // Derive PSQL path from PG_DUMP_PATH
     const pgDumpPath = process.env.PG_DUMP_PATH || 'pg_dump';
-    const psqlBinary = pgDumpPath.includes('pg_dump') 
-      ? pgDumpPath.replace('pg_dump', 'psql') 
+    const psqlBinary = pgDumpPath.includes('pg_dump')
+      ? pgDumpPath.replace('pg_dump', 'psql')
       : 'psql';
 
     console.log(`[RESTORE] Starting restoration from: ${filePath}`);
     console.log(`[RESTORE] Using binary: ${psqlBinary}`);
 
     // Spawn psql
-    const psql = spawn(`"${psqlBinary}"`, ["-d", dbUrl], { 
+    const psql = spawn(`"${psqlBinary}"`, ["-d", dbUrl], {
       shell: true,
       env: { ...process.env, PGPASSWORD: pgPassword }
     });
@@ -3319,14 +3319,14 @@ app.post('/api/admin/restore', tenantMiddleware, uploadRestore.single('backup'),
     psql.on('close', (code) => {
       console.log(`[RESTORE] psql process exited with code ${code}`);
       cleanupLocalFile(filePath);
-      
+
       if (code === 0) {
         res.json({ success: true, message: 'Database berhasil dipulihkan sepenuhnya.' });
       } else {
         if (!res.headersSent) {
-          res.status(500).json({ 
-            error: 'Proses restore selesai dengan kesalahan.', 
-            details: errorData || 'Cek console server untuk detail lebih lanjut.' 
+          res.status(500).json({
+            error: 'Proses restore selesai dengan kesalahan.',
+            details: errorData || 'Cek console server untuk detail lebih lanjut.'
           });
         }
       }
@@ -3349,13 +3349,13 @@ app.get('/api/companies/my', tenantMiddleware, async (req: Request, res: Respons
       where: { id: tenantId }
     });
     if (!company) return res.status(404).json({ error: 'Perusahaan tidak ditemukan' });
-    
+
     // Ensure absolute URL for local logo
     if (company.logoUrl && company.logoUrl.startsWith('/uploads')) {
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       company.logoUrl = `${baseUrl}${company.logoUrl}`;
     }
-    
+
     const expiryLevel = await getTenantExpiryLevel(tenantId);
     // Prevent 304 Not Modified caching issues that break module detection
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -3600,7 +3600,7 @@ app.get('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request,
     const userId = (req as any).userId;
 
     let where: any = { companyId: tenantId };
-    
+
     // Role-based filtering if needed (e.g., Operational only sees their own)
     if (userRole === 'OPERATIONAL') {
       where.createdById = userId;
@@ -3826,7 +3826,7 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
     const userId = (req as any).userId;
     const userRole = (req as any).userRole;
     const id = parseInt(req.params.id as string);
-    const { receivedItems, receivedDate } = req.body; 
+    const { receivedItems, receivedDate } = req.body;
     // receivedItems format: [{ id: purchaseOrderItemId, receivedQty: number }]
 
     if (!['PURCHASING', 'ADMIN', 'SUPERADMIN', 'OWNER', 'FINANCE', 'WAREHOUSE_ADMIN', 'OPERATIONAL', 'SUPERVISOR'].includes(userRole)) {
@@ -3893,7 +3893,7 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
           const factor = currentProduct.purchaseFactor || 1;
           const currentStock = Math.max(0, currentProduct.stock);
           const currentCost = currentProduct.costPrice || 0;
-          
+
           const incomingQty = qtyToReceive * factor;
           const incomingPrice = poItem.price / factor;
 
@@ -3904,7 +3904,7 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
 
           await tx.product.update({
             where: { id: poItem.productId },
-            data: { 
+            data: {
               stock: { increment: incomingQty },
               costPrice: Number(newAverageCost.toFixed(2))
             }
@@ -3994,10 +3994,10 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
         }
 
         const existingExpense = await tx.expense.findFirst({
-          where: { 
-            companyId: tenantId, 
+          where: {
+            companyId: tenantId,
             description: { startsWith: `Hutang otomatis dari PO #${poData.orderNumber}` },
-            status: 'PENDING' 
+            status: 'PENDING'
           }
         });
 
@@ -4008,7 +4008,7 @@ app.post('/api/inventory/purchase-orders/:id/receive', tenantMiddleware, async (
           });
         } else {
           const finalReceivedDate = receivedDate ? new Date(receivedDate) : new Date();
-          const dueDate = new Date(finalReceivedDate.getTime() + 7 * 24 * 60 * 60 * 1000); 
+          const dueDate = new Date(finalReceivedDate.getTime() + 7 * 24 * 60 * 60 * 1000);
           await tx.expense.create({
             data: {
               companyId: tenantId,
@@ -4142,8 +4142,8 @@ app.post('/api/inventory/purchase-orders/:id/verify-invoice', tenantMiddleware, 
       }
 
       const parsedInvoiceDate = invoiceDate ? new Date(invoiceDate) : new Date();
-      const parsedDueDate = invoiceDueDate 
-        ? new Date(invoiceDueDate) 
+      const parsedDueDate = invoiceDueDate
+        ? new Date(invoiceDueDate)
         : new Date(parsedInvoiceDate.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       // 3. Update PO Header
@@ -4435,7 +4435,7 @@ app.delete('/api/companies/:id', tenantMiddleware, async (req: Request, res: Res
     }
 
     const companyId = parseInt(req.params.id as string);
-    
+
     // Pastikan bukan menghapus Owner Company sendiri (Id 1 biasanya)
     if (companyId === 1) {
       return res.status(400).json({ error: 'Tidak dapat menghapus perusahaan sistem utama' });
@@ -4472,7 +4472,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       return res.status(403).json({ error: 'Akses Ditolak: Hanya Admin yang dapat merubah profil perusahaan' });
     }
 
-    const { 
+    const {
       name, latitude, longitude, radius,
       picName, picPhone, address, contractType, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays, modules,
@@ -4595,7 +4595,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
     if (userRole !== 'SUPERADMIN' && tenantIdFromAuth !== companyId) {
       return res.status(403).json({ error: 'Hanya Super Admin atau Admin terkait yang dapat mengedit data ini' });
     }
-    const { 
+    const {
       name, latitude, longitude, radius,
       picName, picPhone, contractType, contractDuration, contractValue, contractStart, contractEnd,
       employeeLimit, adminLimit, posLimit, photoRetentionDays,
@@ -4605,15 +4605,15 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
       allowDineIn, allowPickUp, allowDelivery, franchiseId
     } = req.body;
 
-    const payloadToLog = { 
-      employeeLimit, adminLimit, posLimit, photoRetentionDays, plan 
+    const payloadToLog = {
+      employeeLimit, adminLimit, posLimit, photoRetentionDays, plan
     };
     console.log(`[DEBUG PATCH /companies/:id] Payload received for ID ${companyId}:`, payloadToLog);
 
     const safeParseInt = (val: any, fallback?: number) => {
-        if (val === undefined || val === null || val === '') return fallback;
-        const n = parseInt(val.toString(), 10);
-        return isNaN(n) ? fallback : n;
+      if (val === undefined || val === null || val === '') return fallback;
+      const n = parseInt(val.toString(), 10);
+      return isNaN(n) ? fallback : n;
     };
 
     const updatedCompany = await prisma.company.update({
@@ -4660,13 +4660,13 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
     });
 
     let adminUser = null;
-    
+
     // Update or Create Admin if email is provided in the edit form
     if (adminEmail) {
       // Try finding the primary admin of the company
       const existingAdmin = await prisma.user.findFirst({
         where: { companyId: companyId, role: 'ADMIN' },
-        orderBy: { createdAt: 'asc' } 
+        orderBy: { createdAt: 'asc' }
       });
 
       if (existingAdmin) {
@@ -4675,7 +4675,7 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
           email: adminEmail.trim().toLowerCase(),
           name: adminName || existingAdmin.name
         };
-        
+
         if (adminPassword) {
           updateData.password = await bcrypt.hash(adminPassword, 10);
         }
@@ -4719,15 +4719,15 @@ app.post('/api/companies/my/api-key', tenantMiddleware, async (req: Request, res
 
     // Cek apakah fitur integrasi sudah di-approve/diaktifkan oleh Owner Pusat
     const company = await prisma.company.findUnique({
-        where: { id: tenantId },
-        select: { isApiEnabled: true }
+      where: { id: tenantId },
+      select: { isApiEnabled: true }
     });
 
     if (!company?.isApiEnabled) {
-        return res.status(403).json({ 
-            error: 'Fitur Integrasi API belum aktif.', 
-            message: 'Silakan hubungi Admin Pusat (Aivola Owner) atau lakukan Request melalui menu Integrasi.' 
-        });
+      return res.status(403).json({
+        error: 'Fitur Integrasi API belum aktif.',
+        message: 'Silakan hubungi Admin Pusat (Aivola Owner) atau lakukan Request melalui menu Integrasi.'
+      });
     }
 
     // Generate simple random API key
@@ -4748,108 +4748,108 @@ app.post('/api/companies/my/api-key', tenantMiddleware, async (req: Request, res
 
 // A3.1.1 Endpoint Request Integrasi API (Oleh Klien)
 app.post('/api/integrations/request', tenantMiddleware, async (req: Request, res: Response) => {
-    try {
-        const tenantId = (req as any).tenantId;
-        const { note } = req.body;
+  try {
+    const tenantId = (req as any).tenantId;
+    const { note } = req.body;
 
-        // Cek apakah sudah ada request PENDING
-        const existingRequest = await prisma.integrationRequest.findFirst({
-            where: { companyId: tenantId, status: 'PENDING' }
-        });
+    // Cek apakah sudah ada request PENDING
+    const existingRequest = await prisma.integrationRequest.findFirst({
+      where: { companyId: tenantId, status: 'PENDING' }
+    });
 
-        if (existingRequest) {
-            return res.status(400).json({ error: 'Anda sudah memiliki permintaan integrasi yang sedang menunggu persetujuan.' });
-        }
-
-        const newRequest = await prisma.integrationRequest.create({
-            data: {
-                companyId: tenantId,
-                note: note || 'Request integrasi eksternal (Pabrik/Industri/POS)',
-                status: 'PENDING'
-            }
-        });
-
-        res.json({ message: 'Permintaan integrasi berhasil dikirim!', request: newRequest });
-    } catch (error: any) {
-        res.status(500).json({ error: 'Gagal mengirim permintaan: ' + error.message });
+    if (existingRequest) {
+      return res.status(400).json({ error: 'Anda sudah memiliki permintaan integrasi yang sedang menunggu persetujuan.' });
     }
+
+    const newRequest = await prisma.integrationRequest.create({
+      data: {
+        companyId: tenantId,
+        note: note || 'Request integrasi eksternal (Pabrik/Industri/POS)',
+        status: 'PENDING'
+      }
+    });
+
+    res.json({ message: 'Permintaan integrasi berhasil dikirim!', request: newRequest });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengirim permintaan: ' + error.message });
+  }
 });
 
 // A3.1.2 Endpoint Ambil Status Request Saya (Oleh Klien)
 app.get('/api/integrations/my-status', tenantMiddleware, async (req: Request, res: Response) => {
-    try {
-        const tenantId = (req as any).tenantId;
-        const request = await prisma.integrationRequest.findFirst({
-            where: { companyId: tenantId },
-            orderBy: { createdAt: 'desc' }
-        });
+  try {
+    const tenantId = (req as any).tenantId;
+    const request = await prisma.integrationRequest.findFirst({
+      where: { companyId: tenantId },
+      orderBy: { createdAt: 'desc' }
+    });
 
-        res.json({ request });
-    } catch (error: any) {
-        res.status(500).json({ error: 'Gagal mengambil status: ' + error.message });
-    }
+    res.json({ request });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil status: ' + error.message });
+  }
 });
 
 // A3.1.3 Endpoint List Request (Oleh Master Admin / SuperAdmin)
 app.get('/api/admin/integrations/requests', tenantMiddleware, async (req: Request, res: Response) => {
-    try {
-        const userRole = (req as any).userRole;
-        if (userRole !== 'SUPERADMIN' && userRole !== 'OWNER') {
-            return res.status(403).json({ error: 'Hanya Admin Pusat yang dapat melihat daftar request' });
-        }
-
-        const requests = await prisma.integrationRequest.findMany({
-            include: { company: { select: { id: true, name: true, plan: true } } },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        res.json(requests);
-    } catch (error: any) {
-        res.status(500).json({ error: 'Gagal mengambil daftar request: ' + error.message });
+  try {
+    const userRole = (req as any).userRole;
+    if (userRole !== 'SUPERADMIN' && userRole !== 'OWNER') {
+      return res.status(403).json({ error: 'Hanya Admin Pusat yang dapat melihat daftar request' });
     }
+
+    const requests = await prisma.integrationRequest.findMany({
+      include: { company: { select: { id: true, name: true, plan: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(requests);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil daftar request: ' + error.message });
+  }
 });
 
 // A3.1.4 Endpoint Approve/Reject Request (Oleh Master Admin / SuperAdmin)
 app.patch('/api/admin/integrations/requests/:id', tenantMiddleware, async (req: Request, res: Response) => {
-    try {
-        const userRole = (req as any).userRole;
-        if (userRole !== 'SUPERADMIN' && userRole !== 'OWNER') {
-            return res.status(403).json({ error: 'Hanya Admin Pusat yang dapat memproses request' });
-        }
-
-        const requestId = parseInt(req.params.id as string);
-        const { status } = req.body; // 'APPROVED' atau 'REJECTED'
-
-        const request = await prisma.integrationRequest.findUnique({
-            where: { id: requestId }
-        });
-
-        if (!request) return res.status(404).json({ error: 'Request tidak ditemukan' });
-
-        // Update Request Status
-        await prisma.integrationRequest.update({
-            where: { id: requestId },
-            data: { status }
-        });
-
-        // Jika APPROVED, aktifkan fiturnya di tabel Company
-        if (status === 'APPROVED') {
-            await prisma.company.update({
-                where: { id: request.companyId },
-                data: { isApiEnabled: true }
-            });
-        } else if (status === 'REJECTED') {
-            // Optional: Nonaktifkan juga jika di-reject (misal mencabut akses lama)
-            await prisma.company.update({
-                where: { id: request.companyId },
-                data: { isApiEnabled: false }
-            });
-        }
-
-        res.json({ message: `Request berhasil ${status.toLowerCase()}!` });
-    } catch (error: any) {
-        res.status(500).json({ error: 'Gagal memproses request: ' + error.message });
+  try {
+    const userRole = (req as any).userRole;
+    if (userRole !== 'SUPERADMIN' && userRole !== 'OWNER') {
+      return res.status(403).json({ error: 'Hanya Admin Pusat yang dapat memproses request' });
     }
+
+    const requestId = parseInt(req.params.id as string);
+    const { status } = req.body; // 'APPROVED' atau 'REJECTED'
+
+    const request = await prisma.integrationRequest.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!request) return res.status(404).json({ error: 'Request tidak ditemukan' });
+
+    // Update Request Status
+    await prisma.integrationRequest.update({
+      where: { id: requestId },
+      data: { status }
+    });
+
+    // Jika APPROVED, aktifkan fiturnya di tabel Company
+    if (status === 'APPROVED') {
+      await prisma.company.update({
+        where: { id: request.companyId },
+        data: { isApiEnabled: true }
+      });
+    } else if (status === 'REJECTED') {
+      // Optional: Nonaktifkan juga jika di-reject (misal mencabut akses lama)
+      await prisma.company.update({
+        where: { id: request.companyId },
+        data: { isApiEnabled: false }
+      });
+    }
+
+    res.json({ message: `Request berhasil ${status.toLowerCase()}!` });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal memproses request: ' + error.message });
+  }
 });
 
 // A3.2. Endpoint Upload Logo Perusahaan (Phase 19)
@@ -4872,7 +4872,7 @@ app.patch('/api/companies/my/logo', tenantMiddleware, uploadLogo.single('logo'),
     const mimeType = req.file.mimetype;
     const base64Image = fs.readFileSync(req.file.path, { encoding: 'base64' });
     const logoUrl = `data:${mimeType};base64,${base64Image}`;
-    
+
     console.log(`[LOGO UPLOAD] File converted to Base64, length: ${logoUrl.length}`);
 
     // 2. Update URL di Database
@@ -4884,15 +4884,15 @@ app.patch('/api/companies/my/logo', tenantMiddleware, uploadLogo.single('logo'),
     // 3. Cleanup local file karena sudah masuk database
     cleanupLocalFile(req.file.path);
 
-    res.json({ 
+    res.json({
       success: true,
-      message: 'Logo berhasil diperbarui dan disimpan di database', 
-      logoUrl: logoUrl 
+      message: 'Logo berhasil diperbarui dan disimpan di database',
+      logoUrl: logoUrl
     });
   } catch (error: any) {
     console.error('!!! LOGO UPLOAD CRITICAL ERROR !!!', error);
-    res.status(500).json({ 
-      error: 'Gagal mengupload logo', 
+    res.status(500).json({
+      error: 'Gagal mengupload logo',
       details: error.message,
       code: error.code
     });
@@ -4918,17 +4918,17 @@ app.patch('/api/companies/my/qris', tenantMiddleware, uploadLogo.single('qris'),
     // 1. Upload ke Supabase Storage (agar mendapatkan URL publik yang valid untuk WhatsApp preview)
     const fullLocalPath = req.file.path;
     let finalQrisUrl = '';
-    
+
     try {
       finalQrisUrl = await uploadToSupabase(fullLocalPath, 'logos', req.file.mimetype); // menggunakan bucket logos yang sudah ada
-      
+
       // Cleanup local file
       cleanupLocalFile(fullLocalPath);
     } catch (uploadError) {
       console.error('Failed to upload QRIS image to Supabase:', uploadError);
       return res.status(500).json({ error: 'Gagal mengupload gambar QRIS ke Cloud Storage' });
     }
-    
+
     console.log(`[QRIS UPLOAD] File uploaded to Supabase: ${finalQrisUrl}`);
 
     // 2. Update URL di Database
@@ -4937,15 +4937,15 @@ app.patch('/api/companies/my/qris', tenantMiddleware, uploadLogo.single('qris'),
       data: { qrisUrl: finalQrisUrl }
     });
 
-    res.json({ 
+    res.json({
       success: true,
-      message: 'QRIS berhasil diperbarui', 
-      qrisUrl: finalQrisUrl 
+      message: 'QRIS berhasil diperbarui',
+      qrisUrl: finalQrisUrl
     });
   } catch (error: any) {
     console.error('!!! QRIS UPLOAD CRITICAL ERROR !!!', error);
-    res.status(500).json({ 
-      error: 'Gagal mengupload QRIS', 
+    res.status(500).json({
+      error: 'Gagal mengupload QRIS',
       details: error.message,
       code: error.code
     });
@@ -4956,9 +4956,9 @@ app.patch('/api/companies/my/qris', tenantMiddleware, uploadLogo.single('qris'),
 app.patch('/api/companies/my/payroll-settings', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
-    const { 
-      lateDeductionRate, absenceDeductionType, absenceDeductionRate, 
-      sickLeaveDeductionRate, workDaysPerMonth, lateGracePeriod 
+    const {
+      lateDeductionRate, absenceDeductionType, absenceDeductionRate,
+      sickLeaveDeductionRate, workDaysPerMonth, lateGracePeriod
     } = req.body;
 
     const updatedCompany = await prisma.company.update({
@@ -5117,9 +5117,9 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
   }
   try {
     const tenantId = (req as any).tenantId;
-    const { 
+    const {
       name, email, password, role, companyId, branchId, shiftId,
-      basicSalary, allowance, overtimeRate, jobTitle, division, 
+      basicSalary, allowance, overtimeRate, jobTitle, division,
       grade, joinDate, contractEndDate, reportToId,
       bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance,
       taxStatus, isTaxable, isAttendanceExempt, salesTarget
@@ -5132,13 +5132,13 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
     // Jika Super Admin, dia boleh menentukan companyId di body (untuk rekrut ke klien)
     let targetTenantId = tenantId;
     if (requestorRole === 'SUPERADMIN' && req.body.companyId) {
-        targetTenantId = parseInt(req.body.companyId, 10);
+      targetTenantId = parseInt(req.body.companyId, 10);
     }
 
     // 2. Proteksi Role SUPERADMIN
     if (role === 'SUPERADMIN' && requestorRole !== 'SUPERADMIN') {
-        console.warn(`[SECURITY] Unauthorized SUPERADMIN creation attempt by user ${requestorId}`);
-        return res.status(403).json({ error: 'Hanya Super Admin yang dapat membuat akun Super Admin lain.' });
+      console.warn(`[SECURITY] Unauthorized SUPERADMIN creation attempt by user ${requestorId}`);
+      return res.status(403).json({ error: 'Hanya Super Admin yang dapat membuat akun Super Admin lain.' });
     }
 
     const company = await prisma.company.findUnique({
@@ -5150,52 +5150,52 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
     if (company) {
       // 1. Check Employee Limit (Active Employees Only)
       const activeUserCount = await prisma.user.count({
-          where: { companyId: targetTenantId, isActive: true }
+        where: { companyId: targetTenantId, isActive: true }
       });
 
       // Super Admin bypass limit check
       if (requestorRole !== 'SUPERADMIN' && company.employeeLimit > 0 && activeUserCount >= company.employeeLimit) {
-        return res.status(403).json({ 
-          error: `Limit karyawan tercapai! Tenant ini hanya diizinkan memiliki maksimal ${company.employeeLimit} karyawan.` 
+        return res.status(403).json({
+          error: `Limit karyawan tercapai! Tenant ini hanya diizinkan memiliki maksimal ${company.employeeLimit} karyawan.`
         });
       }
 
       // 3. Check Admin/Back-office Limit
       const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING', 'POS_VIEWER'] as any;
       if (backOfficeRoles.includes(role)) {
-          // Gunakan raw query untuk melewati validasi enum Prisma yang terkadang cache
-          const adminCountResult: any = await prisma.$queryRawUnsafe(
-              `SELECT COUNT(*)::int as count FROM "User" WHERE "companyId" = $1 AND "role"::text = ANY($2)`,
-              targetTenantId,
-              backOfficeRoles
-          );
-          const currentAdminCount = adminCountResult[0]?.count || 0;
+        // Gunakan raw query untuk melewati validasi enum Prisma yang terkadang cache
+        const adminCountResult: any = await prisma.$queryRawUnsafe(
+          `SELECT COUNT(*)::int as count FROM "User" WHERE "companyId" = $1 AND "role"::text = ANY($2)`,
+          targetTenantId,
+          backOfficeRoles
+        );
+        const currentAdminCount = adminCountResult[0]?.count || 0;
 
-          // Super Admin bypass limit check
-          if (requestorRole !== 'SUPERADMIN' && company.adminLimit > 0 && currentAdminCount >= company.adminLimit) {
-              console.error(`[LIMIT FAILURE] Company: ${company.name} (ID: ${company.id}), adminLimit: ${company.adminLimit}, currentAdmins: ${currentAdminCount}`);
-              return res.status(403).json({
-                  error: `Limit Admin/Back-office tercapai! Paket Anda hanya mengizinkan maksimal ${company.adminLimit} user dengan role manajemen. Silakan upgrade paket atau tambah slot admin.`
-              });
-          }
+        // Super Admin bypass limit check
+        if (requestorRole !== 'SUPERADMIN' && company.adminLimit > 0 && currentAdminCount >= company.adminLimit) {
+          console.error(`[LIMIT FAILURE] Company: ${company.name} (ID: ${company.id}), adminLimit: ${company.adminLimit}, currentAdmins: ${currentAdminCount}`);
+          return res.status(403).json({
+            error: `Limit Admin/Back-office tercapai! Paket Anda hanya mengizinkan maksimal ${company.adminLimit} user dengan role manajemen. Silakan upgrade paket atau tambah slot admin.`
+          });
+        }
       }
 
       // 4. Check POS/Cashier Limit
       if (role === 'CASHIER') {
-          const companyLimit = await prisma.company.findUnique({ where: { id: targetTenantId } });
-          const currentCashierCount = await prisma.user.count({
-              where: { 
-                  companyId: targetTenantId,
-                  role: 'CASHIER'
-              }
-          });
-
-          // Super Admin bypass limit check
-          if (requestorRole !== 'SUPERADMIN' && companyLimit && companyLimit.posLimit > 0 && currentCashierCount >= companyLimit.posLimit) {
-              return res.status(403).json({
-                  error: `Limit Kasir (POS) tercapai! Paket Anda hanya mengizinkan maksimal ${companyLimit.posLimit} unit kasir. Silakan upgrade paket atau tambah slot kasir.`
-              });
+        const companyLimit = await prisma.company.findUnique({ where: { id: targetTenantId } });
+        const currentCashierCount = await prisma.user.count({
+          where: {
+            companyId: targetTenantId,
+            role: 'CASHIER'
           }
+        });
+
+        // Super Admin bypass limit check
+        if (requestorRole !== 'SUPERADMIN' && companyLimit && companyLimit.posLimit > 0 && currentCashierCount >= companyLimit.posLimit) {
+          return res.status(403).json({
+            error: `Limit Kasir (POS) tercapai! Paket Anda hanya mengizinkan maksimal ${companyLimit.posLimit} unit kasir. Silakan upgrade paket atau tambah slot kasir.`
+          });
+        }
       }
     }
 
@@ -5214,9 +5214,9 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
 
     // Validasi Date
     const parseDate = (d: any) => {
-        if (!d) return null;
-        const date = new Date(d);
-        return isNaN(date.getTime()) ? null : date;
+      if (!d) return null;
+      const date = new Date(d);
+      return isNaN(date.getTime()) ? null : date;
     };
 
     const user = await (prisma.user as any).create({
@@ -5250,7 +5250,7 @@ app.post('/api/users', tenantMiddleware, async (req: Request, res: Response) => 
     res.json({ message: 'Karyawan berhasil ditambahkan', user: { id: user.id, name: user.name, email: user.email } });
   } catch (error: any) {
     console.error('Error saat pendaftaran karyawan:', error);
-    
+
     // Tangani error email duplikat dari Prisma (P2002)
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'Email sudah terdaftar. Gunakan email lain.' });
@@ -5269,19 +5269,19 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
     const tenantId = (req as any).tenantId;
     const requestorRole = (req as any).userRole;
     const reqUserId = parseInt(req.params.id as string);
-    
+
     // 1. Ambil Data User yang akan diedit
     let checkUser = await prisma.user.findFirst({ where: { id: reqUserId } });
     if (!checkUser) return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
 
     // 2. Validasi Akses: Harus Tenant yang sama ATAU Superadmin
     if (requestorRole !== 'SUPERADMIN' && checkUser.companyId !== tenantId) {
-        return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki wewenang mengedit data tenant lain' });
+      return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki wewenang mengedit data tenant lain' });
     }
 
-    const { 
-      name, email, role, basicSalary, allowance, overtimeRate, 
-      jobTitle, division, grade, joinDate, contractEndDate, 
+    const {
+      name, email, role, basicSalary, allowance, overtimeRate,
+      jobTitle, division, grade, joinDate, contractEndDate,
       reportToId, branchId, isActive, resignDate,
       bpjsKesehatan, bpjsKetenagakerjaan, mealAllowance,
       taxStatus, isTaxable, isAttendanceExempt, salesTarget
@@ -5289,42 +5289,42 @@ app.put('/api/users/:id', tenantMiddleware, async (req: Request, res: Response) 
 
     // 3. Proteksi Role SUPERADMIN
     if (role === 'SUPERADMIN' && requestorRole !== 'SUPERADMIN') {
-        return res.status(403).json({ error: 'Hanya Super Admin yang dapat menunjuk akun Super Admin lain.' });
+      return res.status(403).json({ error: 'Hanya Super Admin yang dapat menunjuk akun Super Admin lain.' });
     }
 
     // --- ENFORCE ADMIN LIMIT ON UPDATE ---
     const backOfficeRoles: Role[] = ['ADMIN', 'OWNER', 'MANAGER', 'FINANCE', 'PURCHASING'] as any;
     if (requestorRole !== 'SUPERADMIN' && role && role !== checkUser.role && backOfficeRoles.includes(role)) {
-        const company = await prisma.company.findUnique({ where: { id: checkUser.companyId } });
-        const currentAdminCount = await prisma.user.count({
-            where: { 
-                companyId: checkUser.companyId,
-                role: { in: backOfficeRoles as any }
-            }
-        });
-
-        if (company && company.adminLimit > 0 && currentAdminCount >= company.adminLimit) {
-            return res.status(403).json({
-                error: `Gagal mengubah role! Limit Admin/Back-office (${company.adminLimit}) sudah penuh. Silakan hubungi pusat untuk menambah slot.`
-            });
+      const company = await prisma.company.findUnique({ where: { id: checkUser.companyId } });
+      const currentAdminCount = await prisma.user.count({
+        where: {
+          companyId: checkUser.companyId,
+          role: { in: backOfficeRoles as any }
         }
+      });
+
+      if (company && company.adminLimit > 0 && currentAdminCount >= company.adminLimit) {
+        return res.status(403).json({
+          error: `Gagal mengubah role! Limit Admin/Back-office (${company.adminLimit}) sudah penuh. Silakan hubungi pusat untuk menambah slot.`
+        });
+      }
     }
 
     // --- ENFORCE POS LIMIT ON UPDATE ---
     if (requestorRole !== 'SUPERADMIN' && role && role !== checkUser.role && role === 'CASHIER') {
-        const company = await prisma.company.findUnique({ where: { id: checkUser.companyId } });
-        const currentCashierCount = await prisma.user.count({
-            where: { 
-                companyId: checkUser.companyId,
-                role: 'CASHIER'
-            }
-        });
-
-        if (company && company.posLimit > 0 && currentCashierCount >= company.posLimit) {
-            return res.status(403).json({
-                error: `Gagal mengubah role! Limit Kasir/POS (${company.posLimit}) sudah penuh. Silakan hubungi pusat untuk menambah slot.`
-            });
+      const company = await prisma.company.findUnique({ where: { id: checkUser.companyId } });
+      const currentCashierCount = await prisma.user.count({
+        where: {
+          companyId: checkUser.companyId,
+          role: 'CASHIER'
         }
+      });
+
+      if (company && company.posLimit > 0 && currentCashierCount >= company.posLimit) {
+        return res.status(403).json({
+          error: `Gagal mengubah role! Limit Kasir/POS (${company.posLimit}) sudah penuh. Silakan hubungi pusat untuk menambah slot.`
+        });
+      }
     }
 
     const updatedUser = await (prisma.user as any).update({
@@ -5435,7 +5435,7 @@ app.delete('/api/users/:id', tenantMiddleware, async (req: Request, res: Respons
 
     // 4. Role Protection
     if (targetUser.role === 'SUPERADMIN' && userRole !== 'SUPERADMIN') {
-        return res.status(403).json({ error: 'Role Super Admin dilindungi. Hubungi IT Cloud.' });
+      return res.status(403).json({ error: 'Role Super Admin dilindungi. Hubungi IT Cloud.' });
     }
 
     // 4. Delete
@@ -5458,10 +5458,10 @@ app.patch('/api/users/:id/deactivate', tenantMiddleware, async (req: Request, re
     const reqUserId = parseInt(req.params.id as string);
     const { resignDate } = req.body || {};
 
-    const userToDeactivate = await prisma.user.findFirst({ 
-      where: { id: reqUserId, companyId: tenantId } 
+    const userToDeactivate = await prisma.user.findFirst({
+      where: { id: reqUserId, companyId: tenantId }
     });
-    
+
     if (!userToDeactivate) {
       return res.status(404).json({ error: 'Karyawan tidak ditemukan atau Anda tidak memiliki akses ke data ini.' });
     }
@@ -5519,7 +5519,7 @@ app.patch('/api/users/:id/reset-device', tenantMiddleware, async (req: Request, 
 // B2. Endpoint Mendapatkan Daftar Karyawan (Menggunakan Tenant Middleware)
 app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).tenantId; 
+    const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
     const { status } = req.query;
 
@@ -5531,12 +5531,12 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
     const users = await (prisma.user as any).findMany({
       where: {
         companyId: tenantId,
-        ...(userRole === 'SUPERADMIN' 
-          ? {} 
-          : { 
-              role: { not: 'SUPERADMIN' },
-              name: { not: 'Aivola Owner' }
-            }
+        ...(userRole === 'SUPERADMIN'
+          ? {}
+          : {
+            role: { not: 'SUPERADMIN' },
+            name: { not: 'Aivola Owner' }
+          }
         ),
         ...(status === 'inactive' ? { isActive: false } : { isActive: true })
       },
@@ -5560,156 +5560,156 @@ app.get('/api/users', tenantMiddleware, async (req: Request, res: Response) => {
 // Ini adalah pusat kendali masalah timezone untuk seluruh sistem absensi.
 // ============================================================
 function getDayRange(timezone: string = 'Asia/Jakarta', date: Date = new Date()) {
-    const dateStrInTz = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date);
-    const dayStart = new Date(`${dateStrInTz}T00:00:00`);
-    const dayEnd = new Date(`${dateStrInTz}T23:59:59`);
+  const dateStrInTz = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date);
+  const dayStart = new Date(`${dateStrInTz}T00:00:00`);
+  const dayEnd = new Date(`${dateStrInTz}T23:59:59`);
 
-    // Convert to proper UTC by using the timezone offset
-    const startWithOffset = new Date(new Date(`${dateStrInTz}T00:00:00+00:00`).toLocaleString('en-US', { timeZone: 'UTC' }));
-    
-    // Cara paling reliable: gunakan ISO string dengan offset timezone
-    const dayStartUTC = new Date(`${dateStrInTz}T00:00:00${getTimezoneOffset(timezone, date)}`);
-    const dayEndUTC = new Date(`${dateStrInTz}T23:59:59${getTimezoneOffset(timezone, date)}`);
-    
-    return { dayStart: dayStartUTC, dayEnd: dayEndUTC, dateStr: dateStrInTz };
+  // Convert to proper UTC by using the timezone offset
+  const startWithOffset = new Date(new Date(`${dateStrInTz}T00:00:00+00:00`).toLocaleString('en-US', { timeZone: 'UTC' }));
+
+  // Cara paling reliable: gunakan ISO string dengan offset timezone
+  const dayStartUTC = new Date(`${dateStrInTz}T00:00:00${getTimezoneOffset(timezone, date)}`);
+  const dayEndUTC = new Date(`${dateStrInTz}T23:59:59${getTimezoneOffset(timezone, date)}`);
+
+  return { dayStart: dayStartUTC, dayEnd: dayEndUTC, dateStr: dateStrInTz };
 }
 
 // Ambil offset timezone dalam format ±HH:MM dari IANA timezone string
 function getTimezoneOffset(timezone: string, date: Date = new Date()): string {
-    const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
-    const tzDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
-    const offsetMs = tzDate.getTime() - utcDate.getTime();
-    const offsetHours = Math.floor(Math.abs(offsetMs) / 3600000);
-    const offsetMinutes = Math.floor((Math.abs(offsetMs) % 3600000) / 60000);
-    const sign = offsetMs >= 0 ? '+' : '-';
-    return `${sign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+  const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const tzDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+  const offsetMs = tzDate.getTime() - utcDate.getTime();
+  const offsetHours = Math.floor(Math.abs(offsetMs) / 3600000);
+  const offsetMinutes = Math.floor((Math.abs(offsetMs) % 3600000) / 60000);
+  const sign = offsetMs >= 0 ? '+' : '-';
+  return `${sign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
 }
 
 // Ambil timezone dari Company (default: Asia/Jakarta)
 // Nanti diintegrasikan dengan setting di database per-perusahaan
 async function getCompanyTimezone(tenantId: number): Promise<string> {
-    try {
-        const company = await prisma.company.findUnique({ where: { id: tenantId } });
-        return (company as any)?.timezone || 'Asia/Jakarta';
-    } catch {
-        return 'Asia/Jakarta'; // Fallback aman
-    }
+  try {
+    const company = await prisma.company.findUnique({ where: { id: tenantId } });
+    return (company as any)?.timezone || 'Asia/Jakarta';
+  } catch {
+    return 'Asia/Jakarta'; // Fallback aman
+  }
 }
 
 // Helper function to recalculate attendance for a specific user and date
 async function recalculateAttendanceForUserAndDate(userId: number, date: Date, tenantId: number) {
-    // Wrapped in outer try-catch so it NEVER crashes the parent route
-    try {
-        const todayStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-        const dateTarget = new Date(todayStr + 'T00:00:00Z');
-        
-        console.log(`[RECALC DEBUG] Starting for User: ${userId}, Date: ${todayStr}`);
+  // Wrapped in outer try-catch so it NEVER crashes the parent route
+  try {
+    const todayStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const dateTarget = new Date(todayStr + 'T00:00:00Z');
 
-        // 1. Get recent attendance records for this user (increased depth for past edits)
-        const recentAttendances = await prisma.attendance.findMany({
-            where: {
-                userId: userId,
-                companyId: tenantId
-            },
-            orderBy: { clockIn: 'desc' },
-            take: 100 
-        });
+    console.log(`[RECALC DEBUG] Starting for User: ${userId}, Date: ${todayStr}`);
 
-        const attendance = recentAttendances.find(a => {
-            const attDate = new Date(a.clockIn).toLocaleDateString('en-CA');
-            return attDate === todayStr;
-        });
+    // 1. Get recent attendance records for this user (increased depth for past edits)
+    const recentAttendances = await prisma.attendance.findMany({
+      where: {
+        userId: userId,
+        companyId: tenantId
+      },
+      orderBy: { clockIn: 'desc' },
+      take: 100
+    });
 
-        if (!attendance) {
-            console.log(`[RECALC DEBUG] No attendance record found for User ${userId} on ${todayStr} after checking 100 records.`);
-            return;
-        }
+    const attendance = recentAttendances.find(a => {
+      const attDate = new Date(a.clockIn).toLocaleDateString('en-CA');
+      return attDate === todayStr;
+    });
 
-        console.log(`[RECALC DEBUG] Found Attendance ID ${attendance.id}, ClockIn (Raw): ${attendance.clockIn}`);
-
-        // 2. Get the new effective shift
-        const [user, manualSchedule] = await Promise.all([
-            prisma.user.findUnique({
-                where: { id: userId },
-                include: { company: true, shift: true }
-            }),
-            (prisma as any).shiftSchedule.findUnique({
-                where: { 
-                    userId_date: {
-                        userId: userId, 
-                        date: dateTarget 
-                    }
-                },
-                include: { shift: true }
-            })
-        ]);
-
-        if (!user) {
-            console.log(`[RECALC DEBUG] User ${userId} not found.`);
-            return;
-        }
-
-        const effectiveShift = manualSchedule ? (manualSchedule.isOff ? null : manualSchedule.shift) : user.shift;
-        const isScheduledOff = manualSchedule?.isOff;
-
-        console.log(`[RECALC DEBUG] Effective Shift Found: ${effectiveShift?.name || 'NONE'}, StartTime: ${effectiveShift?.startTime || 'MISSING'}`);
-
-        // 3. Recalculate status, lateMinutes, and earlyCheckOutMinutes
-        let status = 'PRESENT';
-        let lateMinutes = 0;
-        let earlyCheckOutMinutes = 0;
-
-        if (isScheduledOff) {
-            status = 'PRESENT';
-            lateMinutes = 0;
-            earlyCheckOutMinutes = 0;
-            console.log(`[RECALC DEBUG] Recalc Result: USER IS OFF`);
-        } else if (effectiveShift?.startTime) {
-            // -- CLOCK IN (LATE) --
-            const clockInDate = new Date(attendance.clockIn);
-            const jakartaIn = new Date(clockInDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-            
-            const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
-            const shiftStartTime = new Date(jakartaIn);
-            shiftStartTime.setHours(sh, sm, 0, 0);
-            
-            const gracePeriod = (user as any).company?.lateGracePeriod || 0;
-            const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
-            
-            if (jakartaIn > threshold) {
-                status = 'LATE';
-                lateMinutes = Math.max(0, Math.floor((jakartaIn.getTime() - shiftStartTime.getTime()) / 60000));
-            }
-
-            // -- CLOCK OUT (EARLY CHECKOUT) --
-            if (attendance.clockOut && effectiveShift.endTime) {
-                const clockOutDate = new Date(attendance.clockOut);
-                const jakartaOut = new Date(clockOutDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-                
-                const [eh, em] = effectiveShift.endTime.split(':').map(Number);
-                const shiftEndTime = new Date(jakartaOut);
-                shiftEndTime.setHours(eh, em, 0, 0);
-
-                if (jakartaOut < shiftEndTime) {
-                    earlyCheckOutMinutes = Math.max(0, Math.floor((shiftEndTime.getTime() - jakartaOut.getTime()) / 60000));
-                }
-            }
-        }
-
-        // 4. Update the attendance record
-        await prisma.attendance.update({
-            where: { id: attendance.id },
-            data: {
-                status: status as any,
-                lateMinutes: lateMinutes,
-                earlyCheckOutMinutes: earlyCheckOutMinutes
-            }
-        });
-
-        console.log(`[RECALC SUCCESS] User ${userId}: ${status} (${lateMinutes} mins late)`);
-    } catch (error) {
-        console.error(`[RECALC ERROR] User ${userId}:`, error);
+    if (!attendance) {
+      console.log(`[RECALC DEBUG] No attendance record found for User ${userId} on ${todayStr} after checking 100 records.`);
+      return;
     }
+
+    console.log(`[RECALC DEBUG] Found Attendance ID ${attendance.id}, ClockIn (Raw): ${attendance.clockIn}`);
+
+    // 2. Get the new effective shift
+    const [user, manualSchedule] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        include: { company: true, shift: true }
+      }),
+      (prisma as any).shiftSchedule.findUnique({
+        where: {
+          userId_date: {
+            userId: userId,
+            date: dateTarget
+          }
+        },
+        include: { shift: true }
+      })
+    ]);
+
+    if (!user) {
+      console.log(`[RECALC DEBUG] User ${userId} not found.`);
+      return;
+    }
+
+    const effectiveShift = manualSchedule ? (manualSchedule.isOff ? null : manualSchedule.shift) : user.shift;
+    const isScheduledOff = manualSchedule?.isOff;
+
+    console.log(`[RECALC DEBUG] Effective Shift Found: ${effectiveShift?.name || 'NONE'}, StartTime: ${effectiveShift?.startTime || 'MISSING'}`);
+
+    // 3. Recalculate status, lateMinutes, and earlyCheckOutMinutes
+    let status = 'PRESENT';
+    let lateMinutes = 0;
+    let earlyCheckOutMinutes = 0;
+
+    if (isScheduledOff) {
+      status = 'PRESENT';
+      lateMinutes = 0;
+      earlyCheckOutMinutes = 0;
+      console.log(`[RECALC DEBUG] Recalc Result: USER IS OFF`);
+    } else if (effectiveShift?.startTime) {
+      // -- CLOCK IN (LATE) --
+      const clockInDate = new Date(attendance.clockIn);
+      const jakartaIn = new Date(clockInDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+
+      const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
+      const shiftStartTime = new Date(jakartaIn);
+      shiftStartTime.setHours(sh, sm, 0, 0);
+
+      const gracePeriod = (user as any).company?.lateGracePeriod || 0;
+      const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
+
+      if (jakartaIn > threshold) {
+        status = 'LATE';
+        lateMinutes = Math.max(0, Math.floor((jakartaIn.getTime() - shiftStartTime.getTime()) / 60000));
+      }
+
+      // -- CLOCK OUT (EARLY CHECKOUT) --
+      if (attendance.clockOut && effectiveShift.endTime) {
+        const clockOutDate = new Date(attendance.clockOut);
+        const jakartaOut = new Date(clockOutDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+
+        const [eh, em] = effectiveShift.endTime.split(':').map(Number);
+        const shiftEndTime = new Date(jakartaOut);
+        shiftEndTime.setHours(eh, em, 0, 0);
+
+        if (jakartaOut < shiftEndTime) {
+          earlyCheckOutMinutes = Math.max(0, Math.floor((shiftEndTime.getTime() - jakartaOut.getTime()) / 60000));
+        }
+      }
+    }
+
+    // 4. Update the attendance record
+    await prisma.attendance.update({
+      where: { id: attendance.id },
+      data: {
+        status: status as any,
+        lateMinutes: lateMinutes,
+        earlyCheckOutMinutes: earlyCheckOutMinutes
+      }
+    });
+
+    console.log(`[RECALC SUCCESS] User ${userId}: ${status} (${lateMinutes} mins late)`);
+  } catch (error) {
+    console.error(`[RECALC ERROR] User ${userId}:`, error);
+  }
 }
 
 // B2.1 Endpoint Mendapatkan Daftar Jadwal Shift (Kalender)
@@ -5916,9 +5916,9 @@ async function clockInHandler(req: Request, res: Response) {
         include: { company: true, branch: true, shift: true }
       }),
       (prisma as any).shiftSchedule.findFirst({
-        where: { 
-          userId: userId, 
-          date: new Date(todayStr) 
+        where: {
+          userId: userId,
+          date: new Date(todayStr)
         },
         include: { shift: true }
       }).catch((e: any) => {
@@ -5955,7 +5955,7 @@ async function clockInHandler(req: Request, res: Response) {
         const capturePath = path.join(process.cwd(), photoUrl!.replace(/^\/+/, ""));
         // @ts-ignore
         const refUrl = user.faceReferenceUrl as string;
-        
+
         const faceResult = await compareFaces(refUrl, capturePath);
         faceSimilarityScore = faceResult.score;
         isFaceVerified = faceResult.verified;
@@ -6004,23 +6004,23 @@ async function clockInHandler(req: Request, res: Response) {
     // @ts-ignore
     const isDeviceMatch = user.lastDeviceId ? (user.lastDeviceId === deviceId) : true;
     const isBorderlineLocation = (refLat && refLng && refRadius) ? (getDistanceFromLatLonInM(lat, lng, refLat, refLng) > (refRadius * 0.8)) : false;
-    
+
     const fraudResult = calculateFraudScore({
-        faceScore: faceSimilarityScore,
-        isDeviceMatch,
-        isBorderlineLocation,
-        // @ts-ignore
-        userHasRegisteredDevice: !!user.lastDeviceId
+      faceScore: faceSimilarityScore,
+      isDeviceMatch,
+      isBorderlineLocation,
+      // @ts-ignore
+      userHasRegisteredDevice: !!user.lastDeviceId
     });
 
     // Update User's lastDeviceId jika belum ada dan absen ini bersih
     // @ts-ignore
     if (!user.lastDeviceId && deviceId && !fraudResult.isSuspicious) {
-        await prisma.user.update({
-            where: { id: userId },
-            // @ts-ignore
-            data: { lastDeviceId: deviceId }
-        });
+      await prisma.user.update({
+        where: { id: userId },
+        // @ts-ignore
+        data: { lastDeviceId: deviceId }
+      });
     }
 
     // 4. CEK APAKAH SUDAH ABSEN HARI INI (Cegah Ganda)
@@ -6039,14 +6039,14 @@ async function clockInHandler(req: Request, res: Response) {
     });
 
     if (existingAttendance && !existingAttendance.clockOut) {
-      return res.status(400).json({ 
-        error: 'Anda sudah melakukan Clock-In hari ini dan belum Clock-Out.' 
+      return res.status(400).json({
+        error: 'Anda sudah melakukan Clock-In hari ini dan belum Clock-Out.'
       });
     }
 
     if (existingAttendance && existingAttendance.clockOut) {
-      return res.status(400).json({ 
-        error: 'Anda sudah menyelesaikan absensi hari ini (sudah Clock-In & Clock-Out).' 
+      return res.status(400).json({
+        error: 'Anda sudah menyelesaikan absensi hari ini (sudah Clock-In & Clock-Out).'
       });
     }
 
@@ -6071,27 +6071,27 @@ async function clockInHandler(req: Request, res: Response) {
         lng: parseFloat(lng),
         photoUrl: finalPhotoUrl,
         ...(() => {
-            if (effectiveShift?.startTime) {
-                const now = new Date();
-                // Gunakan jam Jakarta untuk perbandingan
-                const jakartaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-                const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
-                
-                const shiftStartTime = new Date(jakartaTime);
-                shiftStartTime.setHours(sh, sm, 0, 0);
-                
-                // @ts-ignore
-                const gracePeriod = user.company.lateGracePeriod || 0;
-                const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
-                
-                if (jakartaTime > threshold) {
-                    // Hanya hitung terlambat jika di hari yang sama atau setelah jam mulai
-                    const lateMinutes = Math.floor((jakartaTime.getTime() - shiftStartTime.getTime()) / 60000);
-                    // Jika lateMinutes negatif (absen kepagian banget sampai kena shift kemarin), set 0
-                    return { status: 'LATE', lateMinutes: Math.max(0, lateMinutes) };
-                }
+          if (effectiveShift?.startTime) {
+            const now = new Date();
+            // Gunakan jam Jakarta untuk perbandingan
+            const jakartaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+            const [sh, sm] = effectiveShift.startTime.split(':').map(Number);
+
+            const shiftStartTime = new Date(jakartaTime);
+            shiftStartTime.setHours(sh, sm, 0, 0);
+
+            // @ts-ignore
+            const gracePeriod = user.company.lateGracePeriod || 0;
+            const threshold = new Date(shiftStartTime.getTime() + (gracePeriod * 60000));
+
+            if (jakartaTime > threshold) {
+              // Hanya hitung terlambat jika di hari yang sama atau setelah jam mulai
+              const lateMinutes = Math.floor((jakartaTime.getTime() - shiftStartTime.getTime()) / 60000);
+              // Jika lateMinutes negatif (absen kepagian banget sampai kena shift kemarin), set 0
+              return { status: 'LATE', lateMinutes: Math.max(0, lateMinutes) };
             }
-            return { status: 'PRESENT', lateMinutes: 0 };
+          }
+          return { status: 'PRESENT', lateMinutes: 0 };
         })(),
         // @ts-ignore
         faceSimilarityScore,
@@ -6108,35 +6108,35 @@ async function clockInHandler(req: Request, res: Response) {
 
     // --- AI MOOD ANALYSIS (Phase 36) - BACKGROUND JOB ---
     if (photoUrl) {
-        const fullPath = path.join(process.cwd(), photoUrl.replace(/^\/+/, ""));
-        console.log(`[Mood AI] Queuing photo for background analysis: ${fullPath}`);
-        
-        // Jalankan secara asynchronous tanpa me-lock response HTTP
-        (async () => {
-            if (fs.existsSync(fullPath)) {
-                try {
-                    const { analyzeMood } = require('./moodAI');
-                    const moodResult = await analyzeMood(fullPath);
-                    console.log(`[Mood AI] Background Result for attendance ${attendance.id}:`, moodResult);
-                    await (prisma.attendance as any).update({
-                        where: { id: attendance.id },
-                        data: {
-                            mood: moodResult.mood,
-                            moodScore: moodResult.score
-                        }
-                    });
-                } catch (moodErr) {
-                    console.error('[Mood AI] Background Error during analysis:', moodErr);
-                }
-            } else {
-                console.warn(`[Mood AI] Photo file not found for analysis: ${fullPath}`);
-            }
-            // Cleanup after Supabase upload and AI processing
-            // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
-            if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
-                cleanupLocalFile(fullPath);
-            }
-        })();
+      const fullPath = path.join(process.cwd(), photoUrl.replace(/^\/+/, ""));
+      console.log(`[Mood AI] Queuing photo for background analysis: ${fullPath}`);
+
+      // Jalankan secara asynchronous tanpa me-lock response HTTP
+      (async () => {
+        if (fs.existsSync(fullPath)) {
+          try {
+            const { analyzeMood } = require('./moodAI');
+            const moodResult = await analyzeMood(fullPath);
+            console.log(`[Mood AI] Background Result for attendance ${attendance.id}:`, moodResult);
+            await (prisma.attendance as any).update({
+              where: { id: attendance.id },
+              data: {
+                mood: moodResult.mood,
+                moodScore: moodResult.score
+              }
+            });
+          } catch (moodErr) {
+            console.error('[Mood AI] Background Error during analysis:', moodErr);
+          }
+        } else {
+          console.warn(`[Mood AI] Photo file not found for analysis: ${fullPath}`);
+        }
+        // Cleanup after Supabase upload and AI processing
+        // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
+        if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
+          cleanupLocalFile(fullPath);
+        }
+      })();
     }
 
     // NOTIFIKASI CLOCK-IN KE ADMIN DINONAKTIFKAN (Mencegah lonjakan Disk IO dan beban DB)
@@ -6181,7 +6181,7 @@ app.patch('/api/users/:id/face-reference', tenantMiddleware, uploadFaceReference
       finalUrl = await uploadToSupabase(fullPath, 'face_references');
       // Only cleanup if successfully uploaded to Supabase
       if (finalUrl && finalUrl.startsWith('http')) {
-          cleanupLocalFile(fullPath);
+        cleanupLocalFile(fullPath);
       }
     } catch (uploadError) {
       console.error('Supabase upload failed for face reference:', uploadError);
@@ -6212,21 +6212,21 @@ app.get('/api/attendance', tenantMiddleware, async (req: Request, res: Response)
 
     // SECURITY: POS_VIEWER cannot see attendance logs
     if (userRole === 'POS_VIEWER') {
-       return res.json([]);
+      return res.json([]);
     }
 
     // Filter by date: ?date=2026-04-17 (default: hari ini di Jakarta +7)
     // Atau filter by month: ?month=2026-04
     const dateParam = req.query.date as string | undefined;
     const monthParam = req.query.month as string | undefined;
-    
+
     let targetDate: Date;
     let nextDate: Date;
 
     if (monthParam) {
       const [y, m] = monthParam.split('-').map(Number);
       targetDate = new Date(`${monthParam}-01T00:00:00+07:00`);
-      
+
       let nextY = y;
       let nextM = m + 1;
       if (nextM > 12) {
@@ -6357,21 +6357,21 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
     const isBorderlineLocation = (refLat && refLng && refRadius) ? (getDistanceFromLatLonInM(lat, lng, refLat, refLng) > (refRadius * 0.8)) : false;
 
     const fraudResult = calculateFraudScore({
-        faceScore: faceSimilarityScore,
-        isDeviceMatch,
-        isBorderlineLocation,
-        // @ts-ignore
-        userHasRegisteredDevice: !!user.lastDeviceId
+      faceScore: faceSimilarityScore,
+      isDeviceMatch,
+      isBorderlineLocation,
+      // @ts-ignore
+      userHasRegisteredDevice: !!user.lastDeviceId
     });
 
     // Update User's lastDeviceId jika belum ada dan absen ini bersih
     // @ts-ignore
     if (!user.lastDeviceId && deviceId && !fraudResult.isSuspicious) {
-        await prisma.user.update({
-            where: { id: userId },
-            // @ts-ignore
-            data: { lastDeviceId: deviceId }
-        });
+      await prisma.user.update({
+        where: { id: userId },
+        // @ts-ignore
+        data: { lastDeviceId: deviceId }
+      });
     }
 
     // Simpan foto ke Supabase jika ada
@@ -6389,7 +6389,7 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
 
     const updatedAttendance = await prisma.attendance.update({
       where: { id: attendance.id },
-      data: { 
+      data: {
         clockOut: new Date(),
         clockOutLat: parseFloat(lat),
         clockOutLng: parseFloat(lng),
@@ -6405,54 +6405,54 @@ app.patch('/api/attendance/clock-out', tenantMiddleware, uploadAttendance.single
         // @ts-ignore
         deviceId: deviceId || (attendance as any).deviceId,
         earlyCheckOutMinutes: (() => {
+          // @ts-ignore
+          if (attendance.user?.shift?.endTime) {
+            const now = new Date();
+            const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
             // @ts-ignore
-            if (attendance.user?.shift?.endTime) {
-                const now = new Date();
-                const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-                // @ts-ignore
-                const [eh, em] = attendance.user.shift.endTime.split(':').map(Number);
-                const shiftEndTime = new Date(jakartaNow);
-                shiftEndTime.setHours(eh, em, 0, 0);
-                
-                if (jakartaNow < shiftEndTime) {
-                    return Math.floor((shiftEndTime.getTime() - jakartaNow.getTime()) / 60000);
-                }
+            const [eh, em] = attendance.user.shift.endTime.split(':').map(Number);
+            const shiftEndTime = new Date(jakartaNow);
+            shiftEndTime.setHours(eh, em, 0, 0);
+
+            if (jakartaNow < shiftEndTime) {
+              return Math.floor((shiftEndTime.getTime() - jakartaNow.getTime()) / 60000);
             }
-            return 0;
+          }
+          return 0;
         })()
       }
     });
 
     // --- AI MOOD ANALYSIS (Phase 36) - Clock Out (BACKGROUND JOB) ---
     if (photoUrl) {
-        const fullPath = path.join(process.cwd(), photoUrl.replace(/^\/+/, ""));
-        console.log(`[Mood AI - ClockOut] Queuing photo for background analysis: ${fullPath}`);
-        
-        // Jalankan secara asynchronous
-        (async () => {
-            if (fs.existsSync(fullPath)) {
-                try {
-                    const { analyzeMood } = require('./moodAI');
-                    const moodResult = await analyzeMood(fullPath);
-                    console.log(`[Mood AI - ClockOut] Background Result for attendance ${attendance.id}:`, moodResult);
-                    // Kita simpan mood clock-out jika ingin mendata mood akhir hari
-                    // Untuk sekarang kita hanya update jika data mood masih kosong
-                    await (prisma.attendance as any).update({
-                        where: { id: attendance.id },
-                        data: {
-                            mood: moodResult.mood,
-                            moodScore: moodResult.score
-                        }
-                    });
-                } catch (moodErr) {
-                    console.error('[Mood AI - ClockOut] Background Error:', moodErr);
-                }
-            }
-            // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
-            if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
-                cleanupLocalFile(fullPath);
-            }
-        })();
+      const fullPath = path.join(process.cwd(), photoUrl.replace(/^\/+/, ""));
+      console.log(`[Mood AI - ClockOut] Queuing photo for background analysis: ${fullPath}`);
+
+      // Jalankan secara asynchronous
+      (async () => {
+        if (fs.existsSync(fullPath)) {
+          try {
+            const { analyzeMood } = require('./moodAI');
+            const moodResult = await analyzeMood(fullPath);
+            console.log(`[Mood AI - ClockOut] Background Result for attendance ${attendance.id}:`, moodResult);
+            // Kita simpan mood clock-out jika ingin mendata mood akhir hari
+            // Untuk sekarang kita hanya update jika data mood masih kosong
+            await (prisma.attendance as any).update({
+              where: { id: attendance.id },
+              data: {
+                mood: moodResult.mood,
+                moodScore: moodResult.score
+              }
+            });
+          } catch (moodErr) {
+            console.error('[Mood AI - ClockOut] Background Error:', moodErr);
+          }
+        }
+        // ONLY cleanup if successfully uploaded to Supabase (finalPhotoUrl is not local)
+        if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
+          cleanupLocalFile(fullPath);
+        }
+      })();
     }
 
     res.json({ message: 'Berhasil Clock-Out', attendance: updatedAttendance });
@@ -6511,8 +6511,8 @@ app.get('/api/shifts', tenantMiddleware, async (req: Request, res: Response) => 
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
-    const shifts = await prisma.shift.findMany({ 
-      where: { companyId: tenantId } 
+    const shifts = await prisma.shift.findMany({
+      where: { companyId: tenantId }
     });
     res.json(shifts);
   } catch (error) {
@@ -6669,10 +6669,10 @@ app.post('/api/leaves', tenantMiddleware, async (req: Request, res: Response) =>
     // TRIGGER NOTIFIKASI KE ADMIN & SUPERVISOR
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     const requesterName = targetUser?.name || 'Seorang karyawan';
-    
+
     // Notif ke Admin
     await notifyAdmins(tenantId, 'Pengajuan Cuti Baru', `${requesterName} mengajukan cuti baru.`);
-    
+
     // Notif ke Supervisor (Approver)
     if (leaveRequest.approverId) {
       await sendNotification(
@@ -6992,9 +6992,9 @@ app.patch('/api/leaves/:id', tenantMiddleware, async (req: Request, res: Respons
     const currentUserId = (req as any).userId;
 
     const isAuthorized = ['SUPERADMIN', 'ADMIN', 'OWNER'].includes(userRole) || leave.approverId === currentUserId;
-    
+
     if (!isAuthorized) {
-        return res.status(403).json({ error: 'Anda tidak memiliki wewenang untuk menyetujui cuti ini.' });
+      return res.status(403).json({ error: 'Anda tidak memiliki wewenang untuk menyetujui cuti ini.' });
     }
 
     const updatedLeave = await prisma.leaveRequest.update({
@@ -7096,7 +7096,7 @@ app.get('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Respo
   try {
     const tenantId = (req as any).tenantId;
     const userId = req.query.userId;
-    
+
     let whereClause: any = { companyId: tenantId };
     if (userId) {
       whereClause = {
@@ -7107,7 +7107,7 @@ app.get('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Respo
         ]
       };
     }
-    
+
     const indicators = await prisma.kPIIndicator.findMany({
       where: whereClause,
       include: {
@@ -7132,7 +7132,7 @@ app.post('/api/kpi/indicators', tenantMiddleware, async (req: Request, res: Resp
 
     let usersConnect: any = undefined;
     const isGloballyApplied = isGlobal !== false;
-    
+
     if (!isGloballyApplied && Array.isArray(userIds)) {
       usersConnect = { connect: userIds.map(id => ({ id: parseInt(id) })) };
     }
@@ -7169,7 +7169,7 @@ app.put('/api/kpi/indicators/:id', tenantMiddleware, async (req: Request, res: R
 
     let usersConnect: any = undefined;
     const isGloballyApplied = isGlobal !== false;
-    
+
     if (!isGloballyApplied && Array.isArray(userIds)) {
       usersConnect = { set: userIds.map(id => ({ id: parseInt(id) })) };
     } else if (isGloballyApplied) {
@@ -7244,8 +7244,8 @@ app.get('/api/kpi/auto-score/:userId', tenantMiddleware, async (req: Request, re
     let workingDaysCount = 0;
     const daysInMonth = new Date(year, month, 0).getDate();
     for (let day = 1; day <= daysInMonth; day++) {
-        const d = new Date(year, month - 1, day);
-        if (d.getDay() !== 0) workingDaysCount++; // Kecuali hari Minggu
+      const d = new Date(year, month - 1, day);
+      if (d.getDay() !== 0) workingDaysCount++; // Kecuali hari Minggu
     }
 
     // Statistik Kehadiran
@@ -7272,7 +7272,7 @@ app.get('/api/kpi/auto-score/:userId', tenantMiddleware, async (req: Request, re
       };
     });
 
-    res.json({ 
+    res.json({
       scores,
       objectives: objectives.map(obj => ({
         id: obj.id,
@@ -7380,7 +7380,7 @@ app.get('/api/kpi/my-performance', tenantMiddleware, async (req: Request, res: R
     const yearStr = req.query.year;
 
     if (typeof monthStr !== 'string' || typeof yearStr !== 'string') {
-        return res.status(400).json({ error: 'Periode tidak valid' });
+      return res.status(400).json({ error: 'Periode tidak valid' });
     }
 
     const month = parseInt(monthStr);
@@ -7418,8 +7418,8 @@ app.get('/api/kpi/my-performance', tenantMiddleware, async (req: Request, res: R
     let workingDaysCount = 0;
     const daysInMonth = new Date(year, month, 0).getDate();
     for (let day = 1; day <= daysInMonth; day++) {
-        const d = new Date(year, month - 1, day);
-        if (d.getDay() !== 0) workingDaysCount++; 
+      const d = new Date(year, month - 1, day);
+      if (d.getDay() !== 0) workingDaysCount++;
     }
 
     const presentCount = attendances.filter(a => a.status === 'PRESENT').length;
@@ -7430,7 +7430,7 @@ app.get('/api/kpi/my-performance', tenantMiddleware, async (req: Request, res: R
     const finalPerformance = indicators.map(ind => {
       // Cari skor yang sudah disimpan
       const saved = savedScores.find(s => s.indicatorId === ind.id);
-      
+
       let score = saved ? saved.score : 0;
       let comment = saved ? saved.comment : '';
 
@@ -7498,7 +7498,7 @@ function calculateBPJS(baseSalary: number, allowance: number, config: { kesehata
     jkm = salary * 0.003;
     jhtEmp = salary * 0.02;
     jhtComp = salary * 0.037;
-    
+
     const basisJP = Math.min(salary, capJP);
     jpEmp = basisJP * 0.01;
     jpComp = basisJP * 0.02;
@@ -7517,23 +7517,23 @@ function calculateBPJS(baseSalary: number, allowance: number, config: { kesehata
 function calculatePPh21(grossIncome: number, jhtjpEmp: number, taxStatus: string) {
   // 1. Biaya Jabatan (5%, max 500k/bulan)
   const biayaJabatan = Math.min(grossIncome * 0.05, 500000);
-  
+
   // 2. Net Income Bulanan
   const netIncomeMonth = grossIncome - biayaJabatan - jhtjpEmp;
-  
+
   // 3. Setahunkan
   const netIncomeYear = netIncomeMonth * 12;
-  
+
   // 4. PTKP (Asumsi standar 2024)
   let ptkp = 54000000; // TK/0
   if (taxStatus === 'K/0') ptkp = 58500000;
   else if (taxStatus === 'K/1') ptkp = 63000000;
   else if (taxStatus === 'K/2') ptkp = 67500000;
   else if (taxStatus === 'K/3') ptkp = 72000000;
-  
+
   // 5. PKP (Penghasilan Kena Pajak)
   const pkp = Math.max(0, netIncomeYear - ptkp);
-  
+
   // 6. Tarif Progresif
   let taxYear = 0;
   let remainingPkp = pkp;
@@ -7578,15 +7578,15 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
     // --- CHECK CLOSING ---
     const dateCheck = new Date(year, month - 1, 1);
     if (await isPeriodClosed(tenantId, dateCheck)) {
-       return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat men-generate gaji pada periode ini.' });
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat men-generate gaji pada periode ini.' });
     }
 
     const userRole = (req as any).userRole;
 
     // 1. Ambil semua karyawan di perusahaan ini
     const company = await prisma.company.findUnique({ where: { id: tenantId } });
-    const users = await prisma.user.findMany({ 
-      where: { 
+    const users = await prisma.user.findMany({
+      where: {
         companyId: tenantId,
         basicSalary: { gt: 0 }
       },
@@ -7640,11 +7640,11 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
       if (lateGracePeriod > 0) {
         // Jika ada grace period, kita filter manual data absen LATE
         const lateAttendances = await prisma.attendance.findMany({
-          where: { 
-            userId: user.id, 
-            companyId: tenantId, 
-            status: 'LATE', 
-            clockIn: { gte: startDate, lte: endDate } 
+          where: {
+            userId: user.id,
+            companyId: tenantId,
+            status: 'LATE',
+            clockIn: { gte: startDate, lte: endDate }
           }
         });
 
@@ -7652,13 +7652,13 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
           if ((user as any).shift && (user as any).shift.startTime) {
             const shiftStart = (user as any).shift.startTime; // Format "HH:mm"
             const [sh, sm] = shiftStart.split(':').map(Number);
-            
+
             const actualIn = new Date(att.clockIn);
             const scheduledIn = new Date(att.clockIn);
             scheduledIn.setHours(sh, sm, 0, 0);
 
             const diffMinutes = (actualIn.getTime() - scheduledIn.getTime()) / (1000 * 60);
-            
+
             // Hanya anggap telat jika melebihi grace period
             if (diffMinutes > lateGracePeriod) {
               lateCount++;
@@ -7717,12 +7717,12 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
 
       // Hitung Reimbursement (Phase 25 & 35: Hanya yang BELUM dibayar mandiri)
       const unpaidReimbursements = await (prisma.reimbursement as any).findMany({
-        where: { 
-          userId: user.id, 
-          companyId: tenantId, 
-          status: 'APPROVED', 
+        where: {
+          userId: user.id,
+          companyId: tenantId,
+          status: 'APPROVED',
           isPaid: false,
-          createdAt: { gte: startDate, lte: endDate } 
+          createdAt: { gte: startDate, lte: endDate }
         }
       });
       const reimbursementPay = unpaidReimbursements.reduce((sum: number, r: any) => sum + r.amount, 0);
@@ -7742,7 +7742,7 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
       const finalLateCount = isExempt ? 0 : lateCount;
       const finalAbsentDeduction = isExempt ? 0 : absentDeductionAmount;
       const totalDeductions = (finalLateCount * LATE_RATE) + finalAbsentDeduction;
-      
+
       const finalSickLeaveDeduction = isExempt ? 0 : sickLeaveDeduction;
       const activeLoan = await prisma.loan.findFirst({
         where: { userId: user.id, companyId: tenantId, status: 'ACTIVE' }
@@ -7768,22 +7768,22 @@ app.post('/api/payroll/generate', tenantMiddleware, async (req: Request, res: Re
 
       // 4.3. Hitung PPh 21 (Point 6: Tax Recovery)
       // Gross Income untuk PPh 21 = Gaji Pokok + Tunjangan + Lembur + Bonus + BPJS Tanggung Perusahaan (Kesehatan + JKK + JKM)
-      const grossForTax = (user.basicSalary + (user.allowance || 0) + overtimePay + bonusPayTotal) 
-                        + bpjs.breakdown.kesehatanComp + bpjs.breakdown.jkk + bpjs.breakdown.jkm;
-      
+      const grossForTax = (user.basicSalary + (user.allowance || 0) + overtimePay + bonusPayTotal)
+        + bpjs.breakdown.kesehatanComp + bpjs.breakdown.jkk + bpjs.breakdown.jkm;
+
       // Pengurang PPh 21 = JHT (Employee) + JP (Employee)
       const deductionForTax = bpjs.breakdown.jhtEmp + bpjs.breakdown.jpEmp;
-      
+
       let pph21 = 0;
       if ((user as any).isTaxable !== false) {
-          pph21 = calculatePPh21(grossForTax, deductionForTax, (user as any).taxStatus || 'TK-0');
+        pph21 = calculatePPh21(grossForTax, deductionForTax, (user as any).taxStatus || 'TK-0');
       }
 
       // 6. Final Calculation
       // Gaji Bersih = (Pendapatan Kotor) - (Potongan Absensi + Pinjaman + BPJS Karyawan + PPh 21 + Potongan Sakit)
       const totalEarnings = (user.basicSalary + (user.allowance || 0) + (user.mealAllowance || 0) + overtimePay + reimbursementPay + bonusPayTotal);
       const totalDeductionsAll = totalDeductions + loanDeduction + bpjs.employeeDeduction + pph21 + finalSickLeaveDeduction;
-      
+
       const netSalary = totalEarnings - totalDeductionsAll;
 
       // Simpan Draft Payroll
@@ -7888,7 +7888,7 @@ app.get('/api/payroll/export', tenantMiddleware, async (req: Request, res: Respo
 
     // SECURITY: POS_VIEWER cannot export payroll
     if (userRole === 'POS_VIEWER') {
-        return res.status(403).json({ error: 'Akses Ditolak.' });
+      return res.status(403).json({ error: 'Akses Ditolak.' });
     }
 
     const { month, year, branchId } = req.query;
@@ -8076,7 +8076,7 @@ app.post('/api/payroll/manual', tenantMiddleware, async (req: Request, res: Resp
     // --- CHECK CLOSING ---
     const dateCheck = new Date(year, month - 1, 1);
     if (await isPeriodClosed(tenantId, dateCheck)) {
-       return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat mencatat gaji manual pada periode ini.' });
+      return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat mencatat gaji manual pada periode ini.' });
     }
 
     const netSalary = (Number(basicSalary) || 0) + (Number(allowance) || 0) + (Number(mealAllowance) || 0) + (Number(bonusPay) || 0) - (Number(deductions) || 0);
@@ -8177,80 +8177,80 @@ app.patch('/api/reimbursements/:id/pay', tenantMiddleware, async (req: Request, 
     const { accountId, categoryId, paymentDate } = req.body;
 
     const reimbursement = await prisma.reimbursement.findUnique({
-        where: { id: parseInt(id as string) }
+      where: { id: parseInt(id as string) }
     });
 
     if (!reimbursement) {
-        return res.status(404).json({ error: `Data reimbursement ID ${id} tidak ditemukan.` });
+      return res.status(404).json({ error: `Data reimbursement ID ${id} tidak ditemukan.` });
     }
 
     if (userRole !== 'SUPERADMIN' && reimbursement.companyId !== tenantId) {
-        return res.status(403).json({ error: 'Anda tidak memiliki akses ke data ini.' });
+      return res.status(403).json({ error: 'Anda tidak memiliki akses ke data ini.' });
     }
 
     if (reimbursement.status !== 'APPROVED') {
-        return res.status(400).json({ error: 'Hanya reimbursement yang sudah DISETUJUI yang bisa dibayar.' });
+      return res.status(400).json({ error: 'Hanya reimbursement yang sudah DISETUJUI yang bisa dibayar.' });
     }
 
     if (reimbursement.isPaid) {
-        return res.status(400).json({ error: 'Reimbursement ini sudah pernah dibayar.' });
+      return res.status(400).json({ error: 'Reimbursement ini sudah pernah dibayar.' });
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-        const paymentDateValue = paymentDate ? new Date(paymentDate) : new Date();
+      const paymentDateValue = paymentDate ? new Date(paymentDate) : new Date();
 
-        // 1. Mark status as Paid
-        const r = await tx.reimbursement.update({
-            where: { id: parseInt(id as string) },
-            data: {
-                isPaid: true,
-                paidAt: paymentDateValue
-            }
-        });
-
-        // 2. Create Finance Entry (if requested)
-        if (accountId && categoryId) {
-            // Check Account
-            const accIdNum = parseInt(accountId.toString());
-            const catIdNum = parseInt(categoryId.toString());
-
-            const account = await tx.financialAccount.findUnique({ where: { id: accIdNum } });
-            if (!account || account.companyId !== tenantId) throw new Error('Akun Kas/Bank tidak valid atau bukan milik perusahaan ini.');
-
-            // Create Expense
-            // Using $queryRaw for reliability with enums across various Prisma versions
-            await tx.$executeRawUnsafe(
-              `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "amount", "date", "status", "description", "paidTo", "updatedAt")
-               VALUES ($1, $2, $3, $4, $7, 'PAID', $5, $6, NOW())`,
-              tenantId,
-              accIdNum,
-              catIdNum,
-              reimbursement.amount,
-              `Pembayaran Reimbursement: ${reimbursement.title}`,
-              `User ID: ${reimbursement.userId}`,
-              paymentDateValue
-            );
-
-            // Update Account Balance
-            await tx.financialAccount.update({
-                where: { id: accIdNum },
-                data: { balance: { decrement: reimbursement.amount } }
-            });
+      // 1. Mark status as Paid
+      const r = await tx.reimbursement.update({
+        where: { id: parseInt(id as string) },
+        data: {
+          isPaid: true,
+          paidAt: paymentDateValue
         }
+      });
 
-        return r;
+      // 2. Create Finance Entry (if requested)
+      if (accountId && categoryId) {
+        // Check Account
+        const accIdNum = parseInt(accountId.toString());
+        const catIdNum = parseInt(categoryId.toString());
+
+        const account = await tx.financialAccount.findUnique({ where: { id: accIdNum } });
+        if (!account || account.companyId !== tenantId) throw new Error('Akun Kas/Bank tidak valid atau bukan milik perusahaan ini.');
+
+        // Create Expense
+        // Using $queryRaw for reliability with enums across various Prisma versions
+        await tx.$executeRawUnsafe(
+          `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "amount", "date", "status", "description", "paidTo", "updatedAt")
+               VALUES ($1, $2, $3, $4, $7, 'PAID', $5, $6, NOW())`,
+          tenantId,
+          accIdNum,
+          catIdNum,
+          reimbursement.amount,
+          `Pembayaran Reimbursement: ${reimbursement.title}`,
+          `User ID: ${reimbursement.userId}`,
+          paymentDateValue
+        );
+
+        // Update Account Balance
+        await tx.financialAccount.update({
+          where: { id: accIdNum },
+          data: { balance: { decrement: reimbursement.amount } }
+        });
+      }
+
+      return r;
     });
 
     // Notifikasi ke karyawan
     try {
-        await sendNotification(
-            tenantId,
-            updated.userId,
-            `Reimbursement Dibayar`,
-            `Dana untuk klaim "${updated.title}" sebesar Rp${updated.amount.toLocaleString('id-ID')} telah dibayarkan ${accountId ? 'via Kas/Bank' : ''}.`
-        );
+      await sendNotification(
+        tenantId,
+        updated.userId,
+        `Reimbursement Dibayar`,
+        `Dana untuk klaim "${updated.title}" sebesar Rp${updated.amount.toLocaleString('id-ID')} telah dibayarkan ${accountId ? 'via Kas/Bank' : ''}.`
+      );
     } catch (notifErr) {
-        console.error('[PAY_NOTIF] Failed:', notifErr);
+      console.error('[PAY_NOTIF] Failed:', notifErr);
     }
 
     res.json(updated);
@@ -8270,45 +8270,45 @@ app.post('/api/loans', tenantMiddleware, async (req: Request, res: Response) => 
 
     // Use a transaction if accountId is provided to ensure atomicity
     const parsedAmount = parseFloat(amount);
-    
+
     let loan;
     if (accountId) {
-        loan = await prisma.$transaction(async (tx) => {
-            // 1. Create the loan
-            const newLoan = await tx.loan.create({
-                data: {
-                    companyId: tenantId,
-                    userId: parseInt(userId),
-                    amount: parsedAmount,
-                    monthlyDeduction: parseFloat(monthlyDeduction),
-                    remainingAmount: parsedAmount,
-                    description,
-                    status: 'ACTIVE'
-                }
-            });
-            
-            // 2. Deduct from financial account
-            await tx.financialAccount.update({
-                where: { id: parseInt(accountId), companyId: tenantId },
-                data: {
-                    balance: { decrement: parsedAmount }
-                }
-            });
-            
-            return newLoan;
+      loan = await prisma.$transaction(async (tx) => {
+        // 1. Create the loan
+        const newLoan = await tx.loan.create({
+          data: {
+            companyId: tenantId,
+            userId: parseInt(userId),
+            amount: parsedAmount,
+            monthlyDeduction: parseFloat(monthlyDeduction),
+            remainingAmount: parsedAmount,
+            description,
+            status: 'ACTIVE'
+          }
         });
+
+        // 2. Deduct from financial account
+        await tx.financialAccount.update({
+          where: { id: parseInt(accountId), companyId: tenantId },
+          data: {
+            balance: { decrement: parsedAmount }
+          }
+        });
+
+        return newLoan;
+      });
     } else {
-        loan = await prisma.loan.create({
-            data: {
-                companyId: tenantId,
-                userId: parseInt(userId),
-                amount: parsedAmount,
-                monthlyDeduction: parseFloat(monthlyDeduction),
-                remainingAmount: parsedAmount,
-                description,
-                status: 'ACTIVE'
-            }
-        });
+      loan = await prisma.loan.create({
+        data: {
+          companyId: tenantId,
+          userId: parseInt(userId),
+          amount: parsedAmount,
+          monthlyDeduction: parseFloat(monthlyDeduction),
+          remainingAmount: parsedAmount,
+          description,
+          status: 'ACTIVE'
+        }
+      });
     }
 
     res.status(201).json(loan);
@@ -8429,7 +8429,7 @@ app.get('/api/loans', tenantMiddleware, async (req: Request, res: Response) => {
 
     // SECURITY: POS_VIEWER cannot see loan data
     if (userRole === 'POS_VIEWER') {
-        return res.json([]);
+      return res.json([]);
     }
 
     const loans = await prisma.loan.findMany({
@@ -8448,7 +8448,7 @@ app.get('/api/loans', tenantMiddleware, async (req: Request, res: Response) => {
 app.post('/api/reimbursements/scan', tenantMiddleware, upload.single('receipt'), async (req: Request, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'File kuitansi tidak ditemukan' });
-    
+
     // Upload to R2 first
     const fullLocalPath = path.join(__dirname, 'uploads/reimbursements', req.file.filename);
     let receiptUrl = `/uploads/reimbursements/${req.file.filename}`;
@@ -8459,10 +8459,10 @@ app.post('/api/reimbursements/scan', tenantMiddleware, upload.single('receipt'),
     }
 
     const { performOCR } = require('./reimbursementAI');
-    
+
     console.log(`[AI Scan] Processing: ${fullLocalPath}`);
     const ocrResult = await performOCR(fullLocalPath);
-    
+
     // Cleanup after Supabase upload and OCR processing
     // Only cleanup if the upload to Supabase was successful (i.e., receiptUrl changed from local path)
     if (receiptUrl && !receiptUrl.includes(req.get('host') || 'localhost')) {
@@ -8515,11 +8515,11 @@ app.post('/api/reimbursements', tenantMiddleware, upload.single('receipt'), asyn
         const { performOCR, detectFraud } = require('./reimbursementAI');
         ocrResult = await performOCR(fullPath);
         fraudCheck = await detectFraud(
-            tenantId,
-            userId,
-            fullPath,
-            parseFloat(amount),
-            ocrResult.amount
+          tenantId,
+          userId,
+          fullPath,
+          parseFloat(amount),
+          ocrResult.amount
         );
       } catch (aiError) {
         console.error('[AI] Reimbursement AI processing failed, continuing without AI data:', aiError);
@@ -8576,7 +8576,7 @@ app.get('/api/reimbursements', tenantMiddleware, async (req: Request, res: Respo
 
     // SECURITY: POS_VIEWER cannot see reimbursements
     if (userRole === 'POS_VIEWER') {
-        return res.json([]);
+      return res.json([]);
     }
 
     const reimbursements = await prisma.reimbursement.findMany({
@@ -8629,11 +8629,11 @@ app.patch('/api/reimbursements/:id', tenantMiddleware, async (req: Request, res:
     // First check if exists
     const check = await prisma.reimbursement.findUnique({ where: { id: parseInt(id as string) } });
     if (!check) {
-       return res.status(404).json({ error: `Reimbursement ID ${id} tidak ditemukan.` });
+      return res.status(404).json({ error: `Reimbursement ID ${id} tidak ditemukan.` });
     }
-    
+
     if (userRole !== 'SUPERADMIN' && check.companyId !== tenantId) {
-       return res.status(403).json({ error: `Anda tidak diizinkan mengubah data perusahaan lain. (Record: ${check.companyId}, Your: ${tenantId})` });
+      return res.status(403).json({ error: `Anda tidak diizinkan mengubah data perusahaan lain. (Record: ${check.companyId}, Your: ${tenantId})` });
     }
 
     const reimbursement = await prisma.reimbursement.update({
@@ -8710,11 +8710,11 @@ app.get('/api/leaves', tenantMiddleware, async (req: Request, res: Response) => 
 
     // SECURITY: POS_VIEWER cannot see leave requests
     if (userRole === 'POS_VIEWER') {
-        return res.json([]);
+      return res.json([]);
     }
 
     let whereClause: any = { companyId: tenantId };
-    
+
     // Hirarki: Manager hanya lihat yang dia harus approve
     if (userRole !== 'SUPERADMIN' && userRole !== 'ADMIN') {
       whereClause.approverId = userId;
@@ -8816,17 +8816,17 @@ app.get('/api/vents', tenantMiddleware, async (req: Request, res: Response) => {
 
     // SECURITY: POS_VIEWER cannot see internal feedback
     if (userRole === 'POS_VIEWER') {
-        return res.json([]);
+      return res.json([]);
     }
 
     const vents = await (prisma as any).employeeVent.findMany({
       where: { companyId: tenantId },
-      include: { 
-        user: { select: { name: true, email: true } } 
+      include: {
+        user: { select: { name: true, email: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
-    
+
     // Anonymize user data if isAnonymous is true
     const safeVents = vents.map((v: any) => ({
       ...v,
@@ -8850,7 +8850,7 @@ app.get('/api/learning/objectives', tenantMiddleware, async (req: Request, res: 
 
     // SECURITY: POS_VIEWER cannot access LMS
     if (userRole === 'POS_VIEWER') {
-        return res.json([]);
+      return res.json([]);
     }
 
     const objectives = await (prisma as any).learningObjective.findMany({
@@ -8874,8 +8874,8 @@ app.post('/api/learning/objectives', tenantMiddleware, async (req: Request, res:
     const userRole = (req as any).userRole;
 
     // Jika admin, gunakan targetUserId jika ada. Jika karyawan, paksa ke diri sendiri.
-    const finalUserId = (userRole === 'ADMIN' || userRole === 'SUPERADMIN') && targetUserId 
-      ? parseInt(targetUserId) 
+    const finalUserId = (userRole === 'ADMIN' || userRole === 'SUPERADMIN') && targetUserId
+      ? parseInt(targetUserId)
       : userId;
 
     const objective = await (prisma as any).learningObjective.create({
@@ -8918,7 +8918,7 @@ app.patch('/api/learning/objectives/:id', tenantMiddleware, async (req: Request,
 
     const objective = await (prisma as any).learningObjective.update({
       where: { id: parseInt(id as string), companyId: tenantId },
-      data: { 
+      data: {
         progress: progress !== undefined ? parseFloat(progress) : undefined,
         status: status || undefined
       }
@@ -8934,12 +8934,12 @@ app.get('/api/learning/recommendations', tenantMiddleware, async (req: Request, 
   try {
     const userId = (req as any).userId;
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    
+
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
 
     const { suggestObjectives } = require('./learningAI');
     const recommendations = await suggestObjectives(user.jobTitle || 'Staff');
-    
+
     res.json(recommendations);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil rekomendasi AI.' });
@@ -8968,7 +8968,7 @@ app.get('/api/admin/learning/all', tenantMiddleware, async (req: Request, res: R
     const userRole = (req as any).userRole;
     const data = await (prisma as any).learningObjective.findMany({
       where: { companyId: tenantId },
-      include: { 
+      include: {
         user: { select: { name: true, jobTitle: true } },
         material: { select: { title: true } }
       },
@@ -9055,8 +9055,8 @@ app.delete('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Re
       where: userRole === 'SUPERADMIN' ? { id } : { id, companyId: tenantId }
     });
     if (!material) {
-        console.warn(`[DEBUG] Material with ID ${id} not found for tenant ${tenantId}`);
-        return res.status(404).json({ error: 'Materi tidak ditemukan.' });
+      console.warn(`[DEBUG] Material with ID ${id} not found for tenant ${tenantId}`);
+      return res.status(404).json({ error: 'Materi tidak ditemukan.' });
     }
 
     console.log(`[DEBUG] Found material: "${material.title}". Identifying associated exams...`);
@@ -9071,25 +9071,25 @@ app.delete('/api/admin/learning/materials/:id', tenantMiddleware, async (req: Re
     console.log(`[DEBUG] Found ${examIds.length} exams to delete: ${examIds.join(', ')}`);
 
     if (examIds.length > 0) {
-        try {
-            console.log(`[DEBUG] Deleting ExamAttempts for exam IDs...`);
-            await (prisma as any).examAttempt.deleteMany({
-                where: { examId: { in: examIds } }
-            });
-            
-            console.log(`[DEBUG] Deleting ExamQuestions for exam IDs...`);
-            await (prisma as any).examQuestion.deleteMany({
-                where: { examId: { in: examIds } }
-            });
-            
-            console.log(`[DEBUG] Deleting Exams...`);
-            await (prisma as any).exam.deleteMany({
-                where: { id: { in: examIds } }
-            });
-        } catch (subErr) {
-            console.error(`[DEBUG] Error during sub-data deletion:`, subErr);
-            // Continue anyway to try deleting the material
-        }
+      try {
+        console.log(`[DEBUG] Deleting ExamAttempts for exam IDs...`);
+        await (prisma as any).examAttempt.deleteMany({
+          where: { examId: { in: examIds } }
+        });
+
+        console.log(`[DEBUG] Deleting ExamQuestions for exam IDs...`);
+        await (prisma as any).examQuestion.deleteMany({
+          where: { examId: { in: examIds } }
+        });
+
+        console.log(`[DEBUG] Deleting Exams...`);
+        await (prisma as any).exam.deleteMany({
+          where: { id: { in: examIds } }
+        });
+      } catch (subErr) {
+        console.error(`[DEBUG] Error during sub-data deletion:`, subErr);
+        // Continue anyway to try deleting the material
+      }
     }
 
     console.log(`[DEBUG] Finally deleting LearningMaterial ID: ${id}`);
@@ -9130,8 +9130,8 @@ app.put('/api/admin/learning/materials/:id', tenantMiddleware, learningUpload.si
     // 1. AI generate questions first if requested (takes time, do this before locking/modifying the database)
     let questionsData: any[] = [];
     if (shouldRegenerate) {
-        const { generateQuestions } = require('./examAI');
-        questionsData = await generateQuestions(content, questionCount ? parseInt(questionCount) : 5);
+      const { generateQuestions } = require('./examAI');
+      questionsData = await generateQuestions(content, questionCount ? parseInt(questionCount) : 5);
     }
 
     // 2. Perform all database updates inside a fast, reliable transaction
@@ -9159,30 +9159,30 @@ app.put('/api/admin/learning/materials/:id', tenantMiddleware, learningUpload.si
 
       // If regenerating, perform delete and create inside transaction
       if (shouldRegenerate && questionsData.length > 0) {
-          // Hapus ujian lama
-          await (tx as any).exam.deleteMany({
-              where: { materialId: id }
-          });
+        // Hapus ujian lama
+        await (tx as any).exam.deleteMany({
+          where: { materialId: id }
+        });
 
-          // Create new exam with AI generated questions
-          await (tx as any).exam.create({
-              data: {
-                  companyId: material.companyId,
-                  materialId: id,
-                  title: `Test Pemahaman: ${title}`,
-                  description: `Ujian otomatis untuk memverifikasi pemahaman Anda tentang ${title}.`,
-                  targetDivision: targetDivision || null,
-                  targetJobTitle: targetJobTitle || null,
-                  minScore: minScore ? parseFloat(minScore) : 70,
-                  questions: {
-                      create: questionsData.map((q: any) => ({
-                          question: q.question,
-                          options: JSON.stringify(q.options),
-                          correctAnswer: q.correctAnswer
-                      }))
-                  }
-              }
-          });
+        // Create new exam with AI generated questions
+        await (tx as any).exam.create({
+          data: {
+            companyId: material.companyId,
+            materialId: id,
+            title: `Test Pemahaman: ${title}`,
+            description: `Ujian otomatis untuk memverifikasi pemahaman Anda tentang ${title}.`,
+            targetDivision: targetDivision || null,
+            targetJobTitle: targetJobTitle || null,
+            minScore: minScore ? parseFloat(minScore) : 70,
+            questions: {
+              create: questionsData.map((q: any) => ({
+                question: q.question,
+                options: JSON.stringify(q.options),
+                correctAnswer: q.correctAnswer
+              }))
+            }
+          }
+        });
       }
 
       return mat;
@@ -9279,7 +9279,7 @@ app.get('/api/learning/exams', tenantMiddleware, async (req: Request, res: Respo
     const assignedMaterialIds = userObjectives.map((o: any) => o.materialId).filter(Boolean);
 
     const exams = await (prisma as any).exam.findMany({
-      where: { 
+      where: {
         companyId: tenantId,
         OR: [
           // Match material yang ditugaskan
@@ -9308,10 +9308,10 @@ app.get('/api/learning/exams/:id', tenantMiddleware, async (req: Request, res: R
     const { id } = req.params;
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
-    
+
     const exam = await (prisma as any).exam.findFirst({
       where: userRole === 'SUPERADMIN' ? { id: parseInt(id as string) } : { id: parseInt(id as string), companyId: tenantId },
-      include: { 
+      include: {
         questions: true,
         material: true
       }
@@ -9384,7 +9384,7 @@ app.post('/api/learning/exams/:id/submit', tenantMiddleware, async (req: Request
     // Auto-complete objectives linked to this material
     const passingScore = exam.minScore ?? 70;
     const isPassed = score >= passingScore;
-    
+
     if (isPassed && exam.materialId) {
       await (prisma as any).learningObjective.updateMany({
         where: {
@@ -9404,8 +9404,8 @@ app.post('/api/learning/exams/:id/submit', tenantMiddleware, async (req: Request
       tenantId,
       userId,
       isPassed ? '🎉 Selamat! Anda Lulus Ujian' : '📝 Hasil Ujian SOP',
-      isPassed 
-        ? `Anda lulus ujian "${exam.title}" dengan skor ${score.toFixed(0)}%. Progress belajar Anda kini 100%.` 
+      isPassed
+        ? `Anda lulus ujian "${exam.title}" dengan skor ${score.toFixed(0)}%. Progress belajar Anda kini 100%.`
         : `Skor Anda ${score.toFixed(0)}% pada ujian "${exam.title}". Silakan pelajari materi lagi dan coba kembali.`
     );
 
@@ -9423,7 +9423,7 @@ app.get('/api/admin/learning/exams/results', tenantMiddleware, async (req: Reque
     const userRole = (req as any).userRole;
     const results = await (prisma as any).examAttempt.findMany({
       where: { companyId: tenantId },
-      include: { 
+      include: {
         user: { select: { name: true, jobTitle: true } },
         exam: { select: { title: true } }
       },
@@ -9444,7 +9444,7 @@ app.get('/api/overtimes', tenantMiddleware, async (req: Request, res: Response) 
     const userId = (req as any).userId;
 
     let whereClause: any = { companyId: tenantId };
-    
+
     // Jika bukan Admin/SuperAdmin, maka hanya lihat yang ditugaskan ke dia (sebagai Manager)
     if (userRole !== 'SUPERADMIN' && userRole !== 'ADMIN') {
       whereClause.approverId = userId;
@@ -9686,7 +9686,7 @@ app.get('/api/notifications', tenantMiddleware, async (req: Request, res: Respon
     // Return empty array to prevent frontend crash, but keep 200 status for now to debug
     // or keep 500 but with more details. 
     // Actually, let's keep 200 with empty array so the user doesn't see the red error overlay.
-    res.json([]); 
+    res.json([]);
   }
 });
 
@@ -9807,7 +9807,7 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
 
     const company = await prisma.company.findUnique({
       where: { id: tenantId },
-      select: { 
+      select: {
         name: true,
         contractStart: true,
         contractEnd: true,
@@ -9923,51 +9923,51 @@ app.get('/api/stats/summary', tenantMiddleware, async (req: Request, res: Respon
     // 7. NEW: Rincian Gaji Karyawan (Untuk Dashboard Coffee)
     let staff_list: any[] = [];
     if (userRole !== 'POS_VIEWER') {
-        const activeStaff = await prisma.user.findMany({
-            where: { companyId: tenantId, isActive: true },
-            select: { id: true, name: true, jobTitle: true, basicSalary: true, allowance: true }
+      const activeStaff = await prisma.user.findMany({
+        where: { companyId: tenantId, isActive: true },
+        select: { id: true, name: true, jobTitle: true, basicSalary: true, allowance: true }
+      });
+
+      staff_list = await Promise.all(activeStaff.map(async (st) => {
+        const attendances = await prisma.attendance.findMany({
+          where: { userId: st.id, clockIn: { gte: firstDayOfMonth } }
         });
 
-        staff_list = await Promise.all(activeStaff.map(async (st) => {
-            const attendances = await prisma.attendance.findMany({
-                where: { userId: st.id, clockIn: { gte: firstDayOfMonth } }
-            });
+        let totalSeconds = 0;
+        attendances.forEach(a => {
+          if (a.clockIn && a.clockOut) {
+            totalSeconds += (new Date(a.clockOut).getTime() - new Date(a.clockIn).getTime()) / 1000;
+          }
+        });
 
-            let totalSeconds = 0;
-            attendances.forEach(a => {
-                if (a.clockIn && a.clockOut) {
-                    totalSeconds += (new Date(a.clockOut).getTime() - new Date(a.clockIn).getTime()) / 1000;
-                }
-            });
+        const lateCount = attendances.filter(a => a.status === 'LATE').length;
+        const deductions = lateCount * (company?.lateDeductionRate || 0);
 
-            const lateCount = attendances.filter(a => a.status === 'LATE').length;
-            const deductions = lateCount * (company?.lateDeductionRate || 0);
-
-            return {
-                id: st.id,
-                name: st.name,
-                job_title: st.jobTitle,
-                worked_hours: Math.round((totalSeconds / 3600) * 10) / 10, // 1 decimal place
-                basic_salary: st.basicSalary,
-                allowance: st.allowance,
-                late_deductions: deductions,
-                total_salary: (st.basicSalary || 0) + (st.allowance || 0) - deductions
-            };
-        }));
+        return {
+          id: st.id,
+          name: st.name,
+          job_title: st.jobTitle,
+          worked_hours: Math.round((totalSeconds / 3600) * 10) / 10, // 1 decimal place
+          basic_salary: st.basicSalary,
+          allowance: st.allowance,
+          late_deductions: deductions,
+          total_salary: (st.basicSalary || 0) + (st.allowance || 0) - deductions
+        };
+      }));
     }
 
     res.json({
-        companyName: company?.name,
-        totalEmployees: userRole === 'POS_VIEWER' ? 0 : totalEmployees,
-        presentCount: userRole === 'POS_VIEWER' ? 0 : presentCount,
-        lateCount: userRole === 'POS_VIEWER' ? 0 : lateCountCurrentDay,
-        leaveCount: userRole === 'POS_VIEWER' ? 0 : leaveCount,
-        totalBalance: userRole === 'POS_VIEWER' ? 0 : totalBalance,
-        monthlyProfit: userRole === 'POS_VIEWER' ? (incomesMonth._sum.amount || 0) : monthlyProfit, // Profit for POS_VIEWER is just Gross Income
-        totalPayable: userRole === 'POS_VIEWER' ? 0 : totalPayable,
-        totalReceivable: userRole === 'POS_VIEWER' ? 0 : totalReceivable,
-        inventoryValue: inventoryValue,
-        staff_list
+      companyName: company?.name,
+      totalEmployees: userRole === 'POS_VIEWER' ? 0 : totalEmployees,
+      presentCount: userRole === 'POS_VIEWER' ? 0 : presentCount,
+      lateCount: userRole === 'POS_VIEWER' ? 0 : lateCountCurrentDay,
+      leaveCount: userRole === 'POS_VIEWER' ? 0 : leaveCount,
+      totalBalance: userRole === 'POS_VIEWER' ? 0 : totalBalance,
+      monthlyProfit: userRole === 'POS_VIEWER' ? (incomesMonth._sum.amount || 0) : monthlyProfit, // Profit for POS_VIEWER is just Gross Income
+      totalPayable: userRole === 'POS_VIEWER' ? 0 : totalPayable,
+      totalReceivable: userRole === 'POS_VIEWER' ? 0 : totalReceivable,
+      inventoryValue: inventoryValue,
+      staff_list
     });
   } catch (error: any) {
     console.error('[Summary Error]:', error);
@@ -9983,7 +9983,7 @@ app.get('/api/stats/contract-alerts', tenantMiddleware, async (req: Request, res
 
     // SECURITY: POS_VIEWER has no business with employee contracts
     if (userRole === 'POS_VIEWER') {
-        return res.json([]);
+      return res.json([]);
     }
 
     const today = new Date();
@@ -10020,21 +10020,21 @@ app.get('/api/stats/ai-insights', tenantMiddleware, async (req: Request, res: Re
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
-    
+
     // Fetch Company to check purchasedInsights & addons
     const company = await prisma.company.findUnique({
       where: { id: tenantId },
       select: { purchasedInsights: true, addons: true }
     });
-    
+
     // Combine purchased insights with addons (if AI_ADVISOR is present, unlock all)
     let purchased = company?.purchasedInsights || [];
     const addons = company?.addons || [];
-    
+
     if (addons.includes('AI_ADVISOR')) {
-        purchased = [...new Set([...purchased, 'PREMIUM_PROFIT', 'PREMIUM_RETENTION', 'PREMIUM_STOCK', 'AI_ADVISOR'])];
+      purchased = [...new Set([...purchased, 'PREMIUM_PROFIT', 'PREMIUM_RETENTION', 'PREMIUM_STOCK', 'AI_ADVISOR'])];
     }
-    
+
     const insights: any[] = [];
 
     const today = new Date();
@@ -10060,149 +10060,149 @@ app.get('/api/stats/ai-insights', tenantMiddleware, async (req: Request, res: Re
     if (valLast > 0) {
       const diff = ((valThis - valLast) / valLast) * 100;
       if (diff > 0) {
-        insights.push({ 
-            type: 'success', 
-            message: `Revenue Naik ${diff.toFixed(1)}%`, 
-            detail: `Performa finansial bulan ini menunjukkan tren positif dibanding periode sebelumnya.` 
+        insights.push({
+          type: 'success',
+          message: `Revenue Naik ${diff.toFixed(1)}%`,
+          detail: `Performa finansial bulan ini menunjukkan tren positif dibanding periode sebelumnya.`
         });
       } else if (diff < -5) {
-        insights.push({ 
-            type: 'warning', 
-            message: `Revenue Turun ${Math.abs(diff).toFixed(1)}%`, 
-            detail: `Terdeteksi penurunan pemasukan. Periksa kembali efisiensi operasional atau target penjualan.` 
+        insights.push({
+          type: 'warning',
+          message: `Revenue Turun ${Math.abs(diff).toFixed(1)}%`,
+          detail: `Terdeteksi penurunan pemasukan. Periksa kembali efisiensi operasional atau target penjualan.`
         });
       }
     } else if (valThis > 0) {
-        insights.push({ type: 'info', message: 'Awal Pertumbuhan', detail: 'Sistem mencatat pemasukan pertama untuk perusahaan Anda di platform ini.' });
+      insights.push({ type: 'info', message: 'Awal Pertumbuhan', detail: 'Sistem mencatat pemasukan pertama untuk perusahaan Anda di platform ini.' });
     }
 
     // 2. Attendance Insight (Daily Discipline)
     const todayStart = new Date();
-    todayStart.setHours(0,0,0,0);
+    todayStart.setHours(0, 0, 0, 0);
     const lateToday = await prisma.attendance.count({
       where: { companyId: tenantId, status: 'LATE', clockIn: { gte: todayStart } }
     });
-    
+
     if (lateToday > 0) {
-      insights.push({ 
-          type: 'warning', 
-          message: `${lateToday} Orang Terlambat`, 
-          detail: `Hari ini terpantau ada ${lateToday} staf yang datang tidak sesuai jam masuk. Perlu pengawasan lebih.` 
+      insights.push({
+        type: 'warning',
+        message: `${lateToday} Orang Terlambat`,
+        detail: `Hari ini terpantau ada ${lateToday} staf yang datang tidak sesuai jam masuk. Perlu pengawasan lebih.`
       });
     } else {
-        const totalPresentToday = await prisma.attendance.count({
-            where: { companyId: tenantId, clockIn: { gte: todayStart } }
+      const totalPresentToday = await prisma.attendance.count({
+        where: { companyId: tenantId, clockIn: { gte: todayStart } }
+      });
+      if (totalPresentToday > 0) {
+        insights.push({
+          type: 'success',
+          message: 'Kedisiplinan Sempurna',
+          detail: 'Seluruh tim yang hadir hari ini datang tepat waktu. Budaya kerja yang sangat baik!'
         });
-        if (totalPresentToday > 0) {
-            insights.push({ 
-                type: 'success', 
-                message: 'Kedisiplinan Sempurna', 
-                detail: 'Seluruh tim yang hadir hari ini datang tepat waktu. Budaya kerja yang sangat baik!' 
-            });
-        }
+      }
     }
 
     // 3. Stock Insight (Inventory Health)
     const lowStockItems = await prisma.product.findMany({
-        where: { companyId: tenantId, stock: { lte: 5 }, isAutoDeduct: false, trackStock: true },
-        take: 1
+      where: { companyId: tenantId, stock: { lte: 5 }, isAutoDeduct: false, trackStock: true },
+      take: 1
     });
 
     if (lowStockItems.length > 0) {
-        insights.push({ 
-            type: 'warning', 
-            message: 'Stok Item Menipis', 
-            detail: `Item '${lowStockItems[0].name}' tersisa sedikit (${lowStockItems[0].stock}). Segera lakukan restok.` 
-        });
+      insights.push({
+        type: 'warning',
+        message: 'Stok Item Menipis',
+        detail: `Item '${lowStockItems[0].name}' tersisa sedikit (${lowStockItems[0].stock}). Segera lakukan restok.`
+      });
     }
 
     // SECURITY FILTER: Limit AI Insights for POS_VIEWER
     if (userRole === 'POS_VIEWER') {
-        // Remove attendance/HR insights, only keep Sales/Stock
-        const filtered = insights.filter(ins => !ins.message.includes('Terlambat') && !ins.message.includes('Kedisiplinan'));
-        return res.json(filtered);
+      // Remove attendance/HR insights, only keep Sales/Stock
+      const filtered = insights.filter(ins => !ins.message.includes('Terlambat') && !ins.message.includes('Kedisiplinan'));
+      return res.json(filtered);
     }
 
     // 4. Contract Insight (HR Risk)
     const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
     const expiringSoon = await prisma.user.count({
-        where: { 
-            companyId: tenantId, 
-            contractEndDate: { 
-                gte: today, 
-                lte: thirtyDaysLater
-            } 
+      where: {
+        companyId: tenantId,
+        contractEndDate: {
+          gte: today,
+          lte: thirtyDaysLater
         }
+      }
     });
 
     if (expiringSoon > 0) {
-        insights.push({
-            type: 'warning',
-            message: `${expiringSoon} Kontrak Akan Berakhir`,
-            detail: `Terdapat ${expiringSoon} karyawan yang kontraknya berakhir dalam 30 hari ke depan. Siapkan review!`
-        });
+      insights.push({
+        type: 'warning',
+        message: `${expiringSoon} Kontrak Akan Berakhir`,
+        detail: `Terdapat ${expiringSoon} karyawan yang kontraknya berakhir dalam 30 hari ke depan. Siapkan review!`
+      });
     }
 
     // --- PREMIUM INSIGHTS STORE (POINT 5) ---
 
     // 5. Premium: Profitability Analysis
     if (purchased.includes('PREMIUM_PROFIT')) {
-        insights.push({
-            type: 'success',
-            isPremium: true,
-            id: 'PREMIUM_PROFIT',
-            message: 'AI: Optimalisasi Margin',
-            detail: 'Berdasarkan korelasi HPP dan Penjualan, Anda bisa menghemat 12% biaya dengan beralih ke Vendor Bahan Baku alternatif.'
-        });
+      insights.push({
+        type: 'success',
+        isPremium: true,
+        id: 'PREMIUM_PROFIT',
+        message: 'AI: Optimalisasi Margin',
+        detail: 'Berdasarkan korelasi HPP dan Penjualan, Anda bisa menghemat 12% biaya dengan beralih ke Vendor Bahan Baku alternatif.'
+      });
     } else {
-        insights.push({
-            type: 'info',
-            isPremium: true,
-            isLocked: true,
-            id: 'PREMIUM_PROFIT',
-            message: 'Profit Optimizer (Locked)',
-            detail: 'Buka insight premium ini untuk melihat rekomendasi penghematan biaya produksi.'
-        });
+      insights.push({
+        type: 'info',
+        isPremium: true,
+        isLocked: true,
+        id: 'PREMIUM_PROFIT',
+        message: 'Profit Optimizer (Locked)',
+        detail: 'Buka insight premium ini untuk melihat rekomendasi penghematan biaya produksi.'
+      });
     }
 
     // 6. Premium: Retention Risk
     if (purchased.includes('PREMIUM_RETENTION')) {
-        insights.push({
-            type: 'warning',
-            isPremium: true,
-            id: 'PREMIUM_RETENTION',
-            message: 'AI: Deteksi Burnout',
-            detail: 'Terdeteksi peningkatan pola keterlambatan dan cuti di departemen Operasional. Risiko pengunduran diri meningkat 15%.'
-        });
+      insights.push({
+        type: 'warning',
+        isPremium: true,
+        id: 'PREMIUM_RETENTION',
+        message: 'AI: Deteksi Burnout',
+        detail: 'Terdeteksi peningkatan pola keterlambatan dan cuti di departemen Operasional. Risiko pengunduran diri meningkat 15%.'
+      });
     } else {
-        insights.push({
-            type: 'info',
-            isPremium: true,
-            isLocked: true,
-            id: 'PREMIUM_RETENTION',
-            message: 'Retention Predictor (Locked)',
-            detail: 'Prediksi risiko kehilangan bakat terbaik Anda dengan AI analisis perilaku.'
-        });
+      insights.push({
+        type: 'info',
+        isPremium: true,
+        isLocked: true,
+        id: 'PREMIUM_RETENTION',
+        message: 'Retention Predictor (Locked)',
+        detail: 'Prediksi risiko kehilangan bakat terbaik Anda dengan AI analisis perilaku.'
+      });
     }
 
     // 7. Premium: Smart Stock Forecasting
     if (purchased.includes('PREMIUM_STOCK')) {
-        insights.push({
-            type: 'danger',
-            isPremium: true,
-            id: 'PREMIUM_STOCK',
-            message: 'AI: Prediksi Stok Habis',
-            detail: 'Berdasarkan kecepatan penjualan 7 hari terakhir, 5 item utama Anda akan habis dalam 48 jam ke depan.'
-        });
+      insights.push({
+        type: 'danger',
+        isPremium: true,
+        id: 'PREMIUM_STOCK',
+        message: 'AI: Prediksi Stok Habis',
+        detail: 'Berdasarkan kecepatan penjualan 7 hari terakhir, 5 item utama Anda akan habis dalam 48 jam ke depan.'
+      });
     } else {
-        insights.push({
-            type: 'info',
-            isPremium: true,
-            isLocked: true,
-            id: 'PREMIUM_STOCK',
-            message: 'Stock Forecaster (Locked)',
-            detail: 'Gunakan AI untuk memprediksi kapan stok barang akan habis agar tidak kehilangan potensi penjualan.'
-        });
+      insights.push({
+        type: 'info',
+        isPremium: true,
+        isLocked: true,
+        id: 'PREMIUM_STOCK',
+        message: 'Stock Forecaster (Locked)',
+        detail: 'Gunakan AI untuk memprediksi kapan stok barang akan habis agar tidak kehilangan potensi penjualan.'
+      });
     }
 
     res.json(insights);
@@ -10264,12 +10264,12 @@ const checkPosAiLimit = (tenantId: number): { allowed: boolean, count: number } 
   const todayStr = new Date().toISOString().split('T')[0];
   const key = `${tenantId}_${todayStr}`;
   const usage = getAiUsage();
-  
+
   const currentCount = usage[key] || 0;
   if (currentCount >= 2) {
     return { allowed: false, count: currentCount };
   }
-  
+
   const newCount = currentCount + 1;
   usage[key] = newCount;
   saveAiUsage(usage);
@@ -10288,12 +10288,12 @@ const checkDashboardAiLimit = (tenantId: number, endpointKey: string): { allowed
   const todayStr = new Date().toISOString().split('T')[0];
   const key = `${tenantId}_${endpointKey}_${todayStr}`;
   const usage = getAiUsage();
-  
+
   const currentCount = usage[key] || 0;
   if (currentCount >= 2) {
     return { allowed: false, count: currentCount };
   }
-  
+
   const newCount = currentCount + 1;
   usage[key] = newCount;
   saveAiUsage(usage);
@@ -10493,7 +10493,7 @@ app.post('/api/assets', tenantMiddleware, uploadAsset.single('image'), async (re
   try {
     const tenantId = (req as any).tenantId;
     const userRole = (req as any).userRole;
-    
+
     // --- ROLE CHECK ---
     const allowedRoles = ['SUPERADMIN', 'ADMIN', 'OWNER', 'FINANCE'];
     if (!allowedRoles.includes(userRole)) {
@@ -10518,16 +10518,16 @@ app.post('/api/assets', tenantMiddleware, uploadAsset.single('image'), async (re
 
     // Cek duplikasi Serial Number di tenant yang sama (hanya jika Serial Number diisi)
     if (serialNumber) {
-        const existing = await prisma.asset.findFirst({
-            where: {
-                companyId: tenantId,
-                serialNumber: serialNumber
-            }
-        });
-
-        if (existing) {
-            return res.status(400).json({ error: 'Nomor seri ini sudah terdaftar di perusahaan Anda.' });
+      const existing = await prisma.asset.findFirst({
+        where: {
+          companyId: tenantId,
+          serialNumber: serialNumber
         }
+      });
+
+      if (existing) {
+        return res.status(400).json({ error: 'Nomor seri ini sudah terdaftar di perusahaan Anda.' });
+      }
     }
 
 
@@ -10744,7 +10744,7 @@ app.post('/api/finance/closing', tenantMiddleware, async (req: Request, res: Res
     });
 
     const totalExpenseManual = (expenseSum._sum.amount || 0) + (payrollSum._sum.netSalary || 0);
-    
+
     // 3. Automated Depreciation & Amortization Calculation
     const activeAssets = await prisma.asset.findMany({
       where: {
@@ -10761,11 +10761,11 @@ app.post('/api/finance/closing', tenantMiddleware, async (req: Request, res: Res
       const price = asset.purchasePrice || 0;
       const residual = asset.residualValue || 0;
       const life = asset.usefulLife || 1;
-      
+
       const monthlyDep = (price - residual) / life;
       const purchaseDate = new Date(asset.purchaseDate!);
       const monthsSincePurchase = (year - purchaseDate.getFullYear()) * 12 + (month - purchaseDate.getMonth() - 1);
-      
+
       if (monthsSincePurchase >= 0 && monthsSincePurchase < life) {
         totalDepreciation += monthlyDep;
       }
@@ -10848,7 +10848,7 @@ app.get('/api/stats/trends', tenantMiddleware, async (req: Request, res: Respons
 
     // SECURITY: POS_VIEWER cannot see attendance trends
     if (userRole === 'POS_VIEWER') {
-        return res.json([]);
+      return res.json([]);
     }
 
     const trends = [];
@@ -11101,7 +11101,7 @@ app.post('/api/admin/billing/generate', tenantMiddleware, async (req: Request, r
 
     // Ambil semua tenant aktif
     const companies = await prisma.company.findMany({
-        include: { _count: { select: { users: true } } }
+      include: { _count: { select: { users: true } } }
     });
 
     const results = {
@@ -11139,7 +11139,7 @@ app.post('/api/admin/billing/generate', tenantMiddleware, async (req: Request, r
           // TAHUNAN: contractValue * kuota (employeeLimit)
           amount = company.contractValue * company.employeeLimit;
         }
-        
+
         // Kalikan dengan durasi kontrak (misal: bayar untuk 2 tahun)
         amount = amount * (company.contractDuration || 1);
 
@@ -11377,24 +11377,24 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 app.post('/api/chat/session', async (req: Request, res: Response) => {
   try {
     const { visitorName, email, userId } = req.body;
-    
+
     const session = await prisma.chatSession.create({
       data: {
         visitorName,
         email,
         userId: userId ? parseInt(userId) : undefined,
         messages: {
-            create: [
-                {
-                    sender: 'AI',
-                    content: "Halo! Saya adalah Asisten AI Aivola. Ada yang bisa saya bantu terkait sistem HRIS kami?"
-                }
-            ]
+          create: [
+            {
+              sender: 'AI',
+              content: "Halo! Saya adalah Asisten AI Aivola. Ada yang bisa saya bantu terkait sistem HRIS kami?"
+            }
+          ]
         }
       },
       include: { messages: true }
     });
-    
+
     res.json(session);
   } catch (error: any) {
     console.error('Create Chat Session Error:', error);
@@ -11406,7 +11406,7 @@ app.post('/api/chat/session', async (req: Request, res: Response) => {
 app.post('/api/chat/message', async (req: Request, res: Response) => {
   try {
     const { sessionId, content } = req.body;
-    
+
     // 1. Save User Message
     const userMsg = await prisma.chatMessage.create({
       data: {
@@ -11415,17 +11415,17 @@ app.post('/api/chat/message', async (req: Request, res: Response) => {
         content
       }
     });
-    
+
     // 2. Get History for context
     const history = await prisma.chatMessage.findMany({
       where: { sessionId },
       orderBy: { createdAt: 'asc' },
       take: 10
     });
-    
+
     // 3. Get AI Response
     const aiResponseContent = await getAIChatResponse(content, history.map((h: any) => ({ role: h.sender, content: h.content })));
-    
+
     // 4. Save AI Response
     const aiMsg = await prisma.chatMessage.create({
       data: {
@@ -11434,7 +11434,7 @@ app.post('/api/chat/message', async (req: Request, res: Response) => {
         content: aiResponseContent
       }
     });
-    
+
     res.json({ userMessage: userMsg, aiResponse: aiMsg });
   } catch (error: any) {
     console.error('Send Chat Message Error:', error);
@@ -11462,13 +11462,13 @@ app.get('/api/chat/admin/sessions', tenantMiddleware, async (req: Request, res: 
       where: { companyId: Number(tenantId) },
       include: {
         messages: {
-           orderBy: { createdAt: 'desc' },
-           take: 1
+          orderBy: { createdAt: 'desc' },
+          take: 1
         }
       },
       orderBy: { updatedAt: 'desc' }
     });
-    
+
     res.json(sessions);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil sesi chat' });
@@ -11480,7 +11480,7 @@ app.get('/api/chat/admin/sessions/:id', tenantMiddleware, async (req: Request, r
   try {
     const tenantId = (req as any).tenantId;
     const session = await prisma.chatSession.findUnique({
-      where: { 
+      where: {
         id: req.params.id as string,
         companyId: Number(tenantId)
       },
@@ -11490,7 +11490,7 @@ app.get('/api/chat/admin/sessions/:id', tenantMiddleware, async (req: Request, r
         }
       }
     });
-    
+
     if (!session) return res.status(404).json({ error: 'Sesi tidak ditemukan' });
     res.json(session);
   } catch (error: any) {
@@ -11505,7 +11505,7 @@ app.get('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Res
   try {
     const { branchId, forPos } = req.query;
     const where: any = { companyId: (req as any).tenantId };
-    
+
     if (branchId && branchId !== 'all') {
       where.branchId = parseInt(branchId as string);
     }
@@ -11537,7 +11537,7 @@ app.post('/api/finance/accounts', tenantMiddleware, async (req: Request, res: Re
     }
 
     if (isNaN(tenantId)) {
-       return res.status(401).json({ error: 'Sesi tidak valid. Silakan login ulang.' });
+      return res.status(401).json({ error: 'Sesi tidak valid. Silakan login ulang.' });
     }
 
     const account = await prisma.financialAccount.create({
@@ -11601,13 +11601,13 @@ app.delete('/api/finance/accounts/:id', tenantMiddleware, async (req: Request, r
     // Check if account has transactions (Income or Expense)
     const incomeCount = await prisma.income.count({ where: { accountId: parseInt(id as string) } });
     const expenseCount = await prisma.expense.count({ where: { accountId: parseInt(id as string) } });
-    
+
     // Also check Sales if accountId is linked there
     const salesCount = await prisma.sale.count({ where: { accountId: parseInt(id as string) } });
 
     if (incomeCount > 0 || expenseCount > 0 || salesCount > 0) {
-      return res.status(400).json({ 
-        error: 'Akun tidak bisa dihapus karena sudah memiliki riwayat transaksi. Silakan hapus transaksi terkait terlebih dahulu.' 
+      return res.status(400).json({
+        error: 'Akun tidak bisa dihapus karena sudah memiliki riwayat transaksi. Silakan hapus transaksi terkait terlebih dahulu.'
       });
     }
 
@@ -11627,7 +11627,7 @@ app.get('/api/finance/income-categories', tenantMiddleware, async (req: Request,
       where: { companyId: (req as any).tenantId },
       orderBy: { name: 'asc' }
     });
-    
+
     const systemCats = [
       { name: '[SYSTEM] Hutang Cabang', type: 'NON_OPERATIONAL' },
       { name: '[SYSTEM] Pelunasan Piutang Cabang', type: 'NON_OPERATIONAL' },
@@ -11639,7 +11639,7 @@ app.get('/api/finance/income-categories', tenantMiddleware, async (req: Request,
       if (!categories.find(c => c.name === sys.name)) {
         await prisma.incomeCategory.create({
           data: { companyId: (req as any).tenantId, name: sys.name, type: sys.type as any }
-        }).catch(() => {});
+        }).catch(() => { });
         needsRefetch = true;
       }
     }
@@ -11678,7 +11678,7 @@ app.get('/api/finance/income', tenantMiddleware, async (req: Request, res: Respo
   try {
     const tenantId = Number((req as any).tenantId);
     const { branchId } = req.query;
-    
+
     const where: any = { companyId: tenantId };
     if (branchId && branchId !== 'all') {
       where.branchId = parseInt(branchId as string);
@@ -11827,7 +11827,7 @@ app.get('/api/finance/expense-categories', tenantMiddleware, async (req: Request
       if (!categories.find(c => c.name === sys)) {
         await prisma.expenseCategory.create({
           data: { companyId: (req as any).tenantId, name: sys, type: 'OPERATIONAL' }
-        }).catch(() => {});
+        }).catch(() => { });
         needsRefetch = true;
       }
     }
@@ -11902,7 +11902,7 @@ app.post('/api/finance/expense-categories', tenantMiddleware, async (req: Reques
   try {
     const { name, type } = req.body;
     const tenantId = Number((req as any).tenantId);
-    
+
     console.log(`[DEBUG] Creating category: ${name}, type: ${type}, tenantId: ${tenantId}`);
 
     // Use raw SQL to bypass Prisma model sync issues on Windows
@@ -11927,7 +11927,7 @@ app.patch('/api/finance/expense-categories/:id', tenantMiddleware, async (req: R
     const { id } = req.params;
     const { name, type } = req.body;
     const tenantId = Number((req as any).tenantId);
-    
+
     const result = await prisma.$queryRawUnsafe<any[]>(
       `UPDATE "ExpenseCategory" 
        SET "name" = COALESCE($1, "name"), "type" = COALESCE($2::"ExpenseType", "type"), "updatedAt" = NOW() 
@@ -11935,7 +11935,7 @@ app.patch('/api/finance/expense-categories/:id', tenantMiddleware, async (req: R
        RETURNING *`,
       name, type, parseInt(String(id)), tenantId
     );
-    
+
     if (result.length === 0) return res.status(404).json({ error: 'Kategori tidak ditemukan' });
     res.json(result[0]);
   } catch (error: any) {
@@ -11948,12 +11948,12 @@ app.delete('/api/finance/expense-categories/:id', tenantMiddleware, async (req: 
   try {
     const tenantId = Number((req as any).tenantId);
     const { id } = req.params;
-    
+
     await prisma.$executeRawUnsafe(
       `DELETE FROM "ExpenseCategory" WHERE "id" = $1 AND "companyId" = $2`,
       parseInt(String(id)), tenantId
     );
-    
+
     res.json({ message: 'Kategori dihapus' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal menghapus kategori: ' + error.message });
@@ -11965,7 +11965,7 @@ app.get('/api/finance/expense', tenantMiddleware, async (req: Request, res: Resp
   try {
     const tenantId = Number((req as any).tenantId);
     const { branchId } = req.query;
-    
+
     const where: any = { companyId: tenantId };
     if (branchId && branchId !== 'all') {
       where.branchId = parseInt(branchId as string);
@@ -12008,7 +12008,7 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
 
       // 1. Handle Inventory Link (Bahan Baku)
       if (prodIdNum && qtyNum > 0) {
-          console.log("DEBUG BAHAN BAKU MODE ACTIVE");
+        console.log("DEBUG BAHAN BAKU MODE ACTIVE");
         // Find or create the "Belanja Bahan Baku" category
         let category: any = await tx.expenseCategory.findFirst({
           where: { companyId: tenantId, name: 'Belanja Bahan Baku (Inventori)' }
@@ -12026,7 +12026,7 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
 
         // Calculate unit cost and update Product Stock & Cost Price
         const newUnitCost = qtyNum > 0 ? parseFloat(amount) / qtyNum : 0;
-        
+
         // Moving Average Calculation
         const currentProduct: any[] = await tx.$queryRawUnsafe(`
           SELECT "stock", "costPrice" FROM "Product" WHERE "id" = $1 AND "companyId" = $2
@@ -12034,19 +12034,19 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
 
         let finalCostPrice = newUnitCost;
         if (currentProduct.length > 0) {
-            const oldStock = Number(currentProduct[0].stock) || 0;
-            const oldCost = Number(currentProduct[0].costPrice) || 0;
-            
-            if (oldStock > 0 && qtyNum > 0) {
-                const totalOldValue = oldStock * oldCost;
-                const totalNewValue = qtyNum * newUnitCost;
-                const newTotalStock = oldStock + qtyNum;
-                finalCostPrice = (totalOldValue + totalNewValue) / newTotalStock;
-            } else if (oldStock <= 0) {
-                finalCostPrice = newUnitCost;
-            }
+          const oldStock = Number(currentProduct[0].stock) || 0;
+          const oldCost = Number(currentProduct[0].costPrice) || 0;
+
+          if (oldStock > 0 && qtyNum > 0) {
+            const totalOldValue = oldStock * oldCost;
+            const totalNewValue = qtyNum * newUnitCost;
+            const newTotalStock = oldStock + qtyNum;
+            finalCostPrice = (totalOldValue + totalNewValue) / newTotalStock;
+          } else if (oldStock <= 0) {
+            finalCostPrice = newUnitCost;
+          }
         }
-        
+
         await tx.$executeRawUnsafe(
           'UPDATE "Product" SET "stock" = "stock" + $1, "costPrice" = $2, "updatedAt" = NOW() WHERE "id" = $3 AND "companyId" = $4',
           qtyNum, finalCostPrice, prodIdNum, tenantId
@@ -12065,12 +12065,12 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
       const dateVal = date ? new Date(date) : new Date();
       const dueDateVal = dueDate ? new Date(dueDate) : null;
       const paidAtVal = (status !== 'PENDING') ? (paidAt ? new Date(paidAt) : dateVal) : null;
-      
+
       const insertRes = await tx.$queryRawUnsafe<any[]>(
         `INSERT INTO "Expense" ("companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "taxAmount", "date", "paidAt", "dueDate", "status", "description", "paidTo", "branchId", "updatedAt")
          VALUES ($1::INTEGER, $2::INTEGER, $3::INTEGER, $4::INTEGER, $5::INTEGER, $6, $7, $8, $9, $10, $11, $12::"ExpenseStatus", $13, $14, $15::INTEGER, NOW())
          RETURNING "id", "companyId", "accountId", "categoryId", "supplierId", "productId", "quantity", "amount", "taxAmount", "date", "paidAt", "dueDate", "status", "description", "paidTo", "branchId"`,
-        tenantId, 
+        tenantId,
         accountId ? Number(accountId) : null,
         finalCategoryId,
         req.body.supplierId ? Number(req.body.supplierId) : null,
@@ -12086,7 +12086,7 @@ app.post('/api/finance/expense', tenantMiddleware, async (req: Request, res: Res
         paidTo,
         branchId ? Number(branchId) : null
       );
-      
+
       const expense = insertRes[0];
 
       // 3. Update account balance (ONLY if status is PAID and accountId is provided)
@@ -12135,7 +12135,7 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
 
     // 1. Safety Check: Period Closing
     const expense = await prisma.expense.findFirst({
-        where: { id: parseInt(id as string), companyId: tenantId }
+      where: { id: parseInt(id as string), companyId: tenantId }
     });
 
     if (!expense) return res.status(404).json({ error: 'Pengeluaran tidak ditemukan' });
@@ -12145,67 +12145,67 @@ app.patch('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res
     }
 
     const result = await prisma.$transaction(async (tx) => {
-        // 2. Revert Old Balance (ONLY if status was not PENDING and had accountId)
-        if (expense.status !== 'PENDING' && expense.accountId) {
-            await tx.$executeRawUnsafe(
-                'UPDATE "FinancialAccount" SET "balance" = "balance" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
-                expense.amount, expense.accountId, tenantId
-            );
+      // 2. Revert Old Balance (ONLY if status was not PENDING and had accountId)
+      if (expense.status !== 'PENDING' && expense.accountId) {
+        await tx.$executeRawUnsafe(
+          'UPDATE "FinancialAccount" SET "balance" = "balance" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
+          expense.amount, expense.accountId, tenantId
+        );
+      }
+
+      // 3. Update Expense
+      const finalStatus = status !== undefined ? status : expense.status;
+      const finalDate = date ? new Date(date) : expense.date;
+
+      let paidAtVal: Date | null = null;
+      if (finalStatus !== 'PENDING') {
+        if (paidAt !== undefined) {
+          paidAtVal = paidAt ? new Date(paidAt) : null;
+        } else if (expense.status === 'PENDING') {
+          paidAtVal = new Date();
+        } else {
+          paidAtVal = expense.paidAt ? new Date(expense.paidAt) : finalDate;
         }
+      }
 
-        // 3. Update Expense
-        const finalStatus = status !== undefined ? status : expense.status;
-        const finalDate = date ? new Date(date) : expense.date;
-        
-        let paidAtVal: Date | null = null;
-        if (finalStatus !== 'PENDING') {
-          if (paidAt !== undefined) {
-            paidAtVal = paidAt ? new Date(paidAt) : null;
-          } else if (expense.status === 'PENDING') {
-            paidAtVal = new Date();
-          } else {
-            paidAtVal = expense.paidAt ? new Date(expense.paidAt) : finalDate;
-          }
-        }
+      const finalAccountId = accountId !== undefined ? (accountId ? Number(accountId) : null) : expense.accountId;
+      const finalCategoryId = categoryId !== undefined ? (categoryId ? Number(categoryId) : expense.categoryId) : expense.categoryId;
+      const finalSupplierId = supplierId !== undefined ? (supplierId ? Number(supplierId) : null) : expense.supplierId;
+      const finalAmount = amount !== undefined ? (amount ? Number(amount) : 0) : expense.amount;
+      const finalDueDate = dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : expense.dueDate;
+      const finalDescription = description !== undefined ? description : expense.description;
+      const finalPaidTo = paidTo !== undefined ? paidTo : expense.paidTo;
 
-        const finalAccountId = accountId !== undefined ? (accountId ? Number(accountId) : null) : expense.accountId;
-        const finalCategoryId = categoryId !== undefined ? (categoryId ? Number(categoryId) : expense.categoryId) : expense.categoryId;
-        const finalSupplierId = supplierId !== undefined ? (supplierId ? Number(supplierId) : null) : expense.supplierId;
-        const finalAmount = amount !== undefined ? (amount ? Number(amount) : 0) : expense.amount;
-        const finalDueDate = dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : expense.dueDate;
-        const finalDescription = description !== undefined ? description : expense.description;
-        const finalPaidTo = paidTo !== undefined ? paidTo : expense.paidTo;
-
-        const upRes = await tx.$queryRawUnsafe<any[]>(
-            `UPDATE "Expense" SET 
+      const upRes = await tx.$queryRawUnsafe<any[]>(
+        `UPDATE "Expense" SET 
                 "accountId" = $1::INTEGER, "categoryId" = $2::INTEGER, "supplierId" = $3::INTEGER, "amount" = $4, 
                 "date" = $5, "dueDate" = $6, "status" = $7::"ExpenseStatus", 
                 "description" = $8, "paidTo" = $9, "paidAt" = $10, "updatedAt" = NOW() 
              WHERE "id" = $11 AND "companyId" = $12
              RETURNING *`,
-            finalAccountId,
-            finalCategoryId,
-            finalSupplierId,
-            finalAmount,
-            finalDate,
-            finalDueDate,
-            finalStatus,
-            finalDescription,
-            finalPaidTo,
-            paidAtVal,
-            parseInt(id as string),
-            tenantId
+        finalAccountId,
+        finalCategoryId,
+        finalSupplierId,
+        finalAmount,
+        finalDate,
+        finalDueDate,
+        finalStatus,
+        finalDescription,
+        finalPaidTo,
+        paidAtVal,
+        parseInt(id as string),
+        tenantId
+      );
+
+      // 4. Apply New Balance (ONLY if new status is not PENDING and has accountId)
+      if (finalStatus !== 'PENDING' && finalAccountId) {
+        await tx.$executeRawUnsafe(
+          'UPDATE "FinancialAccount" SET "balance" = "balance" - $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
+          finalAmount, finalAccountId, tenantId
         );
+      }
 
-        // 4. Apply New Balance (ONLY if new status is not PENDING and has accountId)
-        if (finalStatus !== 'PENDING' && finalAccountId) {
-            await tx.$executeRawUnsafe(
-                'UPDATE "FinancialAccount" SET "balance" = "balance" - $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
-                finalAmount, finalAccountId, tenantId
-            );
-        }
-
-        return upRes[0];
+      return upRes[0];
     });
 
     res.json(result);
@@ -12222,7 +12222,7 @@ app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, re
     const tenantId = Number((req as any).tenantId);
 
     const expense = await prisma.expense.findFirst({
-        where: { id: parseInt(id as string), companyId: tenantId }
+      where: { id: parseInt(id as string), companyId: tenantId }
     });
 
     if (!expense) return res.status(404).json({ error: 'Pengeluaran tidak ditemukan' });
@@ -12232,16 +12232,16 @@ app.delete('/api/finance/expense/:id', tenantMiddleware, async (req: Request, re
     }
 
     await prisma.$transaction(async (tx) => {
-        // Revert Balance (Add back if was PAID)
-        if (expense.status !== 'PENDING' && expense.accountId) {
-            await tx.$executeRawUnsafe(
-                'UPDATE "FinancialAccount" SET "balance" = "balance" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
-                expense.amount, expense.accountId, tenantId
-            );
-        }
+      // Revert Balance (Add back if was PAID)
+      if (expense.status !== 'PENDING' && expense.accountId) {
+        await tx.$executeRawUnsafe(
+          'UPDATE "FinancialAccount" SET "balance" = "balance" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
+          expense.amount, expense.accountId, tenantId
+        );
+      }
 
-        // Delete record
-        await tx.expense.delete({ where: { id: parseInt(id as string) } });
+      // Delete record
+      await tx.expense.delete({ where: { id: parseInt(id as string) } });
     });
 
     res.json({ message: 'Pengeluaran berhasil dihapus' });
@@ -12353,8 +12353,8 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
       }
 
       const remainingBalance = parseFloat((expense.amount - (expense.paidAmount || 0)).toFixed(2));
-      const amountToPay = paymentAmount !== undefined 
-        ? Math.min(parseFloat(paymentAmount.toString()), remainingBalance) 
+      const amountToPay = paymentAmount !== undefined
+        ? Math.min(parseFloat(paymentAmount.toString()), remainingBalance)
         : remainingBalance;
 
       if (amountToPay <= 0) throw new Error('Nominal pembayaran tidak valid.');
@@ -12441,13 +12441,13 @@ app.put('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: 
       return res.status(403).json({ error: 'Periode buku sudah ditutup. Tidak dapat memperbarui transaksi pada tanggal ini.' });
     }
 
-      const result = await prisma.$transaction(async (tx) => {
-        const prodIdNum = req.body.productId ? parseInt(req.body.productId.toString()) : null;
-        const qtyNum = req.body.quantity ? parseFloat(req.body.quantity.toString()) : 0;
-        
-        console.log("DEBUG EXPENSE UPDATE PARSED:", { prodIdNum, qtyNum, amount: req.body.amount });
+    const result = await prisma.$transaction(async (tx) => {
+      const prodIdNum = req.body.productId ? parseInt(req.body.productId.toString()) : null;
+      const qtyNum = req.body.quantity ? parseFloat(req.body.quantity.toString()) : 0;
 
-        // 1. Get old expense
+      console.log("DEBUG EXPENSE UPDATE PARSED:", { prodIdNum, qtyNum, amount: req.body.amount });
+
+      // 1. Get old expense
       const oldExpense = await tx.expense.findUnique({
         where: { id: expenseId, companyId: tenantId }
       });
@@ -12459,78 +12459,78 @@ app.put('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: 
       // 2. Adjust Balance if PAID
       if (oldExpense.status === 'PAID' && status === 'PAID') {
         if (oldExpense.accountId === newAccountId) {
-            const diff = newAmount - oldExpense.amount;
-            if (diff !== 0 && newAccountId) {
-                await tx.financialAccount.update({
-                    where: { id: newAccountId },
-                    data: { balance: { decrement: diff } }
-                });
-            }
+          const diff = newAmount - oldExpense.amount;
+          if (diff !== 0 && newAccountId) {
+            await tx.financialAccount.update({
+              where: { id: newAccountId },
+              data: { balance: { decrement: diff } }
+            });
+          }
         } else {
-            if (oldExpense.accountId) {
-                await tx.financialAccount.update({
-                    where: { id: oldExpense.accountId },
-                    data: { balance: { increment: oldExpense.amount } }
-                });
-            }
-            if (newAccountId) {
-                await tx.financialAccount.update({
-                    where: { id: newAccountId },
-                    data: { balance: { decrement: newAmount } }
-                });
-            }
+          if (oldExpense.accountId) {
+            await tx.financialAccount.update({
+              where: { id: oldExpense.accountId },
+              data: { balance: { increment: oldExpense.amount } }
+            });
+          }
+          if (newAccountId) {
+            await tx.financialAccount.update({
+              where: { id: newAccountId },
+              data: { balance: { decrement: newAmount } }
+            });
+          }
         }
       } else if (oldExpense.status === 'PENDING' && status === 'PAID') {
         if (newAccountId) {
-            await tx.financialAccount.update({
-                where: { id: newAccountId },
-                data: { balance: { decrement: newAmount } }
-            });
+          await tx.financialAccount.update({
+            where: { id: newAccountId },
+            data: { balance: { decrement: newAmount } }
+          });
         }
       } else if (oldExpense.status === 'PAID' && status === 'PENDING') {
         if (oldExpense.accountId) {
-            await tx.financialAccount.update({
-                where: { id: oldExpense.accountId },
-                data: { balance: { increment: oldExpense.amount } }
-            });
+          await tx.financialAccount.update({
+            where: { id: oldExpense.accountId },
+            data: { balance: { increment: oldExpense.amount } }
+          });
         }
       }
 
       // 4. Update Product Cost Price (if BAHAN_BAKU mode/data provided)
       if (prodIdNum && qtyNum > 0) {
-          const newUnitCost = newAmount / qtyNum;
-          
-          // Moving Average Calculation for Update
-          const currentProduct: any[] = await tx.$queryRawUnsafe(`
+        const newUnitCost = newAmount / qtyNum;
+
+        // Moving Average Calculation for Update
+        const currentProduct: any[] = await tx.$queryRawUnsafe(`
             SELECT "stock", "costPrice" FROM "Product" WHERE "id" = $1 AND "companyId" = $2
           `, prodIdNum, tenantId);
 
-          let finalCostPrice = newUnitCost;
-          if (currentProduct.length > 0) {
-              const oldStock = Number(currentProduct[0].stock) || 0;
-              const oldCost = Number(currentProduct[0].costPrice) || 0;
-              
-              if (oldStock > 0) {
-                  // Revert old transaction effect roughly by assuming oldStock includes it or just simple approach:
-                  // Actually, for update, doing full Moving Average reversal is complex. 
-                  // We will just do a re-average based on current stock to be safe, though not perfect for retroactive.
-                  const totalOldValue = oldStock * oldCost;
-                  const totalNewValue = qtyNum * newUnitCost;
-                  const newTotalStock = oldStock + qtyNum; 
-                  // NOTE: This assumes update is treating it as an addition to weight. In a real system, update would reverse old value.
-                  // For simplicity in this POS, we just update the price if stock is low or average it if stock exists.
-                  finalCostPrice = (totalOldValue + totalNewValue) / newTotalStock;
-              } else {
-                  finalCostPrice = newUnitCost;
-              }
-          }
+        let finalCostPrice = newUnitCost;
+        if (currentProduct.length > 0) {
+          const oldStock = Number(currentProduct[0].stock) || 0;
+          const oldCost = Number(currentProduct[0].costPrice) || 0;
 
-          console.log("DEBUG SYNC COST PRICE:", { prodIdNum, finalCostPrice });
-          const updateRes = await tx.$executeRawUnsafe(
-            'UPDATE "Product" SET "costPrice" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
-            finalCostPrice, prodIdNum, tenantId
-          );
-          console.log("DEBUG UPDATE RES:", updateRes);
+          if (oldStock > 0) {
+            // Revert old transaction effect roughly by assuming oldStock includes it or just simple approach:
+            // Actually, for update, doing full Moving Average reversal is complex. 
+            // We will just do a re-average based on current stock to be safe, though not perfect for retroactive.
+            const totalOldValue = oldStock * oldCost;
+            const totalNewValue = qtyNum * newUnitCost;
+            const newTotalStock = oldStock + qtyNum;
+            // NOTE: This assumes update is treating it as an addition to weight. In a real system, update would reverse old value.
+            // For simplicity in this POS, we just update the price if stock is low or average it if stock exists.
+            finalCostPrice = (totalOldValue + totalNewValue) / newTotalStock;
+          } else {
+            finalCostPrice = newUnitCost;
+          }
+        }
+
+        console.log("DEBUG SYNC COST PRICE:", { prodIdNum, finalCostPrice });
+        const updateRes = await tx.$executeRawUnsafe(
+          'UPDATE "Product" SET "costPrice" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3',
+          finalCostPrice, prodIdNum, tenantId
+        );
+        console.log("DEBUG UPDATE RES:", updateRes);
       }
 
       // 3. Update record
@@ -12547,11 +12547,11 @@ app.put('/api/finance/expense/:id', tenantMiddleware, async (req: Request, res: 
             "paidTo" = $9, 
             "updatedAt" = NOW()
          WHERE "id" = $10 AND "companyId" = $11`,
-        newAccountId ? Number(newAccountId) : null, 
-        categoryId ? Number(categoryId) : null, 
+        newAccountId ? Number(newAccountId) : null,
+        categoryId ? Number(categoryId) : null,
         req.body.supplierId ? Number(req.body.supplierId) : null,
-        newAmount, 
-        new Date(date), 
+        newAmount,
+        new Date(date),
         dueDate ? new Date(dueDate) : null,
         status,
         description,
@@ -12648,7 +12648,7 @@ async function calculateSingleSaleCOGS(tenantId: number, saleId: number, txClien
 
   const getProductCost = (product: any, visited = new Set<number>()): number => {
     if (!product || visited.has(product.id)) return 0;
-    
+
     if (!product.isAutoDeduct || !product.Recipes || product.Recipes.length === 0) {
       return Number(product.costPrice) || 0;
     }
@@ -12665,7 +12665,7 @@ async function calculateSingleSaleCOGS(tenantId: number, saleId: number, txClien
       }
     }
     visited.delete(product.id);
-    
+
     return yieldFactor > 0 ? totalRecipeCost / yieldFactor : totalRecipeCost;
   };
 
@@ -12676,7 +12676,7 @@ async function calculateSingleSaleCOGS(tenantId: number, saleId: number, txClien
   for (const item of saleItems) {
     const prodId = Number(item.productId);
     const qty = Number(item.quantity);
-    
+
     let unitCogs = productCostCache.get(prodId);
     if (unitCogs === undefined) {
       const product = allProducts.find((p: any) => p.id === prodId);
@@ -12687,22 +12687,22 @@ async function calculateSingleSaleCOGS(tenantId: number, saleId: number, txClien
     calculatedCogsFromSales += qty * unitCogs;
 
     if (item.modifiers) {
-       const mods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
-       Object.values(mods).forEach((val: any) => {
-          if (val && val.linkedProductId) {
-             const linkedProdId = Number(val.linkedProductId);
-             const linkedQty = Number(val.linkedQuantity) || 1;
-             
-             let modUnitCogs = productCostCache.get(linkedProdId);
-             if (modUnitCogs === undefined) {
-                 const modProduct = allProducts.find((p: any) => p.id === linkedProdId);
-                 modUnitCogs = modProduct ? getProductCost(modProduct) : 0;
-                 productCostCache.set(linkedProdId, modUnitCogs);
-             }
-             
-             calculatedCogsFromSales += qty * linkedQty * modUnitCogs;
+      const mods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
+      Object.values(mods).forEach((val: any) => {
+        if (val && val.linkedProductId) {
+          const linkedProdId = Number(val.linkedProductId);
+          const linkedQty = Number(val.linkedQuantity) || 1;
+
+          let modUnitCogs = productCostCache.get(linkedProdId);
+          if (modUnitCogs === undefined) {
+            const modProduct = allProducts.find((p: any) => p.id === linkedProdId);
+            modUnitCogs = modProduct ? getProductCost(modProduct) : 0;
+            productCostCache.set(linkedProdId, modUnitCogs);
           }
-       });
+
+          calculatedCogsFromSales += qty * linkedQty * modUnitCogs;
+        }
+      });
     }
   }
 
@@ -12781,7 +12781,7 @@ async function autoBackfillTenantSalesCOGS(tenantId: number, startDate: Date, en
               itemCogs += Number(item.quantity) * linkedQty * modUnitCost;
             }
           });
-        } catch (e) {}
+        } catch (e) { }
       }
       sCogs += itemCogs;
     }
@@ -12897,7 +12897,7 @@ async function calculatePreviousYearsRetainedEarnings(tenantId: number, startOfY
         let monthsBeforeThisYear = (startOfYear.getFullYear() - purchaseDate.getFullYear()) * 12 + (startOfYear.getMonth() - purchaseDate.getMonth());
         if (monthsBeforeThisYear >= 0) monthsBeforeThisYear += 1;
         if (monthsBeforeThisYear > Number(asset.usefulLife)) monthsBeforeThisYear = Number(asset.usefulLife);
-        
+
         if (monthsBeforeThisYear > 0) {
           const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
           prevAssetDepreciation += Math.max(0, Math.min(monthsBeforeThisYear * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
@@ -12963,14 +12963,14 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
 
     accrualSales.forEach(sale => {
       // Calculate omzet as sum of items total (to exactly match POS Profitability) minus any partial returns
-      const rawAmount = sale.SaleItem && sale.SaleItem.length > 0 
-        ? sale.SaleItem.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0) 
+      const rawAmount = sale.SaleItem && sale.SaleItem.length > 0
+        ? sale.SaleItem.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0)
         : sale.totalAmount; // fallback
       const refundedAmount = sale.SaleReturn?.reduce((sum: number, r: any) => sum + (Number(r.totalRefundAmount) || 0), 0) || 0;
       let amount = Math.max(0, rawAmount - refundedAmount);
 
       const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
-      
+
       if (sale.taxRate && sale.taxRate > 0) {
         // Collect tax if any
         if (sale.taxAmount && sale.taxAmount > 0) {
@@ -12979,7 +12979,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
           totalTaxCollected += amount * (sale.taxRate / (100 + sale.taxRate));
         }
       }
-      
+
       salesRevenueByCategory[catName] = (salesRevenueByCategory[catName] || 0) + amount;
       totalSalesRevenue += amount;
     });
@@ -12987,11 +12987,11 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
     incomes.forEach(inc => {
       const catName = inc.category?.name || 'Uncategorized';
       let amount = inc.amount;
-      
+
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
       const isEquity = inc.category?.type === 'EQUITY';
       const isSystem = inc.category?.name.startsWith('[SYSTEM]');
-      
+
       if (!isSales && !isEquity && !isSystem) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
         totalOtherIncome += amount;
@@ -13016,7 +13016,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       const isInventory = exp.category?.type === 'INVENTORY';
       const isSystem = exp.category?.name.startsWith('[SYSTEM]');
       const isSalesRefund = exp.category?.name === 'Refund Penjualan';
-      
+
       if (isCapex || isInventory || isSystem || isSalesRefund) {
         // Exclude CAPEX, INVENTORY, SYSTEM, and Refund Penjualan (already netted in accrualSales) from P&L
       } else if (isCOGS) {
@@ -13026,7 +13026,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
         // Classify opex into General Opex, Depreciation, or Non-Operational
         const isDep = /penyusutan|amortisasi|depresiasi/i.test(catName);
         const isNonOp = /admin bank|biaya bank|bunga bank|biaya lain|jasa manajemen|non-operasional|lain-lain/i.test(catName);
-        
+
         if (isDep) {
           // Only add to P&L if it's a manual entry. System cron job entries are ignored here
           // because we will calculate depreciation dynamically below to ensure real-time accuracy.
@@ -13062,7 +13062,7 @@ app.get('/api/finance/reports/profit-loss', tenantMiddleware, async (req: Reques
       if (asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
         const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
         const monthsFromPurchase = (year - purchaseDate.getFullYear()) * 12 + (month - 1 - purchaseDate.getMonth());
-        
+
         if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
           const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
           const depName = `Penyusutan Kategori: ${asset.category || 'Lainnya'}`;
@@ -13179,14 +13179,14 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
 
     accrualSales.forEach(sale => {
       // Calculate omzet as sum of items total (to exactly match POS Profitability) minus any partial returns
-      const rawAmount = sale.SaleItem && sale.SaleItem.length > 0 
-        ? sale.SaleItem.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0) 
+      const rawAmount = sale.SaleItem && sale.SaleItem.length > 0
+        ? sale.SaleItem.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0)
         : sale.totalAmount; // fallback
       const refundedAmount = sale.SaleReturn?.reduce((sum: number, r: any) => sum + (Number(r.totalRefundAmount) || 0), 0) || 0;
       let amount = Math.max(0, rawAmount - refundedAmount);
 
       const catName = sale.saleType === 'POS' ? 'Penjualan POS' : 'Penjualan Produk';
-      
+
       if (sale.taxRate && sale.taxRate > 0) {
         if (sale.taxAmount && sale.taxAmount > 0) {
           totalTaxCollected += sale.taxAmount;
@@ -13194,7 +13194,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
           totalTaxCollected += amount * (sale.taxRate / (100 + sale.taxRate));
         }
       }
-      
+
       salesRevenueByCategory[catName] = (salesRevenueByCategory[catName] || 0) + amount;
       totalSalesRevenue += amount;
     });
@@ -13202,11 +13202,11 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
     incomes.forEach(inc => {
       const catName = inc.category?.name || 'Uncategorized';
       let amount = inc.amount;
-      
+
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
       const isEquity = inc.category?.type === 'EQUITY';
       const isSystem = inc.category?.name.startsWith('[SYSTEM]');
-      
+
       if (!isSales && !isEquity && !isSystem) {
         otherIncomeByCategory[catName] = (otherIncomeByCategory[catName] || 0) + amount;
         totalOtherIncome += amount;
@@ -13231,7 +13231,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
       const isInventory = exp.category?.type === 'INVENTORY';
       const isSystem = exp.category?.name.startsWith('[SYSTEM]');
       const isSalesRefund = exp.category?.name === 'Refund Penjualan';
-      
+
       if (isCapex || isInventory || isSystem || isSalesRefund) {
         // Exclude CAPEX, INVENTORY, SYSTEM, and Refund Penjualan (already netted in accrualSales) from P&L
       } else if (isCOGS) {
@@ -13241,7 +13241,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
         // Classify opex into General Opex, Depreciation, or Non-Operational
         const isDep = /penyusutan|amortisasi|depresiasi/i.test(catName);
         const isNonOp = /admin bank|biaya bank|bunga bank|biaya lain|jasa manajemen|non-operasional|lain-lain/i.test(catName);
-        
+
         if (isDep) {
           // Only add to P&L if it's a manual entry. System cron job entries are ignored here
           // because we will calculate depreciation dynamically below to ensure real-time accuracy.
@@ -13277,7 +13277,7 @@ app.get('/api/finance/reports/profit-loss/export', tenantMiddleware, async (req:
         const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
         // Calculate months between purchaseDate and the target P&L month/year
         const monthsFromPurchase = (year - purchaseDate.getFullYear()) * 12 + (month - 1 - purchaseDate.getMonth());
-        
+
         if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
           const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
           const depName = `Penyusutan Kategori: ${asset.category || 'Lainnya'}`;
@@ -13458,12 +13458,12 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     let totalFixedAssetsGross = 0;
     let totalAccumulatedDepreciation = 0;
     const assetsWithBookValue = physicalAssets.map(asset => {
-        let bookValue = Number(asset.bookValue || asset.purchasePrice || 0);
-        let accumulatedDepreciation = Number(asset.accumulatedDepreciation || 0);
-        totalFixedAssetsGross += Number(asset.purchasePrice || 0);
-        totalAccumulatedDepreciation += accumulatedDepreciation;
-        totalFixedAssets += bookValue;
-        return { ...asset, bookValue, accumulatedDepreciation };
+      let bookValue = Number(asset.bookValue || asset.purchasePrice || 0);
+      let accumulatedDepreciation = Number(asset.accumulatedDepreciation || 0);
+      totalFixedAssetsGross += Number(asset.purchasePrice || 0);
+      totalAccumulatedDepreciation += accumulatedDepreciation;
+      totalFixedAssets += bookValue;
+      return { ...asset, bookValue, accumulatedDepreciation };
     });
 
     // 3. Assets: Employee Loans (Piutang Karyawan)
@@ -13473,10 +13473,10 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     });
     const totalLoans = activeLoans.reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
     const loanDetails = activeLoans.map(l => ({
-        id: l.id,
-        name: l.user?.name || 'Karyawan',
-        amount: l.remainingAmount,
-        notes: l.description || '-'
+      id: l.id,
+      name: l.user?.name || 'Karyawan',
+      amount: l.remainingAmount,
+      notes: l.description || '-'
     }));
 
     // 3b. Assets: Customer Receivables (Piutang Usaha)
@@ -13486,10 +13486,10 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     });
     const totalCustomerReceivables = unpaidSales.reduce((sum, s) => sum + (Number(s.totalAmount) - Number(s.paidAmount || 0)), 0);
     const customerReceivableDetails = unpaidSales.map(s => ({
-        id: s.invoiceNumber,
-        name: s.customerName || 'Pelanggan Umum',
-        amount: Number(s.totalAmount) - Number(s.paidAmount || 0),
-        notes: `Inv: ${s.invoiceNumber}`
+      id: s.invoiceNumber,
+      name: s.customerName || 'Pelanggan Umum',
+      amount: Number(s.totalAmount) - Number(s.paidAmount || 0),
+      notes: `Inv: ${s.invoiceNumber}`
     }));
 
     // 3c. Assets: Stock / Inventory Value (Persediaan Barang)
@@ -13506,13 +13506,13 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       where: { companyId: tenantId, category: { name: '[SYSTEM] Pelunasan Piutang Cabang' } }
     });
     const totalPiutangCabang = piutangExpenses.reduce((sum, e) => sum + e.amount, 0) - piutangIncomes.reduce((sum, i) => sum + i.amount, 0);
-    
+
     // Simplistic detail for Piutang Cabang (just listing the origin expenses)
     const piutangCabangDetails = piutangExpenses.map(e => ({
-        id: e.id,
-        name: e.paidTo || 'Cabang Lain',
-        amount: e.amount,
-        notes: e.description || '-'
+      id: e.id,
+      name: e.paidTo || 'Cabang Lain',
+      amount: e.amount,
+      notes: e.description || '-'
     }));
 
     const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalPiutangCabang + totalInventoryValue;
@@ -13588,7 +13588,7 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       },
       include: { category: true }
     });
-    
+
     let ytdTotalOtherIncome = 0;
     ytdIncomesAll.forEach(inc => {
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
@@ -13626,24 +13626,24 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     // 5. Calculate YTD Asset Depreciation
     let ytdAssetDepreciation = 0;
     const currentMonthNum = endOfToday.getMonth(); // 0-11
-    
+
     physicalAssets.forEach(asset => {
       if (asset.isDepreciating && asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
         const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
-        
+
         // We only depreciate up to the current month for the current year.
         for (let m = 0; m <= currentMonthNum; m++) {
-           const monthsFromPurchase = (currentYear - purchaseDate.getFullYear()) * 12 + (m - purchaseDate.getMonth());
-           if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
-             const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-             ytdAssetDepreciation += monthlyDepreciation;
-           }
+          const monthsFromPurchase = (currentYear - purchaseDate.getFullYear()) * 12 + (m - purchaseDate.getMonth());
+          if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
+            const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+            ytdAssetDepreciation += monthlyDepreciation;
+          }
         }
       }
     });
 
     const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs + ytdAssetDepreciation)) * 100) / 100;
-    
+
     // Fetch historical modal disetor
     const equityIncomes = await prisma.income.findMany({
       where: { companyId: tenantId, category: { type: 'EQUITY' } }
@@ -13655,10 +13655,10 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
     const modalDisetorHistorical = equityIncomes.reduce((sum, inc) => sum + inc.amount, 0) - totalPrive;
 
     const calculatedModalDisetor = Math.round((totalEquity - ytdNetProfit) * 100) / 100;
-    
+
     // 5c. Calculate Laba Ditahan (Retained Earnings from Previous Years)
     const labaDitahanTahunLalu = await calculatePreviousYearsRetainedEarnings(tenantId, startOfYear);
-    
+
     // Akun Penahan (Selisih Pembukuan) = Calculated Modal - Modal Disetor - Laba Ditahan Tahun Lalu
     const akunPenahan = Math.round((calculatedModalDisetor - modalDisetorHistorical - labaDitahanTahunLalu) * 100) / 100;
 
@@ -13680,15 +13680,15 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         customerReceivableDetails,
         piutangCabangDetails
       },
-      liabilities: { 
-        total: totalLiabilities, 
+      liabilities: {
+        total: totalLiabilities,
         pendingExpensesTotal: totalPendingExpenses,
         taxLiability: totalTaxLiability,
         totalHutangCabang: totalHutangCabang,
         totalHutangBank: totalHutangBank,
-        details: pendingExpenses 
+        details: pendingExpenses
       },
-      equity: { 
+      equity: {
         total: totalEquity,
         modalDisetor: modalDisetorHistorical,
         totalPrive: totalPrive,
@@ -13719,21 +13719,21 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     let totalFixedAssetsGross = 0;
     let totalAccumulatedDepreciation = 0;
     const assetsWithBookValue = physicalAssets.map(asset => {
-        let bookValue = Number(asset.purchasePrice || 0);
-        let accumulatedDepreciation = 0;
-        totalFixedAssetsGross += bookValue;
-        if (asset.isDepreciating && Number(asset.purchasePrice) > 0 && Number(asset.usefulLife) > 0) {
-            const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
-            const now = new Date();
-            let monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
-            if (monthsPassed >= 0) monthsPassed += 1; // Count purchase month as 1 full month
-            const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-            accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
-            bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
-        }
-        totalAccumulatedDepreciation += accumulatedDepreciation;
-        totalFixedAssets += bookValue;
-        return { ...asset, bookValue, accumulatedDepreciation };
+      let bookValue = Number(asset.purchasePrice || 0);
+      let accumulatedDepreciation = 0;
+      totalFixedAssetsGross += bookValue;
+      if (asset.isDepreciating && Number(asset.purchasePrice) > 0 && Number(asset.usefulLife) > 0) {
+        const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
+        const now = new Date();
+        let monthsPassed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
+        if (monthsPassed >= 0) monthsPassed += 1; // Count purchase month as 1 full month
+        const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+        accumulatedDepreciation = Math.max(0, Math.min(monthsPassed * monthlyDepreciation, Number(asset.purchasePrice) - Number(asset.residualValue || 0)));
+        bookValue = Number(asset.purchasePrice) - accumulatedDepreciation;
+      }
+      totalAccumulatedDepreciation += accumulatedDepreciation;
+      totalFixedAssets += bookValue;
+      return { ...asset, bookValue, accumulatedDepreciation };
     });
 
     const activeLoans = await prisma.loan.findMany({ where: { companyId: tenantId, status: 'ACTIVE' } });
@@ -13825,7 +13825,7 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       },
       include: { category: true }
     });
-    
+
     let ytdTotalOtherIncome = 0;
     ytdIncomesAll.forEach(inc => {
       const isSales = inc.category?.name === 'Penjualan Produk' || inc.category?.name === 'Penjualan POS';
@@ -13863,24 +13863,24 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     // 5. Calculate YTD Asset Depreciation
     let ytdAssetDepreciation = 0;
     const currentMonthNum = endOfToday.getMonth(); // 0-11
-    
+
     physicalAssets.forEach(asset => {
       if (asset.isDepreciating && asset.purchasePrice && asset.purchasePrice > 0 && asset.usefulLife && asset.usefulLife > 0) {
         const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(asset.createdAt);
-        
+
         // We only depreciate up to the current month for the current year.
         for (let m = 0; m <= currentMonthNum; m++) {
-           const monthsFromPurchase = (currentYear - purchaseDate.getFullYear()) * 12 + (m - purchaseDate.getMonth());
-           if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
-             const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
-             ytdAssetDepreciation += monthlyDepreciation;
-           }
+          const monthsFromPurchase = (currentYear - purchaseDate.getFullYear()) * 12 + (m - purchaseDate.getMonth());
+          if (monthsFromPurchase >= 0 && monthsFromPurchase < asset.usefulLife) {
+            const monthlyDepreciation = Math.round(((Number(asset.purchasePrice) - Number(asset.residualValue || 0)) / Number(asset.usefulLife)) * 100) / 100;
+            ytdAssetDepreciation += monthlyDepreciation;
+          }
         }
       }
     });
 
     const ytdNetProfit = Math.round((ytdRevenue - (ytdExpense + ytdSalesCogs + ytdAssetDepreciation)) * 100) / 100;
-    
+
     // Fetch historical modal disetor
     const equityIncomes = await prisma.income.findMany({
       where: { companyId: tenantId, category: { type: 'EQUITY' } }
@@ -13932,18 +13932,18 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     worksheet.addRow(['Aset Tetap (Harga Perolehan)']);
     worksheet.getRow(currentRow).font = { italic: true, bold: true };
     currentRow++;
-    
+
     const groupedAssets: Record<string, { gross: number, dep: number }> = {};
     assetsWithBookValue.forEach(asset => {
-        const cat = asset.category || 'Lainnya';
-        if (!groupedAssets[cat]) groupedAssets[cat] = { gross: 0, dep: 0 };
-        groupedAssets[cat].gross += asset.purchasePrice || 0;
-        groupedAssets[cat].dep += asset.accumulatedDepreciation || 0;
+      const cat = asset.category || 'Lainnya';
+      if (!groupedAssets[cat]) groupedAssets[cat] = { gross: 0, dep: 0 };
+      groupedAssets[cat].gross += asset.purchasePrice || 0;
+      groupedAssets[cat].dep += asset.accumulatedDepreciation || 0;
     });
 
     Object.entries(groupedAssets).forEach(([cat, vals]) => {
-        worksheet.addRow([cat, '', vals.gross]);
-        currentRow++;
+      worksheet.addRow([cat, '', vals.gross]);
+      currentRow++;
     });
 
     worksheet.addRow(['Penyusutan']);
@@ -13951,10 +13951,10 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     currentRow++;
 
     Object.entries(groupedAssets).forEach(([cat, vals]) => {
-        if (vals.dep > 0) {
-            worksheet.addRow([`Akumulasi Penyusutan ${cat}`, '', -vals.dep]);
-            currentRow++;
-        }
+      if (vals.dep > 0) {
+        worksheet.addRow([`Akumulasi Penyusutan ${cat}`, '', -vals.dep]);
+        currentRow++;
+      }
     });
 
     worksheet.addRow(['Total Aset Tetap Bersih', '', totalFixedAssets]);
@@ -14351,7 +14351,7 @@ app.get('/api/finance/reports/cash-flow/export', tenantMiddleware, async (req: R
 app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    
+
     const { month, year } = req.query;
     const whereClause: any = { companyId: tenantId };
     if (month && year && month !== 'all' && year !== 'all') {
@@ -14605,7 +14605,7 @@ app.get('/api/finance/journal/export', tenantMiddleware, async (req: Request, re
         credit: entry.credit || 0,
         description: entry.description
       });
-      
+
       // Format number cells
       row.getCell('debit').numFmt = '#,##0';
       row.getCell('credit').numFmt = '#,##0';
@@ -14723,24 +14723,24 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
       const calculatedUnitCost = product ? getProductCost(product) : (item.currentCostPrice || 0);
 
       let itemCogs = Number(item.quantity) * calculatedUnitCost;
-      
+
       // Calculate Modifiers COGS
       if (item.modifiers) {
-         const mods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
-         Object.values(mods).forEach((val: any) => {
-            if (val && val.linkedProductId) {
-               const linkedProdId = Number(val.linkedProductId);
-               const linkedQty = Number(val.linkedQuantity) || 1;
-               const modProduct = allProducts.find(p => p.id === linkedProdId);
-               const modUnitCogs = modProduct ? getProductCost(modProduct) : 0;
-               itemCogs += (Number(item.quantity) * linkedQty * modUnitCogs);
-            }
-         });
+        const mods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
+        Object.values(mods).forEach((val: any) => {
+          if (val && val.linkedProductId) {
+            const linkedProdId = Number(val.linkedProductId);
+            const linkedQty = Number(val.linkedQuantity) || 1;
+            const modProduct = allProducts.find(p => p.id === linkedProdId);
+            const modUnitCogs = modProduct ? getProductCost(modProduct) : 0;
+            itemCogs += (Number(item.quantity) * linkedQty * modUnitCogs);
+          }
+        });
       }
 
       const itemRevenue = Number(item.total) || 0;
       const itemProfit = itemRevenue - itemCogs;
-      
+
       productStats[pid].qtySold += Number(item.quantity) || 0;
       productStats[pid].revenue += itemRevenue;
       productStats[pid].cogs += itemCogs;
@@ -14791,7 +14791,7 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
 app.get('/api/finance/reports/payable', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    
+
     const payables = await prisma.$queryRawUnsafe(`
       SELECT e.*, s."name" as "supplierName", ec."name" as "categoryName"
       FROM "Expense" e
@@ -14811,7 +14811,7 @@ app.get('/api/finance/reports/payable', tenantMiddleware, async (req: Request, r
 app.get('/api/finance/reports/receivable', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
-    
+
     const receivables = await prisma.$queryRawUnsafe(`
       SELECT s.*, c."name" as "customerName"
       FROM "Sale" s
@@ -14873,8 +14873,8 @@ app.patch('/api/finance/sales/:id/pay', tenantMiddleware, async (req: Request, r
       if (sale.status === 'PAID') throw new Error('Penjualan sudah lunas.');
 
       const remainingBalance = parseFloat((sale.totalAmount - (sale.paidAmount || 0)).toFixed(2));
-      const amountToPay = paymentAmount !== undefined 
-        ? Math.min(parseFloat(paymentAmount.toString()), remainingBalance) 
+      const amountToPay = paymentAmount !== undefined
+        ? Math.min(parseFloat(paymentAmount.toString()), remainingBalance)
         : remainingBalance;
 
       if (amountToPay <= 0) throw new Error('Nominal pembayaran tidak valid.');
@@ -14909,8 +14909,8 @@ app.patch('/api/finance/sales/:id/pay', tenantMiddleware, async (req: Request, r
         category = { id: catResult[0].id };
       }
 
-      const desc = isFullyPaid 
-        ? `Pelunasan Piutang Inv ${sale.invoiceNumber}` 
+      const desc = isFullyPaid
+        ? `Pelunasan Piutang Inv ${sale.invoiceNumber}`
         : `Cicilan Piutang Inv ${sale.invoiceNumber}`;
 
       await tx.income.create({
@@ -15039,7 +15039,7 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
         companyId: Number(sourceCompanyId),
         id: productIds && productIds.length > 0 ? { in: productIds.map(Number) } : undefined
       },
-      include: { 
+      include: {
         category: true,
         customizations: {
           include: {
@@ -15216,7 +15216,7 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
       where: { id: targetCompanyId },
       select: { addons: true }
     });
-    
+
     const addons = targetCompanyInfo?.addons || [];
     let skuLimit = 10; // Default Free Tier
     if (addons.includes('INVENTORY_ENTERPRISE')) {
@@ -15230,8 +15230,8 @@ app.post('/api/products/import', tenantMiddleware, async (req: Request, res: Res
     if (skuLimit !== Infinity) {
       const currentSkuCount = existingTargetProducts.length;
       if (currentSkuCount + productsToCreate.length > skuLimit) {
-        return res.status(403).json({ 
-          error: `Batas SKU tercapai. Anda mencoba mengimpor ${productsToCreate.length} produk baru, namun sisa limit Add-on Inventory Anda adalah ${skuLimit - currentSkuCount} SKU (Total saat ini: ${currentSkuCount}/${skuLimit} SKU). Silakan upgrade Add-on Inventory Anda.` 
+        return res.status(403).json({
+          error: `Batas SKU tercapai. Anda mencoba mengimpor ${productsToCreate.length} produk baru, namun sisa limit Add-on Inventory Anda adalah ${skuLimit - currentSkuCount} SKU (Total saat ini: ${currentSkuCount}/${skuLimit} SKU). Silakan upgrade Add-on Inventory Anda.`
         });
       }
     }
@@ -15429,45 +15429,45 @@ app.get('/api/inventory/products', tenantMiddleware, async (req: Request, res: R
     });
 
     const productsWithFilteredStock = products.map(p => {
-       const getProductCost = (product: any, visited = new Set<number>()): number => {
-         if (!product || visited.has(product.id)) return 0;
-         visited.add(product.id);
+      const getProductCost = (product: any, visited = new Set<number>()): number => {
+        if (!product || visited.has(product.id)) return 0;
+        visited.add(product.id);
 
-         if (product.Recipes && product.Recipes.length > 0) {
-           const totalBatchCost = product.Recipes.reduce((sum: number, r: any) => {
-             const material = products.find(m => m.id === r.materialId);
-             // Safety fallback: if material not in current list, use its own costPrice if available in raw relation
-             const materialUnitCost = material ? getProductCost(material, new Set(visited)) : (r.Material?.costPrice || 0);
-             return sum + (Number(r.quantity || 0) * Number(materialUnitCost || 0));
-           }, 0);
+        if (product.Recipes && product.Recipes.length > 0) {
+          const totalBatchCost = product.Recipes.reduce((sum: number, r: any) => {
+            const material = products.find(m => m.id === r.materialId);
+            // Safety fallback: if material not in current list, use its own costPrice if available in raw relation
+            const materialUnitCost = material ? getProductCost(material, new Set(visited)) : (r.Material?.costPrice || 0);
+            return sum + (Number(r.quantity || 0) * Number(materialUnitCost || 0));
+          }, 0);
 
-           // Divide by yield to get UNIT HPP
-           return totalBatchCost / (product.recipeYield || 1);
-         }
+          // Divide by yield to get UNIT HPP
+          return totalBatchCost / (product.recipeYield || 1);
+        }
 
-         return product.costPrice || 0;
-       };
+        return product.costPrice || 0;
+      };
 
-       const recipeCogs = (p.Recipes && p.Recipes.length > 0) ? getProductCost(p) : 0;
-       
-       let displayStock = 0;
-       if (warehouseId && warehouseId !== 'all') {
-         const ws = p.WarehouseStock.find((ws: any) => ws.warehouseId === Number(warehouseId));
-         displayStock = ws ? ws.quantity : 0;
-       } else if (branchId && branchId !== 'all') {
-         if (branchId === 'null') {
-            const hqWarehouse = p.WarehouseStock.find((ws: any) => ws.warehouse.branchId === null);
-            displayStock = hqWarehouse ? hqWarehouse.quantity : 0;
-         } else {
-            const branchWarehouses = p.WarehouseStock.filter((ws: any) => ws.warehouse.branchId === Number(branchId));
-            displayStock = branchWarehouses.reduce((sum: number, ws: any) => sum + ws.quantity, 0);
-         }
-       } else {
-         // Global stock: source of truth is the sum of all WarehouseStock, ignoring potentially desynced p.stock
-         displayStock = p.WarehouseStock ? p.WarehouseStock.reduce((sum: number, ws: any) => sum + ws.quantity, 0) : p.stock;
-       }
+      const recipeCogs = (p.Recipes && p.Recipes.length > 0) ? getProductCost(p) : 0;
 
-       return { ...p, stock: displayStock, originalTotalStock: p.stock, recipeCogs };
+      let displayStock = 0;
+      if (warehouseId && warehouseId !== 'all') {
+        const ws = p.WarehouseStock.find((ws: any) => ws.warehouseId === Number(warehouseId));
+        displayStock = ws ? ws.quantity : 0;
+      } else if (branchId && branchId !== 'all') {
+        if (branchId === 'null') {
+          const hqWarehouse = p.WarehouseStock.find((ws: any) => ws.warehouse.branchId === null);
+          displayStock = hqWarehouse ? hqWarehouse.quantity : 0;
+        } else {
+          const branchWarehouses = p.WarehouseStock.filter((ws: any) => ws.warehouse.branchId === Number(branchId));
+          displayStock = branchWarehouses.reduce((sum: number, ws: any) => sum + ws.quantity, 0);
+        }
+      } else {
+        // Global stock: source of truth is the sum of all WarehouseStock, ignoring potentially desynced p.stock
+        displayStock = p.WarehouseStock ? p.WarehouseStock.reduce((sum: number, ws: any) => sum + ws.quantity, 0) : p.stock;
+      }
+
+      return { ...p, stock: displayStock, originalTotalStock: p.stock, recipeCogs };
     });
 
     // LOG RESULT COUNT
@@ -15491,10 +15491,10 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
       where: { id: tenantId },
       select: { addons: true }
     });
-    
+
     const addons = company?.addons || [];
     let skuLimit = 10; // Default Free Tier
-    
+
     if (addons.includes('INVENTORY_ENTERPRISE')) {
       skuLimit = Infinity;
     } else if (addons.includes('INVENTORY_PRO')) {
@@ -15507,10 +15507,10 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
       const currentSkuCount = await prisma.product.count({
         where: { companyId: tenantId }
       });
-      
+
       if (currentSkuCount >= skuLimit) {
-        return res.status(403).json({ 
-          error: `Batas SKU tercapai (${skuLimit} produk). Silakan upgrade Add-on Inventory Anda.` 
+        return res.status(403).json({
+          error: `Batas SKU tercapai (${skuLimit} produk). Silakan upgrade Add-on Inventory Anda.`
         });
       }
     }
@@ -15548,7 +15548,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
           updatedAt: new Date()
         }
       });
-      
+
       const productId = product.id;
 
       // 2. Initial Stock Transaction & Warehouse Stock
@@ -15577,7 +15577,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
       // 3. Optional Expense Sync
       if (recordExpense && stock > 0 && accountId && costPrice > 0) {
         const totalCost = stock * costPrice;
-        
+
         // Find or create "Belanja Stok" category
         let category: any = await tx.expenseCategory.findFirst({
           where: { companyId: tenantId, name: 'Belanja Stok (Inventori)' }
@@ -15621,7 +15621,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
   } catch (error: any) {
     fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] PRODUCT CREATE ERROR: \n${error.stack || error.message}\n`);
     console.error('Product Create Error:', error);
-    
+
     // Handle Prisma Unique Constraint Error (e.g. Duplicate SKU)
     if (error.code === 'P2002') {
       const targets = error.meta?.target || [];
@@ -15633,7 +15633,7 @@ app.post('/api/inventory/products', tenantMiddleware, async (req: Request, res: 
       }
       return res.status(400).json({ error: 'Gagal: Data (SKU/Nama) sudah terdaftar di sistem.' });
     }
-    
+
     res.status(500).json({ error: 'Gagal menambah produk: ' + error.message });
   }
 });
@@ -15687,7 +15687,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
     res.json({ message: 'Produk berhasil diperbarui' });
   } catch (error: any) {
     console.error('Product Update Error:', error);
-    
+
     // Handle Prisma Unique Constraint Error (e.g. Duplicate SKU)
     if (error.code === 'P2002') {
       const targets = error.meta?.target || [];
@@ -15699,7 +15699,7 @@ app.patch('/api/inventory/products/:id', tenantMiddleware, async (req: Request, 
       }
       return res.status(400).json({ error: 'Gagal: Data (SKU/Nama) sudah terdaftar di sistem.' });
     }
-    
+
     res.status(500).json({ error: 'Gagal memperbarui produk: ' + error.message });
   }
 });
@@ -15721,7 +15721,7 @@ app.delete('/api/inventory/products/:id', tenantMiddleware, async (req: Request,
     await prisma.$transaction(async (tx) => {
       // 1. Delete associated recipes first (since there's no FK constraint)
       await tx.$executeRawUnsafe(`DELETE FROM "ProductRecipe" WHERE "productId" = $1`, id);
-      
+
       // 2. Delete the product
       await tx.product.delete({
         where: { id }
@@ -15740,7 +15740,7 @@ app.get('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Requ
   try {
     const productId = parseInt(req.params.id as string);
     const { warehouseId } = req.query;
-    
+
     const recipes = await prisma.$queryRawUnsafe(`
       SELECT pr.*, p.name as material_name, p.unit as material_unit,
              COALESCE(p.stock, 0)::float as "globalStock",
@@ -15766,7 +15766,7 @@ app.post('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Req
     await prisma.$transaction(async (tx) => {
       // 1. Delete existing recipe
       await tx.$executeRawUnsafe(`DELETE FROM "ProductRecipe" WHERE "productId" = $1`, productId);
-      
+
       // 2. Insert new recipe items (deduplicate by materialId to prevent double entries)
       if (items && Array.isArray(items)) {
         // Keep only the last occurrence of each materialId
@@ -15779,7 +15779,7 @@ app.post('/api/inventory/products/:id/recipe', tenantMiddleware, async (req: Req
         for (const item of dedupedItems as any[]) {
           // Diagnostic Logging
           console.log(`[RECIPE SAVE] Product: ${productId} | Material: ${item.materialId} | Qty: ${item.quantity}`);
-          
+
           await tx.$executeRawUnsafe(`
             INSERT INTO "ProductRecipe" ("productId", "materialId", "quantity", "updatedAt")
             VALUES ($1, $2, $3, NOW())
@@ -15860,7 +15860,7 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
         const wStocks: any[] = await tx.$queryRawUnsafe(`SELECT quantity FROM "WarehouseStock" WHERE "productId" = $1 AND "warehouseId" = $2`, productId, wId);
         let oldWQty = wStocks.length > 0 ? wStocks[0].quantity : 0;
         let newWQty = oldWQty;
-        
+
         if (type === 'IN') newWQty += quantity;
         else if (type === 'OUT') newWQty -= quantity;
         else if (type === 'ADJUST') newWQty = quantity;
@@ -15875,7 +15875,7 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
       // 5. Record Transaction
       const safeSupplierId = supplierId && !isNaN(parseInt(String(supplierId))) ? parseInt(String(supplierId)) : null;
       const safeWarehouseId = warehouseId && !isNaN(parseInt(String(warehouseId))) ? parseInt(String(warehouseId)) : null;
-      
+
       await tx.$executeRawUnsafe(`
         INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date", "supplierId", "warehouseId")
         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -15885,7 +15885,7 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
       // 5. Optional Expense Sync (Only for IN)
       if (recordExpense && type === 'IN' && accountId && quantity > 0 && product.costPrice > 0) {
         const totalCost = quantity * product.costPrice;
-        
+
         // Determine Category Name & Type
         const isCOGS = expenseType === 'COGS';
         const catName = isCOGS ? 'Belanja Bahan Baku (Inventori)' : 'Biaya Operasional (Inventori)';
@@ -15967,7 +15967,7 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
                 data: { companyId: tenantId, name: catName, type: 'OPERATIONAL', updatedAt: new Date() }
               });
             }
-            
+
             // For income, we need an account. We can find a default account or use a system-generated one.
             // But Income requires accountId in schema. Let's find any account or create a "Kas Selisih" account.
             let account = await tx.financialAccount.findFirst({ where: { companyId: tenantId, name: 'Kas Selisih (Sistem)' } });
@@ -15975,9 +15975,9 @@ app.post('/api/inventory/adjust', tenantMiddleware, async (req: Request, res: Re
               // try to find any account if Kas Selisih doesn't exist yet to avoid failing
               account = await tx.financialAccount.findFirst({ where: { companyId: tenantId } });
               if (!account) {
-                 account = await tx.financialAccount.create({
-                    data: { companyId: tenantId, name: 'Kas Selisih (Sistem)', type: 'CASH', balance: 0 }
-                 });
+                account = await tx.financialAccount.create({
+                  data: { companyId: tenantId, name: 'Kas Selisih (Sistem)', type: 'CASH', balance: 0 }
+                });
               }
             }
 
@@ -16190,7 +16190,7 @@ app.post('/api/inventory/produce', tenantMiddleware, async (req: Request, res: R
         }
       });
 
-      return { 
+      return {
         producedProduct: product.name,
         producedQty,
         remainingUnit: product.unit
@@ -16363,12 +16363,12 @@ app.post('/api/inventory/warehouses', tenantMiddleware, async (req: Request, res
   try {
     const tenantId = Number((req as any).tenantId);
     const { name, location, isMain, branchId } = req.body;
-    
+
     // If isMain is true, unset other main warehouses for this company
     if (isMain) {
       await prisma.$executeRawUnsafe(`UPDATE "Warehouse" SET "isMain" = FALSE WHERE "companyId" = $1`, tenantId);
     }
-    
+
     const parsedBranchId = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
 
     const result: any[] = await prisma.$queryRawUnsafe(`
@@ -16376,7 +16376,7 @@ app.post('/api/inventory/warehouses', tenantMiddleware, async (req: Request, res
       VALUES ($1, $2, $3, $4, $5, NOW())
       RETURNING id
     `, tenantId, name, location, isMain || false, parsedBranchId);
-    
+
     res.status(201).json({ message: 'Gudang berhasil ditambahkan', warehouseId: result[0].id });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal menambah gudang: ' + error.message });
@@ -16389,11 +16389,11 @@ app.patch('/api/inventory/warehouses/:id', tenantMiddleware, async (req: Request
     const tenantId = Number((req as any).tenantId);
     const warehouseId = parseInt(req.params.id as string);
     const { name, location, isMain, branchId } = req.body;
-    
+
     if (isMain) {
       await prisma.$executeRawUnsafe(`UPDATE "Warehouse" SET "isMain" = FALSE WHERE "companyId" = $1`, tenantId);
     }
-    
+
     const parsedBranchId = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
 
     await prisma.$executeRawUnsafe(`
@@ -16401,7 +16401,7 @@ app.patch('/api/inventory/warehouses/:id', tenantMiddleware, async (req: Request
       SET "name" = $1, "location" = $2, "isMain" = $3, "branchId" = $4, "updatedAt" = NOW()
       WHERE id = $5 AND "companyId" = $6
     `, name, location, isMain, parsedBranchId, warehouseId, tenantId);
-    
+
     res.json({ message: 'Gudang berhasil diperbarui' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal memperbarui gudang: ' + error.message });
@@ -16413,11 +16413,11 @@ app.delete('/api/inventory/warehouses/:id', tenantMiddleware, async (req: Reques
   try {
     const tenantId = Number((req as any).tenantId);
     const warehouseId = parseInt(req.params.id as string);
-    
+
     await prisma.$executeRawUnsafe(`
       DELETE FROM "Warehouse" WHERE id = $1 AND "companyId" = $2
     `, warehouseId, tenantId);
-    
+
     res.json({ message: 'Gudang berhasil dihapus' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal menghapus gudang: ' + error.message });
@@ -16437,7 +16437,7 @@ async function getFranchiseCompanyIds(tenantId: number, txClient?: any): Promise
     return [tenantId];
   }
   const sisterCompanies = await client.company.findMany({
-    where: { 
+    where: {
       franchiseId: { equals: company.franchiseId, mode: 'insensitive' }
     },
     select: { id: true }
@@ -16577,7 +16577,7 @@ app.post('/api/customers/otp-request', tenantMiddleware, async (req: Request, re
 
     // 4. Send Message via Wablas
     const message = `Halo! Kode OTP pendaftaran Member Anda di *${company?.name || 'Aivola POS'}* adalah: *${otp}*.\n\nKode ini berlaku selama 5 menit. Mohon tidak memberikan kode ini kepada siapapun.`;
-    
+
     console.log(`[OTP] Mengirim WA via Wablas...`);
     // @ts-ignore
     const waResult = await sendWhatsAppMessage(phone, message, company?.waGatewayUrl || undefined, company?.waApiKey || undefined, true);
@@ -16611,18 +16611,18 @@ app.post('/api/customers/otp-verify', tenantMiddleware, async (req: Request, res
     // 2. Upsert Customer & Mark as Member
     const customer = await prisma.customer.upsert({
       where: { companyId_phone: { companyId: tenantId, phone } },
-      update: { 
-        name: name || undefined, 
-        isMember: true, 
+      update: {
+        name: name || undefined,
+        isMember: true,
         // @ts-ignore
         birthDate: birthDate ? new Date(birthDate) : undefined,
         // @ts-ignore
-        gender: gender 
+        gender: gender
       },
-      create: { 
-        companyId: tenantId, 
-        phone, 
-        name: name || 'Pelanggan Baru', 
+      create: {
+        companyId: tenantId,
+        phone,
+        name: name || 'Pelanggan Baru',
         isMember: true,
         // @ts-ignore
         birthDate: birthDate ? new Date(birthDate) : null,
@@ -16763,7 +16763,7 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
   try {
     const tenantId = Number((req as any).tenantId);
     const salesWithVoucher = await prisma.sale.findMany({
-      where: { 
+      where: {
         companyId: tenantId,
         OR: [
           { voucherCode: { not: null } },
@@ -16777,7 +16777,7 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
       },
       orderBy: { date: 'desc' }
     });
-    
+
     // Map to a consistent format for frontend
     const mappedResult = salesWithVoucher.map(sale => {
       let code = sale.voucherCode;
@@ -16788,8 +16788,8 @@ app.get('/api/vouchers/used', tenantMiddleware, async (req: Request, res: Respon
       const itemsSubtotal = (sale.SaleItem || []).reduce((sum: number, it: any) => sum + (Number(it.price) * Number(it.quantity)), 0);
       const diffDiscount = Math.max(0, itemsSubtotal - Number(sale.totalAmount));
 
-      let discount = sale.voucherDiscountAmount > 0 
-        ? sale.voucherDiscountAmount 
+      let discount = sale.voucherDiscountAmount > 0
+        ? sale.voucherDiscountAmount
         : (sale.memberDiscountAmount > 0 ? sale.memberDiscountAmount : 0);
 
       if (discount === 0 && diffDiscount > 0) {
@@ -16838,7 +16838,7 @@ app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) 
     const isGiftCardAuthorized = userRole === 'OWNER' || userRole === 'SUPERADMIN';
 
     const { code, discountType, discountValue, initialBalance, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
-    
+
     // RBAC: Only OWNER and SUPERADMIN can create Gift Cards (STORED_VALUE)
     if (discountType === 'STORED_VALUE' && !isGiftCardAuthorized) {
       return res.status(403).json({ error: 'Akses Ditolak. Hanya Owner dan Super Admin yang dapat membuat Gift Card (Saldo Tunai).' });
@@ -16848,7 +16848,7 @@ app.post('/api/vouchers', tenantMiddleware, async (req: Request, res: Response) 
     if (discountType === 'STORED_VALUE') {
       bal = initialBalance ? Number(initialBalance) : Number(discountValue || 0);
     }
-    
+
     const voucher = await prisma.voucher.create({
       data: {
         companyId: tenantId,
@@ -16887,7 +16887,7 @@ app.patch('/api/vouchers/:id', tenantMiddleware, async (req: Request, res: Respo
 
     const voucherId = Number(req.params.id);
     const { code, discountType, discountValue, initialBalance, currentBalance, minPurchase, minQuantity, maxDiscount, validFrom, validUntil, quota, isActive, targetAudience } = req.body;
-    
+
     // Ensure voucher belongs to tenant
     const existing = await prisma.voucher.findFirst({ where: { id: voucherId, companyId: tenantId } });
     if (!existing) return res.status(404).json({ error: 'Voucher tidak ditemukan' });
@@ -17011,8 +17011,8 @@ app.get('/api/customers/me/vouchers', tenantMiddleware, async (req: Request, res
     if (!customer) return res.json([]);
 
     const claimed = await prisma.customerVoucher.findMany({
-      where: { 
-        customerId: customer.id, 
+      where: {
+        customerId: customer.id,
         isUsed: false,
         voucher: {
           isActive: true,
@@ -17143,7 +17143,7 @@ app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: 
     const voucherId = parseInt(String(req.params.id));
     const userId = Number((req as any).userId);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    
+
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -17174,7 +17174,7 @@ app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: 
     }
 
     let customer = await prisma.customer.findFirst({ where: { email: user.email } });
-    
+
     // Create customer profile if doesn't exist (Auto-Member)
     if (!customer) {
       customer = await prisma.customer.create({
@@ -17189,8 +17189,8 @@ app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: 
 
     // Check if already claimed
     const existing = await prisma.customerVoucher.findUnique({
-      where: { 
-        customerId_voucherId: { customerId: customer.id, voucherId } 
+      where: {
+        customerId_voucherId: { customerId: customer.id, voucherId }
       }
     });
 
@@ -17297,7 +17297,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
     // --- SECURITY & SYNC FIX ---
     const userRole = (req as any).userRole;
-    
+
     if (userRole === 'CUSTOMER' && userId) {
       finalCustomerId = userId;
     } else if (!finalCustomerId && userId) {
@@ -17305,15 +17305,15 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
       if (user) {
         let linkedCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
         if (!linkedCustomer) {
-           linkedCustomer = await prisma.customer.create({
-             data: {
-               companyId: user.companyId,
-               name: user.name,
-               email: user.email,
-               phone: '00' + user.id.toString() + Math.floor(Math.random() * 1000).toString(),
-               isActive: true,
-             }
-           });
+          linkedCustomer = await prisma.customer.create({
+            data: {
+              companyId: user.companyId,
+              name: user.name,
+              email: user.email,
+              phone: '00' + user.id.toString() + Math.floor(Math.random() * 1000).toString(),
+              isActive: true,
+            }
+          });
         }
         if (linkedCustomer) {
           finalCustomerId = linkedCustomer.id;
@@ -17386,7 +17386,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         const isNotExpired = (!voucher?.validUntil || voucher.validUntil >= now) && (!voucher?.validFrom || voucher.validFrom <= now);
         const hasQuota = !voucher?.quota || voucher.usedCount < voucher.quota;
         const isPublicVoucher = voucher?.targetAudience === 'PUBLIC' && voucher?.discountType !== 'STORED_VALUE' && voucher?.code.toUpperCase() !== 'KARYAWAN';
-        
+
         let totalQuantity = 0;
         for (const item of items) {
           totalQuantity += parseFloat(item.quantity);
@@ -17422,12 +17422,12 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           } else {
             voucherDiscountAmount = voucher.discountValue;
           }
-          
+
           let updateData: any = { usedCount: { increment: 1 } };
           if (voucher.discountType === 'STORED_VALUE') {
             updateData.currentBalance = { decrement: voucherDiscountAmount };
           }
-          
+
           // Increment used count (and decrement balance)
           await tx.voucher.updateMany({
             where: { id: voucher.id },
@@ -17482,38 +17482,38 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         INSERT INTO "Sale" ("companyId", "branchId", "cashierId", "salespersonId", "invoiceNumber", "customerId", "date", "dueDate", "totalAmount", "totalCommission", "status", "accountId", "notes", "updatedAt", "voucherCode", "voucherDiscountAmount", "saleType", "pointsUsed", "deliveryMethod", "paymentMethod", "taxRate", "taxAmount", "memberDiscountAmount", "poNumber")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
         RETURNING id
-      `, 
-      tenantId, 
-      finalBranchId, 
-      finalCashierId, 
-      finalSalespersonId,
-      invoiceNumber, 
-      finalCustomerId, 
-      dateVal, 
-      dueDateVal,
-      totalAmount, 
-      totalCommission, 
-      status || 'PAID', 
-      accountId ? parseInt(accountId) : null, 
-      notes, 
-      voucherCode, 
-      voucherDiscountAmount, 
-      saleType || 'WALK_IN', 
-      pointsUsedNum,
-      deliveryMethod || 'Dine-in',
-      paymentMethod || 'Bayar di Kasir',
-      taxRate || 0,
-      taxAmount || 0,
-      memberDiscountAmount || 0,
-      poNumber || null);
-      
+      `,
+        tenantId,
+        finalBranchId,
+        finalCashierId,
+        finalSalespersonId,
+        invoiceNumber,
+        finalCustomerId,
+        dateVal,
+        dueDateVal,
+        totalAmount,
+        totalCommission,
+        status || 'PAID',
+        accountId ? parseInt(accountId) : null,
+        notes,
+        voucherCode,
+        voucherDiscountAmount,
+        saleType || 'WALK_IN',
+        pointsUsedNum,
+        deliveryMethod || 'Dine-in',
+        paymentMethod || 'Bayar di Kasir',
+        taxRate || 0,
+        taxAmount || 0,
+        memberDiscountAmount || 0,
+        poNumber || null);
+
       const saleId = saleResult[0].id;
 
       // --- INVENTORY WILL BE DEDUCTED IMMEDIATELY FOR PENDING ORDERS TO RESERVE STOCK ---
       // --- LOYALTY LOGIC: Earn & Redeem Points ---
       if (finalCustomerId) {
         const custId = finalCustomerId;
-        
+
         // 1. Redeem Points
         if (pointsUsedNum > 0) {
           await tx.customer.update({
@@ -17535,7 +17535,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
         if (earnedPoints > 0 && status !== 'PENDING') {
           await tx.customer.update({
             where: { id: custId },
-            data: { 
+            data: {
               points: { increment: earnedPoints },
               totalSpent: { increment: totalAmount }
             }
@@ -17653,7 +17653,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
 
       let customerEmail = null;
       if (finalCustomerId) {
-        const cust = await tx.customer.findUnique({where: {id: finalCustomerId}});
+        const cust = await tx.customer.findUnique({ where: { id: finalCustomerId } });
         customerEmail = cust?.email;
       }
       return { id: saleId, saleId, invoiceNumber, totalAmount, paymentMethod: paymentMethod || 'Bayar di Kasir', customerEmail };
@@ -17663,20 +17663,20 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     });
 
     // Fetch Payment Settings & Static QR from Company profile
-    const companyInfo = await prisma.company.findUnique({ 
-      where: { id: tenantId }, 
-      select: { 
-        qrisUrl: true, 
+    const companyInfo = await prisma.company.findUnique({
+      where: { id: tenantId },
+      select: {
+        qrisUrl: true,
         paymentInstructions: true,
         xenditMode: true,
         xenditSecretKey: true
-      } 
+      }
     });
     const qrisUrl = companyInfo?.qrisUrl || null;
     const paymentInstructions = companyInfo?.paymentInstructions || null;
 
     let invoiceUrl = null;
-    
+
     // --- DYNAMIC XENDIT PAYMENT GATEWAY (Aivola Default vs Client Custom) ---
     // Berlaku untuk "QRIS / Transfer (Online Payment)" (Pick-up/Delivery) dan "QRIS" (Dine-in)
     const isXenditEligibleMethod = result.paymentMethod.includes('Online Payment') || result.paymentMethod === 'QRIS';
@@ -17700,7 +17700,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
           });
 
           invoiceUrl = xenditRes.data.invoice_url;
-          
+
           // Simpan URL di notes sebagai referensi
           await prisma.sale.update({
             where: { id: result.saleId },
@@ -17726,7 +17726,7 @@ app.post('/api/sales', tenantMiddleware, async (req: Request, res: Response) => 
     // --- SOCKET NOTIFICATION ---
     const orderStatus = req.body.status || 'PENDING';
     const targetBranchId = req.body.branchId || finalBranchId;
-    
+
     console.log(`[Socket Debug] Order created with status: ${orderStatus}, target branch: ${targetBranchId}`);
 
     if (['PENDING', 'PROCESSING', 'PAID', 'APPROVED'].includes(orderStatus)) {
@@ -17992,34 +17992,34 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
             });
           }
         }
-        await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
-        
+        await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } } });
+
         // 2. Revert PointHistory
         const pointHistories = await tx.pointHistory.findMany({ where: { description: { contains: sale.invoiceNumber } } });
         for (const ph of pointHistories) {
-            if (ph.type === 'EARN') {
-                await tx.customer.update({
-                    where: { id: ph.customerId },
-                    data: { points: { decrement: ph.amount } }
-                });
-            } else if (ph.type === 'REDEEM') {
-                await tx.customer.update({
-                    where: { id: ph.customerId },
-                    data: { points: { increment: ph.amount } }
-                });
-            }
+          if (ph.type === 'EARN') {
+            await tx.customer.update({
+              where: { id: ph.customerId },
+              data: { points: { decrement: ph.amount } }
+            });
+          } else if (ph.type === 'REDEEM') {
+            await tx.customer.update({
+              where: { id: ph.customerId },
+              data: { points: { increment: ph.amount } }
+            });
+          }
         }
-        await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+        await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } } });
 
         // 3. Revert Inventory (Because PENDING, PAID, and PROCESSING all have deducted stock)
         if (oldStatus === 'PAID' || oldStatus === 'PROCESSING' || oldStatus === 'PENDING' || oldStatus === 'APPROVED' || oldStatus === 'PREPARING' || oldStatus === 'SHIPPED') {
           for (const item of sale.SaleItem) {
             if (!item.productId) continue;
             const qty = parseFloat(item.quantity as any);
-            
+
             await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3`, qty, item.productId, tenantId);
             await tx.$executeRawUnsafe(`INSERT INTO "StockTransaction" ("productId", "type", "quantity", "reference", "date") VALUES ($1, 'IN', $2, $3, NOW())`, item.productId, qty, `Pembatalan Penjualan Inv ${sale.invoiceNumber}`);
-            
+
             const recipes: any[] = await tx.$queryRawUnsafe(`SELECT pr.*, p."recipeYield" FROM "ProductRecipe" pr JOIN "Product" p ON pr."productId" = p.id WHERE pr."productId" = $1`, item.productId);
             if (recipes.length > 0) {
               const yieldVal = parseFloat(recipes[0].recipeYield) || 1;
@@ -18035,16 +18035,16 @@ app.patch('/api/sales/:id/status', tenantMiddleware, async (req: Request, res: R
 
       const userId = Number((req as any).userId);
       if (userId && (status === 'VOID' || status === 'CANCELLED')) {
-          await tx.auditLog.create({
-            data: {
-              companyId: tenantId,
-              userId: userId,
-              action: 'VOID_SALE',
-              entity: 'Sale',
-              entityId: sale.invoiceNumber,
-              details: `Membatalkan (Void) penjualan ${sale.invoiceNumber}`,
-            }
-          });
+        await tx.auditLog.create({
+          data: {
+            companyId: tenantId,
+            userId: userId,
+            action: 'VOID_SALE',
+            entity: 'Sale',
+            entityId: sale.invoiceNumber,
+            details: `Membatalkan (Void) penjualan ${sale.invoiceNumber}`,
+          }
+        });
       }
     });
 
@@ -18174,7 +18174,7 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
       return res.status(403).json({ error: 'Akses Ditolak. Hanya Admin, Owner, dan Finance yang dapat menghapus transaksi penjualan.' });
     }
 
-    const sale = await prisma.sale.findFirst({ where: { id: saleId, companyId: tenantId }});
+    const sale = await prisma.sale.findFirst({ where: { id: saleId, companyId: tenantId } });
     if (!sale) return res.status(404).json({ error: 'Penjualan tidak ditemukan' });
 
     // --- CHECK CLOSING ---
@@ -18193,26 +18193,26 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
           });
         }
       }
-      await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+      await tx.income.deleteMany({ where: { description: { contains: sale.invoiceNumber } } });
 
       // 2. Hapus Riwayat Poin (Jika ada poin yang digunakan atau didapat dari pesanan ini)
       // (Untuk penyederhanaan, kita abaikan pengembalian poin ke user, hanya menghapus record transaksinya agar database tidak kotor)
-      await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } }});
+      await tx.pointHistory.deleteMany({ where: { description: { contains: sale.invoiceNumber } } });
 
       // 3. Hapus SaleReturnItem, SaleReturn, dan Expense Refund Penjualan (Jika pernah diretur)
       const returnedQtyByProduct: Record<number, number> = {};
-      const returns = await tx.saleReturn.findMany({ where: { saleId }});
+      const returns = await tx.saleReturn.findMany({ where: { saleId } });
       for (const r of returns) {
-         const returnItems: any[] = await tx.$queryRawUnsafe(`
+        const returnItems: any[] = await tx.$queryRawUnsafe(`
            SELECT "productId", "quantity" FROM "SaleReturnItem" WHERE "returnId" = $1
          `, r.id);
-         for (const ri of returnItems) {
-           if (ri.productId) {
-             returnedQtyByProduct[ri.productId] = (returnedQtyByProduct[ri.productId] || 0) + (parseFloat(ri.quantity) || 0);
-           }
-         }
-         await tx.saleReturnItem.deleteMany({ where: { returnId: r.id }});
-         await tx.saleReturn.delete({ where: { id: r.id }});
+        for (const ri of returnItems) {
+          if (ri.productId) {
+            returnedQtyByProduct[ri.productId] = (returnedQtyByProduct[ri.productId] || 0) + (parseFloat(ri.quantity) || 0);
+          }
+        }
+        await tx.saleReturnItem.deleteMany({ where: { returnId: r.id } });
+        await tx.saleReturn.delete({ where: { id: r.id } });
       }
 
       // Hapus Expense Refund terkait & kembalikan saldo akun yang sempat terpotong refund
@@ -18240,7 +18240,7 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
         where: { companyId: tenantId }
       });
 
-      const saleItems = await tx.saleItem.findMany({ 
+      const saleItems = await tx.saleItem.findMany({
         where: { saleId },
         include: { product: { select: { name: true, sku: true, trackStock: true, type: true } } }
       });
@@ -18251,7 +18251,7 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
         const alreadyReturned = returnedQtyByProduct[productId] || 0;
         const qty = Math.max(0, rawQty - alreadyReturned);
         if (qty <= 0) continue;
-        
+
         // Return product stock
         await tx.$executeRawUnsafe(`
           UPDATE "Product" SET "stock" = "stock" + $1, "updatedAt" = NOW() WHERE "id" = $2 AND "companyId" = $3
@@ -18305,10 +18305,10 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
       }
 
       // 4. Hapus SaleItem (Detail barang)
-      await tx.saleItem.deleteMany({ where: { saleId }});
+      await tx.saleItem.deleteMany({ where: { saleId } });
 
       // 5. Hapus Penjualan Utama
-      await tx.sale.delete({ where: { id: saleId }});
+      await tx.sale.delete({ where: { id: saleId } });
 
       // 6. Record Audit Log
       await tx.auditLog.create({
@@ -18319,8 +18319,8 @@ app.delete('/api/sales/:id', tenantMiddleware, async (req: Request, res: Respons
           action: 'DELETE_SALE',
           entity: 'Sale',
           entityId: sale.invoiceNumber,
-          details: JSON.stringify({ 
-            totalAmount: sale.totalAmount, 
+          details: JSON.stringify({
+            totalAmount: sale.totalAmount,
             date: sale.date,
             customerName: sale.customerName,
             items: saleItems.map(it => ({
@@ -18356,17 +18356,17 @@ const buildPosWhereClause = async (req: Request, tenantId: number, query: any) =
     select: { id: true, franchiseId: true }
   });
 
-  let whereConditions = [`s."companyId" = $1`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')` ];
+  let whereConditions = [`s."companyId" = $1`, `s."status" NOT IN ('RETURNED', 'CANCELLED', 'VOID')`];
   let queryParams: any[] = [tenantId];
   let paramIndex = 2;
 
   // Strict isolation: POS queries, POS analytics, and cashier views must NEVER include B2B Sales Orders
-  const isPosRequest = 
-    req.path.startsWith('/api/pos') || 
-    query.isPos === 'true' || 
-    query.isPos === true || 
-    query.source === 'pos' || 
-    isPosViewer || 
+  const isPosRequest =
+    req.path.startsWith('/api/pos') ||
+    query.isPos === 'true' ||
+    query.isPos === true ||
+    query.source === 'pos' ||
+    isPosViewer ||
     ['CASHIER', 'OPERATIONAL'].includes(user?.role || '');
 
   if (isPosRequest) {
@@ -18541,7 +18541,7 @@ app.get('/api/sales', tenantMiddleware, async (req: Request, res: Response) => {
         sale.items = itemsBySaleId[sale.id] || [];
       }
     }
-    
+
     res.json(sales);
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal mengambil data penjualan: ' + error.message });
@@ -18786,7 +18786,7 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
 
     const cacheKey = `pos_insights_${tenantId}_${branchId || 'all'}_${startDate || 'none'}_${endDate || 'none'}`;
     const cached = insightCache[cacheKey];
-    
+
     // 2. If cached in the last 1 hour, return it directly (does not consume daily limit)
     if (cached && Date.now() - cached.timestamp < POS_INSIGHT_CACHE_TTL) {
       const currentCount = getPosAiCurrentCount(tenantId);
@@ -18822,9 +18822,9 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
     });
 
     if (sales.length === 0) {
-      return res.json({ 
+      return res.json({
         insights: ["Belum ada data penjualan POS untuk dianalisa periode ini."],
-        usageCount: limitStatus.count 
+        usageCount: limitStatus.count
       });
     }
 
@@ -18839,9 +18839,9 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
         hour12: false
       }).format(new Date(s.date));
       const hour = parseInt(hourStr, 10) === 24 ? 0 : parseInt(hourStr, 10);
-      
+
       hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
-      
+
       s.SaleItem.forEach((item: any) => {
         const name = item.product?.name || 'Produk Tidak Terdefinisi';
         topProducts[name] = (topProducts[name] || 0) + item.quantity;
@@ -18870,7 +18870,7 @@ app.get('/api/pos/analytics/ai-insights', tenantMiddleware, async (req: Request,
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
+
     // Clean JSON from response if Gemini adds markdown code blocks
     const jsonMatch = responseText.match(/\{.*\}/s);
     const finalData = jsonMatch ? JSON.parse(jsonMatch[0]) : { insights: ["Gagal menganalisa data."] };
@@ -18897,13 +18897,13 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
 
     // 1. Fetch User Data
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
-    
+
     const { branchId, startDate, endDate, paymentMethod, saleType } = req.query;
-    
+
     // 2. Build Query with Filters (Symmetric with List Sales)
     const isPosViewer = (user?.role as string) === 'POS_VIEWER';
     const invoiceFilter = isPosViewer ? `AND (s."invoiceNumber" LIKE 'POS-%' OR s."invoiceNumber" LIKE 'SLS-%')` : '';
-    
+
     let whereConditions = [`s."companyId" = ${tenantId}`, `s."status" NOT IN ('CANCELLED', 'VOID', 'RETURNED')`];
     const isPosRequest = isPosViewer || String(req.query.isPos) === 'true' || req.query.source === 'pos';
     if (isPosRequest) {
@@ -19050,12 +19050,12 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     }
 
     // 4. Calculate total quantity, revenue, and HPP per product (Rekapitulasi)
-    const productSummaryMap: Record<string, { 
-      sku: string, 
-      name: string, 
-      category: string, 
+    const productSummaryMap: Record<string, {
+      sku: string,
+      name: string,
+      category: string,
       costPrice: number,
-      totalQty: number, 
+      totalQty: number,
       totalRevenue: number,
       totalCost: number
     }> = {};
@@ -19076,7 +19076,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
       simulatedCost: number,
       defaultFoodCostRate: number
     }> = {};
-    
+
     saleItems.forEach(item => {
       const key = item.productId.toString();
       const qty = Number(item.quantity) || 0;
@@ -19649,7 +19649,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     try {
       const sharp = require('sharp');
       const chartCategories = categoriesList.slice(0, 5);
-      
+
       const chartWidth = 440;
       const chartHeight = 210;
       const plotLeft = 50;
@@ -19670,7 +19670,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
         const cOmzet = cat.totalRevenue;
         const rawSys = cOmzet > 0 ? (cOmzet - cat.systemCost) / cOmzet : 0;
         const rawSim = cOmzet > 0 ? (cOmzet - cat.simulatedCost) / cOmzet : 0;
-        
+
         const sysH = Math.max(0, Math.min(1, rawSys)) * barH;
         const simH = Math.max(0, Math.min(1, rawSim)) * barH;
         const xSys = cx - barW - 1.5;
@@ -19736,9 +19736,9 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     wsDashboard.getRow(startCatRow).height = 22;
 
     const notes = [
-      `1) Apa ini? Gross profit = omzet - HPP. Laporan sistem menghitung Rp ${systemGrossProfit.toLocaleString('id-ID')} (margin ${(systemMargin*100).toFixed(1)}%), tetapi ${invalidHppCount} dari ${productSummaries.length} menu (${(invalidHppRevenueShare*100).toFixed(1)}% dari omzet) ber-HPP <= Rp100 per unit, kemungkinan belum diisi, sehingga margin sistem tampak terlalu tinggi.`,
+      `1) Apa ini? Gross profit = omzet - HPP. Laporan sistem menghitung Rp ${systemGrossProfit.toLocaleString('id-ID')} (margin ${(systemMargin * 100).toFixed(1)}%), tetapi ${invalidHppCount} dari ${productSummaries.length} menu (${(invalidHppRevenueShare * 100).toFixed(1)}% dari omzet) ber-HPP <= Rp100 per unit, kemungkinan belum diisi, sehingga margin sistem tampak terlalu tinggi.`,
       `2) Cara simulasi: untuk menu ber-HPP belum valid (HPP/unit <= Rp100), HPP diganti omzet × food cost % asumsi di tabel kuning (mis. Ayam 40%, Minuman 25%). Menu dengan HPP valid tetap memakai HPP riil.`,
-      `3) Hasil: Total HPP simulasi menjadi Rp ${simulatedTotalHpp.toLocaleString('id-ID')} (selisih ${diffHpp >= 0 ? '+' : ''}${diffHpp.toLocaleString('id-ID')}), gross profit simulasi Rp ${simulatedGrossProfit.toLocaleString('id-ID')} dengan margin ${(simulatedMargin*100).toFixed(1)}% (${Math.abs(diffMarginPt).toFixed(1)} poin lebih realistis dari laporan sistem).`,
+      `3) Hasil: Total HPP simulasi menjadi Rp ${simulatedTotalHpp.toLocaleString('id-ID')} (selisih ${diffHpp >= 0 ? '+' : ''}${diffHpp.toLocaleString('id-ID')}), gross profit simulasi Rp ${simulatedGrossProfit.toLocaleString('id-ID')} dengan margin ${(simulatedMargin * 100).toFixed(1)}% (${Math.abs(diffMarginPt).toFixed(1)} poin lebih realistis dari laporan sistem).`,
       `4) Per bill: ${totalBills} bill, rata-rata omzet Rp ${Math.round(rataRataPerBill).toLocaleString('id-ID')} dan gross profit simulasi sekitar Rp ${Math.round(simulatedGpPerBill).toLocaleString('id-ID')} per bill (laporan sistem Rp ${Math.round(systemGpPerBill).toLocaleString('id-ID')}).`,
       `5) Catatan: angka simulasi adalah perkiraan untuk perencanaan bisnis. Ganti asumsi kuning dengan HPP riil pada Master Menu bila resep sudah terdata lengkap.`
     ];
@@ -19798,8 +19798,8 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
         invoiceNumber: sale.invoiceNumber,
         branchName: sale.branchName || 'Kantor Pusat',
         customerName: sale.customerName || 'Umum',
-        status: sale.status === 'PAID' ? 'Lunas' : 
-                sale.status === 'PARTIALLY_RETURNED' ? 'Retur Sebagian' : 'Belum Bayar',
+        status: sale.status === 'PAID' ? 'Lunas' :
+          sale.status === 'PARTIALLY_RETURNED' ? 'Retur Sebagian' : 'Belum Bayar',
         paymentMethod: detectedMethod,
         paymentReference: refVal,
         totalAmount: sale.netTotalAmount !== undefined ? sale.netTotalAmount : sale.totalAmount || 0,
@@ -19850,11 +19850,11 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     saleItems.forEach(item => {
       let modText = '';
       if (item.modifiers) {
-         try {
-           const parsedMods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
-           const modsArr = Array.isArray(parsedMods) ? parsedMods : Object.values(parsedMods);
-           modText = modsArr.map((m: any) => m.optionName || m.name).filter(Boolean).join(', ');
-         } catch(e) {}
+        try {
+          const parsedMods = typeof item.modifiers === 'string' ? JSON.parse(item.modifiers) : item.modifiers;
+          const modsArr = Array.isArray(parsedMods) ? parsedMods : Object.values(parsedMods);
+          modText = modsArr.map((m: any) => m.optionName || m.name).filter(Boolean).join(', ');
+        } catch (e) { }
       }
 
       const row = worksheet3.addRow({
@@ -19900,7 +19900,7 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
     // SECURITY: POS_VIEWER can only see POS transactions
     const userRole = (req as any).userRole;
     if (userRole === 'POS_VIEWER' && !sale.invoiceNumber?.startsWith('POS-')) {
-       return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki izin untuk melihat detail transaksi non-POS.' });
+      return res.status(403).json({ error: 'Akses Ditolak: Anda tidak memiliki izin untuk melihat detail transaksi non-POS.' });
     }
 
     const items = await prisma.$queryRawUnsafe(`
@@ -19941,7 +19941,7 @@ app.get('/api/sales/:id', tenantMiddleware, async (req: Request, res: Response) 
     };
 
     const company: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Company" WHERE id = $1`, tenantId);
-    
+
     // Fetch active bank accounts of the company to display on invoice
     const bankAccounts = await prisma.financialAccount.findMany({
       where: {
@@ -19987,7 +19987,7 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
     const saleId = parseInt(req.params.id as string);
-    const { items, accountId, notes, date } = req.body; 
+    const { items, accountId, notes, date } = req.body;
     const dateVal = date ? new Date(date) : new Date();
 
     // 1. Role Verification for Refund (Hanya SPV ke atas)
@@ -20027,7 +20027,7 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
       for (const item of items) {
         const productId = parseInt(item.productId);
         const returnQty = parseFloat(item.quantity);
-        
+
         const origItem = originalItems.find(oi => oi.productId === productId);
         if (!origItem) throw new Error(`Produk ID ${productId} tidak ada dalam transaksi original`);
 
@@ -20042,14 +20042,14 @@ app.post('/api/sales/:id/return', tenantMiddleware, async (req: Request, res: Re
       }
 
       // 3. Create Return Record
-      const returnNumber = `RET/${dateVal.getFullYear()}/${(dateVal.getMonth()+1).toString().padStart(2,'0')}/ID${tenantId}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
-      
+      const returnNumber = `RET/${dateVal.getFullYear()}/${(dateVal.getMonth() + 1).toString().padStart(2, '0')}/ID${tenantId}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
       const returnResult: any[] = await tx.$queryRawUnsafe(`
         INSERT INTO "SaleReturn" ("companyId", "saleId", "returnNumber", "date", "totalRefundAmount", "notes", "accountId", "updatedAt")
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
         RETURNING id
       `, tenantId, saleId, returnNumber, dateVal, totalRefundAmount, notes, accountId ? parseInt(accountId) : null);
-      
+
       const returnId = returnResult[0].id;
 
       // 4. Process Items (Restore Stock & Create Return Items)
@@ -20263,7 +20263,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
 
     // Found user's branch
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true } });
-    
+
     // Find warehouse for this branch
     const warehouse = await prisma.warehouse.findFirst({
       where: { companyId: tenantId, branchId: user?.branchId, type: 'STORE' }
@@ -20275,7 +20275,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
 
     const products = await prisma.product.findMany({
       where: { companyId: tenantId, showInPos: true },
-      select: { 
+      select: {
         id: true,
         name: true,
         price: true,
@@ -20341,7 +20341,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
       visited.add(productId);
 
       const meta = prodMetaMap.get(productId);
-      
+
       if (meta && meta.trackStock === false) return Infinity;
 
       // If it's a leaf node (not AutoDeduct), return its physical stock
@@ -20359,7 +20359,7 @@ app.get('/api/pos/products', tenantMiddleware, async (req: Request, res: Respons
         const yieldFactor = r.Product?.recipeYield || 1;
         const matQtyNeededForOne = Number(r.quantity) / yieldFactor;
         if (matQtyNeededForOne <= 0) continue;
-        
+
         let matAvailable = getMaxStock(r.materialId, new Set(visited));
         const canMake = Math.floor(matAvailable / matQtyNeededForOne);
         if (canMake < maxCanMake) maxCanMake = canMake;
@@ -20411,7 +20411,7 @@ app.post('/api/pos/customizations', tenantMiddleware, async (req: Request, res: 
       linkedProductId: opt.linkedProductId ? Number(opt.linkedProductId) : null,
       linkedQuantity: opt.linkedQuantity ? Number(opt.linkedQuantity) : null
     }));
-    
+
     const group = await prisma.customizationGroup.create({
       data: {
         companyId: tenantId,
@@ -20473,8 +20473,8 @@ app.patch('/api/pos/products/:id/customizations', tenantMiddleware, async (req: 
     const tenantId = Number((req as any).tenantId);
     const productId = Number(req.params.id);
     const { groupIds } = req.body;
-    
-    const product = await prisma.product.findUnique({ where: { id: productId, companyId: tenantId }});
+
+    const product = await prisma.product.findUnique({ where: { id: productId, companyId: tenantId } });
     if (!product) return res.status(404).json({ error: 'Produk tidak ditemukan' });
 
     await prisma.productCustomization.deleteMany({
@@ -20502,7 +20502,7 @@ app.get('/api/pos/customers', tenantMiddleware, async (req: Request, res: Respon
   try {
     const tenantId = Number((req as any).tenantId);
     const q = req.query.q as string || "";
-    
+
     const companyIds = await getFranchiseCompanyIds(tenantId);
 
     const customers = await prisma.customer.findMany({
@@ -20516,7 +20516,7 @@ app.get('/api/pos/customers', tenantMiddleware, async (req: Request, res: Respon
       take: 40,
       orderBy: { points: 'desc' }
     });
-    
+
     // Deduplicate by phone so cashier sees one clean, consolidated record per customer
     const customerMap = new Map<string, any>();
     for (const c of customers) {
@@ -20556,7 +20556,7 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
           select: { id: true, isDiscountable: true }
         });
         const discMap = new Map(dbProducts.map(p => [p.id, p.isDiscountable]));
-        
+
         let calcDiscountable = 0;
         for (const it of items) {
           const pId = Number(it.productId || it.id);
@@ -20603,7 +20603,7 @@ app.post('/api/pos/calculate', tenantMiddleware, async (req: Request, res: Respo
           customer = null;
         }
       }
-      
+
       // Member Discount - strictly only if discountable amount > 0
       if (customer && customer.isMember && baseDiscountAmount > 0) {
         if (company.memberDiscountValue > 0) {
@@ -20723,14 +20723,14 @@ app.get('/api/employee/qr', tenantMiddleware, async (req: Request, res: Response
 
     const secret = process.env.JWT_SECRET || 'supersecretkey';
     const token = jwt.sign(
-      { 
-        userId: user.id, 
-        companyId: tenantId, 
+      {
+        userId: user.id,
+        companyId: tenantId,
         type: 'EMPLOYEE_DISCOUNT',
         name: user.name,
         phone: ''
-      }, 
-      secret, 
+      },
+      secret,
       { expiresIn: '60s' }
     );
 
@@ -20792,8 +20792,8 @@ app.post('/api/pos/scan-employee-qr', tenantMiddleware, async (req: Request, res
 
     // Ensure customer profile exists for this employee
     let customer = await prisma.customer.findFirst({
-      where: { 
-        companyId: tenantId, 
+      where: {
+        companyId: tenantId,
         phone: employeePhone
       }
     });
@@ -20924,7 +20924,7 @@ const notifyKitchenUpdate = (tenantId: number, branchId?: number, eventType: str
     if (branchId) {
       io.to(`branch_${branchId}`).emit('kitchen_update', { type: eventType, tenantId, branchId });
     }
-  } catch (e) {}
+  } catch (e) { }
 };
 
 app.get('/api/kitchen/stream', async (req: Request, res: Response) => {
@@ -20940,7 +20940,7 @@ app.get('/api/kitchen/stream', async (req: Request, res: Response) => {
         const decoded: any = jwt.verify(token, JWT_SECRET);
         tenantId = Number(decoded.companyId || decoded.tenantId || tenantId);
         if (decoded.branchId) branchId = Number(decoded.branchId);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!tenantId) {
@@ -20985,17 +20985,17 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
   try {
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
-    const { 
-      items, 
-      accountId, 
-      totalAmount, 
-      customerId, 
+    const {
+      items,
+      accountId,
+      totalAmount,
+      customerId,
       customerName,
       customerPhone,
-      notes, 
-      saleType = 'DINE_IN', 
+      notes,
+      saleType = 'DINE_IN',
       deliveryMethod,
-      serviceFee = 0, 
+      serviceFee = 0,
       markupPercentage = 0,
       memberDiscountAmount = 0,
       voucherCode = null,
@@ -21074,7 +21074,7 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       });
 
       if (!warehouse) throw new Error("Gudang penjualan tidak ditemukan. Hubungin admin.");
-      
+
       // 0. Get Account Name for notes
       let finalAccountId = accountId ? Number(accountId) : null;
       if (!finalAccountId) {
@@ -21188,11 +21188,11 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       let finalCustomerId = customerId ? Number(customerId) : null;
       if (customerPhone) {
         let customer = await tx.customer.findUnique({
-          where: { 
-            companyId_phone: { 
-              companyId: tenantId, 
-              phone: customerPhone 
-            } 
+          where: {
+            companyId_phone: {
+              companyId: tenantId,
+              phone: customerPhone
+            }
           }
         });
 
@@ -21482,276 +21482,276 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
       if (voucherCode) {
         let voucher = await tx.voucher.findUnique({ where: { companyId_code: { companyId: tenantId, code: voucherCode } } });
         if (!voucher) {
-            const company = await tx.company.findUnique({ where: { id: tenantId } });
-            if (company && company.franchiseId) {
-                voucher = await tx.voucher.findFirst({
-                    where: { code: voucherCode, company: { franchiseId: company.franchiseId } }
-                });
-            }
+          const company = await tx.company.findUnique({ where: { id: tenantId } });
+          if (company && company.franchiseId) {
+            voucher = await tx.voucher.findFirst({
+              where: { code: voucherCode, company: { franchiseId: company.franchiseId } }
+            });
+          }
         }
 
         if (voucher) {
-            let updateData: any = { usedCount: { increment: 1 } };
-            if (voucher.discountType === 'STORED_VALUE') {
-                updateData.currentBalance = { decrement: Number(voucherDiscountAmount) };
-            }
-            await tx.voucher.update({
-                where: { id: voucher.id },
-                data: updateData
-            });
+          let updateData: any = { usedCount: { increment: 1 } };
+          if (voucher.discountType === 'STORED_VALUE') {
+            updateData.currentBalance = { decrement: Number(voucherDiscountAmount) };
+          }
+          await tx.voucher.update({
+            where: { id: voucher.id },
+            data: updateData
+          });
         }
       }
 
-        // 2. Pre-fetch all products & recipes for the tenant in 2 batch queries (eliminates recursive N+1 DB queries)
-        const [tenantProducts, allRecipes] = await Promise.all([
-            tx.product.findMany({
-                where: { companyId: tenantId },
-                select: { id: true, name: true, stock: true, trackStock: true, isAutoDeduct: true, recipeYield: true }
-            }),
-            tx.productRecipe.findMany({
-                where: { Product: { companyId: tenantId } }
-            })
-        ]);
+      // 2. Pre-fetch all products & recipes for the tenant in 2 batch queries (eliminates recursive N+1 DB queries)
+      const [tenantProducts, allRecipes] = await Promise.all([
+        tx.product.findMany({
+          where: { companyId: tenantId },
+          select: { id: true, name: true, stock: true, trackStock: true, isAutoDeduct: true, recipeYield: true }
+        }),
+        tx.productRecipe.findMany({
+          where: { Product: { companyId: tenantId } }
+        })
+      ]);
 
-        const productMap = new Map<number, any>();
-        for (const p of tenantProducts) {
-            productMap.set(p.id, p);
+      const productMap = new Map<number, any>();
+      for (const p of tenantProducts) {
+        productMap.set(p.id, p);
+      }
+
+      // Group recipes by productId for instant in-memory access
+      const recipeMap: Record<number, any[]> = {};
+      allRecipes.forEach((r: any) => {
+        if (!recipeMap[r.productId]) recipeMap[r.productId] = [];
+        const parentProd = productMap.get(r.productId);
+        recipeMap[r.productId].push({
+          ...r,
+          recipeYield: parentProd?.recipeYield || 1
+        });
+      });
+
+      // Pre-fetch customization options for stock deduction
+      const optionIds: number[] = [];
+      for (const item of items) {
+        if (item.modifiers) {
+          Object.values(item.modifiers).forEach((val: any) => {
+            const optId = val ? (val.optionId ?? val.id) : null;
+            if (optId) optionIds.push(Number(optId));
+          });
+        }
+      }
+      const linkedOptions = optionIds.length > 0 ? await tx.customizationOption.findMany({
+        where: { id: { in: optionIds }, linkedProductId: { not: null } }
+      }) : [];
+      const optionMap: Record<number, any> = {};
+      linkedOptions.forEach((opt: any) => optionMap[opt.id] = opt);
+
+      // In-memory helper for recursive deduction of materials (with cycle detection, 0 DB queries)
+      function getRecursiveDeductionsSync(productId: number, qtyNeeded: number, visited = new Set<number>()): { id: number, qty: number }[] {
+        if (visited.has(productId)) {
+          console.warn(`[WARNING] Cycle detected in BOM for product ID ${productId}. Breaking infinite loop.`);
+          return [];
+        }
+        visited.add(productId);
+
+        const product = productMap.get(productId);
+        if (!product) return [];
+
+        // If Auto Deduct is ON, we don't deduct the parent directly, we explode its recipe
+        if (product.isAutoDeduct) {
+          const recipes = recipeMap[productId] || [];
+          if (recipes.length > 0) {
+            let deductions: { id: number, qty: number }[] = [];
+            for (const r of recipes) {
+              const yieldFactor = r.recipeYield || product.recipeYield || 1;
+              const matQty = (Number(r.quantity) / yieldFactor) * qtyNeeded;
+              const childDeductions = getRecursiveDeductionsSync(Number(r.materialId), matQty, new Set(visited));
+              deductions = deductions.concat(childDeductions);
+            }
+            return deductions;
+          }
+        }
+        // If it's not an Auto Deduct WIP (or has no recipe), we just deduct it directly
+        return [{ id: productId, qty: qtyNeeded }];
+      }
+
+      // 1.7 Validate Stock before proceeding (Skip validation for offline synchronized sales since they have already been finalized)
+      if (!req.body.offlineInvoiceNumber) {
+        const requiredStock: Record<number, number> = {};
+
+        for (const item of items) {
+          const productId = Number(item.productId);
+          const quantity = Number(item.quantity);
+          const product = productMap.get(productId);
+
+          if (product && product.trackStock !== false) {
+            const recipes = recipeMap[productId] || [];
+            if (product.isAutoDeduct && recipes.length > 0) {
+              for (const recipe of recipes) {
+                const materialId = Number(recipe.materialId);
+                const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
+                const deductions = getRecursiveDeductionsSync(materialId, materialQtyNeeded, new Set([productId]));
+                for (const ded of deductions) {
+                  requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
+                }
+              }
+            } else {
+              requiredStock[productId] = (requiredStock[productId] || 0) + quantity;
+            }
+          }
+
+          // Add modifiers
+          if (item.modifiers) {
+            for (const val of Object.values(item.modifiers) as any[]) {
+              const optId = val ? (val.optionId ?? val.id) : null;
+              if (optId && optionMap[optId]) {
+                const opt = optionMap[optId];
+                if (opt.linkedProductId) {
+                  const modQty = quantity * (opt.linkedQuantity || 1);
+                  const deductions = getRecursiveDeductionsSync(Number(opt.linkedProductId), modQty);
+                  for (const ded of deductions) {
+                    requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
+                  }
+                }
+              }
+            }
+          }
         }
 
-        // Group recipes by productId for instant in-memory access
-        const recipeMap: Record<number, any[]> = {};
-        allRecipes.forEach((r: any) => {
-            if (!recipeMap[r.productId]) recipeMap[r.productId] = [];
-            const parentProd = productMap.get(r.productId);
-            recipeMap[r.productId].push({
-                ...r,
-                recipeYield: parentProd?.recipeYield || 1
-            });
+        // Fetch actual warehouse stock for all required products in 1 query
+        const requiredProductIds = Object.keys(requiredStock).map(Number);
+        if (requiredProductIds.length > 0) {
+          const warehouseStocks = await tx.warehouseStock.findMany({
+            where: { warehouseId: warehouse.id, productId: { in: requiredProductIds } },
+            select: { productId: true, quantity: true }
+          });
+          const wsMap = new Map(warehouseStocks.map(ws => [ws.productId, ws.quantity]));
+
+          for (const reqProdId of requiredProductIds) {
+            const p = productMap.get(reqProdId);
+            const availableStock = wsMap.get(reqProdId) ?? 0;
+            if (p && p.trackStock && availableStock < requiredStock[reqProdId]) {
+              throw new Error(`Stok tidak mencukupi untuk bahan/produk: ${p.name}. Dibutuhkan: ${requiredStock[reqProdId]}, Tersedia: ${availableStock}`);
+            }
+          }
+        }
+      }
+
+      // 3. Prepare batched SaleItems, aggregated stock deductions, and batched StockTransactions
+      const saleItemsToCreate: any[] = [];
+      const aggregatedDeductions = new Map<number, number>();
+      const stockTransactionsToCreate: any[] = [];
+      const now = new Date();
+
+      const addDeduction = (targetProductId: number, qty: number, ref: string) => {
+        if (!qty || qty <= 0) return;
+        aggregatedDeductions.set(targetProductId, (aggregatedDeductions.get(targetProductId) || 0) + qty);
+        stockTransactionsToCreate.push({
+          productId: targetProductId,
+          warehouseId: warehouse.id,
+          type: 'OUT',
+          quantity: qty,
+          reference: ref,
+          date: now
+        });
+      };
+
+      for (const item of items) {
+        const productId = Number(item.productId);
+        const quantity = Number(item.quantity);
+        const price = Number(item.price);
+        const originalPrice = Number(item.originalPrice || item.price);
+
+        // Pre-process modifiers to include linked product info for accurate COGS calculation later
+        const finalModifiers: any = {};
+        if (item.modifiers) {
+          Object.entries(item.modifiers).forEach(([key, val]: [string, any]) => {
+            const finalVal = { ...val };
+            const optId = val ? (val.optionId ?? val.id) : null;
+            if (optId && optionMap[optId]) {
+              const opt = optionMap[optId];
+              if (opt.linkedProductId) {
+                finalVal.linkedProductId = opt.linkedProductId;
+                finalVal.linkedQuantity = opt.linkedQuantity;
+              }
+            }
+            finalModifiers[key] = finalVal;
+          });
+        }
+        const hasModifiers = Object.keys(finalModifiers).length > 0;
+
+        saleItemsToCreate.push({
+          saleId: sale.id,
+          productId: productId,
+          quantity: quantity,
+          price: price,
+          originalPrice: originalPrice,
+          total: price * quantity,
+          modifiers: hasModifiers ? finalModifiers : null
         });
 
-        // Pre-fetch customization options for stock deduction
-        const optionIds: number[] = [];
-        for (const item of items) {
-            if (item.modifiers) {
-                Object.values(item.modifiers).forEach((val: any) => {
-                    const optId = val ? (val.optionId ?? val.id) : null;
-                    if (optId) optionIds.push(Number(optId));
-                });
-            }
+        // --- OPTIMIZED STOCK LOGIC ---
+        const mainProduct = productMap.get(productId);
+        const isAutoDeduct = mainProduct?.isAutoDeduct || false;
+        const recipes = recipeMap[productId] || [];
+
+        // Mode Pabrikasi (isAutoDeduct = false): HANYA potong stok produk jadi.
+        // Mode Made-to-Order (isAutoDeduct = true): JANGAN potong stok produk jadi (KECUALI TIDAK ADA RESEP).
+        if (!isAutoDeduct || recipes.length === 0) {
+          addDeduction(productId, quantity, `POS ${invoiceNumber}`);
         }
-        const linkedOptions = optionIds.length > 0 ? await tx.customizationOption.findMany({
-            where: { id: { in: optionIds }, linkedProductId: { not: null } }
-        }) : [];
-        const optionMap: Record<number, any> = {};
-        linkedOptions.forEach((opt: any) => optionMap[opt.id] = opt);
 
-        // In-memory helper for recursive deduction of materials (with cycle detection, 0 DB queries)
-        function getRecursiveDeductionsSync(productId: number, qtyNeeded: number, visited = new Set<number>()): { id: number, qty: number }[] {
-            if (visited.has(productId)) {
-                console.warn(`[WARNING] Cycle detected in BOM for product ID ${productId}. Breaking infinite loop.`);
-                return [];
-            }
-            visited.add(productId);
-
-            const product = productMap.get(productId);
-            if (!product) return [];
-
-            // If Auto Deduct is ON, we don't deduct the parent directly, we explode its recipe
-            if (product.isAutoDeduct) {
-                const recipes = recipeMap[productId] || [];
-                if (recipes.length > 0) {
-                    let deductions: { id: number, qty: number }[] = [];
-                    for (const r of recipes) {
-                        const yieldFactor = r.recipeYield || product.recipeYield || 1;
-                        const matQty = (Number(r.quantity) / yieldFactor) * qtyNeeded;
-                        const childDeductions = getRecursiveDeductionsSync(Number(r.materialId), matQty, new Set(visited));
-                        deductions = deductions.concat(childDeductions);
-                    }
-                    return deductions;
+        // --- MODIFIER STOCK DEDUCTION ---
+        if (item.modifiers) {
+          for (const val of Object.values(item.modifiers) as any[]) {
+            const optId = val ? (val.optionId ?? val.id) : null;
+            if (optId && optionMap[optId]) {
+              const opt = optionMap[optId];
+              if (opt.linkedProductId) {
+                const modQty = quantity * (opt.linkedQuantity || 1);
+                const deductions = getRecursiveDeductionsSync(Number(opt.linkedProductId), modQty);
+                for (const ded of deductions) {
+                  addDeduction(ded.id, ded.qty, `POS Add-on ${invoiceNumber}`);
                 }
+              }
             }
-            // If it's not an Auto Deduct WIP (or has no recipe), we just deduct it directly
-            return [{ id: productId, qty: qtyNeeded }];
+          }
         }
 
-        // 1.7 Validate Stock before proceeding (Skip validation for offline synchronized sales since they have already been finalized)
-        if (!req.body.offlineInvoiceNumber) {
-            const requiredStock: Record<number, number> = {};
-
-            for (const item of items) {
-                const productId = Number(item.productId);
-                const quantity = Number(item.quantity);
-                const product = productMap.get(productId);
-
-                if (product && product.trackStock !== false) {
-                    const recipes = recipeMap[productId] || [];
-                    if (product.isAutoDeduct && recipes.length > 0) {
-                        for (const recipe of recipes) {
-                            const materialId = Number(recipe.materialId);
-                            const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
-                            const deductions = getRecursiveDeductionsSync(materialId, materialQtyNeeded, new Set([productId]));
-                            for (const ded of deductions) {
-                                requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
-                            }
-                        }
-                    } else {
-                        requiredStock[productId] = (requiredStock[productId] || 0) + quantity;
-                    }
-                }
-
-                // Add modifiers
-                if (item.modifiers) {
-                    for (const val of Object.values(item.modifiers) as any[]) {
-                        const optId = val ? (val.optionId ?? val.id) : null;
-                        if (optId && optionMap[optId]) {
-                            const opt = optionMap[optId];
-                            if (opt.linkedProductId) {
-                                const modQty = quantity * (opt.linkedQuantity || 1);
-                                const deductions = getRecursiveDeductionsSync(Number(opt.linkedProductId), modQty);
-                                for (const ded of deductions) {
-                                    requiredStock[ded.id] = (requiredStock[ded.id] || 0) + ded.qty;
-                                }
-                            }
-                        }
-                    }
-                }
+        // If it has a recipe AND is Made-to-Order, decrement the MATERIALS
+        if (isAutoDeduct && recipes.length > 0) {
+          for (const recipe of recipes) {
+            const materialId = Number(recipe.materialId);
+            const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
+            const deductions = getRecursiveDeductionsSync(materialId, materialQtyNeeded, new Set([productId]));
+            for (const ded of deductions) {
+              addDeduction(ded.id, ded.qty, `POS ${invoiceNumber} (BOM Result of ${sale.invoiceNumber})`);
             }
-
-            // Fetch actual warehouse stock for all required products in 1 query
-            const requiredProductIds = Object.keys(requiredStock).map(Number);
-            if (requiredProductIds.length > 0) {
-                const warehouseStocks = await tx.warehouseStock.findMany({
-                    where: { warehouseId: warehouse.id, productId: { in: requiredProductIds } },
-                    select: { productId: true, quantity: true }
-                });
-                const wsMap = new Map(warehouseStocks.map(ws => [ws.productId, ws.quantity]));
-
-                for (const reqProdId of requiredProductIds) {
-                    const p = productMap.get(reqProdId);
-                    const availableStock = wsMap.get(reqProdId) ?? 0;
-                    if (p && p.trackStock && availableStock < requiredStock[reqProdId]) {
-                        throw new Error(`Stok tidak mencukupi untuk bahan/produk: ${p.name}. Dibutuhkan: ${requiredStock[reqProdId]}, Tersedia: ${availableStock}`);
-                    }
-                }
-            }
+          }
         }
+      }
 
-        // 3. Prepare batched SaleItems, aggregated stock deductions, and batched StockTransactions
-        const saleItemsToCreate: any[] = [];
-        const aggregatedDeductions = new Map<number, number>();
-        const stockTransactionsToCreate: any[] = [];
-        const now = new Date();
+      if (saleItemsToCreate.length > 0) {
+        await tx.saleItem.createMany({ data: saleItemsToCreate });
+      }
 
-        const addDeduction = (targetProductId: number, qty: number, ref: string) => {
-            if (!qty || qty <= 0) return;
-            aggregatedDeductions.set(targetProductId, (aggregatedDeductions.get(targetProductId) || 0) + qty);
-            stockTransactionsToCreate.push({
-                productId: targetProductId,
-                warehouseId: warehouse.id,
-                type: 'OUT',
-                quantity: qty,
-                reference: ref,
-                date: now
-            });
-        };
+      // Apply aggregated stock updates sorted by productId ASC to prevent deadlocks and minimize row-level IO
+      const sortedDeductionIds = Array.from(aggregatedDeductions.keys()).sort((a, b) => a - b);
+      for (const dedProdId of sortedDeductionIds) {
+        const totalQty = aggregatedDeductions.get(dedProdId)!;
+        await tx.product.update({
+          where: { id: dedProdId },
+          data: { stock: { decrement: totalQty } }
+        });
+        await tx.warehouseStock.upsert({
+          where: { productId_warehouseId: { productId: dedProdId, warehouseId: warehouse.id } },
+          update: { quantity: { decrement: totalQty } },
+          create: { productId: dedProdId, warehouseId: warehouse.id, quantity: -totalQty }
+        });
+      }
 
-        for (const item of items) {
-            const productId = Number(item.productId);
-            const quantity = Number(item.quantity);
-            const price = Number(item.price);
-            const originalPrice = Number(item.originalPrice || item.price);
-
-            // Pre-process modifiers to include linked product info for accurate COGS calculation later
-            const finalModifiers: any = {};
-            if (item.modifiers) {
-                Object.entries(item.modifiers).forEach(([key, val]: [string, any]) => {
-                    const finalVal = { ...val };
-                    const optId = val ? (val.optionId ?? val.id) : null;
-                    if (optId && optionMap[optId]) {
-                        const opt = optionMap[optId];
-                        if (opt.linkedProductId) {
-                           finalVal.linkedProductId = opt.linkedProductId;
-                           finalVal.linkedQuantity = opt.linkedQuantity;
-                        }
-                    }
-                    finalModifiers[key] = finalVal;
-                });
-            }
-            const hasModifiers = Object.keys(finalModifiers).length > 0;
-
-            saleItemsToCreate.push({
-                saleId: sale.id,
-                productId: productId,
-                quantity: quantity,
-                price: price,
-                originalPrice: originalPrice,
-                total: price * quantity,
-                modifiers: hasModifiers ? finalModifiers : null
-            });
-
-            // --- OPTIMIZED STOCK LOGIC ---
-            const mainProduct = productMap.get(productId);
-            const isAutoDeduct = mainProduct?.isAutoDeduct || false;
-            const recipes = recipeMap[productId] || [];
-
-            // Mode Pabrikasi (isAutoDeduct = false): HANYA potong stok produk jadi.
-            // Mode Made-to-Order (isAutoDeduct = true): JANGAN potong stok produk jadi (KECUALI TIDAK ADA RESEP).
-            if (!isAutoDeduct || recipes.length === 0) {
-                addDeduction(productId, quantity, `POS ${invoiceNumber}`);
-            }
-
-            // --- MODIFIER STOCK DEDUCTION ---
-            if (item.modifiers) {
-                for (const val of Object.values(item.modifiers) as any[]) {
-                    const optId = val ? (val.optionId ?? val.id) : null;
-                    if (optId && optionMap[optId]) {
-                        const opt = optionMap[optId];
-                        if (opt.linkedProductId) {
-                            const modQty = quantity * (opt.linkedQuantity || 1);
-                            const deductions = getRecursiveDeductionsSync(Number(opt.linkedProductId), modQty);
-                            for (const ded of deductions) {
-                                addDeduction(ded.id, ded.qty, `POS Add-on ${invoiceNumber}`);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // If it has a recipe AND is Made-to-Order, decrement the MATERIALS
-            if (isAutoDeduct && recipes.length > 0) {
-                for (const recipe of recipes) {
-                    const materialId = Number(recipe.materialId);
-                    const materialQtyNeeded = (Number(recipe.quantity) / (Number(recipe.recipeYield) || 1)) * quantity;
-                    const deductions = getRecursiveDeductionsSync(materialId, materialQtyNeeded, new Set([productId]));
-                    for (const ded of deductions) {
-                        addDeduction(ded.id, ded.qty, `POS ${invoiceNumber} (BOM Result of ${sale.invoiceNumber})`);
-                    }
-                }
-            }
-        }
-
-        if (saleItemsToCreate.length > 0) {
-            await tx.saleItem.createMany({ data: saleItemsToCreate });
-        }
-
-        // Apply aggregated stock updates sorted by productId ASC to prevent deadlocks and minimize row-level IO
-        const sortedDeductionIds = Array.from(aggregatedDeductions.keys()).sort((a, b) => a - b);
-        for (const dedProdId of sortedDeductionIds) {
-            const totalQty = aggregatedDeductions.get(dedProdId)!;
-            await tx.product.update({
-                where: { id: dedProdId },
-                data: { stock: { decrement: totalQty } }
-            });
-            await tx.warehouseStock.upsert({
-                where: { productId_warehouseId: { productId: dedProdId, warehouseId: warehouse.id } },
-                update: { quantity: { decrement: totalQty } },
-                create: { productId: dedProdId, warehouseId: warehouse.id, quantity: -totalQty }
-            });
-        }
-
-        if (stockTransactionsToCreate.length > 0) {
-            await tx.stockTransaction.createMany({ data: stockTransactionsToCreate });
-        }
+      if (stockTransactionsToCreate.length > 0) {
+        await tx.stockTransaction.createMany({ data: stockTransactionsToCreate });
+      }
 
       // 4. Finance
       if (finalAccountId) {
@@ -22023,48 +22023,48 @@ app.delete('/api/pos/pending/:id', tenantMiddleware, async (req: Request, res: R
 
     const pendingBill = await prisma.pendingBill.findFirst({ where: { id, companyId: tenantId } });
     if (pendingBill) {
-        await prisma.pendingBill.delete({
-          where: { id, companyId: tenantId },
-        });
+      await prisma.pendingBill.delete({
+        where: { id, companyId: tenantId },
+      });
 
-        const userId = Number((req as any).userId) || pendingBill.cashierId;
-        const cashierUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      const userId = Number((req as any).userId) || pendingBill.cashierId;
+      const cashierUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
 
-        let parsedItems: any[] = [];
-        try {
-          if (typeof pendingBill.items === 'string') {
-            parsedItems = JSON.parse(pendingBill.items);
-          } else if (Array.isArray(pendingBill.items)) {
-            parsedItems = pendingBill.items;
-          }
-        } catch (e) {}
+      let parsedItems: any[] = [];
+      try {
+        if (typeof pendingBill.items === 'string') {
+          parsedItems = JSON.parse(pendingBill.items);
+        } else if (Array.isArray(pendingBill.items)) {
+          parsedItems = pendingBill.items;
+        }
+      } catch (e) { }
 
-        const totalAmount = parsedItems.reduce((acc: number, it: any) => acc + ((Number(it.price) || 0) * (Number(it.quantity || it.qty) || 1)), 0);
+      const totalAmount = parsedItems.reduce((acc: number, it: any) => acc + ((Number(it.price) || 0) * (Number(it.quantity || it.qty) || 1)), 0);
 
-        await prisma.auditLog.create({
-          data: {
-            companyId: tenantId,
-            userId: userId,
-            userName: cashierUser?.name || null,
-            action: 'DELETE_PENDING_BILL',
-            entity: 'PendingBill',
-            entityId: String(id),
-            details: JSON.stringify({
-              label: pendingBill.label || `Bill #${id}`,
-              totalAmount,
-              queueNumber: pendingBill.queueNumber,
-              saleType: pendingBill.saleType,
-              items: parsedItems.map((it: any) => ({
-                id: it.id || it.productId,
-                name: it.name || it.productName || 'Produk',
-                quantity: Number(it.quantity || it.qty) || 1,
-                price: Number(it.price) || 0,
-                subtotal: (Number(it.price) || 0) * (Number(it.quantity || it.qty) || 1),
-                notes: it.notes || it.note || ''
-              }))
-            }),
-          }
-        });
+      await prisma.auditLog.create({
+        data: {
+          companyId: tenantId,
+          userId: userId,
+          userName: cashierUser?.name || null,
+          action: 'DELETE_PENDING_BILL',
+          entity: 'PendingBill',
+          entityId: String(id),
+          details: JSON.stringify({
+            label: pendingBill.label || `Bill #${id}`,
+            totalAmount,
+            queueNumber: pendingBill.queueNumber,
+            saleType: pendingBill.saleType,
+            items: parsedItems.map((it: any) => ({
+              id: it.id || it.productId,
+              name: it.name || it.productName || 'Produk',
+              quantity: Number(it.quantity || it.qty) || 1,
+              price: Number(it.price) || 0,
+              subtotal: (Number(it.price) || 0) * (Number(it.quantity || it.qty) || 1),
+              notes: it.notes || it.note || ''
+            }))
+          }),
+        }
+      });
     }
 
     res.json({ message: 'Pending bill dihapus' });
@@ -22079,7 +22079,7 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
     const tenantId = Number((req as any).tenantId);
     const user = (req as any).user;
     const { startDate, endDate, fnbType } = req.query;
-    
+
     let dateFilter: any = {};
     if (startDate && endDate) {
       dateFilter = {
@@ -22088,7 +22088,7 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
       };
     }
 
-    
+
     // We only care about orders that are READY or SERVED (i.e. they finished preparing)
     // and have both createdAt and preparedAt set.
     const completedSales = await prisma.sale.findMany({
@@ -22134,7 +22134,7 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
       // Calculate diff in seconds
       const diffMs = sale.preparedAt!.getTime() - sale.createdAt.getTime();
       const diffSeconds = Math.max(0, Math.floor(diffMs / 1000));
-      
+
       const saleDate = sale.createdAt;
       if (saleDate >= today) {
         todayCount++;
@@ -22190,7 +22190,7 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
       return res.json([]);
     }
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
+
     // Fetch from Pending Bills (active within last 24h)
     const pendingBills = await prisma.pendingBill.findMany({
       where: {
@@ -22201,7 +22201,7 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
       orderBy: { createdAt: 'asc' },
       take: 100
     });
-    
+
     // Fetch from Sales (active within last 24h, bounded by take: 100 to prevent full-history scan)
     const sales = await prisma.sale.findMany({
       where: {
@@ -22228,9 +22228,9 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
         }
       }
     }
-    const pendingProducts = pendingProductIds.size > 0 ? await prisma.product.findMany({ 
-      where: { id: { in: Array.from(pendingProductIds) } }, 
-      select: { id: true, fnbType: true } 
+    const pendingProducts = pendingProductIds.size > 0 ? await prisma.product.findMany({
+      where: { id: { in: Array.from(pendingProductIds) } },
+      select: { id: true, fnbType: true }
     }) : [];
     const productFnbMap = new Map(pendingProducts.map(p => [p.id, p.fnbType]));
 
@@ -22286,7 +22286,7 @@ app.patch('/api/kitchen/orders/:type/:id/ready', tenantMiddleware, async (req: R
     const tenantId = Number((req as any).tenantId);
     const { type, id } = req.params;
     const { staffName, staffId } = req.body;
-    
+
     let orderCreatedAt: Date | null = null;
     let totalItems = 0;
 
@@ -22309,78 +22309,78 @@ app.patch('/api/kitchen/orders/:type/:id/ready', tenantMiddleware, async (req: R
 
     // --- AUTO KPI SCORING LOGIC ---
     if (staffId && orderCreatedAt) {
-        const leadTimeMin = Math.max(1, Math.round((new Date().getTime() - new Date(orderCreatedAt).getTime()) / 60000));
-        const currentMonth = new Date().getMonth() + 1;
-        const currentYear = new Date().getFullYear();
+      const leadTimeMin = Math.max(1, Math.round((new Date().getTime() - new Date(orderCreatedAt).getTime()) / 60000));
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
 
-        // Ensure KPI Indicators exist
-        let speedIndicator = await prisma.kPIIndicator.findFirst({ where: { companyId: tenantId, systemType: 'KITCHEN_SPEED' }});
-        if (!speedIndicator) {
-            speedIndicator = await prisma.kPIIndicator.create({
-                data: { companyId: tenantId, name: 'Kecepatan Dapur (Auto)', target: 15, weight: 1, isSystem: true, systemType: 'KITCHEN_SPEED' }
-            });
+      // Ensure KPI Indicators exist
+      let speedIndicator = await prisma.kPIIndicator.findFirst({ where: { companyId: tenantId, systemType: 'KITCHEN_SPEED' } });
+      if (!speedIndicator) {
+        speedIndicator = await prisma.kPIIndicator.create({
+          data: { companyId: tenantId, name: 'Kecepatan Dapur (Auto)', target: 15, weight: 1, isSystem: true, systemType: 'KITCHEN_SPEED' }
+        });
+      }
+
+      let volumeIndicator = await prisma.kPIIndicator.findFirst({ where: { companyId: tenantId, systemType: 'KITCHEN_VOLUME' } });
+      if (!volumeIndicator) {
+        volumeIndicator = await prisma.kPIIndicator.create({
+          data: { companyId: tenantId, name: 'Volume Masakan (Auto)', target: 500, weight: 1, isSystem: true, systemType: 'KITCHEN_VOLUME' }
+        });
+      }
+
+      // --- Calculate Average Speed & Total Volume for this Month ---
+      // Fetch all done sales this month
+      const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+      const endOfMonth = new Date(currentYear, currentMonth, 1);
+
+      const salesThisMonth = await prisma.sale.findMany({
+        where: { companyId: tenantId, kitchenStaffId: Number(staffId), preparedAt: { not: null }, createdAt: { gte: startOfMonth, lt: endOfMonth } },
+        include: { SaleItem: true }
+      });
+      const pendingBillsThisMonth = await prisma.pendingBill.findMany({
+        where: { companyId: tenantId, kitchenStaffId: Number(staffId), preparedAt: { not: null }, createdAt: { gte: startOfMonth, lt: endOfMonth } }
+      });
+
+      let totalLeadTime = 0;
+      let orderCount = 0;
+      let itemVolume = 0;
+
+      salesThisMonth.forEach((s: any) => {
+        if (s.preparedAt && s.createdAt) {
+          totalLeadTime += Math.max(1, Math.round((s.preparedAt.getTime() - s.createdAt.getTime()) / 60000));
+          orderCount++;
+          itemVolume += s.SaleItem?.length || 1;
         }
-        
-        let volumeIndicator = await prisma.kPIIndicator.findFirst({ where: { companyId: tenantId, systemType: 'KITCHEN_VOLUME' }});
-        if (!volumeIndicator) {
-            volumeIndicator = await prisma.kPIIndicator.create({
-                data: { companyId: tenantId, name: 'Volume Masakan (Auto)', target: 500, weight: 1, isSystem: true, systemType: 'KITCHEN_VOLUME' }
-            });
+      });
+      pendingBillsThisMonth.forEach((pb: any) => {
+        if (pb.preparedAt && pb.createdAt) {
+          totalLeadTime += Math.max(1, Math.round((pb.preparedAt.getTime() - pb.createdAt.getTime()) / 60000));
+          orderCount++;
+          itemVolume += Array.isArray(pb.items) ? pb.items.length : 1;
         }
+      });
 
-        // --- Calculate Average Speed & Total Volume for this Month ---
-        // Fetch all done sales this month
-        const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
-        const endOfMonth = new Date(currentYear, currentMonth, 1);
-        
-        const salesThisMonth = await prisma.sale.findMany({
-            where: { companyId: tenantId, kitchenStaffId: Number(staffId), preparedAt: { not: null }, createdAt: { gte: startOfMonth, lt: endOfMonth } },
-            include: { SaleItem: true }
-        });
-        const pendingBillsThisMonth = await prisma.pendingBill.findMany({
-            where: { companyId: tenantId, kitchenStaffId: Number(staffId), preparedAt: { not: null }, createdAt: { gte: startOfMonth, lt: endOfMonth } }
-        });
+      const averageSpeed = orderCount > 0 ? (totalLeadTime / orderCount) : leadTimeMin;
 
-        let totalLeadTime = 0;
-        let orderCount = 0;
-        let itemVolume = 0;
+      // 1. Update Speed KPI (Score is calculated, for speed maybe we just save the minutes directly or calculate out of 100)
+      // If target is 15 mins, and they do it in 5, score = 100. Let's just save average minutes as score for simplicity, 
+      // or a percentage: (Target / AvgTime) * 100 (Capped at 100)
+      const speedScore = Math.min(100, Math.round((speedIndicator.target / averageSpeed) * 100));
 
-        salesThisMonth.forEach((s: any) => {
-            if (s.preparedAt && s.createdAt) {
-                totalLeadTime += Math.max(1, Math.round((s.preparedAt.getTime() - s.createdAt.getTime()) / 60000));
-                orderCount++;
-                itemVolume += s.SaleItem?.length || 1;
-            }
-        });
-        pendingBillsThisMonth.forEach((pb: any) => {
-            if (pb.preparedAt && pb.createdAt) {
-                totalLeadTime += Math.max(1, Math.round((pb.preparedAt.getTime() - pb.createdAt.getTime()) / 60000));
-                orderCount++;
-                itemVolume += Array.isArray(pb.items) ? pb.items.length : 1;
-            }
-        });
+      await prisma.kPIScore.upsert({
+        where: { userId_indicatorId_month_year: { userId: Number(staffId), indicatorId: speedIndicator.id, month: currentMonth, year: currentYear } },
+        update: { score: speedScore, comment: `Rata-rata kecepatan: ${averageSpeed.toFixed(1)} menit (Auto Update dari KDS)` },
+        create: { companyId: tenantId, userId: Number(staffId), indicatorId: speedIndicator.id, score: speedScore, month: currentMonth, year: currentYear, comment: `Rata-rata kecepatan: ${averageSpeed.toFixed(1)} menit (Auto Update dari KDS)` }
+      });
 
-        const averageSpeed = orderCount > 0 ? (totalLeadTime / orderCount) : leadTimeMin;
-        
-        // 1. Update Speed KPI (Score is calculated, for speed maybe we just save the minutes directly or calculate out of 100)
-        // If target is 15 mins, and they do it in 5, score = 100. Let's just save average minutes as score for simplicity, 
-        // or a percentage: (Target / AvgTime) * 100 (Capped at 100)
-        const speedScore = Math.min(100, Math.round((speedIndicator.target / averageSpeed) * 100));
-
-        await prisma.kPIScore.upsert({
-            where: { userId_indicatorId_month_year: { userId: Number(staffId), indicatorId: speedIndicator.id, month: currentMonth, year: currentYear } },
-            update: { score: speedScore, comment: `Rata-rata kecepatan: ${averageSpeed.toFixed(1)} menit (Auto Update dari KDS)` },
-            create: { companyId: tenantId, userId: Number(staffId), indicatorId: speedIndicator.id, score: speedScore, month: currentMonth, year: currentYear, comment: `Rata-rata kecepatan: ${averageSpeed.toFixed(1)} menit (Auto Update dari KDS)` }
-        });
-
-        // 2. Update Volume KPI
-        // Score = (Volume / Target) * 100
-        const volumeScore = Math.min(100, Math.round((itemVolume / volumeIndicator.target) * 100));
-        await prisma.kPIScore.upsert({
-            where: { userId_indicatorId_month_year: { userId: Number(staffId), indicatorId: volumeIndicator.id, month: currentMonth, year: currentYear } },
-            update: { score: volumeScore, comment: `Total pesanan: ${itemVolume} (Auto Update dari KDS)` },
-            create: { companyId: tenantId, userId: Number(staffId), indicatorId: volumeIndicator.id, score: volumeScore, month: currentMonth, year: currentYear, comment: `Total pesanan: ${itemVolume} (Auto Update dari KDS)` }
-        });
+      // 2. Update Volume KPI
+      // Score = (Volume / Target) * 100
+      const volumeScore = Math.min(100, Math.round((itemVolume / volumeIndicator.target) * 100));
+      await prisma.kPIScore.upsert({
+        where: { userId_indicatorId_month_year: { userId: Number(staffId), indicatorId: volumeIndicator.id, month: currentMonth, year: currentYear } },
+        update: { score: volumeScore, comment: `Total pesanan: ${itemVolume} (Auto Update dari KDS)` },
+        create: { companyId: tenantId, userId: Number(staffId), indicatorId: volumeIndicator.id, score: volumeScore, month: currentMonth, year: currentYear, comment: `Total pesanan: ${itemVolume} (Auto Update dari KDS)` }
+      });
     }
 
     notifyKitchenUpdate(tenantId, undefined, 'ORDER_READY');
@@ -22395,7 +22395,7 @@ app.patch('/api/kitchen/orders/:type/:id/serve', tenantMiddleware, async (req: R
   try {
     const tenantId = Number((req as any).tenantId);
     const { type, id } = req.params;
-    
+
     if (type === 'pending') {
       await prisma.pendingBill.update({
         where: { id: Number(id), companyId: tenantId },
@@ -22423,7 +22423,7 @@ app.get('/api/pos/closing-summary', tenantMiddleware, async (req: Request, res: 
     const userId = Number((req as any).userId);
 
     let user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
-    
+
     // Robustness: fallback to first branch if user has no branchId
     if (!user?.branchId) {
       const firstBranch = await prisma.branch.findFirst({ where: { companyId: tenantId } });
@@ -22616,12 +22616,12 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
   try {
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
-    const { 
-      startTime, 
-      endTime, 
-      totalGrossSales, 
-      totalNetSales, 
-      totalCommission, 
+    const {
+      startTime,
+      endTime,
+      totalGrossSales,
+      totalNetSales,
+      totalCommission,
       totalTransactions,
       actualCash,
       expectedCash,
@@ -22630,7 +22630,7 @@ app.post('/api/pos/closing', tenantMiddleware, async (req: Request, res: Respons
     } = req.body;
 
     let user = await prisma.user.findUnique({ where: { id: userId }, select: { branchId: true, role: true } });
-    
+
     // Fallback to first branch if user has no branchId
     if (!user?.branchId) {
       const firstBranch = await prisma.branch.findFirst({ where: { companyId: tenantId } });
@@ -22845,7 +22845,7 @@ app.patch('/api/finance/capital', tenantMiddleware, async (req: Request, res: Re
   try {
     const tenantId = Number((req as any).tenantId);
     const { authorizedCapital } = req.body;
-    
+
     const company = await prisma.company.update({
       where: { id: tenantId },
       data: { authorizedCapital: parseFloat(authorizedCapital) }
@@ -22948,9 +22948,9 @@ app.post('/api/assignments', tenantMiddleware, async (req: Request, res: Respons
     // Notify user if assigned by someone else
     if (targetUserId !== creatorId) {
       await sendNotification(
-        tenantId, 
-        targetUserId, 
-        'Tugas Baru Di-assign', 
+        tenantId,
+        targetUserId,
+        'Tugas Baru Di-assign',
         `Anda mendapatkan tugas baru: ${title}. Segera cek aplikasi!`
       );
     } else if (!['SUPERADMIN', 'ADMIN', 'OWNER'].includes(role)) {
@@ -22996,12 +22996,12 @@ app.patch('/api/assignments/:id/status', tenantMiddleware, async (req: Request, 
 
     // Notify creator if completed by employee
     if (status === 'COMPLETED' && assignment.assignedById !== userId) {
-       await sendNotification(
-         tenantId,
-         assignment.assignedById,
-         'Tugas Selesai',
-         `Tugas "${assignment.title}" telah diselesaikan oleh pelaksana.`
-       );
+      await sendNotification(
+        tenantId,
+        assignment.assignedById,
+        'Tugas Selesai',
+        `Tugas "${assignment.title}" telah diselesaikan oleh pelaksana.`
+      );
     }
 
     res.json(updated);
@@ -23016,7 +23016,7 @@ app.patch('/api/assignments/:id/result', tenantMiddleware, upload.single('photo'
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId;
     const { resultNote } = req.body;
-    
+
     // Get file path if uploaded
     let resultImageUrl = req.body.resultImageUrl;
     if (req.file) {
@@ -23037,10 +23037,10 @@ app.patch('/api/assignments/:id/result', tenantMiddleware, upload.single('photo'
 
     const updated = await prisma.assignment.update({
       where: { id: assignment.id },
-      data: { 
-        resultNote, 
+      data: {
+        resultNote,
         resultImageUrl,
-        status: 'COMPLETED' 
+        status: 'COMPLETED'
       }
     });
 
@@ -23065,7 +23065,7 @@ app.patch('/api/assignments/:id/approve', tenantMiddleware, async (req: Request,
     const tenantId = (req as any).tenantId;
     const role = (req as any).userRole;
     const { action } = req.body; // 'APPROVE', 'REJECT', or 'VERIFY'
-    
+
     if (role === 'EMPLOYEE') return res.status(403).json({ error: 'Hanya Admin/Manager yang bisa menyetujui' });
 
     const assignment = await prisma.assignment.findUnique({
@@ -23086,7 +23086,7 @@ app.patch('/api/assignments/:id/approve', tenantMiddleware, async (req: Request,
     } else if (action === 'VERIFY') {
       // Final Approval after completion -> Award KPI
       newStatus = 'COMPLETED'; // Ensure it's marked as final
-      
+
       // KPI Integration logic
       // 1. Find or Create Indicator for "Penugasan Khusus"
       let indicator = await prisma.kPIIndicator.findFirst({
@@ -23108,7 +23108,7 @@ app.patch('/api/assignments/:id/approve', tenantMiddleware, async (req: Request,
       // 2. Add Score
       const now = new Date();
       const score = assignment.priority === 'HIGH' ? 100 : (assignment.priority === 'MEDIUM' ? 85 : 70);
-      
+
       await prisma.kPIScore.upsert({
         where: {
           userId_indicatorId_month_year: {
@@ -23180,8 +23180,8 @@ app.get('/api/companies/public/:id/vouchers', async (req: Request, res: Response
   try {
     const now = new Date();
     const vouchers = await prisma.voucher.findMany({
-      where: { 
-        companyId, 
+      where: {
+        companyId,
         isActive: true,
         targetAudience: 'PUBLIC',
         discountType: { not: 'STORED_VALUE' },
@@ -23215,7 +23215,7 @@ app.post('/api/payments/xendit/webhook', async (req: Request, res: Response) => 
   try {
     const callbackToken = req.headers['x-callback-token'] as string;
     const { external_id, status } = req.body;
-    
+
     // Log the incoming webhook for debugging
     console.log(`[XENDIT WEBHOOK] Received for invoice: ${external_id}, status: ${status}`);
 
@@ -23270,7 +23270,7 @@ app.post('/api/payments/xendit/webhook', async (req: Request, res: Response) => 
         console.log(`[XENDIT WEBHOOK] Sale ${external_id} successfully marked as PAID.`);
       }
     }
-    
+
     // Xendit expects a 200 OK response quickly
     res.status(200).json({ message: 'Webhook received successfully' });
   } catch (error: any) {
@@ -23299,7 +23299,7 @@ app.post('/api/chat', tenantMiddleware, async (req: Request, res: Response) => {
     const systemPromptPath = path.join(__dirname, 'ai_knowledge.md');
     let systemPrompt = 'Kamu adalah Aivola Support Assistant.';
     if (fs.existsSync(systemPromptPath)) {
-        systemPrompt = fs.readFileSync(systemPromptPath, 'utf8');
+      systemPrompt = fs.readFileSync(systemPromptPath, 'utf8');
     }
 
     const chat = model.startChat({
@@ -23318,7 +23318,7 @@ app.post('/api/chat', tenantMiddleware, async (req: Request, res: Response) => {
 
     const result = await chat.sendMessage(message);
     const response = await result.response;
-    
+
     res.json({ reply: response.text() });
   } catch (error: any) {
     console.error("[AI CHAT ERROR]:", error.message);
@@ -23343,7 +23343,7 @@ app.get('/api/audit-logs', tenantMiddleware, async (req: Request, res: Response)
         user: { select: { name: true } }
       }
     });
-    
+
     const formattedLogs = logs.map(log => {
       let parsedDetails: any = null;
       let totalAmount: number | null = null;
@@ -23360,7 +23360,7 @@ app.get('/api/audit-logs', tenantMiddleware, async (req: Request, res: Response)
             if (parsedDetails.totalRefundAmount !== undefined) totalAmount = Number(parsedDetails.totalRefundAmount);
             if (parsedDetails.label) label = parsedDetails.label;
             if (Array.isArray(parsedDetails.items)) itemCount = parsedDetails.items.length;
-          } catch (e) {}
+          } catch (e) { }
         } else {
           const senilaiMatch = log.details.match(/senilai\s+([0-9.]+)/i);
           if (senilaiMatch) {
@@ -23374,8 +23374,8 @@ app.get('/api/audit-logs', tenantMiddleware, async (req: Request, res: Response)
       }
 
       if (totalAmount !== null && totalAmount > 0) {
-        summaryText = log.action.includes('REFUND') 
-          ? `Refund: Rp ${totalAmount.toLocaleString('id-ID')}` 
+        summaryText = log.action.includes('REFUND')
+          ? `Refund: Rp ${totalAmount.toLocaleString('id-ID')}`
           : `Total: Rp ${totalAmount.toLocaleString('id-ID')}`;
       } else if (label) {
         summaryText = `Hold: "${label}"`;
@@ -23436,7 +23436,7 @@ app.get('/api/audit-logs/:id/detail', tenantMiddleware, async (req: Request, res
         if (Array.isArray(parsedDetails.items)) {
           items = parsedDetails.items;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // 1. REFUND_SALE handling (lookup SaleReturn if items not present)
@@ -23561,7 +23561,7 @@ app.post('/api/b2b-contracts', tenantMiddleware, uploadContract.single('file'), 
     let fileUrl = req.body.fileUrl || '';
     let parsedItems = [];
     if (req.body.items) {
-      try { parsedItems = JSON.parse(req.body.items); } catch(e) {}
+      try { parsedItems = JSON.parse(req.body.items); } catch (e) { }
     }
 
     if (req.file) {
@@ -23569,19 +23569,19 @@ app.post('/api/b2b-contracts', tenantMiddleware, uploadContract.single('file'), 
       try {
         fileUrl = await uploadToSupabase(fullLocalPath, 'contracts');
         if (fileUrl.startsWith('/uploads/')) {
-          fileUrl = process.env.NEXT_PUBLIC_API_URL 
+          fileUrl = process.env.NEXT_PUBLIC_API_URL
             ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api', '')}${fileUrl}`
             : `http://localhost:${PORT || 5005}${fileUrl}`;
         }
       } catch (uploadError) {
         console.error('Failed to upload contract file:', uploadError);
         fileUrl = `/uploads/contracts/${req.file.filename}`;
-        fileUrl = process.env.NEXT_PUBLIC_API_URL 
+        fileUrl = process.env.NEXT_PUBLIC_API_URL
           ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api', '')}${fileUrl}`
           : `http://localhost:${PORT || 5005}${fileUrl}`;
       }
     }
-    
+
     const newContract = await prisma.b2BContract.create({
       data: {
         companyId: tenantId,
@@ -23607,7 +23607,7 @@ app.post('/api/b2b-contracts', tenantMiddleware, uploadContract.single('file'), 
       },
       include: { items: { include: { product: true } } }
     });
-    
+
     await prisma.auditLog.create({
       data: {
         companyId: tenantId,
@@ -23635,7 +23635,7 @@ app.put('/api/b2b-contracts/:id', tenantMiddleware, uploadContract.single('file'
     let fileUrl = req.body.fileUrl;
     let parsedItems = [];
     if (req.body.items) {
-      try { parsedItems = JSON.parse(req.body.items); } catch(e) {}
+      try { parsedItems = JSON.parse(req.body.items); } catch (e) { }
     }
 
     if (req.file) {
@@ -23643,14 +23643,14 @@ app.put('/api/b2b-contracts/:id', tenantMiddleware, uploadContract.single('file'
       try {
         fileUrl = await uploadToSupabase(fullLocalPath, 'contracts');
         if (fileUrl.startsWith('/uploads/')) {
-          fileUrl = process.env.NEXT_PUBLIC_API_URL 
+          fileUrl = process.env.NEXT_PUBLIC_API_URL
             ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api', '')}${fileUrl}`
             : `http://localhost:${PORT || 5005}${fileUrl}`;
         }
       } catch (uploadError) {
         console.error('Failed to upload contract file:', uploadError);
         fileUrl = `/uploads/contracts/${req.file.filename}`;
-        fileUrl = process.env.NEXT_PUBLIC_API_URL 
+        fileUrl = process.env.NEXT_PUBLIC_API_URL
           ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api', '')}${fileUrl}`
           : `http://localhost:${PORT || 5005}${fileUrl}`;
       }
@@ -23677,7 +23677,7 @@ app.put('/api/b2b-contracts/:id', tenantMiddleware, uploadContract.single('file'
       },
       include: { items: { include: { product: true } } }
     });
-    
+
     await prisma.auditLog.create({
       data: {
         companyId: tenantId,
@@ -23708,7 +23708,7 @@ app.delete('/api/b2b-contracts/:id', tenantMiddleware, async (req: Request, res:
     await prisma.b2BContract.delete({
       where: { id: contractId, companyId: tenantId }
     });
-    
+
     await prisma.auditLog.create({
       data: {
         companyId: tenantId,
