@@ -103,6 +103,7 @@ export default function POSPage() {
     const [agentConfig, setAgentConfig] = useState<any>(null);
     const [showAgentSettingsModal, setShowAgentSettingsModal] = useState(false);
     const showAgentSettingsModalRef = useRef(false);
+    const agentBaseUrlRef = useRef<string>("http://127.0.0.1:18181");
     const [agentKasirIp, setAgentKasirIp] = useState("192.168.1.200");
     const [agentDapurIp, setAgentDapurIp] = useState("192.168.1.201");
     const [agentBarIp, setAgentBarIp] = useState("192.168.1.202");
@@ -327,52 +328,69 @@ export default function POSPage() {
     };
 
     const checkPrintAgent = async () => {
-        try {
-            const res = await fetch("http://localhost:18181/status", {
-                signal: AbortSignal.timeout(1500)
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setPrintAgentOnline(true);
-                setAgentConfig(data.config);
+        // Coba port 18181 via 127.0.0.1 (langsung loopback IPv4 untuk menghindari issue DNS IPv6 [::1] di Windows),
+        // lalu coba fallback ke localhost.
+        const candidateHosts = [
+            agentBaseUrlRef.current,
+            "http://127.0.0.1:18181",
+            "http://localhost:18181"
+        ].filter(Boolean);
+        const uniqueHosts = Array.from(new Set(candidateHosts));
 
-                // Jangan timpa input teks user jika user sedang membuka modal setting
-                if (!showAgentSettingsModalRef.current) {
-                    const localKasir = typeof window !== 'undefined' ? localStorage.getItem('lan_print_kasir_ip') : null;
-                    const localDapur = typeof window !== 'undefined' ? localStorage.getItem('lan_print_dapur_ip') : null;
-                    const localBar = typeof window !== 'undefined' ? localStorage.getItem('lan_print_bar_ip') : null;
+        for (const host of uniqueHosts) {
+            try {
+                const res = await fetch(`${host}/status`, {
+                    signal: AbortSignal.timeout(3000)
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    agentBaseUrlRef.current = host;
+                    setPrintAgentOnline(true);
+                    setAgentConfig(data.config);
 
-                    if (localKasir) {
-                        setAgentKasirIp(localKasir);
-                    } else if (data.config?.kasir?.ip) {
-                        setAgentKasirIp(data.config.kasir.ip);
+                    // Simpan URL agent yang aktif agar komponen lain (seperti closing modal) bisa memakainya
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('lan_print_agent_url', host);
                     }
 
-                    if (localDapur) {
-                        setAgentDapurIp(localDapur);
-                    } else if (data.config?.dapur?.ip) {
-                        setAgentDapurIp(data.config.dapur.ip);
-                    }
+                    // Jangan timpa input teks user jika user sedang membuka modal setting
+                    if (!showAgentSettingsModalRef.current) {
+                        const localKasir = typeof window !== 'undefined' ? localStorage.getItem('lan_print_kasir_ip') : null;
+                        const localDapur = typeof window !== 'undefined' ? localStorage.getItem('lan_print_dapur_ip') : null;
+                        const localBar = typeof window !== 'undefined' ? localStorage.getItem('lan_print_bar_ip') : null;
 
-                    if (localBar) {
-                        setAgentBarIp(localBar);
-                    } else if (data.config?.bar?.ip) {
-                        setAgentBarIp(data.config.bar.ip);
-                    }
+                        if (localKasir) {
+                            setAgentKasirIp(localKasir);
+                        } else if (data.config?.kasir?.ip) {
+                            setAgentKasirIp(data.config.kasir.ip);
+                        }
 
-                    const localKasirCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_kasir_copies') : null;
-                    const localDapurCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_dapur_copies') : null;
-                    const localBarCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_bar_copies') : null;
-                    if (!localKasirCop && data.config?.kasir?.copies) setAgentKasirCopies(Math.max(1, Number(data.config.kasir.copies) || 1));
-                    if (!localDapurCop && data.config?.dapur?.copies) setAgentDapurCopies(Math.max(1, Number(data.config.dapur.copies) || 1));
-                    if (!localBarCop && data.config?.bar?.copies) setAgentBarCopies(Math.max(1, Number(data.config.bar.copies) || 1));
+                        if (localDapur) {
+                            setAgentDapurIp(localDapur);
+                        } else if (data.config?.dapur?.ip) {
+                            setAgentDapurIp(data.config.dapur.ip);
+                        }
+
+                        if (localBar) {
+                            setAgentBarIp(localBar);
+                        } else if (data.config?.bar?.ip) {
+                            setAgentBarIp(data.config.bar.ip);
+                        }
+
+                        const localKasirCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_kasir_copies') : null;
+                        const localDapurCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_dapur_copies') : null;
+                        const localBarCop = typeof window !== 'undefined' ? localStorage.getItem('lan_print_bar_copies') : null;
+                        if (!localKasirCop && data.config?.kasir?.copies) setAgentKasirCopies(Math.max(1, Number(data.config.kasir.copies) || 1));
+                        if (!localDapurCop && data.config?.dapur?.copies) setAgentDapurCopies(Math.max(1, Number(data.config.dapur.copies) || 1));
+                        if (!localBarCop && data.config?.bar?.copies) setAgentBarCopies(Math.max(1, Number(data.config.bar.copies) || 1));
+                    }
+                    return; // Berhasil terhubung!
                 }
-            } else {
-                setPrintAgentOnline(false);
+            } catch (_) {
+                // Gagal di host ini, lanjut coba kandidat berikutnya
             }
-        } catch (_) {
-            setPrintAgentOnline(false);
         }
+        setPrintAgentOnline(false);
     };
 
     useEffect(() => {
@@ -476,7 +494,7 @@ export default function POSPage() {
                 };
 
                 // Sinkronkan config ke agent terlebih dahulu (penting untuk agent versi lama yang membaca config global dari POST /config)
-                await fetch("http://localhost:18181/config", {
+                await fetch(`${agentBaseUrlRef.current}/config`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(fullConfig)
@@ -495,7 +513,7 @@ export default function POSPage() {
                     store: baseStore,
                     config: fullConfig
                 };
-                const res = await fetch("http://localhost:18181/print", {
+                const res = await fetch(`${agentBaseUrlRef.current}/print`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
@@ -530,7 +548,7 @@ export default function POSPage() {
                                 };
 
                                 // Wajib update POST /config dulu karena agent versi lama mengabaikan payload.config di dalam POST /print!
-                                await fetch("http://localhost:18181/config", {
+                                await fetch(`${agentBaseUrlRef.current}/config`, {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify(roundConfig)
@@ -538,7 +556,7 @@ export default function POSPage() {
 
                                 await new Promise(r => setTimeout(r, 350));
 
-                                await fetch("http://localhost:18181/print", {
+                                await fetch(`${agentBaseUrlRef.current}/print`, {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({
@@ -552,7 +570,7 @@ export default function POSPage() {
                             }
                         } finally {
                             // Kembalikan config asli ke agent setelah semua round selesai
-                            await fetch("http://localhost:18181/config", {
+                            await fetch(`${agentBaseUrlRef.current}/config`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify(fullConfig)
@@ -642,7 +660,7 @@ export default function POSPage() {
                     targets: [target]
                 };
 
-                const res = await fetch("http://localhost:18181/print", {
+                const res = await fetch(`${agentBaseUrlRef.current}/print`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
@@ -687,7 +705,7 @@ export default function POSPage() {
         const copies = target === 'kasir' ? agentKasirCopies : (target === 'dapur' ? agentDapurCopies : agentBarCopies);
         setAgentTesting(target);
         try {
-            const res = await fetch("http://localhost:18181/test-print", {
+            const res = await fetch(`${agentBaseUrlRef.current}/test-print`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ target, ip: ip.trim(), copies })
@@ -698,7 +716,7 @@ export default function POSPage() {
                 if (!data.copiesPrinted && copies > 1) {
                     for (let i = 2; i <= copies; i++) {
                         await new Promise(r => setTimeout(r, 350));
-                        await fetch("http://localhost:18181/test-print", {
+                        await fetch(`${agentBaseUrlRef.current}/test-print`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ target, ip: ip.trim(), copies: 1 })
@@ -752,7 +770,7 @@ export default function POSPage() {
 
         if (printAgentOnline) {
             try {
-                const res = await fetch("http://localhost:18181/config", {
+                const res = await fetch(`${agentBaseUrlRef.current}/config`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(newConfig)

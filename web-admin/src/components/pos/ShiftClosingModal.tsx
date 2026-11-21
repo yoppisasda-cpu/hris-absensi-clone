@@ -165,7 +165,11 @@ export default function ShiftClosingModal({
         if (printAgentOnline) {
             try {
                 toast.loading('Mencetak struk closing ke printer kasir...', { id: 'closing-print' });
-                const res = await fetch('http://localhost:18181/print-closing', {
+                const baseAgentUrl = (typeof window !== 'undefined' && localStorage.getItem('lan_print_agent_url')) 
+                    ? localStorage.getItem('lan_print_agent_url') 
+                    : 'http://127.0.0.1:18181';
+
+                let res = await fetch(`${baseAgentUrl}/print-closing`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -179,11 +183,34 @@ export default function ShiftClosingModal({
                             footer: receiptStoreFooter.trim()
                         }
                     })
-                });
-                const resData = await res.json();
-                if (resData.success) {
-                    toast.success('Struk closing berhasil dicetak!', { id: 'closing-print' });
-                    return;
+                }).catch(() => null);
+
+                // Fallback jika baseAgentUrl gagal
+                if (!res || !res.ok) {
+                    const fallbackUrl = baseAgentUrl?.includes('127.0.0.1') ? 'http://localhost:18181' : 'http://127.0.0.1:18181';
+                    res = await fetch(`${fallbackUrl}/print-closing`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            closing: targetData,
+                            cashierName: cashierName,
+                            companyName: finalStoreName,
+                            store: {
+                                name: finalStoreName,
+                                address: receiptStoreAddress.trim(),
+                                phone: receiptStorePhone.trim(),
+                                footer: receiptStoreFooter.trim()
+                            }
+                        })
+                    }).catch(() => null);
+                }
+
+                if (res && res.ok) {
+                    const resData = await res.json();
+                    if (resData.success) {
+                        toast.success('Struk closing berhasil dicetak!', { id: 'closing-print' });
+                        return;
+                    }
                 }
             } catch (err) {
                 console.error('Print agent closing error:', err);

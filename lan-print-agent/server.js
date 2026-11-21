@@ -115,13 +115,21 @@ async function sendToPrinter(ip, port = 9100, buffer, timeoutMs = 3500, maxRetri
 }
 
 const server = http.createServer((req, res) => {
-    // CORS Headers
+    // CORS & Private Network Access (PNA) Headers
+    // Header Access-Control-Allow-Private-Network wajib agar web browser HTTPS (aivola.id)
+    // diizinkan melakukan fetch/preflight ke localhost / IP privat di jaringan lokal
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Access-Control-Request-Private-Network');
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
 
     if (req.method === 'OPTIONS') {
-        res.writeHead(204);
+        res.writeHead(204, {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, Access-Control-Request-Private-Network',
+            'Access-Control-Allow-Private-Network': 'true'
+        });
         return res.end();
     }
 
@@ -267,10 +275,12 @@ const server = http.createServer((req, res) => {
 });
 
 const PORT = config.port || 18181;
-server.listen(PORT, '0.0.0.0', () => {
+// Listen tanpa host mengaktifkan dual-stack (IPv4 0.0.0.0 & IPv6 ::),
+// sehingga localhost ([::1]) maupun 127.0.0.1 keduanya bisa menerima koneksi dari browser di Windows.
+server.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(`  🚀 AIVOLA LAN PRINT AGENT AKTIF di Port: ${PORT}`);
-    console.log(`  🔗 Status Endpoint: http://localhost:${PORT}/status`);
+    console.log(`  🔗 Status Endpoint: http://127.0.0.1:${PORT}/status / http://localhost:${PORT}/status`);
     console.log(`  🖨️  Printer Kasir : ${config.kasir?.ip || '-'}:${config.kasir?.port || 9100}`);
     console.log(`  🍳 Printer Dapur : ${config.dapur?.ip || '-'}:${config.dapur?.port || 9100}`);
     console.log(`  ☕ Printer Bar   : ${config.bar?.ip || '-'}:${config.bar?.port || 9100}`);
