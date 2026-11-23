@@ -152,6 +152,20 @@ export default function POSPage() {
     const [showPendingBillsModal, setShowPendingBillsModal] = useState(false);
     const [holdLabel, setHoldLabel] = useState('');
     const [holdLoading, setHoldLoading] = useState(false);
+    const [holdPrintKitchenBar, setHoldPrintKitchenBar] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('pos_hold_print_kitchen_bar');
+            if (saved !== null) return saved === 'true';
+        }
+        return true;
+    });
+    const [holdPrintKasirSlip, setHoldPrintKasirSlip] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('pos_hold_print_kasir_slip');
+            if (saved !== null) return saved === 'true';
+        }
+        return false;
+    });
     const isFirstPendingFetch = useRef(true);
     const prevPendingCountRef = useRef(0);
 
@@ -965,7 +979,7 @@ export default function POSPage() {
         return () => clearInterval(timer);
     }, []);
 
-    const handleHoldBill = async () => {
+    const handleHoldBill = async (overridePrintKitchenBar?: boolean, overridePrintKasirSlip?: boolean) => {
         if (cart.length === 0) {
             toast.error("Keranjang masih kosong");
             return;
@@ -993,13 +1007,80 @@ export default function POSPage() {
                     quantity: item.qty,
                     image: item.image,
                     modifiers: item.modifiers,
-                    cartId: item.cartId
+                    cartId: item.cartId,
+                    fnbType: item.fnbType,
+                    notes: item.notes
                 })),
                 saleType,
                 branchId: userBranchId ? Number(userBranchId) : undefined
             });
 
-            toast.success(`Pesanan "${finalLabel}" berhasil ditahan! Antrean #${res.data?.queueNumber || '-'}`);
+            const queueNum = res.data?.queueNumber || '-';
+            const shouldPrintKB = overridePrintKitchenBar !== undefined ? overridePrintKitchenBar : holdPrintKitchenBar;
+            const shouldPrintKasir = overridePrintKasirSlip !== undefined ? overridePrintKasirSlip : holdPrintKasirSlip;
+
+            // Cetak tiket jika printer agent aktif dan opsi cetak dipilih
+            if (printAgentOnline && (shouldPrintKB || shouldPrintKasir)) {
+                try {
+                    const finalDisplayName = receiptStoreName.trim() || companyName || "AIVOLA POS";
+                    const baseStore = {
+                        name: finalDisplayName,
+                        address: receiptStoreAddress.trim(),
+                        phone: receiptStorePhone.trim(),
+                        footer: receiptStoreFooter.trim()
+                    };
+                    const fullConfig = {
+                        kasir: { ip: agentKasirIp.trim(), port: 9100, enabled: agentKasirEnabled && shouldPrintKasir, copies: agentKasirCopies },
+                        dapur: { ip: agentDapurIp.trim(), port: 9100, enabled: agentDapurEnabled && shouldPrintKB, copies: agentDapurCopies },
+                        bar: { ip: agentBarIp.trim(), port: 9100, enabled: agentBarEnabled && shouldPrintKB, copies: agentBarCopies }
+                    };
+
+                    const cartForAgent = (!agentBarEnabled || !agentBarIp.trim()) && agentDapurEnabled
+                        ? cart.map(it => ({ ...it, fnbType: 'FOOD' }))
+                        : cart;
+
+                    const printTargets: string[] = [];
+                    if (shouldPrintKasir && agentKasirEnabled) printTargets.push('kasir');
+                    if (shouldPrintKB && agentDapurEnabled) printTargets.push('dapur');
+                    if (shouldPrintKB && agentBarEnabled) printTargets.push('bar');
+
+                    if (printTargets.length > 0) {
+                        const holdSalePayload = {
+                            invoiceNumber: `HOLD #${queueNum}`,
+                            queueNumber: queueNum,
+                            customerName: finalLabel,
+                            cashierName: typeof window !== 'undefined' ? localStorage.getItem('userName') || 'Kasir' : 'Kasir',
+                            saleType,
+                            isHoldBill: true,
+                            totalAmount: finalTotalAmount,
+                            taxAmount: taxRate > 0 ? Math.round(finalTotalAmount * (taxRate / 100)) : 0,
+                            taxRate,
+                            createdAt: new Date()
+                        };
+
+                        await fetch(`${agentBaseUrlRef.current}/print`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                sale: holdSalePayload,
+                                cart: cartForAgent,
+                                companyName: finalDisplayName,
+                                store: baseStore,
+                                config: fullConfig,
+                                targets: printTargets
+                            })
+                        }).catch(e => console.warn("Gagal kirim print hold:", e));
+                    }
+                } catch (printErr) {
+                    console.error("Hold bill print error:", printErr);
+                }
+            }
+
+            const printInfoMsg = shouldPrintKB 
+                ? (shouldPrintKasir ? ' • Tiket Dapur, Bar & Slip Kasir Dicetak' : ' • Tiket Dapur & Bar Dicetak')
+                : (shouldPrintKasir ? ' • Slip Kasir Dicetak' : '');
+
+            toast.success(`Pesanan "${finalLabel}" berhasil ditahan! Antrean #${queueNum}${printInfoMsg}`);
             setCart([]);
             setActivePendingBillId(null);
             setActivePendingBillLabel('');
@@ -1368,11 +1449,13 @@ export default function POSPage() {
                 pendingBillId: activePendingBillId || null
             };
 
+            const wasResumedFromHold = Boolean(activePendingBillId);
             const res = await api.post('/pos/checkout', payload);
             setLastSale({
                 ...res.data,
                 paidAmount: paid,
-                changeAmount: change
+                changeAmount: change,
+                wasResumedFromHold
             });
             toast.success("Transaksi Berhasil!");
 
@@ -2848,11 +2931,25 @@ export default function POSPage() {
                             
                             <div className="flex flex-col gap-3">
                                 <button 
-                                    onClick={handlePrintAll}
-                                    className="flex items-center justify-center gap-3 w-full py-5 bg-blue-600 text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] hover:bg-blue-500 shadow-2xl shadow-blue-500/20 transition-all active:scale-95 italic border-b-4 border-blue-900"
+                                    onClick={() => {
+                                        if (lastSale?.wasResumedFromHold) {
+                                            handlePrintTarget('kasir');
+                                        } else {
+                                            handlePrintAll();
+                                        }
+                                    }}
+                                    className={`flex items-center justify-center gap-3 w-full py-5 text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl transition-all active:scale-95 italic border-b-4 ${
+                                        lastSale?.wasResumedFromHold 
+                                            ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20 border-emerald-900" 
+                                            : "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20 border-blue-900"
+                                    }`}
                                 >
                                     <Printer className="h-4 w-4 stroke-[3px]" />
-                                    {printAgentOnline ? "Cetak Otomatis (Semua Printer)" : (browserCombineTickets ? "Cetak Gabungan (Kasir+Dapur+Bar)" : "Cetak Struk Kasir")}
+                                    {lastSale?.wasResumedFromHold ? (
+                                        <span>Cetak Struk Kasir (Pelanggan)</span>
+                                    ) : (
+                                        printAgentOnline ? "Cetak Otomatis (Semua Printer)" : (browserCombineTickets ? "Cetak Gabungan (Kasir+Dapur+Bar)" : "Cetak Struk Kasir")
+                                    )}
                                 </button>
                                 
                                 {/* Tombol Cetak Ulang Satuan / Spesifik per Printer */}
@@ -3036,26 +3133,75 @@ export default function POSPage() {
                                 <span className="font-bold text-white">{cart.reduce((s, c) => s + c.qty, 0)} item &bull; Rp {finalTotalAmount.toLocaleString('id-ID')}</span>
                             </div>
 
+                            {/* Print Options for Open Bill */}
+                            <div className="bg-slate-950/70 p-3 rounded-2xl border border-white/5 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold text-slate-300 flex items-center gap-2 cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox"
+                                            checked={holdPrintKitchenBar}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                setHoldPrintKitchenBar(checked);
+                                                if (typeof window !== 'undefined') localStorage.setItem('pos_hold_print_kitchen_bar', String(checked));
+                                            }}
+                                            className="w-4 h-4 rounded text-amber-500 focus:ring-0 bg-slate-900 border-white/20 accent-amber-500 cursor-pointer"
+                                        />
+                                        <span>🍳 ☕ Cetak Tiket ke Dapur & Bar</span>
+                                    </label>
+                                    {printAgentOnline ? (
+                                        <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">LAN Online</span>
+                                    ) : (
+                                        <span className="text-[10px] text-slate-500">Agent Offline</span>
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold text-slate-400 flex items-center gap-2 cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox"
+                                            checked={holdPrintKasirSlip}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                setHoldPrintKasirSlip(checked);
+                                                if (typeof window !== 'undefined') localStorage.setItem('pos_hold_print_kasir_slip', String(checked));
+                                            }}
+                                            className="w-4 h-4 rounded text-amber-500 focus:ring-0 bg-slate-900 border-white/20 accent-amber-500 cursor-pointer"
+                                        />
+                                        <span>🧾 Cetak Slip Meja ke Kasir (Bill Sementara)</span>
+                                    </label>
+                                </div>
+                            </div>
+
                             <div className="flex gap-2 pt-2">
                                 <button
                                     type="button"
                                     onClick={() => setShowHoldModal(false)}
-                                    className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                                    className="px-3 py-3 rounded-2xl text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white hover:bg-white/5 transition-all"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="button"
                                     disabled={holdLoading}
-                                    onClick={handleHoldBill}
-                                    className="flex-1 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5"
+                                    onClick={() => handleHoldBill(false, false)}
+                                    className="px-3 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] uppercase tracking-wider border border-white/5 transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                                    title="Simpan ke antrean tanpa mengirim perintah cetak"
+                                >
+                                    <PauseCircle className="h-4 w-4" />
+                                    <span>Hanya Simpan</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={holdLoading}
+                                    onClick={() => handleHoldBill()}
+                                    className="flex-1 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5 active:scale-95"
                                 >
                                     {holdLoading ? (
                                         <div className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                                     ) : (
                                         <>
-                                            <PauseCircle className="h-4 w-4" />
-                                            <span>Simpan & Tahan</span>
+                                            <Printer className="h-4 w-4" />
+                                            <span>Simpan & Cetak</span>
                                         </>
                                     )}
                                 </button>

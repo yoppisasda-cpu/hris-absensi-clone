@@ -68,7 +68,7 @@ function buildReceiptBuffer(sale, cart, companyName = 'AIVOLA POS', store = {}) 
 
     if (store.address) buffers.push(line(store.address));
     if (store.phone) buffers.push(line('Telp: ' + store.phone));
-    buffers.push(line('STRUK PEMBAYARAN RESMI'));
+    buffers.push(line(sale.isHoldBill ? '*** BILL SEMENTARA / ORDER SLIP ***' : 'STRUK PEMBAYARAN RESMI'));
     buffers.push(hr(width));
 
     buffers.push(CMD.ALIGN_LEFT);
@@ -128,16 +128,22 @@ function buildReceiptBuffer(sale, cart, companyName = 'AIVOLA POS', store = {}) 
 
     // Payment Info
     buffers.push(CMD.ALIGN_RIGHT);
-    const paid = Number(sale.paidAmount || totalAmount);
-    const change = Number(sale.changeAmount || 0);
-    buffers.push(line(`Bayar (${sale.paymentMethod || 'TUNAI'}): Rp ${paid.toLocaleString('id-ID')}`));
-    if (change > 0) {
+    if (sale.isHoldBill) {
         buffers.push(CMD.BOLD_ON);
-        buffers.push(line(`Kembalian: Rp ${change.toLocaleString('id-ID')}`));
+        buffers.push(line('STATUS: BELUM DIBAYAR (OPEN BILL)'));
         buffers.push(CMD.BOLD_OFF);
-    }
-    if (sale.paymentReference) {
-        buffers.push(line(`Ref/EDC: ${sale.paymentReference}`));
+    } else {
+        const paid = Number(sale.paidAmount || totalAmount);
+        const change = Number(sale.changeAmount || 0);
+        buffers.push(line(`Bayar (${sale.paymentMethod || 'TUNAI'}): Rp ${paid.toLocaleString('id-ID')}`));
+        if (change > 0) {
+            buffers.push(CMD.BOLD_ON);
+            buffers.push(line(`Kembalian: Rp ${change.toLocaleString('id-ID')}`));
+            buffers.push(CMD.BOLD_OFF);
+        }
+        if (sale.paymentReference) {
+            buffers.push(line(`Ref/EDC: ${sale.paymentReference}`));
+        }
     }
 
     // Footer
@@ -162,7 +168,7 @@ function buildKitchenBuffer(sale, foodItems) {
     buffers.push(CMD.ALIGN_CENTER);
     buffers.push(CMD.BOLD_ON);
     buffers.push(CMD.SIZE_LARGE);
-    buffers.push(line('*** DAPUR ***'));
+    buffers.push(line(sale.isHoldBill ? '*** DAPUR (OPEN BILL) ***' : '*** DAPUR ***'));
     buffers.push(CMD.SIZE_NORMAL);
     buffers.push(line('KITCHEN ORDER TICKET'));
     buffers.push(CMD.BOLD_OFF);
@@ -236,7 +242,7 @@ function buildBarBuffer(sale, beverageItems) {
     buffers.push(CMD.ALIGN_CENTER);
     buffers.push(CMD.BOLD_ON);
     buffers.push(CMD.SIZE_LARGE);
-    buffers.push(line('*** BAR / MINUMAN ***'));
+    buffers.push(line(sale.isHoldBill ? '*** BAR (OPEN BILL) ***' : '*** BAR / MINUMAN ***'));
     buffers.push(CMD.SIZE_NORMAL);
     buffers.push(line('BAR DRINKS TICKET'));
     buffers.push(CMD.BOLD_OFF);
