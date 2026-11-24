@@ -102,9 +102,21 @@ export default function QueueDisplay() {
             interval = setInterval(fetchOrders, 60000);
         }
 
+        // 3. Deteksi otomatis saat pergantian hari (00:00) agar display antrean reset fresh
+        let lastDateStr = new Date().toDateString();
+        const midnightChecker = setInterval(() => {
+            const currentDateStr = new Date().toDateString();
+            if (currentDateStr !== lastDateStr) {
+                lastDateStr = currentDateStr;
+                announcedOrdersRef.current.clear();
+                fetchOrders();
+            }
+        }, 30000);
+
         return () => {
             if (eventSource) eventSource.close();
             if (interval) clearInterval(interval);
+            clearInterval(midnightChecker);
         };
     }, [isPolling, realtimeConnected]);
 

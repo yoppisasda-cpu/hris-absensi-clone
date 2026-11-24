@@ -87,9 +87,20 @@ export default function KitchenDisplay() {
             interval = setInterval(fetchOrders, 60000);
         }
 
+        // 3. Deteksi otomatis saat berganti hari (00:00) agar layar bersih & fresh untuk hari baru
+        let lastDateStr = new Date().toDateString();
+        const midnightChecker = setInterval(() => {
+            const currentDateStr = new Date().toDateString();
+            if (currentDateStr !== lastDateStr) {
+                lastDateStr = currentDateStr;
+                fetchOrders();
+            }
+        }, 30000);
+
         return () => {
             if (eventSource) eventSource.close();
             if (interval) clearInterval(interval);
+            clearInterval(midnightChecker);
         };
     }, [isPolling, realtimeConnected]);
 

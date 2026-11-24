@@ -22189,25 +22189,26 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
     if (!comp?.kdsEnabled) {
       return res.json([]);
     }
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const timezone = await getCompanyTimezone(tenantId);
+    const { dayStart } = getDayRange(timezone);
 
-    // Fetch from Pending Bills (active within last 24h)
+    // Fetch from Pending Bills (active today only)
     const pendingBills = await prisma.pendingBill.findMany({
       where: {
         companyId: tenantId,
         kitchenStatus: { in: ['PREPARING', 'READY'] },
-        createdAt: { gte: twentyFourHoursAgo }
+        createdAt: { gte: dayStart }
       },
       orderBy: { createdAt: 'asc' },
       take: 100
     });
 
-    // Fetch from Sales (active within last 24h, bounded by take: 100 to prevent full-history scan)
+    // Fetch from Sales (active today only, bounded by take: 100 to prevent full-history scan)
     const sales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
         kitchenStatus: { in: ['PREPARING', 'READY'] },
-        createdAt: { gte: twentyFourHoursAgo }
+        createdAt: { gte: dayStart }
       },
       orderBy: { createdAt: 'asc' },
       take: 100,
