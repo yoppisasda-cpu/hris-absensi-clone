@@ -66,15 +66,22 @@ export default function PayablesPage() {
         }
     };
 
-    const handlePay = async (accountId: string, paymentAmount?: number, paymentDate?: string, categoryId?: string) => {
+    const handlePay = async (
+        accountId: string, 
+        paymentAmount?: number, 
+        paymentDate?: string, 
+        categoryId?: string, 
+        depositDeduction?: number
+    ) => {
         if (!selectedExpense) return;
         setPayLoading(true);
         try {
             await api.post(`/finance/expense/${selectedExpense.id}/pay`, { 
-                accountId, 
+                accountId: accountId || undefined, 
                 paymentAmount, 
                 paymentDate,
-                categoryId 
+                categoryId,
+                depositDeduction: depositDeduction || 0
             });
             alert("Pembayaran berhasil dicatat!");
             setIsPayModalOpen(false);

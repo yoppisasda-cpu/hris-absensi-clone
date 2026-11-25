@@ -82,6 +82,13 @@ model Company {
   allowCashPayment        Boolean                   @default(true)
   allowBankTransfer       Boolean                   @default(true)
   allowQrisPayment        Boolean                   @default(true)
+  defaultCashAccountId    Int?
+  defaultQrisAccountId    Int?
+  defaultTransferAccountId Int?
+  posCashAccountId        Int?
+  posQrisAccountId        Int?
+  posTransferAccountId    Int?
+  posEdcAccountId         Int?
   announcements           Announcement[]
   assets                  Asset[]
   assignments             Assignment[]
@@ -157,6 +164,7 @@ model FinancialAccount {
   incomes       Income[]
   fromTransfers Transfer[] @relation("FromAccount")
   toTransfers   Transfer[] @relation("ToAccount")
+  supplierTransactions SupplierTransaction[]
 }
 
 model IncomeCategory {
@@ -251,6 +259,7 @@ model Supplier {
   expenses          Expense[]
   purchaseOrders    PurchaseOrder[]
   stockTransactions StockTransaction[]
+  supplierTransactions SupplierTransaction[]
 }
 
 model Branch {
@@ -952,6 +961,7 @@ model Sale {
   createdAt             DateTime     @default(now()) @db.Timestamp(6)
   updatedAt             DateTime     @default(now()) @db.Timestamp(6)
   cashierId             Int?
+  shippedAt             DateTime?
   isTukarFaktur         Boolean      @default(false)
   tukarFakturDate       DateTime?
   tukarFakturRef        String?
@@ -1228,6 +1238,31 @@ model PurchaseOrder {
   supplier              Supplier            @relation(fields: [supplierId], references: [id])
   warehouse             Warehouse?          @relation(fields: [warehouseId], references: [id])
   items                 PurchaseOrderItem[]
+  supplierTransactions  SupplierTransaction[]
+}
+
+model SupplierTransaction {
+  id                 Int               @id @default(autoincrement())
+  companyId          Int
+  supplierId         Int
+  type               String            // 'DEPOSIT', 'DEPOSIT_REFUND', 'DEPOSIT_USED', 'LOAN', 'INSTALLMENT'
+  amount             Float             @default(0)
+  paymentMethod      String?           @default("CASH") // 'CASH', 'TRANSFER', 'POTONG_PO'
+  financialAccountId Int?
+  purchaseOrderId    Int?
+  referenceNumber    String?
+  notes              String?
+  date               DateTime          @default(now()) @db.Timestamp(6)
+  createdById        Int?
+  createdAt          DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime          @default(now()) @updatedAt @db.Timestamp(6)
+
+  supplier           Supplier          @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  financialAccount   FinancialAccount? @relation(fields: [financialAccountId], references: [id])
+  purchaseOrder      PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
+
+  @@index([companyId, supplierId])
+  @@index([companyId, type])
 }
 
 model PurchaseOrderItem {

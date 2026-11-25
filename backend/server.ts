@@ -7,6 +7,33 @@ import path from 'path';
 // --- INITIALIZE ENVIRONMENT FIRST ---
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
+// --- AUTO-CONFIGURE FONTCONFIG (Cross-platform: macOS & Linux) ---
+try {
+  const fontConfDir = path.resolve(__dirname, '.fontconfig');
+  if (!fs.existsSync(fontConfDir)) {
+    fs.mkdirSync(fontConfDir, { recursive: true });
+  }
+  const fontConfPath = path.join(fontConfDir, 'fonts.conf');
+  const fontConfXml = `<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <dir>/System/Library/Fonts</dir>
+  <dir>/System/Library/Fonts/Supplemental</dir>
+  <dir>/Library/Fonts</dir>
+  <dir>~/Library/Fonts</dir>
+  <dir>/usr/share/fonts</dir>
+  <dir>/usr/local/share/fonts</dir>
+  <dir>~/.fonts</dir>
+  <cachedir>/tmp/fontconfig-cache</cachedir>
+</fontconfig>`;
+  fs.writeFileSync(fontConfPath, fontConfXml, 'utf8');
+  if (!process.env.FONTCONFIG_PATH) {
+    process.env.FONTCONFIG_PATH = fontConfDir;
+  }
+} catch (fcErr) {
+  console.warn('[FONTCONFIG] Auto-config warning:', fcErr);
+}
+
 import cors from 'cors';
 import { PrismaClient, Role, AssignmentStatus } from '@prisma/client';
 import type { Request, Response, NextFunction } from 'express';
@@ -181,6 +208,13 @@ const runAutoMigration = async () => {
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "closeTime" TEXT DEFAULT '22:00'`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "isOpenManual" BOOLEAN DEFAULT true`,
     `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "kdsEnabled" BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "defaultCashAccountId" INTEGER`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "defaultQrisAccountId" INTEGER`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "defaultTransferAccountId" INTEGER`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "posCashAccountId" INTEGER`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "posQrisAccountId" INTEGER`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "posTransferAccountId" INTEGER`,
+    `ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "posEdcAccountId" INTEGER`,
     `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "supplierInvoiceNumber" TEXT`,
     `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceDate" TIMESTAMP`,
     `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "invoiceDueDate" TIMESTAMP`,
@@ -4119,7 +4153,7 @@ app.post('/api/inventory/purchase-orders/:id/verify-invoice', tenantMiddleware, 
 
         // 2. Adjust Product HPP (WAC / costPrice) if goods have been received
         if (poItem.receivedQty > 0 && oldPrice !== newPrice) {
-          const product = await tx.product.findUnique({
+          const product = poItem.product || await tx.product.findUnique({
             where: { id: poItem.productId },
             select: { stock: true, costPrice: true, purchaseFactor: true }
           });
@@ -4187,13 +4221,13 @@ app.post('/api/inventory/purchase-orders/:id/verify-invoice', tenantMiddleware, 
       } else if (po.items.some(i => i.receivedQty > 0)) {
         let targetCategory = await tx.expenseCategory.findFirst({
           where: { companyId: tenantId, name: 'Pembelian (Auto-PO)' }
+        }) || await tx.expenseCategory.findFirst({
+          where: { companyId: tenantId }
         });
-        if (!targetCategory) {
-          targetCategory = await tx.expenseCategory.findFirst({ where: { companyId: tenantId } });
-        }
+
         if (!targetCategory) {
           try {
-            targetCategory = await tx.expenseCategory.create({
+            targetCategory = await prisma.expenseCategory.create({
               data: {
                 companyId: tenantId,
                 name: 'Pembelian (Auto-PO)',
@@ -4201,9 +4235,8 @@ app.post('/api/inventory/purchase-orders/:id/verify-invoice', tenantMiddleware, 
               }
             });
           } catch (e) {
-            // in case of concurrent insert
             targetCategory = await tx.expenseCategory.findFirst({
-              where: { companyId: tenantId, name: 'Pembelian (Auto-PO)' }
+              where: { companyId: tenantId }
             });
           }
         }
@@ -4225,6 +4258,9 @@ app.post('/api/inventory/purchase-orders/:id/verify-invoice', tenantMiddleware, 
       }
 
       return savedPo;
+    }, {
+      maxWait: 15000,
+      timeout: 60000
     });
 
     res.json({
@@ -4509,6 +4545,7 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
       const num = parseInt(val.toString(), 10);
       return isNaN(num) ? undefined : num;
     };
+    const safeParseInt = parseIntNum;
 
     // --- VALIDASI PENGATURAN XENDIT ---
     // Browser hanya menerima key yang tersamar, jadi input kosong = "pertahankan key lama".
@@ -4540,6 +4577,13 @@ app.patch('/api/companies/my', tenantMiddleware, async (req: Request, res: Respo
         allowCashPayment: (req.body.allowCashPayment !== undefined) ? (req.body.allowCashPayment === true || req.body.allowCashPayment === 'true') : undefined,
         allowBankTransfer: (req.body.allowBankTransfer !== undefined) ? (req.body.allowBankTransfer === true || req.body.allowBankTransfer === 'true') : undefined,
         allowQrisPayment: (req.body.allowQrisPayment !== undefined) ? (req.body.allowQrisPayment === true || req.body.allowQrisPayment === 'true') : undefined,
+        defaultCashAccountId: req.body.defaultCashAccountId !== undefined ? (safeParseInt(req.body.defaultCashAccountId) ?? null) : undefined,
+        defaultQrisAccountId: req.body.defaultQrisAccountId !== undefined ? (safeParseInt(req.body.defaultQrisAccountId) ?? null) : undefined,
+        defaultTransferAccountId: req.body.defaultTransferAccountId !== undefined ? (safeParseInt(req.body.defaultTransferAccountId) ?? null) : undefined,
+        posCashAccountId: req.body.posCashAccountId !== undefined ? (safeParseInt(req.body.posCashAccountId) ?? null) : undefined,
+        posQrisAccountId: req.body.posQrisAccountId !== undefined ? (safeParseInt(req.body.posQrisAccountId) ?? null) : undefined,
+        posTransferAccountId: req.body.posTransferAccountId !== undefined ? (safeParseInt(req.body.posTransferAccountId) ?? null) : undefined,
+        posEdcAccountId: req.body.posEdcAccountId !== undefined ? (safeParseInt(req.body.posEdcAccountId) ?? null) : undefined,
         latitude: parseNum(latitude),
         longitude: parseNum(longitude),
         radius: parseIntNum(radius),
@@ -4629,6 +4673,13 @@ app.patch('/api/companies/:id', tenantMiddleware, async (req: Request, res: Resp
         allowCashPayment: (req.body.allowCashPayment !== undefined) ? (req.body.allowCashPayment === true || req.body.allowCashPayment === 'true') : undefined,
         allowBankTransfer: (req.body.allowBankTransfer !== undefined) ? (req.body.allowBankTransfer === true || req.body.allowBankTransfer === 'true') : undefined,
         allowQrisPayment: (req.body.allowQrisPayment !== undefined) ? (req.body.allowQrisPayment === true || req.body.allowQrisPayment === 'true') : undefined,
+        defaultCashAccountId: req.body.defaultCashAccountId !== undefined ? (safeParseInt(req.body.defaultCashAccountId) ?? null) : undefined,
+        defaultQrisAccountId: req.body.defaultQrisAccountId !== undefined ? (safeParseInt(req.body.defaultQrisAccountId) ?? null) : undefined,
+        defaultTransferAccountId: req.body.defaultTransferAccountId !== undefined ? (safeParseInt(req.body.defaultTransferAccountId) ?? null) : undefined,
+        posCashAccountId: req.body.posCashAccountId !== undefined ? (safeParseInt(req.body.posCashAccountId) ?? null) : undefined,
+        posQrisAccountId: req.body.posQrisAccountId !== undefined ? (safeParseInt(req.body.posQrisAccountId) ?? null) : undefined,
+        posTransferAccountId: req.body.posTransferAccountId !== undefined ? (safeParseInt(req.body.posTransferAccountId) ?? null) : undefined,
+        posEdcAccountId: req.body.posEdcAccountId !== undefined ? (safeParseInt(req.body.posEdcAccountId) ?? null) : undefined,
         latitude: (latitude !== undefined && latitude !== null) ? parseFloat(latitude.toString()) : (latitude === null ? null : undefined),
         longitude: (longitude !== undefined && longitude !== null) ? parseFloat(longitude.toString()) : (longitude === null ? null : undefined),
         radius: safeParseInt(radius),
@@ -12329,14 +12380,13 @@ app.post('/api/finance/transfer', tenantMiddleware, async (req: Request, res: Re
   }
 });
 
-// F5.3. Pay Pending Expense (Support Partial / Installment)
+// F5.3. Pay Pending Expense (Support Partial, Installment, and Supplier Deposit Deduction)
 app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const expenseId = parseInt(req.params.id as string);
-    const { accountId, paymentAmount, paymentDate } = req.body; // New: support paymentAmount and paymentDate
+    const { accountId, paymentAmount, paymentDate, depositDeduction } = req.body;
     const tenantId = Number((req as any).tenantId);
-
-    if (!accountId) return res.status(400).json({ error: 'Pilih akun pembayaran' });
+    const rawUserId = (req as any).userId;
 
     const result = await prisma.$transaction(async (tx) => {
       const expense = await tx.expense.findUnique({
@@ -12359,15 +12409,71 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
 
       if (amountToPay <= 0) throw new Error('Nominal pembayaran tidak valid.');
 
+      // Hitung alokasi potong deposit vs kas
+      const rawDepositDeduct = Number(depositDeduction || 0);
+      const depositDeduct = Math.max(0, Math.min(rawDepositDeduct, amountToPay));
+      const cashPay = Math.max(0, amountToPay - depositDeduct);
+
+      // Validasi akun jika ada porsi pembayaran kas
+      if (cashPay > 0 && !accountId) {
+        throw new Error(`Pilih akun kas/bank untuk sisa pembayaran sebesar Rp ${cashPay.toLocaleString()}`);
+      }
+
+      // 1. Eksekusi Potong Deposit jika ada
+      if (depositDeduct > 0) {
+        if (!expense.supplierId) {
+          throw new Error('Hutang ini tidak terhubung ke supplier, tidak dapat menggunakan deposit');
+        }
+
+        // Cek saldo deposit aktif supplier
+        const txs = await tx.supplierTransaction.findMany({
+          where: { companyId: tenantId, supplierId: expense.supplierId }
+        });
+        let availableDeposit = 0;
+        for (const t of txs) {
+          if (t.type === 'DEPOSIT') availableDeposit += t.amount;
+          else if (t.type === 'DEPOSIT_REFUND' || t.type === 'DEPOSIT_USED') availableDeposit -= t.amount;
+        }
+
+        if (depositDeduct > availableDeposit + 0.01) {
+          throw new Error(`Saldo deposit supplier tidak mencukupi (Tersedia: Rp ${availableDeposit.toLocaleString()})`);
+        }
+
+        // Catat mutasi deposit terpakai
+        await tx.supplierTransaction.create({
+          data: {
+            companyId: tenantId,
+            supplierId: expense.supplierId,
+            type: 'DEPOSIT_USED',
+            amount: depositDeduct,
+            paymentMethod: 'POTONG_DEPOSIT',
+            referenceNumber: `EXP-${expense.id}`,
+            notes: `Potong deposit untuk bayar tagihan Expense #${expense.id} (${expense.description || ''})`,
+            date: payDate,
+            createdById: rawUserId ? Number(rawUserId) : null
+          }
+        });
+      }
+
+      // 2. Eksekusi Pembayaran Kas / Bank jika ada
+      if (cashPay > 0 && accountId) {
+        await tx.financialAccount.update({
+          where: { id: parseInt(accountId) },
+          data: {
+            balance: { decrement: cashPay }
+          }
+        });
+      }
+
       const newPaidAmount = (expense.paidAmount || 0) + amountToPay;
-      const isFullyPaid = newPaidAmount >= expense.amount - 0.01; // handle floating precision
+      const isFullyPaid = newPaidAmount >= expense.amount - 0.01;
       const newStatus = isFullyPaid ? 'PAID' : 'PENDING';
 
-      // Update Expense using safe Prisma client
+      // Update Expense
       const updateData: any = {
         status: newStatus as any,
         paidAmount: newPaidAmount,
-        accountId: parseInt(accountId),
+        accountId: cashPay > 0 ? parseInt(accountId) : (expense.accountId || null),
         paidAt: isFullyPaid ? payDate : undefined,
         updatedAt: payDate
       };
@@ -12380,17 +12486,11 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
         data: updateData
       });
 
-      // Decrement account balance by the payment amount
-      await tx.financialAccount.update({
-        where: { id: parseInt(accountId) },
-        data: {
-          balance: { decrement: amountToPay }
-        }
-      });
-
       return {
         ...updatedExpense,
         amountPaidThisTime: amountToPay,
+        depositDeduct,
+        cashPay,
         isFullyPaid
       };
     });
@@ -12399,7 +12499,7 @@ app.post('/api/finance/expense/:id/pay', tenantMiddleware, async (req: Request, 
   } catch (error: any) {
     console.error("DEBUG EXPENSE PAY ERROR:", error);
     fs.appendFileSync('debug_error.txt', `\n[${new Date().toISOString()}] EXPENSE PAY ERROR: ${error.message}\n${error.stack}\n`);
-    res.status(500).json({ error: 'Gagal mencatat pembayaran hutang: ' + error.message });
+    res.status(500).json({ error: error.message || 'Gagal mencatat pembayaran hutang' });
   }
 });
 
@@ -13515,7 +13615,57 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
       notes: e.description || '-'
     }));
 
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalPiutangCabang + totalInventoryValue;
+    // 3e. Assets: Supplier Deposits (Uang Muka / Deposit Supplier)
+    const supplierDepositsRaw: any[] = await prisma.$queryRawUnsafe(`
+      SELECT 
+        s.id,
+        s.name,
+        COALESCE(SUM(CASE WHEN st."type" = 'DEPOSIT' THEN st."amount" 
+                          WHEN st."type" IN ('DEPOSIT_REFUND', 'DEPOSIT_USED') THEN -st."amount" 
+                          ELSE 0 END), 0)::float as balance
+      FROM "Supplier" s
+      JOIN "SupplierTransaction" st ON st."supplierId" = s.id
+      WHERE s."companyId" = $1
+      GROUP BY s.id, s.name
+      HAVING COALESCE(SUM(CASE WHEN st."type" = 'DEPOSIT' THEN st."amount" 
+                               WHEN st."type" IN ('DEPOSIT_REFUND', 'DEPOSIT_USED') THEN -st."amount" 
+                               ELSE 0 END), 0) > 0
+    `, tenantId);
+
+    const totalSupplierDeposits = supplierDepositsRaw.reduce((sum, s) => sum + Number(s.balance || 0), 0);
+    const supplierDepositDetails = supplierDepositsRaw.map(s => ({
+      id: s.id,
+      name: s.name,
+      amount: Number(s.balance || 0),
+      notes: 'Uang Muka / Deposit Supplier'
+    }));
+
+    // 3f. Assets: Supplier Loans / Receivables (Piutang Pinjaman Supplier)
+    const supplierReceivablesRaw: any[] = await prisma.$queryRawUnsafe(`
+      SELECT 
+        s.id,
+        s.name,
+        COALESCE(SUM(CASE WHEN st."type" = 'LOAN' THEN st."amount" 
+                          WHEN st."type" = 'INSTALLMENT' THEN -st."amount" 
+                          ELSE 0 END), 0)::float as balance
+      FROM "Supplier" s
+      JOIN "SupplierTransaction" st ON st."supplierId" = s.id
+      WHERE s."companyId" = $1
+      GROUP BY s.id, s.name
+      HAVING COALESCE(SUM(CASE WHEN st."type" = 'LOAN' THEN st."amount" 
+                               WHEN st."type" = 'INSTALLMENT' THEN -st."amount" 
+                               ELSE 0 END), 0) > 0
+    `, tenantId);
+
+    const totalSupplierReceivables = supplierReceivablesRaw.reduce((sum, s) => sum + Number(s.balance || 0), 0);
+    const supplierReceivableDetails = supplierReceivablesRaw.map(s => ({
+      id: s.id,
+      name: s.name,
+      amount: Number(s.balance || 0),
+      notes: 'Pinjaman Supplier (Piutang)'
+    }));
+
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalPiutangCabang + totalInventoryValue + totalSupplierDeposits + totalSupplierReceivables;
 
     // 4. Liabilities: Pending Expenses (Hutang Usaha) & Tax Liability (PPN Keluaran)
     const pendingExpenses = await prisma.expense.findMany({
@@ -13673,12 +13823,16 @@ app.get('/api/finance/reports/balance-sheet', tenantMiddleware, async (req: Requ
         totalCustomerReceivables: totalCustomerReceivables,
         totalInventoryValue: totalInventoryValue,
         totalPiutangCabang: totalPiutangCabang,
+        totalSupplierDeposits: totalSupplierDeposits,
+        totalSupplierReceivables: totalSupplierReceivables,
         accounts,
         fixedAssets: assetsWithBookValue,
         loans: activeLoans,
         loanDetails,
         customerReceivableDetails,
-        piutangCabangDetails
+        piutangCabangDetails,
+        supplierDepositDetails,
+        supplierReceivableDetails
       },
       liabilities: {
         total: totalLiabilities,
@@ -13757,7 +13911,43 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
     });
     const totalPiutangCabang = piutangExpenses.reduce((sum, e) => sum + e.amount, 0) - piutangIncomes.reduce((sum, i) => sum + i.amount, 0);
 
-    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue + totalPiutangCabang;
+    // 3e. Assets: Supplier Deposits (Uang Muka / Deposit Supplier)
+    const supplierDepositsRaw: any[] = await prisma.$queryRawUnsafe(`
+      SELECT 
+        s.id,
+        s.name,
+        COALESCE(SUM(CASE WHEN st."type" = 'DEPOSIT' THEN st."amount" 
+                          WHEN st."type" IN ('DEPOSIT_REFUND', 'DEPOSIT_USED') THEN -st."amount" 
+                          ELSE 0 END), 0)::float as balance
+      FROM "Supplier" s
+      JOIN "SupplierTransaction" st ON st."supplierId" = s.id
+      WHERE s."companyId" = $1
+      GROUP BY s.id, s.name
+      HAVING COALESCE(SUM(CASE WHEN st."type" = 'DEPOSIT' THEN st."amount" 
+                               WHEN st."type" IN ('DEPOSIT_REFUND', 'DEPOSIT_USED') THEN -st."amount" 
+                               ELSE 0 END), 0) > 0
+    `, tenantId);
+    const totalSupplierDeposits = supplierDepositsRaw.reduce((sum, s) => sum + Number(s.balance || 0), 0);
+
+    // 3f. Assets: Supplier Loans / Receivables (Piutang Pinjaman Supplier)
+    const supplierReceivablesRaw: any[] = await prisma.$queryRawUnsafe(`
+      SELECT 
+        s.id,
+        s.name,
+        COALESCE(SUM(CASE WHEN st."type" = 'LOAN' THEN st."amount" 
+                          WHEN st."type" = 'INSTALLMENT' THEN -st."amount" 
+                          ELSE 0 END), 0)::float as balance
+      FROM "Supplier" s
+      JOIN "SupplierTransaction" st ON st."supplierId" = s.id
+      WHERE s."companyId" = $1
+      GROUP BY s.id, s.name
+      HAVING COALESCE(SUM(CASE WHEN st."type" = 'LOAN' THEN st."amount" 
+                               WHEN st."type" = 'INSTALLMENT' THEN -st."amount" 
+                               ELSE 0 END), 0) > 0
+    `, tenantId);
+    const totalSupplierReceivables = supplierReceivablesRaw.reduce((sum, s) => sum + Number(s.balance || 0), 0);
+
+    const totalAssets = totalCurrentAssets + totalFixedAssets + totalLoans + totalCustomerReceivables + totalInventoryValue + totalPiutangCabang + totalSupplierDeposits + totalSupplierReceivables;
 
     const pendingExpenses = await prisma.expense.findMany({ where: { companyId: tenantId, status: 'PENDING' } });
     const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -13918,14 +14108,18 @@ app.get('/api/finance/reports/balance-sheet/export', tenantMiddleware, async (re
       worksheet.addRow([acc.name, '', acc.balance]);
       currentRow++;
     });
+    worksheet.addRow(['Uang Muka / Deposit Supplier', '', totalSupplierDeposits]);
+    currentRow++;
     worksheet.addRow(['Piutang Usaha (Outstanding)', '', totalCustomerReceivables]);
     currentRow++;
     worksheet.addRow(['Piutang Karyawan', '', totalLoans]);
     currentRow++;
+    worksheet.addRow(['Piutang Pinjaman Supplier', '', totalSupplierReceivables]);
+    currentRow++;
     worksheet.addRow(['Persediaan Barang Dagang', '', totalInventoryValue]);
     worksheet.addRow(['Piutang Antar Cabang', '', totalPiutangCabang]);
     currentRow++;
-    worksheet.addRow(['Total Aset Lancar & Piutang', '', totalCurrentAssets + totalLoans + totalCustomerReceivables + totalInventoryValue + totalPiutangCabang]);
+    worksheet.addRow(['Total Aset Lancar & Piutang', '', totalCurrentAssets + totalSupplierDeposits + totalLoans + totalCustomerReceivables + totalSupplierReceivables + totalInventoryValue + totalPiutangCabang]);
     worksheet.getRow(currentRow).font = { bold: true };
     currentRow += 2;
 
@@ -14381,6 +14575,30 @@ app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Resp
       orderBy: { date: 'desc' }
     });
 
+    // 4. Fetch Supplier Transactions (Setoran Deposit, Refund, Pinjaman, Angsuran)
+    const supplierTransactions = await prisma.supplierTransaction.findMany({
+      where: {
+        ...whereClause,
+        type: { not: 'DEPOSIT_USED' }
+      },
+      include: { supplier: true, financialAccount: true, purchaseOrder: true },
+      orderBy: { date: 'desc' }
+    });
+
+    // 5. Build lookup for deposit used per expense
+    const allDepositUsed = await prisma.supplierTransaction.findMany({
+      where: { companyId: tenantId, type: 'DEPOSIT_USED' }
+    });
+    const depositUsedMap = new Map<number, number>();
+    allDepositUsed.forEach(tx => {
+      if (tx.referenceNumber && tx.referenceNumber.startsWith('EXP-')) {
+        const expId = parseInt(tx.referenceNumber.replace('EXP-', ''));
+        if (!isNaN(expId)) {
+          depositUsedMap.set(expId, (depositUsedMap.get(expId) || 0) + tx.amount);
+        }
+      }
+    });
+
     const journalEntries: any[] = [];
 
     // Map Incomes to Journal Lines
@@ -14406,10 +14624,11 @@ app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Resp
       });
     });
 
-    // Map Expenses to Journal Lines
+    // Map Expenses to Journal Lines (Mendukung Split Pelunasan dengan Deposit & Kas)
     expenses.forEach(exp => {
       const entryId = `EXP-${exp.id.toString().padStart(6, '0')}`;
       const hasDifferentDates = exp.status === 'PAID' && exp.paidAt && new Date(exp.paidAt).toDateString() !== new Date(exp.date).toDateString();
+      const depositUsed = depositUsedMap.get(exp.id) || 0;
 
       if (hasDifferentDates) {
         // Accrual Dual-Date Entry 1: Recognition of Expense and Liability (on invoice date)
@@ -14442,15 +14661,33 @@ app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Resp
           debit: exp.amount,
           credit: 0
         });
-        journalEntries.push({
-          id: `${entryId}-PAY-C`,
-          date: exp.paidAt!,
-          ref: entryId,
-          description: '',
-          accountName: exp.account?.name || 'Kas/Bank',
-          debit: 0,
-          credit: exp.amount
-        });
+
+        // Kredit 1: Potong Deposit Supplier (jika ada)
+        if (depositUsed > 0) {
+          journalEntries.push({
+            id: `${entryId}-PAY-C-DEP`,
+            date: exp.paidAt!,
+            ref: entryId,
+            description: 'Pemotongan Uang Muka / Deposit Supplier',
+            accountName: 'Uang Muka / Deposit Supplier',
+            debit: 0,
+            credit: Math.min(exp.amount, depositUsed)
+          });
+        }
+
+        // Kredit 2: Kas / Bank (untuk sisa yang dibayar tunai/transfer)
+        const cashPaid = Math.max(0, exp.amount - depositUsed);
+        if (cashPaid > 0 || depositUsed === 0) {
+          journalEntries.push({
+            id: `${entryId}-PAY-C`,
+            date: exp.paidAt!,
+            ref: entryId,
+            description: '',
+            accountName: exp.account?.name || 'Kas/Bank',
+            debit: 0,
+            credit: depositUsed > 0 ? cashPaid : exp.amount
+          });
+        }
       } else {
         // Simple Single-Date Entry (either PAID same-day or PENDING)
         journalEntries.push({
@@ -14464,26 +14701,170 @@ app.get('/api/finance/journal', tenantMiddleware, async (req: Request, res: Resp
         });
 
         if (exp.status === 'PAID') {
-          journalEntries.push({
-            id: `${entryId}-C`,
-            date: exp.date,
-            ref: entryId,
-            description: '',
-            accountName: exp.account?.name || 'Kas/Bank',
-            debit: 0,
-            credit: exp.amount
-          });
+          if (depositUsed > 0) {
+            journalEntries.push({
+              id: `${entryId}-C-DEP`,
+              date: exp.date,
+              ref: entryId,
+              description: 'Pemotongan Uang Muka / Deposit Supplier',
+              accountName: 'Uang Muka / Deposit Supplier',
+              debit: 0,
+              credit: Math.min(exp.amount, depositUsed)
+            });
+          }
+          const cashPaid = Math.max(0, exp.amount - depositUsed);
+          if (cashPaid > 0 || depositUsed === 0) {
+            journalEntries.push({
+              id: `${entryId}-C`,
+              date: exp.date,
+              ref: entryId,
+              description: '',
+              accountName: exp.account?.name || 'Kas/Bank',
+              debit: 0,
+              credit: depositUsed > 0 ? cashPaid : exp.amount
+            });
+          }
         } else {
-          journalEntries.push({
-            id: `${entryId}-C`,
-            date: exp.date,
-            ref: entryId,
-            description: '',
-            accountName: 'Hutang Usaha (Accounts Payable)',
-            debit: 0,
-            credit: exp.amount
-          });
+          // Status PENDING (mungkin sudah ada DP/angsuran sebagian atau belum sama sekali)
+          const totalPaid = exp.paidAmount || 0;
+          if (totalPaid > 0) {
+            if (depositUsed > 0) {
+              journalEntries.push({
+                id: `${entryId}-C-DEP`,
+                date: exp.date,
+                ref: entryId,
+                description: 'Pemotongan Uang Muka / Deposit Supplier',
+                accountName: 'Uang Muka / Deposit Supplier',
+                debit: 0,
+                credit: Math.min(totalPaid, depositUsed)
+              });
+            }
+            const cashPaid = Math.max(0, totalPaid - depositUsed);
+            if (cashPaid > 0) {
+              journalEntries.push({
+                id: `${entryId}-C-CASH`,
+                date: exp.date,
+                ref: entryId,
+                description: '',
+                accountName: exp.account?.name || 'Kas/Bank',
+                debit: 0,
+                credit: cashPaid
+              });
+            }
+            const remainingHutang = Math.max(0, exp.amount - totalPaid);
+            if (remainingHutang > 0) {
+              journalEntries.push({
+                id: `${entryId}-C-HUTANG`,
+                date: exp.date,
+                ref: entryId,
+                description: '',
+                accountName: 'Hutang Usaha (Accounts Payable)',
+                debit: 0,
+                credit: remainingHutang
+              });
+            }
+          } else {
+            journalEntries.push({
+              id: `${entryId}-C`,
+              date: exp.date,
+              ref: entryId,
+              description: '',
+              accountName: 'Hutang Usaha (Accounts Payable)',
+              debit: 0,
+              credit: exp.amount
+            });
+          }
         }
+      }
+    });
+
+    // Map Supplier Transactions to Journal Lines (Setoran Deposit, Refund, Pinjaman, Angsuran)
+    supplierTransactions.forEach(st => {
+      const entryId = `STX-${st.id.toString().padStart(6, '0')}`;
+      const suppName = st.supplier?.name || 'Supplier';
+      const cashAcc = st.financialAccount?.name || 'Kas/Bank';
+
+      if (st.type === 'DEPOSIT') {
+        // Setor Deposit: Debit Uang Muka, Kredit Kas/Bank
+        journalEntries.push({
+          id: `${entryId}-D`,
+          date: st.date,
+          ref: entryId,
+          description: `Setoran Deposit Supplier: ${suppName}${st.notes ? ` (${st.notes})` : ''}`,
+          accountName: 'Uang Muka / Deposit Supplier',
+          debit: st.amount,
+          credit: 0
+        });
+        journalEntries.push({
+          id: `${entryId}-C`,
+          date: st.date,
+          ref: entryId,
+          description: '',
+          accountName: cashAcc,
+          debit: 0,
+          credit: st.amount
+        });
+      } else if (st.type === 'DEPOSIT_REFUND') {
+        // Refund Deposit: Debit Kas/Bank, Kredit Uang Muka
+        journalEntries.push({
+          id: `${entryId}-D`,
+          date: st.date,
+          ref: entryId,
+          description: `Pengembalian/Refund Deposit dari ${suppName}${st.notes ? ` (${st.notes})` : ''}`,
+          accountName: cashAcc,
+          debit: st.amount,
+          credit: 0
+        });
+        journalEntries.push({
+          id: `${entryId}-C`,
+          date: st.date,
+          ref: entryId,
+          description: '',
+          accountName: 'Uang Muka / Deposit Supplier',
+          debit: 0,
+          credit: st.amount
+        });
+      } else if (st.type === 'LOAN') {
+        // Pinjaman ke Supplier: Debit Piutang Supplier, Kredit Kas/Bank
+        journalEntries.push({
+          id: `${entryId}-D`,
+          date: st.date,
+          ref: entryId,
+          description: `Pemberian Pinjaman ke ${suppName}${st.notes ? ` (${st.notes})` : ''}`,
+          accountName: 'Piutang Pinjaman Supplier',
+          debit: st.amount,
+          credit: 0
+        });
+        journalEntries.push({
+          id: `${entryId}-C`,
+          date: st.date,
+          ref: entryId,
+          description: '',
+          accountName: cashAcc,
+          debit: 0,
+          credit: st.amount
+        });
+      } else if (st.type === 'INSTALLMENT') {
+        // Angsuran dari Supplier: Debit Kas/Bank (atau Hutang Usaha jika POTONG_PO), Kredit Piutang Supplier
+        const debitAcc = st.paymentMethod === 'POTONG_PO' ? 'Hutang Usaha (Accounts Payable)' : cashAcc;
+        journalEntries.push({
+          id: `${entryId}-D`,
+          date: st.date,
+          ref: entryId,
+          description: `Penerimaan Angsuran Pinjaman dari ${suppName}${st.notes ? ` (${st.notes})` : ''}`,
+          accountName: debitAcc,
+          debit: st.amount,
+          credit: 0
+        });
+        journalEntries.push({
+          id: `${entryId}-C`,
+          date: st.date,
+          ref: entryId,
+          description: '',
+          accountName: 'Piutang Pinjaman Supplier',
+          debit: 0,
+          credit: st.amount
+        });
       }
     });
 
@@ -14558,16 +14939,102 @@ app.get('/api/finance/journal/export', tenantMiddleware, async (req: Request, re
       orderBy: { date: 'asc' }
     });
 
+    const supplierTransactions = await prisma.supplierTransaction.findMany({
+      where: {
+        ...whereClause,
+        type: { not: 'DEPOSIT_USED' }
+      },
+      include: { supplier: true, financialAccount: true, purchaseOrder: true },
+      orderBy: { date: 'asc' }
+    });
+
+    const allDepositUsed = await prisma.supplierTransaction.findMany({
+      where: { companyId: tenantId, type: 'DEPOSIT_USED' }
+    });
+    const depositUsedMap = new Map<number, number>();
+    allDepositUsed.forEach(tx => {
+      if (tx.referenceNumber && tx.referenceNumber.startsWith('EXP-')) {
+        const expId = parseInt(tx.referenceNumber.replace('EXP-', ''));
+        if (!isNaN(expId)) {
+          depositUsedMap.set(expId, (depositUsedMap.get(expId) || 0) + tx.amount);
+        }
+      }
+    });
+
     const journalEntries: any[] = [];
     incomes.forEach(inc => {
       const entryId = `INC-${inc.id.toString().padStart(6, '0')}`;
       journalEntries.push({ date: inc.date, ref: entryId, account: inc.account.name, debit: inc.amount, credit: 0, description: inc.description || `Penerimaan: ${inc.receivedFrom || '-'}` });
       journalEntries.push({ date: inc.date, ref: entryId, account: inc.category.name, debit: 0, credit: inc.amount, description: '' });
     });
+
     expenses.forEach(exp => {
       const entryId = `EXP-${exp.id.toString().padStart(6, '0')}`;
-      journalEntries.push({ date: exp.date, ref: entryId, account: exp.category.name, debit: exp.amount, credit: 0, description: exp.description || `Pengeluaran: ${exp.paidTo || '-'}` });
-      journalEntries.push({ date: exp.date, ref: entryId, account: exp.status === 'PAID' ? (exp.account?.name || 'Kas/Bank') : 'Hutang Usaha', debit: 0, credit: exp.amount, description: '' });
+      const hasDifferentDates = exp.status === 'PAID' && exp.paidAt && new Date(exp.paidAt).toDateString() !== new Date(exp.date).toDateString();
+      const depositUsed = depositUsedMap.get(exp.id) || 0;
+
+      if (hasDifferentDates) {
+        journalEntries.push({ date: exp.date, ref: entryId, account: exp.category.name, debit: exp.amount, credit: 0, description: (exp.description || `Pengeluaran: ${exp.paidTo || '-'}`) + ' (Pengakuan Hutang)' });
+        journalEntries.push({ date: exp.date, ref: entryId, account: 'Hutang Usaha (Accounts Payable)', debit: 0, credit: exp.amount, description: '' });
+
+        journalEntries.push({ date: exp.paidAt!, ref: entryId, account: 'Hutang Usaha (Accounts Payable)', debit: exp.amount, credit: 0, description: `Pelunasan: ${exp.description || exp.paidTo || '-'}` });
+        if (depositUsed > 0) {
+          journalEntries.push({ date: exp.paidAt!, ref: entryId, account: 'Uang Muka / Deposit Supplier', debit: 0, credit: Math.min(exp.amount, depositUsed), description: 'Pemotongan Deposit Supplier' });
+        }
+        const cashPaid = Math.max(0, exp.amount - depositUsed);
+        if (cashPaid > 0 || depositUsed === 0) {
+          journalEntries.push({ date: exp.paidAt!, ref: entryId, account: exp.account?.name || 'Kas/Bank', debit: 0, credit: depositUsed > 0 ? cashPaid : exp.amount, description: '' });
+        }
+      } else {
+        journalEntries.push({ date: exp.date, ref: entryId, account: exp.category.name, debit: exp.amount, credit: 0, description: exp.description || `Pengeluaran: ${exp.paidTo || '-'}` });
+        if (exp.status === 'PAID') {
+          if (depositUsed > 0) {
+            journalEntries.push({ date: exp.date, ref: entryId, account: 'Uang Muka / Deposit Supplier', debit: 0, credit: Math.min(exp.amount, depositUsed), description: 'Pemotongan Deposit Supplier' });
+          }
+          const cashPaid = Math.max(0, exp.amount - depositUsed);
+          if (cashPaid > 0 || depositUsed === 0) {
+            journalEntries.push({ date: exp.date, ref: entryId, account: exp.account?.name || 'Kas/Bank', debit: 0, credit: depositUsed > 0 ? cashPaid : exp.amount, description: '' });
+          }
+        } else {
+          const totalPaid = exp.paidAmount || 0;
+          if (totalPaid > 0) {
+            if (depositUsed > 0) {
+              journalEntries.push({ date: exp.date, ref: entryId, account: 'Uang Muka / Deposit Supplier', debit: 0, credit: Math.min(totalPaid, depositUsed), description: 'Pemotongan Deposit Supplier' });
+            }
+            const cashPaid = Math.max(0, totalPaid - depositUsed);
+            if (cashPaid > 0) {
+              journalEntries.push({ date: exp.date, ref: entryId, account: exp.account?.name || 'Kas/Bank', debit: 0, credit: cashPaid, description: '' });
+            }
+            const remainingHutang = Math.max(0, exp.amount - totalPaid);
+            if (remainingHutang > 0) {
+              journalEntries.push({ date: exp.date, ref: entryId, account: 'Hutang Usaha (Accounts Payable)', debit: 0, credit: remainingHutang, description: '' });
+            }
+          } else {
+            journalEntries.push({ date: exp.date, ref: entryId, account: 'Hutang Usaha (Accounts Payable)', debit: 0, credit: exp.amount, description: '' });
+          }
+        }
+      }
+    });
+
+    supplierTransactions.forEach(st => {
+      const entryId = `STX-${st.id.toString().padStart(6, '0')}`;
+      const suppName = st.supplier?.name || 'Supplier';
+      const cashAcc = st.financialAccount?.name || 'Kas/Bank';
+
+      if (st.type === 'DEPOSIT') {
+        journalEntries.push({ date: st.date, ref: entryId, account: 'Uang Muka / Deposit Supplier', debit: st.amount, credit: 0, description: `Setoran Deposit Supplier: ${suppName}${st.notes ? ` (${st.notes})` : ''}` });
+        journalEntries.push({ date: st.date, ref: entryId, account: cashAcc, debit: 0, credit: st.amount, description: '' });
+      } else if (st.type === 'DEPOSIT_REFUND') {
+        journalEntries.push({ date: st.date, ref: entryId, account: cashAcc, debit: st.amount, credit: 0, description: `Pengembalian/Refund Deposit dari ${suppName}${st.notes ? ` (${st.notes})` : ''}` });
+        journalEntries.push({ date: st.date, ref: entryId, account: 'Uang Muka / Deposit Supplier', debit: 0, credit: st.amount, description: '' });
+      } else if (st.type === 'LOAN') {
+        journalEntries.push({ date: st.date, ref: entryId, account: 'Piutang Pinjaman Supplier', debit: st.amount, credit: 0, description: `Pemberian Pinjaman ke ${suppName}${st.notes ? ` (${st.notes})` : ''}` });
+        journalEntries.push({ date: st.date, ref: entryId, account: cashAcc, debit: 0, credit: st.amount, description: '' });
+      } else if (st.type === 'INSTALLMENT') {
+        const debitAcc = st.paymentMethod === 'POTONG_PO' ? 'Hutang Usaha (Accounts Payable)' : cashAcc;
+        journalEntries.push({ date: st.date, ref: entryId, account: debitAcc, debit: st.amount, credit: 0, description: `Penerimaan Angsuran Pinjaman dari ${suppName}${st.notes ? ` (${st.notes})` : ''}` });
+        journalEntries.push({ date: st.date, ref: entryId, account: 'Piutang Pinjaman Supplier', debit: 0, credit: st.amount, description: '' });
+      }
     });
     transfers.forEach(trsf => {
       const entryId = `TRSF-${trsf.id.toString().padStart(6, '0')}`;
@@ -14787,16 +15254,28 @@ app.get('/api/reports/profitability', tenantMiddleware, async (req: Request, res
     res.status(500).json({ error: "Gagal mengambil data laporan profitabilitas: " + error.message });
   }
 });
-// F16.1. Get Payables Report (Hutang)
+// F16.1. Get Payables Report (Hutang) with Supplier Deposit Balance
 app.get('/api/finance/reports/payable', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
 
     const payables = await prisma.$queryRawUnsafe(`
-      SELECT e.*, s."name" as "supplierName", ec."name" as "categoryName"
+      SELECT e.*, s."name" as "supplierName", ec."name" as "categoryName",
+        COALESCE(dep.total_deposit, 0)::float as "supplierDepositBalance"
       FROM "Expense" e
       LEFT JOIN "Supplier" s ON e."supplierId" = s.id
       JOIN "ExpenseCategory" ec ON e."categoryId" = ec.id
+      LEFT JOIN (
+        SELECT "supplierId", 
+          SUM(CASE 
+            WHEN "type" = 'DEPOSIT' THEN "amount"
+            WHEN "type" IN ('DEPOSIT_REFUND', 'DEPOSIT_USED') THEN -"amount"
+            ELSE 0 
+          END) as total_deposit
+        FROM "SupplierTransaction"
+        WHERE "companyId" = $1
+        GROUP BY "supplierId"
+      ) dep ON dep."supplierId" = e."supplierId"
       WHERE e."companyId" = $1 AND e."status" = 'PENDING'
       ORDER BY e."dueDate" ASC NULLS LAST, e."date" ASC
     `, tenantId);
@@ -17214,12 +17693,48 @@ app.post('/api/vouchers/:id/claim', tenantMiddleware, async (req: Request, res: 
 
 // --- MODUL SUPPLIER & PEMASOK ---
 
-// SP1. List Suppliers
+// SP1. List Suppliers with Financial Balances
 app.get('/api/suppliers', tenantMiddleware, async (req: Request, res: Response) => {
   try {
     const tenantId = Number((req as any).tenantId);
     const suppliers = await prisma.$queryRawUnsafe(`
-      SELECT * FROM "Supplier" WHERE "companyId" = $1 ORDER BY "name" ASC
+      SELECT 
+        s.*,
+        COALESCE(dep.total_deposit, 0)::float as "depositBalance",
+        COALESCE(rec.total_receivable, 0)::float as "receivableBalance",
+        COALESCE(pay.total_payable, 0)::float as "payableBalance"
+      FROM "Supplier" s
+      LEFT JOIN (
+        SELECT "supplierId", 
+          SUM(CASE 
+            WHEN "type" = 'DEPOSIT' THEN "amount"
+            WHEN "type" IN ('DEPOSIT_REFUND', 'DEPOSIT_USED') THEN -"amount"
+            ELSE 0 
+          END) as total_deposit
+        FROM "SupplierTransaction"
+        WHERE "companyId" = $1
+        GROUP BY "supplierId"
+      ) dep ON dep."supplierId" = s.id
+      LEFT JOIN (
+        SELECT "supplierId",
+          SUM(CASE 
+            WHEN "type" = 'LOAN' THEN "amount"
+            WHEN "type" = 'INSTALLMENT' THEN -"amount"
+            ELSE 0 
+          END) as total_receivable
+        FROM "SupplierTransaction"
+        WHERE "companyId" = $1
+        GROUP BY "supplierId"
+      ) rec ON rec."supplierId" = s.id
+      LEFT JOIN (
+        SELECT "supplierId",
+          SUM("amount" - COALESCE("paidAmount", 0)) as total_payable
+        FROM "Expense"
+        WHERE "companyId" = $1 AND "status" = 'PENDING'
+        GROUP BY "supplierId"
+      ) pay ON pay."supplierId" = s.id
+      WHERE s."companyId" = $1
+      ORDER BY s."name" ASC
     `, tenantId);
     res.json(suppliers);
   } catch (error: any) {
@@ -17280,6 +17795,351 @@ app.delete('/api/suppliers/:id', tenantMiddleware, async (req: Request, res: Res
     res.json({ message: 'Supplier berhasil dihapus' });
   } catch (error: any) {
     res.status(500).json({ error: 'Gagal menghapus supplier: ' + error.message });
+  }
+});
+
+// SP5. Get Supplier Financials & Transaction History (Hutang, Deposit & Piutang Angsuran)
+app.get('/api/suppliers/:id/financials', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const supplierId = parseInt(req.params.id as string);
+
+    const supplier = await prisma.supplier.findFirst({
+      where: { id: supplierId, companyId: tenantId }
+    });
+    if (!supplier) return res.status(404).json({ error: 'Supplier tidak ditemukan' });
+
+    // Ambil riwayat transaksi supplier
+    const transactions = await prisma.supplierTransaction.findMany({
+      where: { companyId: tenantId, supplierId },
+      orderBy: { date: 'desc' },
+      include: {
+        financialAccount: { select: { id: true, name: true, type: true } },
+        purchaseOrder: { select: { id: true, orderNumber: true, totalAmount: true } }
+      }
+    });
+
+    // Hitung saldo deposit & piutang
+    let depositBalance = 0;
+    let receivableBalance = 0;
+    for (const tx of transactions) {
+      if (tx.type === 'DEPOSIT') depositBalance += tx.amount;
+      else if (tx.type === 'DEPOSIT_REFUND' || tx.type === 'DEPOSIT_USED') depositBalance -= tx.amount;
+      else if (tx.type === 'LOAN') receivableBalance += tx.amount;
+      else if (tx.type === 'INSTALLMENT') receivableBalance -= tx.amount;
+    }
+
+    // Ambil hutang tempo berjalan (Expense status PENDING)
+    const unpaidExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, supplierId, status: 'PENDING' },
+      orderBy: { dueDate: 'asc' },
+      select: { id: true, description: true, amount: true, paidAmount: true, dueDate: true, date: true }
+    });
+
+    const payableBalance = unpaidExpenses.reduce((acc, curr) => acc + (curr.amount - (curr.paidAmount || 0)), 0);
+
+    // Ambil akun kas/bank aktif
+    const accounts = await prisma.financialAccount.findMany({
+      where: { companyId: tenantId },
+      select: { id: true, name: true, balance: true, bankName: true, accountNumber: true }
+    });
+
+    // Ambil daftar PO yang sedang aktif / belum diverifikasi lunas untuk referensi potong nota
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where: { companyId: tenantId, supplierId, status: { notIn: ['REJECTED', 'CANCELLED'] } },
+      orderBy: { date: 'desc' },
+      take: 20,
+      select: { id: true, orderNumber: true, totalAmount: true, date: true, status: true }
+    });
+
+    res.json({
+      supplier,
+      depositBalance: Math.max(0, depositBalance),
+      receivableBalance: Math.max(0, receivableBalance),
+      payableBalance: Math.max(0, payableBalance),
+      transactions,
+      unpaidExpenses,
+      accounts,
+      purchaseOrders
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Gagal mengambil data finansial supplier: ' + error.message });
+  }
+});
+
+// SP5b. Export Supplier Financials to Excel
+app.get('/api/suppliers/:id/financials/export', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const supplierId = parseInt(req.params.id as string);
+    const ExcelJS = require('exceljs');
+
+    const supplier = await prisma.supplier.findFirst({
+      where: { id: supplierId, companyId: tenantId }
+    });
+    if (!supplier) return res.status(404).json({ error: 'Supplier tidak ditemukan' });
+
+    // Ambil riwayat transaksi supplier
+    const transactions = await prisma.supplierTransaction.findMany({
+      where: { companyId: tenantId, supplierId },
+      orderBy: { date: 'desc' },
+      include: {
+        financialAccount: { select: { id: true, name: true, type: true } },
+        purchaseOrder: { select: { id: true, orderNumber: true, totalAmount: true } }
+      }
+    });
+
+    let depositBalance = 0;
+    let receivableBalance = 0;
+    for (const tx of transactions) {
+      if (tx.type === 'DEPOSIT') depositBalance += tx.amount;
+      else if (tx.type === 'DEPOSIT_REFUND' || tx.type === 'DEPOSIT_USED') depositBalance -= tx.amount;
+      else if (tx.type === 'LOAN') receivableBalance += tx.amount;
+      else if (tx.type === 'INSTALLMENT') receivableBalance -= tx.amount;
+    }
+
+    // Ambil hutang tempo berjalan (Expense status PENDING)
+    const unpaidExpenses = await prisma.expense.findMany({
+      where: { companyId: tenantId, supplierId, status: 'PENDING' },
+      orderBy: { dueDate: 'asc' },
+      select: { id: true, description: true, amount: true, paidAmount: true, dueDate: true, date: true }
+    });
+    const payableBalance = unpaidExpenses.reduce((acc, curr) => acc + (curr.amount - (curr.paidAmount || 0)), 0);
+
+    const workbook = new ExcelJS.Workbook();
+
+    // SHEET 1: RINGKASAN & RIWAYAT MUTASI
+    const wsMutasi = workbook.addWorksheet('Buku Finansial & Mutasi');
+
+    wsMutasi.mergeCells('A1:F1');
+    wsMutasi.getCell('A1').value = `BUKU FINANSIAL SUPPLIER: ${supplier.name.toUpperCase()}`;
+    wsMutasi.getCell('A1').font = { bold: true, size: 14 };
+    wsMutasi.getCell('A1').alignment = { horizontal: 'center' };
+
+    wsMutasi.mergeCells('A2:F2');
+    wsMutasi.getCell('A2').value = `Kontak: ${supplier.contactPerson || '-'} | Telepon: ${supplier.phone || '-'} | Kategori: ${supplier.category || '-'} | Dicetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    wsMutasi.getCell('A2').font = { italic: true, size: 10 };
+    wsMutasi.getCell('A2').alignment = { horizontal: 'center' };
+
+    // Ringkasan Kartu Saldo (Baris 4-7)
+    wsMutasi.getCell('A4').value = 'RINGKASAN SALDO FINANSIAL';
+    wsMutasi.getCell('A4').font = { bold: true };
+
+    const r5 = wsMutasi.addRow(['Saldo Deposit / Uang Muka', '', Math.max(0, depositBalance)]);
+    const r6 = wsMutasi.addRow(['Hutang Tempo PO (Belum Lunas)', '', Math.max(0, payableBalance)]);
+    const r7 = wsMutasi.addRow(['Sisa Piutang / Pinjaman Supplier', '', Math.max(0, receivableBalance)]);
+
+    r5.font = { bold: true };
+    r6.font = { bold: true };
+    r7.font = { bold: true };
+    r5.getCell(3).numFmt = '#,##0';
+    r6.getCell(3).numFmt = '#,##0';
+    r7.getCell(3).numFmt = '#,##0';
+
+    wsMutasi.addRow([]); // Blank row
+
+    // Tabel Riwayat Mutasi
+    const mutasiTitleRow = wsMutasi.addRow(['RIWAYAT MUTASI & TRANSAKSI']);
+    mutasiTitleRow.font = { bold: true };
+
+    const headerRow = wsMutasi.addRow(['Tanggal', 'Jenis Transaksi', 'Nominal (Rp)', 'Metode & Rekening', 'Referensi', 'Keterangan']);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+    const typeLabels: Record<string, string> = {
+      DEPOSIT: 'SETOR DEPOSIT',
+      DEPOSIT_REFUND: 'PENGEMBALIAN DEPOSIT',
+      DEPOSIT_USED: 'DEPOSIT TERPAKAI (POTONG PO)',
+      LOAN: 'PINJAMAN / TALANGAN',
+      INSTALLMENT: 'ANGSURAN DITERIMA'
+    };
+
+    transactions.forEach(tx => {
+      const row = wsMutasi.addRow([
+        new Date(tx.date).toLocaleDateString('id-ID'),
+        typeLabels[tx.type] || tx.type,
+        tx.amount,
+        tx.paymentMethod === 'POTONG_PO' ? 'Potong Nota PO' : (tx.financialAccount?.name || tx.paymentMethod || '-'),
+        tx.referenceNumber || (tx.purchaseOrder ? `PO #${tx.purchaseOrder.orderNumber}` : '-'),
+        tx.notes || '-'
+      ]);
+      row.getCell(3).numFmt = '#,##0';
+    });
+
+    wsMutasi.columns = [
+      { width: 16 },
+      { width: 30 },
+      { width: 18 },
+      { width: 25 },
+      { width: 22 },
+      { width: 40 }
+    ];
+
+    // SHEET 2: TAGIHAN TEMPO PO (EXPENSES)
+    const wsTagihan = workbook.addWorksheet('Tagihan Tempo PO');
+
+    wsTagihan.mergeCells('A1:F1');
+    wsTagihan.getCell('A1').value = `TAGIHAN HUTANG TEMPO PO - ${supplier.name.toUpperCase()}`;
+    wsTagihan.getCell('A1').font = { bold: true, size: 14 };
+    wsTagihan.getCell('A1').alignment = { horizontal: 'center' };
+
+    wsTagihan.addRow([]); // Blank row
+
+    const tagihanHeader = wsTagihan.addRow(['No. Tagihan / Ref', 'Deskripsi / Faktur', 'Tanggal Faktur', 'Jatuh Tempo', 'Total Tagihan', 'Sisa Hutang']);
+    tagihanHeader.font = { bold: true };
+    tagihanHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+    unpaidExpenses.forEach(exp => {
+      const sisa = exp.amount - (exp.paidAmount || 0);
+      const row = wsTagihan.addRow([
+        `EXP-${exp.id}`,
+        exp.description || 'Tagihan PO',
+        exp.date ? new Date(exp.date).toLocaleDateString('id-ID') : '-',
+        exp.dueDate ? new Date(exp.dueDate).toLocaleDateString('id-ID') : '-',
+        exp.amount,
+        sisa
+      ]);
+      row.getCell(5).numFmt = '#,##0';
+      row.getCell(6).numFmt = '#,##0';
+    });
+
+    wsTagihan.columns = [
+      { width: 18 },
+      { width: 40 },
+      { width: 16 },
+      { width: 16 },
+      { width: 18 },
+      { width: 18 }
+    ];
+
+    const safeSupplierName = supplier.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `Buku_Finansial_${safeSupplierName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.send(buffer);
+
+  } catch (error: any) {
+    console.error("EXPORT SUPPLIER FINANCIALS ERROR:", error);
+    res.status(500).json({ error: 'Gagal mengekspor buku finansial: ' + error.message });
+  }
+});
+
+// SP6. Create Supplier Transaction (Deposit, Refund, Pinjaman & Penerimaan Angsuran)
+app.post('/api/suppliers/:id/transactions', tenantMiddleware, async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number((req as any).tenantId);
+    const supplierId = parseInt(req.params.id as string);
+    const rawUserId = (req as any).userId;
+    const userId = (rawUserId && !isNaN(Number(rawUserId)) && Number(rawUserId) > 0) ? Number(rawUserId) : null;
+    const { type, amount, paymentMethod, financialAccountId, purchaseOrderId, referenceNumber, notes, date } = req.body;
+
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: 'Nominal transaksi harus lebih dari 0' });
+    }
+
+    const validTypes = ['DEPOSIT', 'DEPOSIT_REFUND', 'DEPOSIT_USED', 'LOAN', 'INSTALLMENT'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ error: 'Tipe transaksi tidak valid' });
+    }
+
+    const txDate = date ? new Date(date) : new Date();
+
+    const result = await prisma.$transaction(async (tx) => {
+      const supplier = await tx.supplier.findFirst({
+        where: { id: supplierId, companyId: tenantId }
+      });
+      if (!supplier) throw new Error('Supplier tidak ditemukan');
+
+      // 1. Mutasi Kas / Bank jika ada financialAccountId
+      if (financialAccountId && ['CASH', 'TRANSFER'].includes(paymentMethod || 'CASH')) {
+        const acc = await tx.financialAccount.findFirst({
+          where: { id: Number(financialAccountId), companyId: tenantId }
+        });
+        if (!acc) throw new Error('Akun kas/bank tidak ditemukan');
+
+        // DEPOSIT & LOAN = Uang keluar dari kas kita
+        if (type === 'DEPOSIT' || type === 'LOAN') {
+          await tx.financialAccount.update({
+            where: { id: acc.id },
+            data: { balance: acc.balance - numAmount }
+          });
+        }
+        // DEPOSIT_REFUND & INSTALLMENT (CASH/TRANSFER) = Uang masuk ke kas kita
+        else if (type === 'DEPOSIT_REFUND' || (type === 'INSTALLMENT' && paymentMethod !== 'POTONG_PO')) {
+          await tx.financialAccount.update({
+            where: { id: acc.id },
+            data: { balance: acc.balance + numAmount }
+          });
+        }
+      }
+
+      // 2. Jika INSTALLMENT via POTONG_PO atau DEPOSIT_USED via POTONG_PO
+      if (paymentMethod === 'POTONG_PO' && purchaseOrderId) {
+        // Cari Expense terkait PO ini atau Expense PENDING dari supplier ini
+        const po = await tx.purchaseOrder.findUnique({
+          where: { id: Number(purchaseOrderId) },
+          select: { orderNumber: true }
+        });
+
+        const expense = await tx.expense.findFirst({
+          where: {
+            companyId: tenantId,
+            supplierId: supplierId,
+            status: 'PENDING',
+            ...(po?.orderNumber ? { description: { contains: po.orderNumber } } : {})
+          },
+          orderBy: { date: 'asc' }
+        }) || await tx.expense.findFirst({
+          where: {
+            companyId: tenantId,
+            supplierId: supplierId,
+            status: 'PENDING'
+          },
+          orderBy: { date: 'asc' }
+        });
+
+        if (expense) {
+          const currentPaid = expense.paidAmount || 0;
+          const newPaid = currentPaid + numAmount;
+          const isPaidFull = newPaid >= expense.amount;
+          await tx.expense.update({
+            where: { id: expense.id },
+            data: {
+              paidAmount: newPaid,
+              status: isPaidFull ? 'PAID' : 'PENDING'
+            }
+          });
+        }
+      }
+
+      // 3. Simpan SupplierTransaction
+      const newTx = await tx.supplierTransaction.create({
+        data: {
+          companyId: tenantId,
+          supplierId,
+          type,
+          amount: numAmount,
+          paymentMethod: paymentMethod || 'CASH',
+          financialAccountId: financialAccountId ? Number(financialAccountId) : null,
+          purchaseOrderId: purchaseOrderId ? Number(purchaseOrderId) : null,
+          referenceNumber: referenceNumber || null,
+          notes: notes || null,
+          date: txDate,
+          createdById: userId
+        }
+      });
+
+      return newTx;
+    });
+
+    res.status(201).json({ success: true, transaction: result });
+  } catch (error: any) {
+    console.error('Supplier transaction error:', error);
+    res.status(500).json({ error: error.message || 'Gagal memproses transaksi supplier' });
   }
 });
 
@@ -19683,10 +20543,10 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
 
         const words = cat.name.split(' ');
         if (words.length > 1 && cat.name.length > 10) {
-          barsSvg += `<text x="${cx.toFixed(1)}" y="146" font-family="Arial, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${words[0]}</text>\n`;
-          barsSvg += `<text x="${cx.toFixed(1)}" y="157" font-family="Arial, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${words.slice(1).join(' ')}</text>\n`;
+          barsSvg += `<text x="${cx.toFixed(1)}" y="146" font-family="'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${words[0]}</text>\n`;
+          barsSvg += `<text x="${cx.toFixed(1)}" y="157" font-family="'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${words.slice(1).join(' ')}</text>\n`;
         } else {
-          barsSvg += `<text x="${cx.toFixed(1)}" y="148" font-family="Arial, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${cat.name}</text>\n`;
+          barsSvg += `<text x="${cx.toFixed(1)}" y="148" font-family="'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif" font-size="8.5" font-weight="bold" fill="#374151" text-anchor="middle">${cat.name}</text>\n`;
         }
       });
 
@@ -19694,21 +20554,21 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
       <svg width="${chartWidth}" height="${chartHeight}" xmlns="http://www.w3.org/2000/svg">
         <rect width="${chartWidth}" height="${chartHeight}" fill="#ffffff" stroke="#D1D5DB" stroke-width="1" rx="4"/>
         <line x1="${plotLeft}" y1="${y100}" x2="${plotRight}" y2="${y100}" stroke="#E5E7EB" stroke-width="1"/>
-        <text x="${plotLeft - 8}" y="${y100 + 4}" font-family="Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">100%</text>
+        <text x="${plotLeft - 8}" y="${y100 + 4}" font-family="'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">100%</text>
         
         <line x1="${plotLeft}" y1="${y50}" x2="${plotRight}" y2="${y50}" stroke="#E5E7EB" stroke-width="1"/>
-        <text x="${plotLeft - 8}" y="${y50 + 4}" font-family="Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">50%</text>
+        <text x="${plotLeft - 8}" y="${y50 + 4}" font-family="'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">50%</text>
         
         <line x1="${plotLeft}" y1="${y0}" x2="${plotRight}" y2="${y0}" stroke="#9CA3AF" stroke-width="1.5"/>
-        <text x="${plotLeft - 8}" y="${y0 + 4}" font-family="Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">0%</text>
+        <text x="${plotLeft - 8}" y="${y0 + 4}" font-family="'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif" font-size="9" fill="#6B7280" text-anchor="end">0%</text>
         
         ${barsSvg}
         
         <rect x="130" y="188" width="12" height="12" fill="#93C5FD" rx="1"/>
-        <text x="148" y="198" font-family="Arial, sans-serif" font-size="9.5" font-weight="bold" fill="#374151">Margin Sistem</text>
+        <text x="148" y="198" font-family="'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif" font-size="9.5" font-weight="bold" fill="#374151">Margin Sistem</text>
         
         <rect x="235" y="188" width="12" height="12" fill="#C2410C" rx="1"/>
-        <text x="253" y="198" font-family="Arial, sans-serif" font-size="9.5" font-weight="bold" fill="#374151">Margin Simulasi</text>
+        <text x="253" y="198" font-family="'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif" font-size="9.5" font-weight="bold" fill="#374151">Margin Simulasi</text>
       </svg>
       `;
 
@@ -19759,6 +20619,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const worksheet1 = workbook.addWorksheet('Ringkasan Penjualan');
     worksheet1.columns = [
       { header: 'Tanggal', key: 'date', width: 15 },
+      { header: 'Waktu', key: 'time', width: 12 },
       { header: 'No. Invoice', key: 'invoiceNumber', width: 25 },
       { header: 'Cabang', key: 'branchName', width: 20 },
       { header: 'Pelanggan', key: 'customerName', width: 25 },
@@ -19793,8 +20654,12 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
         detectedMethod = 'TUNAI';
       }
 
+      const dateObj = new Date(sale.createdAt || sale.date);
+      const timeStr = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
       const row = worksheet1.addRow({
         date: new Date(sale.date).toLocaleDateString('id-ID'),
+        time: timeStr,
         invoiceNumber: sale.invoiceNumber,
         branchName: sale.branchName || 'Kantor Pusat',
         customerName: sale.customerName || 'Umum',
@@ -19836,6 +20701,7 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
     const worksheet3 = workbook.addWorksheet('Detail Item Terjual');
     worksheet3.columns = [
       { header: 'Tanggal', key: 'date', width: 15 },
+      { header: 'Waktu', key: 'time', width: 12 },
       { header: 'No. Invoice', key: 'invoiceNumber', width: 25 },
       { header: 'SKU', key: 'sku', width: 15 },
       { header: 'Nama Produk', key: 'name', width: 30 },
@@ -19857,8 +20723,12 @@ app.get('/api/sales/export', tenantMiddleware, async (req: Request, res: Respons
         } catch (e) { }
       }
 
+      const itemDateObj = new Date(item.date);
+      const itemTimeStr = itemDateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
       const row = worksheet3.addRow({
-        date: new Date(item.date).toLocaleDateString('id-ID'),
+        date: itemDateObj.toLocaleDateString('id-ID'),
+        time: itemTimeStr,
         invoiceNumber: item.invoiceNumber,
         sku: item.productSku || '-',
         name: item.productName ? (modText ? `${item.productName} (${modText})` : item.productName) : 'Produk Tidak Diketahui',
@@ -21110,66 +21980,145 @@ app.post('/api/pos/checkout', tenantMiddleware, async (req: Request, res: Respon
         detectedNormalizedMethod = 'TUNAI';
       }
 
-      // Safeguard & Auto-Routing: Ensure non-cash methods (QRIS, EDC, TRANSFER) are routed to BANK/QRIS accounts, and cash to CASH accounts
+      // Safeguard & Auto-Routing: Ensure non-cash methods (QRIS, EDC, TRANSFER) are routed to configured/BANK/QRIS accounts, and cash to CASH accounts
+      const companyConfig = await tx.company.findUnique({
+        where: { id: tenantId },
+        select: {
+          defaultCashAccountId: true, defaultQrisAccountId: true, defaultTransferAccountId: true,
+          posCashAccountId: true, posQrisAccountId: true, posTransferAccountId: true, posEdcAccountId: true
+        }
+      });
+
+      const targetQrisId = companyConfig?.posQrisAccountId || companyConfig?.defaultQrisAccountId;
+      const targetCashId = companyConfig?.posCashAccountId || companyConfig?.defaultCashAccountId;
+      const targetTransferId = companyConfig?.posTransferAccountId || companyConfig?.defaultTransferAccountId;
+      const targetEdcId = companyConfig?.posEdcAccountId || companyConfig?.posTransferAccountId || companyConfig?.defaultTransferAccountId;
+
       if (detectedNormalizedMethod === 'QRIS') {
         const isCash = !account || account.type === 'CASH' || account.name.toLowerCase().includes('tunai') || account.name.toLowerCase().includes('cash') || account.name.toLowerCase().includes('petty');
         if (isCash) {
-          const targetBankAcc = await tx.financialAccount.findFirst({
-            where: {
-              companyId: tenantId,
-              name: { contains: 'QRIS', mode: 'insensitive' }
+          let routed = false;
+          if (targetQrisId) {
+            const cfgAcc = await tx.financialAccount.findFirst({
+              where: { id: targetQrisId, companyId: tenantId }
+            });
+            if (cfgAcc) {
+              finalAccountId = cfgAcc.id;
+              account = cfgAcc;
+              routed = true;
             }
-          }) || await tx.financialAccount.findFirst({
-            where: {
-              companyId: tenantId,
-              type: 'BANK'
+          }
+          if (!routed) {
+            const targetBankAcc = await tx.financialAccount.findFirst({
+              where: {
+                companyId: tenantId,
+                name: { contains: 'QRIS', mode: 'insensitive' }
+              }
+            }) || await tx.financialAccount.findFirst({
+              where: {
+                companyId: tenantId,
+                type: 'BANK'
+              }
+            }) || await tx.financialAccount.findFirst({
+              where: {
+                companyId: tenantId,
+                NOT: [
+                  { type: 'CASH' },
+                  { name: { contains: 'Tunai', mode: 'insensitive' } },
+                  { name: { contains: 'Petty', mode: 'insensitive' } }
+                ]
+              }
+            });
+            if (targetBankAcc) {
+              console.log(`[POS CHECKOUT ROUTING] Re-routed QRIS sale from cash account #${finalAccountId} (${account?.name}) to bank/QRIS account #${targetBankAcc.id} (${targetBankAcc.name}) for tenant ${tenantId}`);
+              finalAccountId = targetBankAcc.id;
+              account = targetBankAcc;
             }
-          }) || await tx.financialAccount.findFirst({
-            where: {
-              companyId: tenantId,
-              NOT: [
-                { type: 'CASH' },
-                { name: { contains: 'Tunai', mode: 'insensitive' } },
-                { name: { contains: 'Petty', mode: 'insensitive' } }
-              ]
-            }
-          });
-          if (targetBankAcc) {
-            console.log(`[POS CHECKOUT ROUTING] Re-routed QRIS sale from cash account #${finalAccountId} (${account?.name}) to bank/QRIS account #${targetBankAcc.id} (${targetBankAcc.name}) for tenant ${tenantId}`);
-            finalAccountId = targetBankAcc.id;
-            account = targetBankAcc;
           }
         }
-      } else if (detectedNormalizedMethod === 'EDC' || detectedNormalizedMethod === 'TRANSFER') {
+      } else if (detectedNormalizedMethod === 'EDC') {
         const isCash = !account || account.type === 'CASH' || account.name.toLowerCase().includes('tunai') || account.name.toLowerCase().includes('cash') || account.name.toLowerCase().includes('petty');
         if (isCash) {
-          const targetBankAcc = await tx.financialAccount.findFirst({
-            where: {
-              companyId: tenantId,
-              type: 'BANK'
+          let routed = false;
+          if (targetEdcId) {
+            const cfgAcc = await tx.financialAccount.findFirst({
+              where: { id: targetEdcId, companyId: tenantId }
+            });
+            if (cfgAcc) {
+              finalAccountId = cfgAcc.id;
+              account = cfgAcc;
+              routed = true;
             }
-          });
-          if (targetBankAcc) {
-            finalAccountId = targetBankAcc.id;
-            account = targetBankAcc;
+          }
+          if (!routed) {
+            const targetBankAcc = await tx.financialAccount.findFirst({
+              where: {
+                companyId: tenantId,
+                type: 'BANK'
+              }
+            });
+            if (targetBankAcc) {
+              finalAccountId = targetBankAcc.id;
+              account = targetBankAcc;
+            }
+          }
+        }
+      } else if (detectedNormalizedMethod === 'TRANSFER') {
+        const isCash = !account || account.type === 'CASH' || account.name.toLowerCase().includes('tunai') || account.name.toLowerCase().includes('cash') || account.name.toLowerCase().includes('petty');
+        if (isCash) {
+          let routed = false;
+          if (targetTransferId) {
+            const cfgAcc = await tx.financialAccount.findFirst({
+              where: { id: targetTransferId, companyId: tenantId }
+            });
+            if (cfgAcc) {
+              finalAccountId = cfgAcc.id;
+              account = cfgAcc;
+              routed = true;
+            }
+          }
+          if (!routed) {
+            const targetBankAcc = await tx.financialAccount.findFirst({
+              where: {
+                companyId: tenantId,
+                type: 'BANK'
+              }
+            });
+            if (targetBankAcc) {
+              finalAccountId = targetBankAcc.id;
+              account = targetBankAcc;
+            }
           }
         }
       } else if (detectedNormalizedMethod === 'TUNAI') {
-        const isBank = account && account.type === 'BANK';
+        const isBank = !account || account.type === 'BANK';
         if (isBank) {
-          const targetCashAcc = await tx.financialAccount.findFirst({
-            where: {
-              companyId: tenantId,
-              OR: [
-                { type: 'CASH' },
-                { name: { contains: 'Tunai', mode: 'insensitive' } },
-                { name: { contains: 'Cash', mode: 'insensitive' } }
-              ]
+          let routed = false;
+          if (targetCashId) {
+            const cfgAcc = await tx.financialAccount.findFirst({
+              where: { id: targetCashId, companyId: tenantId }
+            });
+            if (cfgAcc) {
+              finalAccountId = cfgAcc.id;
+              account = cfgAcc;
+              routed = true;
             }
-          });
-          if (targetCashAcc) {
-            finalAccountId = targetCashAcc.id;
-            account = targetCashAcc;
+          }
+          if (!routed) {
+            const targetCashAcc = await tx.financialAccount.findFirst({
+              where: {
+                companyId: tenantId,
+                OR: [
+                  { type: 'CASH' },
+                  { name: { contains: 'Tunai', mode: 'insensitive' } },
+                  { name: { contains: 'Cash', mode: 'insensitive' } }
+                ]
+              }
+            });
+            if (targetCashAcc) {
+              finalAccountId = targetCashAcc.id;
+              account = targetCashAcc;
+            }
           }
         }
       }
@@ -22082,9 +23031,13 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
 
     let dateFilter: any = {};
     if (startDate && endDate) {
+      const start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
       dateFilter = {
-        gte: new Date(startDate as string),
-        lte: new Date(endDate as string)
+        gte: start,
+        lte: end
       };
     }
 
@@ -22113,7 +23066,18 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
         date: true,
         createdAt: true,
         preparedAt: true,
-        queueNumber: true
+        queueNumber: true,
+        SaleItem: {
+          select: {
+            quantity: true,
+            product: {
+              select: {
+                name: true,
+                fnbType: true
+              }
+            }
+          }
+        }
       },
       orderBy: { createdAt: 'desc' },
       take: (startDate && endDate) ? undefined : 100 // limit to 100 if no date filter, else fetch all in range
@@ -22149,6 +23113,10 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
         monthTotalTime += diffSeconds;
       }
 
+      const itemsList = sale.SaleItem && sale.SaleItem.length > 0
+        ? sale.SaleItem.map((si: any) => `${si.product?.name || 'Item'} (x${si.quantity})`).join(', ')
+        : '-';
+
       return {
         id: sale.id,
         invoiceNumber: sale.invoiceNumber,
@@ -22157,7 +23125,8 @@ app.get('/api/kitchen/reports', tenantMiddleware, async (req: Request, res: Resp
         date: sale.date,
         createdAt: sale.createdAt,
         preparedAt: sale.preparedAt,
-        durationSeconds: diffSeconds
+        durationSeconds: diffSeconds,
+        items: itemsList
       };
     });
 
@@ -23598,12 +24567,14 @@ app.post('/api/b2b-contracts', tenantMiddleware, uploadContract.single('file'), 
         picContact,
         notes,
         items: {
-          create: parsedItems.map((item: any) => ({
-            productId: Number(item.productId),
-            contractPrice: Number(item.contractPrice),
-            unit: item.unit ? String(item.unit) : null,
-            conversionFactor: item.conversionFactor !== undefined && item.conversionFactor !== '' ? Number(item.conversionFactor) : 1
-          }))
+          create: parsedItems
+            .filter((item: any) => item && item.productId && Number(item.productId) > 0)
+            .map((item: any) => ({
+              productId: Number(item.productId),
+              contractPrice: Number(item.contractPrice) || 0,
+              unit: item.unit ? String(item.unit) : null,
+              conversionFactor: item.conversionFactor !== undefined && item.conversionFactor !== '' ? Number(item.conversionFactor) : 1
+            }))
         }
       },
       include: { items: { include: { product: true } } }
@@ -23668,12 +24639,14 @@ app.put('/api/b2b-contracts/:id', tenantMiddleware, uploadContract.single('file'
         reminderDays: reminderDays !== undefined ? Number(reminderDays) : undefined,
         items: {
           deleteMany: {},
-          create: parsedItems.map((item: any) => ({
-            productId: Number(item.productId),
-            contractPrice: Number(item.contractPrice),
-            unit: item.unit ? String(item.unit) : null,
-            conversionFactor: item.conversionFactor !== undefined && item.conversionFactor !== '' ? Number(item.conversionFactor) : 1
-          }))
+          create: parsedItems
+            .filter((item: any) => item && item.productId && Number(item.productId) > 0)
+            .map((item: any) => ({
+              productId: Number(item.productId),
+              contractPrice: Number(item.contractPrice) || 0,
+              unit: item.unit ? String(item.unit) : null,
+              conversionFactor: item.conversionFactor !== undefined && item.conversionFactor !== '' ? Number(item.conversionFactor) : 1
+            }))
         }
       },
       include: { items: { include: { product: true } } }

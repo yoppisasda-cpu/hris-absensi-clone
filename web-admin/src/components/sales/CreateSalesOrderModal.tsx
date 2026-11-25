@@ -45,7 +45,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
   const [productSearch, setProductSearch] = useState("");
   const [productTypeFilter, setProductTypeFilter] = useState<string>("ALL");
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
-  const [activeContractItems, setActiveContractItems] = useState<Record<number, { price: number; unit: string; conversionFactor: number }>>({});
+  const [activeContractItems, setActiveContractItems] = useState<Record<number, { price: number; unit: string; conversionFactor: number; contractNumber: string }>>({});
 
   const fetchData = async () => {
     try {
@@ -53,24 +53,26 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
         api.get("/customers"),
         api.get("/inventory/products")
       ]);
-      setCustomers(cusRes.data);
+      const loadedCustomers = cusRes.data || [];
+      setCustomers(loadedCustomers);
       // Mendukung semua produk yang dapat dijual: FINISHED_GOOD, RAW_MATERIAL (Bahan Baku), dan WIP
-      setProducts(prodRes.data);
+      setProducts(prodRes.data || []);
       
       if (orderId) {
-        await fetchOrderDetails();
+        await fetchOrderDetails(loadedCustomers);
       }
     } catch (error: any) {
       toast.error("Gagal memuat data pelanggan / produk");
     }
   };
 
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = async (loadedCusts?: any[]) => {
     try {
       setLoading(true);
       const res = await api.get(`/sales/orders/${orderId}`);
       const order = res.data;
-      setCustomerId(order.customerId.toString());
+      const custIdStr = order.customerId.toString();
+      setCustomerId(custIdStr);
       setOrderNumber(order.orderNumber);
       setDate(new Date(order.date).toISOString().split("T")[0]);
       setNotes(order.notes || "");
@@ -85,11 +87,14 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
         productId: i.productId,
         productName: i.product?.name || i.productName || "Produk",
         unit: i.product?.purchaseUnit || i.product?.unit || "Pcs",
-        purchaseFactor: i.product?.purchaseFactor || 1,
+        conversionFactor: i.conversionFactor || i.product?.purchaseFactor || 1,
         quantity: i.quantity,
         price: i.price,
         total: i.total
       })));
+
+      // Load contract in edit mode
+      await loadContractForCustomer(custIdStr, loadedCusts || customers);
     } catch (err) {
       toast.error("Gagal memuat detail pesanan");
     } finally {
@@ -107,6 +112,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
         setCustomerId("");
         setNotes("");
         setItems([]);
+        setActiveContractItems({});
         setTaxRate(0);
         setTaxPreset(0);
         setCustomTaxRate("");
@@ -125,8 +131,8 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     setIsProductDropdownOpen(false);
     const prod = products.find(p => p.id.toString() === pId);
     if (prod) {
-      // Gunakan harga kontrak jika ada, fallback ke harga jual (price) atau harga modal (costPrice)
-      const contractData = activeContractItems[prod.id];
+      // Prioritaskan harga kontrak jika ada, fallback ke harga jual (price) atau harga modal (costPrice)
+      const contractData = activeContractItems[prod.id] || activeContractItems[Number(prod.id)];
       const defaultPrice = prod.price > 0 ? prod.price : (prod.costPrice || 0);
       setPrice(contractData ? contractData.price.toString() : defaultPrice.toString());
     } else {
@@ -134,30 +140,91 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     }
   };
 
+  // Helper load kontrak B2B aktif untuk customer (mendukung multiple contracts & nama customer yang sama)
+  const loadContractForCustomer = async (newCustomerId: string, custList: any[]) => {
+    if (!newCustomerId) {
+      setActiveContractItems({});
+      return;
+    }
+
+    try {
+      const res = await api.get('/b2b-contracts');
+      const contracts: any[] = res.data || [];
+      const currentCust = custList.find((c: any) => c.id.toString() === newCustomerId);
+      const currentCustName = currentCust?.name?.trim().toLowerCase();
+
+      // Cari semua kontrak aktif yang cocok dengan ID pelanggan atau Nama pelanggan (jika ada duplikasi akun)
+      const matchingContracts = contracts.filter((c: any) => {
+        if (c.status !== 'ACTIVE') return false;
+        const matchId = c.customerId?.toString() === newCustomerId;
+        const matchName = currentCustName && c.customer?.name?.trim().toLowerCase() === currentCustName;
+        return matchId || matchName;
+      });
+
+      if (matchingContracts.length > 0) {
+        // Urutkan dari yang lebih lama ke yang terbaru agar kontrak terbaru me-override kontrak lama jika produk sama
+        matchingContracts.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+
+        const map: Record<number, { price: number; unit: string; conversionFactor: number; contractNumber: string }> = {};
+        const contractNumbers: string[] = [];
+
+        matchingContracts.forEach((c: any) => {
+          if (!contractNumbers.includes(c.contractNumber)) {
+            contractNumbers.push(c.contractNumber);
+          }
+          c.items?.forEach((item: any) => {
+            const pId = Number(item.productId);
+            if (pId > 0) {
+              map[pId] = {
+                price: Number(item.contractPrice),
+                unit: item.unit || item.product?.purchaseUnit || item.product?.unit || 'Pcs',
+                conversionFactor: Number(item.conversionFactor) || item.product?.purchaseFactor || 1,
+                contractNumber: c.contractNumber
+              };
+            }
+          });
+        });
+
+        setActiveContractItems(map);
+        const itemCount = Object.keys(map).length;
+        if (itemCount > 0) {
+          toast.success(`Kontrak B2B "${contractNumbers.join(', ')}" diterapkan (${itemCount} produk terdaftar)`);
+        }
+
+        // Jika produk sudah dipilih sebelumnya di form, update harga dan unitnya
+        if (selectedProduct) {
+          const cData = map[Number(selectedProduct)];
+          if (cData) {
+            setPrice(cData.price.toString());
+          }
+        }
+
+        // Update item yang sudah ada di daftar pesanan jika cocok dengan kontrak
+        setItems(prevItems => prevItems.map(item => {
+          const cData = map[Number(item.productId)];
+          if (cData) {
+            return {
+              ...item,
+              price: cData.price,
+              unit: cData.unit || item.unit,
+              conversionFactor: cData.conversionFactor || item.conversionFactor,
+              total: item.quantity * cData.price
+            };
+          }
+          return item;
+        }));
+      } else {
+        setActiveContractItems({});
+      }
+    } catch (err) {
+      console.error("Gagal memuat kontrak B2B:", err);
+    }
+  };
+
   // Fetch kontrak B2B aktif saat customer berubah
   const handleCustomerChange = async (newCustomerId: string) => {
     setCustomerId(newCustomerId);
-    setActiveContractItems({});
-    if (!newCustomerId) return;
-    try {
-      const res = await api.get('/b2b-contracts');
-      const contracts: any[] = res.data;
-      const activeContract = contracts.find(
-        (c: any) => c.customerId.toString() === newCustomerId && c.status === 'ACTIVE'
-      );
-      if (activeContract?.items?.length) {
-        const map: Record<number, { price: number; unit: string; conversionFactor: number }> = {};
-        activeContract.items.forEach((item: any) => {
-          map[item.productId] = {
-            price: item.contractPrice,
-            unit: item.unit || item.product?.purchaseUnit || item.product?.unit || 'Pcs',
-            conversionFactor: Number(item.conversionFactor) || item.product?.purchaseFactor || 1
-          };
-        });
-        setActiveContractItems(map);
-        toast.success(`Harga & Satuan Kontrak B2B "${activeContract.contractNumber}" diterapkan`);
-      }
-    } catch {}
+    await loadContractForCustomer(newCustomerId, customers);
   };
 
   const filteredProducts = products.filter(p => {
@@ -172,7 +239,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
     const prod = products.find(p => p.id.toString() === selectedProduct);
     if (!prod) return;
 
-    const contractData = activeContractItems[prod.id];
+    const contractData = activeContractItems[prod.id] || activeContractItems[Number(prod.id)];
     const itemUnit = contractData?.unit || prod.purchaseUnit || prod.unit || 'Pcs';
     const itemFactor = contractData?.conversionFactor || prod.purchaseFactor || 1;
     setItems([...items, {
@@ -217,7 +284,7 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
   const totalOrder = subtotal + taxAmount;
 
   const selectedProductObj = products.find(p => p.id.toString() === selectedProduct);
-  const contractData = selectedProduct ? activeContractItems[Number(selectedProduct)] : null;
+  const contractData = selectedProduct ? (activeContractItems[Number(selectedProduct)] || activeContractItems[selectedProduct as any]) : null;
   const selectedUnit = contractData?.unit || selectedProductObj?.purchaseUnit || selectedProductObj?.unit || 'Pcs';
 
   if (!isOpen) return null;
@@ -256,9 +323,19 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                 >
                   <option value="">-- RESOLVE CLIENT --</option>
                   {customers.map(c => (
-                    <option key={c.id} value={c.id} className="bg-slate-900">{c.name.toUpperCase()}</option>
+                    <option key={c.id} value={c.id} className="bg-slate-900">
+                      {c.name.toUpperCase()}{c.phone ? ` (${c.phone})` : ''}
+                    </option>
                   ))}
                 </select>
+                {Object.keys(activeContractItems).length > 0 && (
+                  <div className="flex items-center gap-2 mt-2 px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest italic">
+                      {Object.keys(activeContractItems).length} Produk Menggunakan Harga Khusus Kontrak B2B
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -420,36 +497,53 @@ export default function CreateSalesOrderModal({ isOpen, onClose, onSuccess, orde
                           {filteredProducts.length === 0 ? (
                             <div className="px-5 py-4 text-[9px] font-black text-slate-700 italic uppercase tracking-widest text-center">Tidak ada produk / bahan baku</div>
                           ) : (
-                            filteredProducts.map(p => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => handleProductSelect(p.id.toString())}
-                                className="w-full px-5 py-3 text-left hover:bg-indigo-500/10 group transition-all"
-                              >
-                                <div className="flex justify-between items-center">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-black text-slate-400 group-hover:text-white uppercase italic transition-colors">
-                                      {p.name}
-                                    </span>
-                                    {p.type === 'RAW_MATERIAL' ? (
-                                      <span className="px-1.5 py-0.5 rounded text-[7px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
-                                        Bahan Baku
+                            filteredProducts.map(p => {
+                              const contractItem = activeContractItems[p.id] || activeContractItems[Number(p.id)];
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => handleProductSelect(p.id.toString())}
+                                  className={`w-full px-5 py-3 text-left group transition-all ${
+                                    contractItem ? 'bg-indigo-950/20 hover:bg-indigo-600/20' : 'hover:bg-indigo-500/10'
+                                  }`}
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-[10px] font-black text-slate-300 group-hover:text-white uppercase italic transition-colors">
+                                        {p.name}
                                       </span>
-                                    ) : p.type === 'WIP' ? (
-                                      <span className="px-1.5 py-0.5 rounded text-[7px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
-                                        WIP
+                                      {p.type === 'RAW_MATERIAL' ? (
+                                        <span className="px-1.5 py-0.5 rounded text-[7px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                                          Bahan Baku
+                                        </span>
+                                      ) : p.type === 'WIP' ? (
+                                        <span className="px-1.5 py-0.5 rounded text-[7px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                                          WIP
+                                        </span>
+                                      ) : null}
+                                      {contractItem && (
+                                        <span className="px-2 py-0.5 rounded text-[8px] font-black bg-indigo-500 text-white shadow-sm uppercase tracking-wider">
+                                          🏷️ KONTRAK: Rp {contractItem.price.toLocaleString('id-ID')} / {contractItem.unit}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="text-[8px] font-black text-slate-500 uppercase italic block">
+                                        AVL: {p.purchaseFactor && p.purchaseFactor > 1 && p.purchaseUnit && p.purchaseUnit !== p.unit
+                                          ? `${((p.stock || 0) / p.purchaseFactor).toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${p.purchaseUnit} (${(p.stock || 0).toLocaleString('id-ID')} ${p.unit})`
+                                          : `${(p.stock || 0).toLocaleString('id-ID')} ${p.unit || ''}`}
                                       </span>
-                                    ) : null}
+                                      {!contractItem && (
+                                        <span className="text-[8px] font-bold text-slate-600">
+                                          Normal: Rp {(p.price > 0 ? p.price : (p.costPrice || 0)).toLocaleString('id-ID')}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                  <span className="text-[8px] font-black text-slate-600 uppercase italic">
-                                    AVL: {p.purchaseFactor && p.purchaseFactor > 1 && p.purchaseUnit && p.purchaseUnit !== p.unit
-                                      ? `${((p.stock || 0) / p.purchaseFactor).toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${p.purchaseUnit} (${(p.stock || 0).toLocaleString('id-ID')} ${p.unit})`
-                                      : `${(p.stock || 0).toLocaleString('id-ID')} ${p.unit || ''}`}
-                                  </span>
-                                </div>
-                              </button>
-                            ))
+                                </button>
+                              );
+                            })
                           )}
                         </div>
                       </div>

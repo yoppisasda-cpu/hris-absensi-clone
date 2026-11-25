@@ -34,3 +34,6 @@ list_*.ts
 
 # Uploads
 uploads/
+
+# Fontconfig cache/conf
+.fontconfig/

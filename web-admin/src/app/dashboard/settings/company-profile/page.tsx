@@ -40,6 +40,13 @@ interface Company {
     openTime: string | null;
     closeTime: string | null;
     isOpenManual: boolean;
+    defaultCashAccountId?: number | null;
+    defaultQrisAccountId?: number | null;
+    defaultTransferAccountId?: number | null;
+    posCashAccountId?: number | null;
+    posQrisAccountId?: number | null;
+    posTransferAccountId?: number | null;
+    posEdcAccountId?: number | null;
     xenditMode?: string | null;
     hasXenditSecretKey?: boolean;
     xenditSecretKeyMasked?: string | null;
@@ -84,10 +91,18 @@ export default function CompanyProfilePage() {
         allowCashPayment: true,
         allowBankTransfer: true,
         allowQrisPayment: true,
+        defaultCashAccountId: '' as string | number,
+        defaultQrisAccountId: '' as string | number,
+        defaultTransferAccountId: '' as string | number,
+        posCashAccountId: '' as string | number,
+        posQrisAccountId: '' as string | number,
+        posTransferAccountId: '' as string | number,
+        posEdcAccountId: '' as string | number,
         xenditMode: 'AIVOLA',
         xenditSecretKey: '',
         xenditWebhookToken: ''
     });
+    const [accounts, setAccounts] = useState<any[]>([]);
     const [payrollData, setPayrollData] = useState({
         lateDeductionRate: '50000',
         absenceDeductionType: 'PRO_RATA',
@@ -113,6 +128,13 @@ export default function CompanyProfilePage() {
                 setApiReqStatus(reqStatus.data.request);
             } catch (e) {
                 console.log("No API request yet");
+            }
+
+            try {
+                const accRes = await api.get('/finance/accounts');
+                setAccounts(accRes.data || []);
+            } catch (e) {
+                console.log("No accounts yet");
             }
 
             setFormData({
@@ -146,6 +168,13 @@ export default function CompanyProfilePage() {
                 allowCashPayment: response.data.allowCashPayment ?? true,
                 allowBankTransfer: response.data.allowBankTransfer ?? true,
                 allowQrisPayment: response.data.allowQrisPayment ?? true,
+                defaultCashAccountId: response.data.defaultCashAccountId || '',
+                defaultQrisAccountId: response.data.defaultQrisAccountId || '',
+                defaultTransferAccountId: response.data.defaultTransferAccountId || '',
+                posCashAccountId: response.data.posCashAccountId || '',
+                posQrisAccountId: response.data.posQrisAccountId || '',
+                posTransferAccountId: response.data.posTransferAccountId || '',
+                posEdcAccountId: response.data.posEdcAccountId || '',
                 xenditMode: response.data.xenditMode || 'AIVOLA',
                 // Secret tidak pernah dikirim utuh dari server; input dikosongkan = pertahankan key lama
                 xenditSecretKey: '',
@@ -217,6 +246,13 @@ export default function CompanyProfilePage() {
                 allowCashPayment: formData.allowCashPayment,
                 allowBankTransfer: formData.allowBankTransfer,
                 allowQrisPayment: formData.allowQrisPayment,
+                defaultCashAccountId: formData.defaultCashAccountId ? Number(formData.defaultCashAccountId) : null,
+                defaultQrisAccountId: formData.defaultQrisAccountId ? Number(formData.defaultQrisAccountId) : null,
+                defaultTransferAccountId: formData.defaultTransferAccountId ? Number(formData.defaultTransferAccountId) : null,
+                posCashAccountId: formData.posCashAccountId ? Number(formData.posCashAccountId) : null,
+                posQrisAccountId: formData.posQrisAccountId ? Number(formData.posQrisAccountId) : null,
+                posTransferAccountId: formData.posTransferAccountId ? Number(formData.posTransferAccountId) : null,
+                posEdcAccountId: formData.posEdcAccountId ? Number(formData.posEdcAccountId) : null,
                 xenditMode: formData.xenditMode,
                 xenditSecretKey: formData.xenditSecretKey,
                 xenditWebhookToken: formData.xenditWebhookToken,
@@ -867,14 +903,14 @@ export default function CompanyProfilePage() {
                                         <div className="h-6 w-1 bg-emerald-500 rounded-full"></div>
                                         <h3 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase tracking-widest">Metode Pembayaran (Aivola GO)</h3>
                                     </div>
-                                    <p className="text-xs text-slate-500 mb-4">Pilih metode pembayaran yang tersedia untuk pelanggan di aplikasi Aivola GO.</p>
+                                    <p className="text-xs text-slate-500 mb-4">Pilih opsi metode pembayaran yang tersedia untuk pelanggan saat memesan mandiri di aplikasi Aivola GO.</p>
                                     <div className="space-y-3">
-                                        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+                                        <div className="p-3.5 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-8 w-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600">💵</div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-slate-800">Bayar di Kasir</h4>
-                                                    <p className="text-[10px] text-slate-500 mt-0.5">Pelanggan bayar langsung ke kasir saat ambil pesanan</p>
+                                                    <h4 className="text-sm font-bold text-slate-800">Bayar di Kasir (Tunai)</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-0.5">Pelanggan memesan mandiri via Aivola GO lalu membayar langsung di kasir</p>
                                                 </div>
                                             </div>
                                             <button
@@ -885,12 +921,13 @@ export default function CompanyProfilePage() {
                                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowCashPayment ? 'translate-x-6' : 'translate-x-1'}`} />
                                             </button>
                                         </div>
-                                        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+
+                                        <div className="p-3.5 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">🏦</div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-slate-800">Transfer Bank</h4>
-                                                    <p className="text-[10px] text-slate-500 mt-0.5">Tampilkan info rekening bank dari menu Kas &amp; Bank</p>
+                                                    <h4 className="text-sm font-bold text-slate-800">Transfer Bank &amp; EDC</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-0.5">Pelanggan dapat memilih opsi transfer rekening bank manual saat memesan</p>
                                                 </div>
                                             </div>
                                             <button
@@ -901,12 +938,13 @@ export default function CompanyProfilePage() {
                                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allowBankTransfer ? 'translate-x-6' : 'translate-x-1'}`} />
                                             </button>
                                         </div>
-                                        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+
+                                        <div className="p-3.5 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-8 w-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">📱</div>
                                                 <div>
                                                     <h4 className="text-sm font-bold text-slate-800">QRIS</h4>
-                                                    <p className="text-[10px] text-slate-500 mt-0.5">Jika Xendit aktif: QRIS dinamis otomatis (QRIS statis disembunyikan). Jika tidak: tampilkan QRIS statis.</p>
+                                                    <p className="text-[10px] text-slate-500 mt-0.5">Pelanggan membayar scan barcode QRIS dinamis/statis di aplikasi</p>
                                                 </div>
                                             </div>
                                             <button
@@ -1131,6 +1169,123 @@ export default function CompanyProfilePage() {
                                                 className="w-full rounded-xl border border-slate-200 py-3 pl-4 pr-8 text-sm font-bold text-slate-700 transition-all focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-center"
                                             />
                                             <span className="absolute right-3 top-3.5 text-slate-400 font-bold">%</span>
+                                        </div>
+                                    </div>
+
+                                    {/* PENGATURAN REKENING METODE PEMBAYARAN KASIR (POS) */}
+                                    <div className="mt-8 pt-6 border-t border-slate-200/80">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="h-5 w-1.5 bg-blue-600 rounded-full"></div>
+                                            <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Pengaturan Rekening Pembayaran Kasir (POS)</h4>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+                                            Pilih rekening kas atau bank tujuan default saat kasir menyelesaikan penjualan di aplikasi POS Kasir. Saat kasir memilih metode pembayaran (Tunai, QRIS, Transfer, atau EDC), dana transaksi otomatis diarahkan ke rekening yang Anda tentukan di bawah.
+                                        </p>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Tunai Kasir */}
+                                            <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 hover:bg-white hover:border-emerald-300 transition-all space-y-2.5 shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-9 w-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base shadow-sm">💵</div>
+                                                    <div>
+                                                        <h5 className="text-xs font-black text-slate-800 uppercase tracking-wide">Kas Tunai Kasir</h5>
+                                                        <p className="text-[11px] text-slate-400">Penerimaan Uang Tunai / Laci Kasir</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Rekening Tujuan Tunai</label>
+                                                    <select
+                                                        value={formData.posCashAccountId || ''}
+                                                        onChange={(e) => setFormData({ ...formData, posCashAccountId: e.target.value })}
+                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 bg-white font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                                    >
+                                                        <option value="">Otomatis (Kasir / Akun Kas Pertama)</option>
+                                                        {accounts.map(acc => (
+                                                            <option key={acc.id} value={acc.id}>
+                                                                {acc.name} ({acc.type === 'CASH' ? 'Kas' : 'Bank'})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            {/* QRIS Kasir */}
+                                            <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 hover:bg-white hover:border-orange-300 transition-all space-y-2.5 shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-9 w-9 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-base shadow-sm">📱</div>
+                                                    <div>
+                                                        <h5 className="text-xs font-black text-slate-800 uppercase tracking-wide">QRIS Kasir</h5>
+                                                        <p className="text-[11px] text-slate-400">Penerimaan Scan QRIS di Meja Kasir</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Rekening Tujuan QRIS</label>
+                                                    <select
+                                                        value={formData.posQrisAccountId || ''}
+                                                        onChange={(e) => setFormData({ ...formData, posQrisAccountId: e.target.value })}
+                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 bg-white font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                                    >
+                                                        <option value="">Otomatis (Akun QRIS / Bank Pertama)</option>
+                                                        {accounts.map(acc => (
+                                                            <option key={acc.id} value={acc.id}>
+                                                                {acc.name} ({acc.type === 'CASH' ? 'Kas' : 'Bank'})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            {/* Transfer Bank Kasir */}
+                                            <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 hover:bg-white hover:border-blue-300 transition-all space-y-2.5 shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base shadow-sm">🏦</div>
+                                                    <div>
+                                                        <h5 className="text-xs font-black text-slate-800 uppercase tracking-wide">Transfer Bank Kasir</h5>
+                                                        <p className="text-[11px] text-slate-400">Penerimaan Transfer Bank Langsung</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Rekening Tujuan Transfer</label>
+                                                    <select
+                                                        value={formData.posTransferAccountId || ''}
+                                                        onChange={(e) => setFormData({ ...formData, posTransferAccountId: e.target.value })}
+                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 bg-white font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                                    >
+                                                        <option value="">Otomatis (Akun Bank Pertama)</option>
+                                                        {accounts.map(acc => (
+                                                            <option key={acc.id} value={acc.id}>
+                                                                {acc.name} ({acc.type === 'CASH' ? 'Kas' : 'Bank'})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            {/* EDC Kasir */}
+                                            <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 hover:bg-white hover:border-purple-300 transition-all space-y-2.5 shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-9 w-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-base shadow-sm">💳</div>
+                                                    <div>
+                                                        <h5 className="text-xs font-black text-slate-800 uppercase tracking-wide">Mesin EDC / Kartu</h5>
+                                                        <p className="text-[11px] text-slate-400">Penerimaan Kartu Debit / Kredit</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Rekening Tujuan Mesin EDC</label>
+                                                    <select
+                                                        value={formData.posEdcAccountId || ''}
+                                                        onChange={(e) => setFormData({ ...formData, posEdcAccountId: e.target.value })}
+                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 bg-white font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                                    >
+                                                        <option value="">Otomatis (Akun Bank Pertama)</option>
+                                                        {accounts.map(acc => (
+                                                            <option key={acc.id} value={acc.id}>
+                                                                {acc.name} ({acc.type === 'CASH' ? 'Kas' : 'Bank'})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

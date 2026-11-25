@@ -311,9 +311,7 @@ export default function B2BContractsPage() {
                               if (prod) {
                                 newItems[index].unit = prod.purchaseUnit || prod.unit || 'Pcs';
                                 newItems[index].conversionFactor = (prod.purchaseFactor || 1).toString();
-                                if (!newItems[index].contractPrice) {
-                                  newItems[index].contractPrice = (prod.price > 0 ? prod.price : (prod.costPrice || 0)).toString();
-                                }
+                                newItems[index].contractPrice = (prod.price > 0 ? prod.price : (prod.costPrice || 0)).toString();
                               }
                               setContractItems(newItems);
                             }}>

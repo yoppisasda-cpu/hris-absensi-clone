@@ -819,7 +819,8 @@ export default function POSReportsPage() {
                     <table className="w-full border-collapse text-left">
                         <thead>
                             <tr className="bg-slate-950/40">
-                                <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Waktu & Tanggal</th>
+                                <th className="px-5 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Tanggal</th>
+                                <th className="px-5 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Waktu</th>
                                 <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Detail Transaksi</th>
                                 <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Metode Bayar</th>
                                 <th className="px-6 py-4 text-right font-black text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-800">Gross</th>
@@ -832,7 +833,7 @@ export default function POSReportsPage() {
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan={7} className="px-6 py-6"><div className="h-4 w-full rounded bg-slate-800/50"></div></td>
+                                        <td colSpan={8} className="px-6 py-6"><div className="h-4 w-full rounded bg-slate-800/50"></div></td>
                                     </tr>
                                 ))
                             ) : filteredSales.length > 0 ? (
@@ -842,9 +843,13 @@ export default function POSReportsPage() {
 
                                     return (
                                         <tr key={sale.id} className="hover:bg-slate-800/20 transition-all group">
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-slate-200">{format(new Date(sale.date), 'dd/MM/yyyy')}</div>
-                                                <div className="text-[10px] text-slate-500 font-medium">{format(new Date(sale.createdAt), 'HH:mm:ss')}</div>
+                                            <td className="px-5 py-4 whitespace-nowrap">
+                                                <div className="font-bold text-slate-200 text-xs">{format(new Date(sale.date), 'dd/MM/yyyy')}</div>
+                                            </td>
+                                            <td className="px-5 py-4 whitespace-nowrap">
+                                                <span className="px-2.5 py-1 rounded-lg bg-slate-950/80 border border-slate-800 font-mono text-[11px] font-bold text-emerald-400 shadow-inner">
+                                                    {format(new Date(sale.createdAt || sale.date), 'HH:mm:ss')}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="font-black text-emerald-500 font-mono tracking-tighter text-sm">{sale.invoiceNumber}</div>
@@ -967,7 +972,7 @@ export default function POSReportsPage() {
                             })
                             ) : (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-24 text-center">
+                                    <td colSpan={8} className="px-6 py-24 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="p-4 bg-slate-800/30 rounded-full border border-slate-700">
                                                 <Receipt className="h-10 w-10 text-slate-600" />

@@ -92,6 +92,13 @@ export default function POSPage() {
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<number | null>(null);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'TUNAI' | 'QRIS' | 'TRANSFER' | 'EDC' | null>(null);
+    const [posPaymentConfig, setPosPaymentConfig] = useState<{
+        posCashAccountId?: number | null;
+        posQrisAccountId?: number | null;
+        posTransferAccountId?: number | null;
+        posEdcAccountId?: number | null;
+    }>({});
     const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [showReceipt, setShowReceipt] = useState(false);
     const [lastSale, setLastSale] = useState<any>(null);
@@ -274,10 +281,19 @@ export default function POSPage() {
             
             // Force manual selection to prevent accidental usage of default account
             setSelectedAccount(null);
+            setSelectedPaymentMethod(null);
 
             // Fetch company profile for customer display header & receipt metadata
             try {
                 const compRes = await api.get('/companies/my');
+                if (compRes.data) {
+                    setPosPaymentConfig({
+                        posCashAccountId: compRes.data.posCashAccountId,
+                        posQrisAccountId: compRes.data.posQrisAccountId,
+                        posTransferAccountId: compRes.data.posTransferAccountId,
+                        posEdcAccountId: compRes.data.posEdcAccountId,
+                    });
+                }
                 if (compRes.data?.name) {
                     setCompanyName(compRes.data.name);
                     setCompanyLogo(compRes.data.logoUrl || null);
@@ -1406,6 +1422,50 @@ export default function POSPage() {
         }
     };
 
+    const activeMethod = selectedPaymentMethod || (() => {
+        if (!selectedAccount) return null;
+        if (posPaymentConfig.posCashAccountId && selectedAccount === posPaymentConfig.posCashAccountId) return 'TUNAI';
+        if (posPaymentConfig.posQrisAccountId && selectedAccount === posPaymentConfig.posQrisAccountId) return 'QRIS';
+        if (posPaymentConfig.posEdcAccountId && selectedAccount === posPaymentConfig.posEdcAccountId) return 'EDC';
+        if (posPaymentConfig.posTransferAccountId && selectedAccount === posPaymentConfig.posTransferAccountId) return 'TRANSFER';
+        const acc = accounts.find(a => a.id === selectedAccount);
+        if (acc?.type === 'CASH' || acc?.name.toUpperCase().includes('KAS') || acc?.name.toUpperCase().includes('TUNAI')) return 'TUNAI';
+        if (acc?.name.toUpperCase().includes('QRIS')) return 'QRIS';
+        if (acc?.name.toUpperCase().includes('EDC')) return 'EDC';
+        return paymentSubMethod || 'TRANSFER';
+    })();
+
+    const handleSelectPosMethod = (method: 'TUNAI' | 'QRIS' | 'TRANSFER' | 'EDC') => {
+        setSelectedPaymentMethod(method);
+        if (method === 'TUNAI') {
+            const target = accounts.find(a => a.id === posPaymentConfig.posCashAccountId)
+                || accounts.find(a => a.type === 'CASH' || a.name.toUpperCase().includes('KAS') || a.name.toUpperCase().includes('TUNAI'))
+                || accounts[0];
+            if (target) setSelectedAccount(target.id);
+        } else if (method === 'QRIS') {
+            setPaymentSubMethod('QRIS');
+            const target = accounts.find(a => a.id === posPaymentConfig.posQrisAccountId)
+                || accounts.find(a => a.name.toUpperCase().includes('QRIS'))
+                || accounts.find(a => a.type === 'BANK')
+                || accounts[0];
+            if (target) setSelectedAccount(target.id);
+        } else if (method === 'TRANSFER') {
+            setPaymentSubMethod('TRANSFER');
+            const target = accounts.find(a => a.id === posPaymentConfig.posTransferAccountId)
+                || accounts.find(a => a.type === 'BANK' && !a.name.toUpperCase().includes('QRIS') && !a.name.toUpperCase().includes('EDC'))
+                || accounts.find(a => a.type === 'BANK')
+                || accounts[0];
+            if (target) setSelectedAccount(target.id);
+        } else if (method === 'EDC') {
+            setPaymentSubMethod('EDC');
+            const target = accounts.find(a => a.id === posPaymentConfig.posEdcAccountId)
+                || accounts.find(a => a.name.toUpperCase().includes('EDC'))
+                || accounts.find(a => a.type === 'BANK')
+                || accounts[0];
+            if (target) setSelectedAccount(target.id);
+        }
+    };
+
     const handleCheckout = async () => {
         if (cart.length === 0) return;
         if (!selectedAccount) {
@@ -1436,7 +1496,8 @@ export default function POSPage() {
                     const acc = accounts.find(a => a.id === selectedAccount);
                     const isCash = acc?.type === 'CASH' || acc?.name.toUpperCase().includes('KAS') || acc?.name.toUpperCase().includes('TUNAI');
                     if (isCash) return acc?.name || 'Tunai';
-                    if (acc?.name.toUpperCase().includes('QRIS')) return acc.name;
+                    if (activeMethod === 'QRIS' || acc?.name.toUpperCase().includes('QRIS')) return `QRIS - ${acc?.name || 'Bank'}`;
+                    if (activeMethod === 'EDC' || acc?.name.toUpperCase().includes('EDC')) return `EDC - ${acc?.name || 'Bank'}`;
                     return `${paymentSubMethod} - ${acc?.name || 'Bank'}`;
                 })(),
                 paymentReference: paymentReference.trim() || null,
@@ -1483,7 +1544,8 @@ export default function POSPage() {
                     const acc = accounts.find(a => a.id === selectedAccount);
                     const isCash = acc?.type === 'CASH' || acc?.name.toUpperCase().includes('KAS') || acc?.name.toUpperCase().includes('TUNAI');
                     if (isCash) return acc?.name || 'Tunai';
-                    if (acc?.name.toUpperCase().includes('QRIS')) return acc.name;
+                    if (activeMethod === 'QRIS' || acc?.name.toUpperCase().includes('QRIS')) return `QRIS - ${acc?.name || 'Bank'}`;
+                    if (activeMethod === 'EDC' || acc?.name.toUpperCase().includes('EDC')) return `EDC - ${acc?.name || 'Bank'}`;
                     return `${paymentSubMethod} - ${acc?.name || 'Bank'}`;
                 })(),
                 isCompleted: true,
@@ -1511,6 +1573,8 @@ export default function POSPage() {
             setVoucherDiscountAmount(0);
             setEmployeeDiscount(null);
             setCashReceived('');
+            setSelectedAccount(null);
+            setSelectedPaymentMethod(null);
             setShowCheckoutModal(false);
             setLastCart([...cart]);
             setCart([]);
@@ -1972,24 +2036,25 @@ export default function POSPage() {
                                     </div>
                                 </div>
 
-                                {/* METODE PEMBAYARAN */}
+                                {/* METODE PEMBAYARAN KASIR */}
                                 <div className="space-y-2.5">
                                     <div className="flex justify-between items-center">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Metode Pembayaran</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Metode Pembayaran Kasir</label>
                                         <span className="text-[9px] font-bold text-slate-500">Pilih salah satu</span>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {accounts.filter(acc => acc.showInPos !== false).map(acc => {
-                                            let icon = <Banknote className="h-4 w-4" />;
-                                            let badgeText = "Tunai";
-                                            const isSelected = selectedAccount === acc.id;
-                                            if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-4 w-4" />; }
-                                            else if (acc.type === 'BANK') { badgeText = "Bank / Non-Tunai"; icon = <CreditCard className="h-4 w-4" />; }
-                                            
+                                        {[
+                                            { id: 'TUNAI', label: 'Tunai', sub: 'Uang Tunai', icon: <Banknote className="h-4 w-4" /> },
+                                            { id: 'QRIS', label: 'QRIS', sub: 'Scan Barcode', icon: <Scan className="h-4 w-4" /> },
+                                            { id: 'TRANSFER', label: 'Transfer', sub: 'Bank Langsung', icon: <Wallet className="h-4 w-4" /> },
+                                            { id: 'EDC', label: 'EDC / Kartu', sub: 'Debit & Kredit', icon: <CreditCard className="h-4 w-4" /> },
+                                        ].map((m) => {
+                                            const isSelected = activeMethod === m.id;
                                             return (
-                                                <button 
-                                                    key={acc.id}
-                                                    onClick={() => setSelectedAccount(acc.id)}
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => handleSelectPosMethod(m.id as any)}
                                                     className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all ${
                                                         isSelected 
                                                         ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10' 
@@ -1997,11 +2062,11 @@ export default function POSPage() {
                                                     }`}
                                                 >
                                                     <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-emerald-500 text-slate-950' : 'bg-slate-950 text-slate-400'}`}>
-                                                        {icon}
+                                                        {m.icon}
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="text-[10px] font-black uppercase text-slate-500">{badgeText}</div>
-                                                        <div className="text-xs font-bold text-white truncate">{acc.name}</div>
+                                                        <div className="text-[10px] font-black uppercase text-slate-500">{m.sub}</div>
+                                                        <div className="text-xs font-bold text-white truncate">{m.label}</div>
                                                     </div>
                                                     {isSelected && <Check className="h-4 w-4 text-emerald-400 shrink-0" />}
                                                 </button>
@@ -2009,8 +2074,44 @@ export default function POSPage() {
                                         })}
                                     </div>
 
+                                    {/* REKENING KASIR AKTIF */}
+                                    {selectedAccount && (
+                                        <div className="flex items-center justify-between px-3 py-2 bg-slate-950/80 border border-white/5 rounded-xl text-[11px] gap-2">
+                                            <div className="flex items-center gap-1.5 truncate">
+                                                <span className="text-slate-500 font-bold uppercase text-[9px] shrink-0">Rekening:</span>
+                                                <span className="text-emerald-400 font-bold truncate">
+                                                    {accounts.find(a => a.id === selectedAccount)?.name}
+                                                </span>
+                                            </div>
+                                            {accounts.length > 1 && (
+                                                <select
+                                                    value={selectedAccount}
+                                                    onChange={(e) => {
+                                                        const accId = Number(e.target.value);
+                                                        setSelectedAccount(accId);
+                                                        const chosen = accounts.find(a => a.id === accId);
+                                                        if (chosen?.type === 'CASH' || chosen?.name.toUpperCase().includes('KAS') || chosen?.name.toUpperCase().includes('TUNAI')) {
+                                                            setSelectedPaymentMethod('TUNAI');
+                                                        } else if (selectedPaymentMethod === 'TUNAI') {
+                                                            setSelectedPaymentMethod('TRANSFER');
+                                                            setPaymentSubMethod('TRANSFER');
+                                                        }
+                                                    }}
+                                                    className="bg-slate-900 text-slate-300 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] font-semibold outline-none cursor-pointer hover:border-white/20"
+                                                    title="Ganti rekening tujuan untuk transaksi ini"
+                                                >
+                                                    {accounts.map(acc => (
+                                                        <option key={acc.id} value={acc.id}>
+                                                            {acc.name} ({acc.type === 'CASH' ? 'Kas' : 'Bank'})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* JIKA METODE TUNAI */}
-                                    {selectedAccount && accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
+                                    {activeMethod === 'TUNAI' && (
                                         <div className="bg-slate-900/80 p-3 rounded-2xl border border-emerald-500/20 space-y-2 mt-2 animate-in fade-in">
                                             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-slate-400">
                                                 <span>Uang Diterima</span>
@@ -2045,44 +2146,23 @@ export default function POSPage() {
                                         </div>
                                     )}
 
-                                    {/* JIKA METODE NON-TUNAI / EDC / QRIS */}
-                                    {selectedAccount && !accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
+                                    {/* JIKA METODE NON-TUNAI / EDC / QRIS / TRANSFER */}
+                                    {activeMethod && activeMethod !== 'TUNAI' && (
                                         <div className="pt-1 animate-in fade-in space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                    Pilih Jalur Non-Tunai
-                                                </label>
-                                                <span className="text-[9px] font-bold text-blue-400">QRIS / EDC / Transfer</span>
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-1.5">
-                                                {[
-                                                    { id: 'QRIS', label: 'QRIS', icon: <Scan className="h-3.5 w-3.5" /> },
-                                                    { id: 'EDC', label: 'EDC / Kartu', icon: <CreditCard className="h-3.5 w-3.5" /> },
-                                                    { id: 'TRANSFER', label: 'Transfer', icon: <Wallet className="h-3.5 w-3.5" /> },
-                                                ].map((m) => (
-                                                    <button
-                                                        key={m.id}
-                                                        type="button"
-                                                        onClick={() => setPaymentSubMethod(m.id as any)}
-                                                        className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-xl text-xs font-bold border transition-all ${
-                                                            paymentSubMethod === m.id
-                                                                ? 'bg-blue-600/25 border-blue-500 text-blue-300 shadow-sm'
-                                                                : 'bg-slate-950 border-white/10 text-slate-400 hover:text-white'
-                                                        }`}
-                                                    >
-                                                        {m.icon}
-                                                        <span>{m.label}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
                                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block pt-1">
-                                                Nomor Referensi / Approval (Opsional)
+                                                Nomor Referensi / Approval / Catatan {activeMethod} (Opsional)
                                             </label>
                                             <input 
                                                 type="text"
                                                 value={paymentReference}
                                                 onChange={(e) => setPaymentReference(e.target.value)}
-                                                placeholder="Contoh: 123456..."
+                                                placeholder={
+                                                    activeMethod === 'QRIS'
+                                                        ? "No. referensi transaksi QRIS..."
+                                                        : activeMethod === 'EDC'
+                                                        ? "No. approval / slip mesin EDC..."
+                                                        : "No. referensi transfer bank..."
+                                                }
                                                 className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
                                             />
                                         </div>
@@ -2349,19 +2429,23 @@ export default function POSPage() {
                             {/* KOLOM KANAN: METODE PEMBAYARAN & TUNAI */}
                             <div className="space-y-5">
                                 <div className="space-y-3 bg-slate-900/80 p-4 rounded-3xl border border-white/5">
-                                    <label className="text-xs font-black uppercase tracking-widest text-slate-300">Pilih Metode Pembayaran</label>
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs font-black uppercase tracking-widest text-slate-300">Pilih Metode Pembayaran Kasir</label>
+                                        <span className="text-[10px] font-bold text-slate-500">Pilih salah satu</span>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-2.5">
-                                        {accounts.filter(acc => acc.showInPos !== false).map(acc => {
-                                            let icon = <Banknote className="h-5 w-5" />;
-                                            let badgeText = "Tunai";
-                                            const isSelected = selectedAccount === acc.id;
-                                            if (acc.name.toUpperCase().includes('QRIS')) { badgeText = "QRIS"; icon = <Scan className="h-5 w-5" />; }
-                                            else if (acc.type === 'BANK') { badgeText = "Bank / Non-Tunai"; icon = <CreditCard className="h-5 w-5" />; }
-                                            
+                                        {[
+                                            { id: 'TUNAI', label: 'Tunai', sub: 'Uang Tunai', icon: <Banknote className="h-5 w-5" /> },
+                                            { id: 'QRIS', label: 'QRIS', sub: 'Scan Barcode', icon: <Scan className="h-5 w-5" /> },
+                                            { id: 'TRANSFER', label: 'Transfer', sub: 'Bank Langsung', icon: <Wallet className="h-5 w-5" /> },
+                                            { id: 'EDC', label: 'EDC / Kartu', sub: 'Debit & Kredit', icon: <CreditCard className="h-5 w-5" /> },
+                                        ].map((m) => {
+                                            const isSelected = activeMethod === m.id;
                                             return (
                                                 <button 
-                                                    key={acc.id}
-                                                    onClick={() => setSelectedAccount(acc.id)}
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => handleSelectPosMethod(m.id as any)}
                                                     className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
                                                         isSelected 
                                                         ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-lg shadow-emerald-500/15' 
@@ -2369,21 +2453,57 @@ export default function POSPage() {
                                                     }`}
                                                 >
                                                     <div className={`p-2 rounded-xl ${isSelected ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400'}`}>
-                                                        {icon}
+                                                        {m.icon}
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="text-[10px] font-black uppercase text-slate-500">{badgeText}</div>
-                                                        <div className="text-xs font-bold text-white truncate">{acc.name}</div>
+                                                        <div className="text-[10px] font-black uppercase text-slate-500">{m.sub}</div>
+                                                        <div className="text-sm font-bold text-white truncate">{m.label}</div>
                                                     </div>
                                                     {isSelected && <Check className="h-5 w-5 text-emerald-400 shrink-0" />}
                                                 </button>
                                             );
                                         })}
                                     </div>
+
+                                    {/* REKENING KASIR AKTIF */}
+                                    {selectedAccount && (
+                                        <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-950/80 border border-white/5 rounded-2xl text-xs gap-2 mt-2">
+                                            <div className="flex items-center gap-2 truncate">
+                                                <span className="text-slate-500 font-bold uppercase text-[10px] shrink-0">Rekening Tujuan:</span>
+                                                <span className="text-emerald-400 font-bold truncate">
+                                                    {accounts.find(a => a.id === selectedAccount)?.name} ({accounts.find(a => a.id === selectedAccount)?.type === 'CASH' ? 'Kas' : 'Bank'})
+                                                </span>
+                                            </div>
+                                            {accounts.length > 1 && (
+                                                <select
+                                                    value={selectedAccount}
+                                                    onChange={(e) => {
+                                                        const accId = Number(e.target.value);
+                                                        setSelectedAccount(accId);
+                                                        const chosen = accounts.find(a => a.id === accId);
+                                                        if (chosen?.type === 'CASH' || chosen?.name.toUpperCase().includes('KAS') || chosen?.name.toUpperCase().includes('TUNAI')) {
+                                                            setSelectedPaymentMethod('TUNAI');
+                                                        } else if (selectedPaymentMethod === 'TUNAI') {
+                                                            setSelectedPaymentMethod('TRANSFER');
+                                                            setPaymentSubMethod('TRANSFER');
+                                                        }
+                                                    }}
+                                                    className="bg-slate-900 text-slate-300 border border-white/10 rounded-xl px-2.5 py-1 text-xs font-semibold outline-none cursor-pointer hover:border-white/20"
+                                                    title="Ganti rekening tujuan untuk transaksi ini"
+                                                >
+                                                    {accounts.map(acc => (
+                                                        <option key={acc.id} value={acc.id}>
+                                                            {acc.name} ({acc.type === 'CASH' ? 'Kas' : 'Bank'})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* JIKA METODE TUNAI DIPILIH */}
-                                {selectedAccount && accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
+                                {activeMethod === 'TUNAI' && (
                                     <div className="space-y-3 bg-slate-900/90 p-4 rounded-3xl border border-emerald-500/30 animate-in fade-in">
                                         <div className="flex justify-between items-center">
                                             <label className="text-xs font-black uppercase tracking-widest text-emerald-400">Pembayaran Tunai</label>
@@ -2448,44 +2568,31 @@ export default function POSPage() {
                                     </div>
                                 )}
 
-                                {/* JIKA NON-TUNAI / EDC / QRIS */}
-                                {selectedAccount && !accounts.find(a => a.id === selectedAccount)?.name.toUpperCase().includes('KAS') && (
+                                {/* JIKA NON-TUNAI / EDC / QRIS / TRANSFER */}
+                                {activeMethod && activeMethod !== 'TUNAI' && (
                                     <div className="space-y-3 bg-slate-900/80 p-4 rounded-3xl border border-white/5 animate-in fade-in">
                                         <div className="flex justify-between items-center">
                                             <label className="text-xs font-black uppercase tracking-widest text-slate-300">
-                                                Pilih Jalur Non-Tunai
+                                                Jalur Non-Tunai ({activeMethod})
                                             </label>
-                                            <span className="text-[10px] font-bold text-blue-400">QRIS / EDC / Transfer Bank</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[
-                                                { id: 'QRIS', label: 'QRIS', icon: <Scan className="h-4 w-4" /> },
-                                                { id: 'EDC', label: 'EDC / Kartu', icon: <CreditCard className="h-4 w-4" /> },
-                                                { id: 'TRANSFER', label: 'Transfer', icon: <Wallet className="h-4 w-4" /> },
-                                            ].map((m) => (
-                                                <button
-                                                    key={m.id}
-                                                    type="button"
-                                                    onClick={() => setPaymentSubMethod(m.id as any)}
-                                                    className={`flex items-center justify-center gap-2 py-2.5 px-2 rounded-2xl text-xs font-bold border transition-all ${
-                                                        paymentSubMethod === m.id
-                                                            ? 'bg-blue-600/25 border-blue-500 text-blue-300 shadow-md shadow-blue-500/10'
-                                                            : 'bg-slate-950 border-white/10 text-slate-400 hover:text-white'
-                                                    }`}
-                                                >
-                                                    {m.icon}
-                                                    <span>{m.label}</span>
-                                                </button>
-                                            ))}
+                                            <span className="text-[10px] font-bold text-blue-400">
+                                                {activeMethod === 'QRIS' ? 'QRIS Scan Barcode' : activeMethod === 'EDC' ? 'Mesin EDC / Gesek Kartu' : 'Transfer Bank'}
+                                            </span>
                                         </div>
                                         <label className="text-xs font-black uppercase tracking-widest text-slate-300 block pt-1">
-                                            Nomor Approval / Ref EDC (Opsional)
+                                            Nomor Referensi / Approval / Catatan {activeMethod} (Opsional)
                                         </label>
                                         <input 
                                             type="text"
                                             value={paymentReference}
                                             onChange={(e) => setPaymentReference(e.target.value)}
-                                            placeholder="Contoh: 123456 atau No Transaksi EDC..."
+                                            placeholder={
+                                                activeMethod === 'QRIS'
+                                                    ? "Contoh: No. transaksi QRIS..."
+                                                    : activeMethod === 'EDC'
+                                                    ? "Contoh: Approval code / No. referensi EDC..."
+                                                    : "Contoh: No. referensi transfer bank..."
+                                            }
                                             className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-2xl text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
                                         />
                                     </div>

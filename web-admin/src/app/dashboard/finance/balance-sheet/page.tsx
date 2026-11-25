@@ -321,7 +321,7 @@ export default function BalanceSheetPage() {
                                     {/* ASSET LANCAR */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-blue-50/10 not-italic">ASET LANCAR (Current Assets)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-slate-400 italic">Rp {displayData?.assets.totalCurrent.toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-slate-400 italic">Rp {(Number(displayData?.assets.totalCurrent || 0) + Number(displayData?.assets.totalSupplierDeposits || 0)).toLocaleString()}</td>
                                     </tr>
                                     {displayData?.assets.accounts.map((acc: any) => (
                                         <tr key={acc.id} className="hover:bg-slate-50 transition-colors">
@@ -332,11 +332,37 @@ export default function BalanceSheetPage() {
                                             <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {acc.balance.toLocaleString()}</td>
                                         </tr>
                                     ))}
+                                    {(displayData?.assets.totalSupplierDeposits || 0) > 0 && (
+                                        <>
+                                            <tr 
+                                                onClick={() => togglePiutang('supplierDeposits')}
+                                                className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                            >
+                                                <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <HandCoins className="h-3 w-3 text-teal-600" />
+                                                        Uang Muka / Deposit Supplier
+                                                    </div>
+                                                    {expandedPiutang['supplierDeposits'] ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                                </td>
+                                                <td className="px-6 py-3 text-right text-sm font-bold text-teal-700">Rp {Number(displayData?.assets.totalSupplierDeposits || 0).toLocaleString()}</td>
+                                            </tr>
+                                            {expandedPiutang['supplierDeposits'] && displayData?.assets.supplierDepositDetails?.map((item: any, idx: number) => (
+                                                <tr key={`dep-${idx}`} className="bg-slate-50/50">
+                                                    <td className="pl-16 pr-6 py-2 text-xs text-slate-600 flex flex-col">
+                                                        <span className="font-semibold text-slate-800">{item.name}</span>
+                                                        <span className="italic text-slate-500">{item.notes}</span>
+                                                    </td>
+                                                    <td className="px-6 py-2 text-right text-xs font-semibold text-teal-700">Rp {Number(item.amount || 0).toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </>
+                                    )}
 
                                     {/* PIUTANG (RECEIVABLES) */}
                                     <tr>
                                         <td className="px-6 py-3 font-black text-slate-900 text-xs tracking-wider uppercase bg-amber-50/10 not-italic">PIUTANG (Receivables)</td>
-                                        <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {(Number(displayData?.assets.totalLoans || 0) + Number(displayData?.assets.totalCustomerReceivables || 0) + Number(displayData?.assets.totalPiutangCabang || 0)).toLocaleString()}</td>
+                                        <td className="px-6 py-3 text-right text-xs font-bold text-amber-600 italic">Rp {(Number(displayData?.assets.totalLoans || 0) + Number(displayData?.assets.totalCustomerReceivables || 0) + Number(displayData?.assets.totalPiutangCabang || 0) + Number(displayData?.assets.totalSupplierReceivables || 0)).toLocaleString()}</td>
                                     </tr>
                                     {(displayData?.assets.totalCustomerReceivables || 0) > 0 && (
                                         <>
@@ -416,7 +442,33 @@ export default function BalanceSheetPage() {
                                             ))}
                                         </>
                                     )}
-                                    {!((displayData?.assets.totalCustomerReceivables || 0) > 0 || (displayData?.assets.totalLoans || 0) > 0 || (displayData?.assets.totalPiutangCabang || 0) !== 0) && (
+                                    {(displayData?.assets.totalSupplierReceivables || 0) > 0 && (
+                                        <>
+                                            <tr 
+                                                onClick={() => togglePiutang('supplierReceivables')}
+                                                className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                            >
+                                                <td className="px-10 py-3 text-sm font-semibold text-slate-600 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <HandCoins className="h-3 w-3 text-amber-500" />
+                                                        Piutang Pinjaman Supplier
+                                                    </div>
+                                                    {expandedPiutang['supplierReceivables'] ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                                </td>
+                                                <td className="px-6 py-3 text-right text-sm font-bold text-slate-900">Rp {Number(displayData?.assets.totalSupplierReceivables || 0).toLocaleString()}</td>
+                                            </tr>
+                                            {expandedPiutang['supplierReceivables'] && displayData?.assets.supplierReceivableDetails?.map((item: any, idx: number) => (
+                                                <tr key={`srec-${idx}`} className="bg-slate-50/50">
+                                                    <td className="pl-16 pr-6 py-2 text-xs text-slate-600 flex flex-col">
+                                                        <span className="font-semibold text-slate-800">{item.name}</span>
+                                                        <span className="italic text-slate-500">{item.notes}</span>
+                                                    </td>
+                                                    <td className="px-6 py-2 text-right text-xs font-semibold text-slate-700">Rp {Number(item.amount || 0).toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </>
+                                    )}
+                                    {!((displayData?.assets.totalCustomerReceivables || 0) > 0 || (displayData?.assets.totalLoans || 0) > 0 || (displayData?.assets.totalPiutangCabang || 0) !== 0 || (displayData?.assets.totalSupplierReceivables || 0) > 0) && (
                                         <tr>
                                             <td colSpan={2} className="px-10 py-2 text-[10px] text-slate-300 italic">Tidak ada piutang aktif</td>
                                         </tr>

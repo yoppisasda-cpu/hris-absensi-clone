@@ -1,7 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ChefHat, BarChart3, Clock, Calendar, CalendarDays, History, ArrowUpDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import toast from 'react-hot-toast';
+import { ChefHat, BarChart3, Clock, Calendar, CalendarDays, History, ArrowUpDown, Download, FileSpreadsheet } from 'lucide-react';
 
 export default function KitchenReports() {
     const [reports, setReports] = useState<any>(null);
@@ -87,6 +89,86 @@ export default function KitchenReports() {
         return new Date(isoString).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
+    const exportToExcel = () => {
+        try {
+            if (!sortedHistory || sortedHistory.length === 0) {
+                toast.error('Tidak ada data riwayat produksi untuk diekspor');
+                return;
+            }
+
+            // 1. Data Sheet 1: Riwayat Produksi
+            const exportRows = sortedHistory.map((sale: any, idx: number) => ({
+                'No': idx + 1,
+                'No. Antrean': `#${sale.queueNumber || sale.id}`,
+                'No. Invoice': sale.invoiceNumber || '-',
+                'Pelanggan': sale.customerName || 'Umum',
+                'Menu / Item yang Dimasak': sale.items || '-',
+                'Tanggal Transaksi': formatDate(sale.date || sale.createdAt),
+                'Jam Masuk': formatTime(sale.createdAt),
+                'Jam Selesai': formatTime(sale.preparedAt),
+                'Durasi Masak': formatSeconds(sale.durationSeconds),
+                'Durasi (Menit)': Number(((sale.durationSeconds || 0) / 60).toFixed(1)),
+                'Durasi (Detik)': sale.durationSeconds || 0
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportRows);
+            worksheet['!cols'] = [
+                { wch: 6 },   // No
+                { wch: 14 },  // No. Antrean
+                { wch: 22 },  // No. Invoice
+                { wch: 20 },  // Pelanggan
+                { wch: 38 },  // Menu / Item
+                { wch: 18 },  // Tanggal Transaksi
+                { wch: 14 },  // Jam Masuk
+                { wch: 14 },  // Jam Selesai
+                { wch: 16 },  // Durasi Masak
+                { wch: 15 },  // Durasi (Menit)
+                { wch: 15 }   // Durasi (Detik)
+            ];
+
+            // 2. Data Sheet 2: Ringkasan KPI
+            const totalOrders = sortedHistory.length;
+            const totalDurationSecs = sortedHistory.reduce((acc: number, curr: any) => acc + (curr.durationSeconds || 0), 0);
+            const avgSelectedPeriod = totalOrders > 0 ? Math.round(totalDurationSecs / totalOrders) : 0;
+
+            const categoryLabel = reportFilter === 'ALL' 
+                ? 'Semua Pesanan' 
+                : reportFilter === 'FOOD' 
+                ? 'Dapur (Makanan)' 
+                : 'Bar (Minuman)';
+
+            const summaryRows = [
+                { 'Informasi / Metrik': 'Periode Laporan', 'Nilai': `${startDate || 'Semua'} s/d ${endDate || 'Semua'}` },
+                { 'Informasi / Metrik': 'Kategori F&B', 'Nilai': categoryLabel },
+                { 'Informasi / Metrik': 'Total Pesanan Selesai', 'Nilai': `${totalOrders} Pesanan` },
+                { 'Informasi / Metrik': 'Rata-rata Waktu Masak (Periode Terpilih)', 'Nilai': formatSeconds(avgSelectedPeriod) },
+                { 'Informasi / Metrik': 'Rata-rata Masak Hari Ini', 'Nilai': formatSeconds(reports?.averages?.today) },
+                { 'Informasi / Metrik': 'Rata-rata Masak Minggu Ini', 'Nilai': formatSeconds(reports?.averages?.week) },
+                { 'Informasi / Metrik': 'Rata-rata Masak Bulan Ini', 'Nilai': formatSeconds(reports?.averages?.month) },
+                { 'Informasi / Metrik': 'Waktu Ekspor', 'Nilai': new Date().toLocaleString('id-ID') }
+            ];
+
+            const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
+            summarySheet['!cols'] = [
+                { wch: 38 },
+                { wch: 30 }
+            ];
+
+            // 3. Create Workbook
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Riwayat Produksi');
+            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Ringkasan KPI Dapur');
+
+            const dateStr = startDate && endDate ? `${startDate}_sd_${endDate}` : (startDate || 'semua');
+            const fileName = `Laporan_Produksi_KDS_${reportFilter}_${dateStr}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+            toast.success('Laporan produksi KDS berhasil diekspor ke Excel');
+        } catch (err) {
+            console.error('Gagal export excel laporan dapur:', err);
+            toast.error('Gagal mengekspor laporan ke Excel');
+        }
+    };
+
     if (loading) return <div className="p-8 text-center text-white/50 animate-pulse">Memuat laporan...</div>;
 
     return (
@@ -127,7 +209,7 @@ export default function KitchenReports() {
                         <button onClick={() => setQuickFilter('month')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Bulan Ini</button>
                         <button onClick={() => setQuickFilter('all')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Semua</button>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                         <input 
                             type="date"
                             value={startDate}
@@ -141,6 +223,14 @@ export default function KitchenReports() {
                             onChange={(e) => setEndDate(e.target.value)}
                             className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg"
                         />
+                        <button 
+                            onClick={exportToExcel}
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg shadow-sm transition-all text-sm"
+                            title="Ekspor Laporan Produksi ke Excel"
+                        >
+                            <FileSpreadsheet size={16} />
+                            <span>Export Excel</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -180,9 +270,22 @@ export default function KitchenReports() {
 
             {/* HISTORY TABLE */}
             <div className="bg-slate-900/50 border border-white/10 rounded-2xl overflow-hidden">
-                <div className="p-6 border-b border-white/10 flex items-center gap-2">
-                    <History className="text-white/60" size={20} />
-                    <h2 className="text-xl font-bold text-white">Riwayat Waktu Masak</h2>
+                <div className="p-6 border-b border-white/10 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <History className="text-white/60" size={20} />
+                        <h2 className="text-xl font-bold text-white">Riwayat Waktu Masak</h2>
+                        <span className="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full font-mono">
+                            {sortedHistory.length} pesanan
+                        </span>
+                    </div>
+                    <button 
+                        onClick={exportToExcel}
+                        className="hidden sm:flex items-center gap-2 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        title="Ekspor Riwayat Produksi ke Excel"
+                    >
+                        <Download size={14} />
+                        <span>Unduh Excel</span>
+                    </button>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
@@ -217,6 +320,11 @@ export default function KitchenReports() {
                                             <div className="flex flex-col">
                                                 <span className="font-bold">#{sale.queueNumber || sale.id}</span>
                                                 <span className="text-xs text-white/40">{sale.invoiceNumber}</span>
+                                                {sale.items && (
+                                                    <span className="text-xs text-slate-400 mt-1 max-w-xs truncate" title={sale.items}>
+                                                        {sale.items}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="p-4 text-white/80">{sale.customerName || '-'}</td>
