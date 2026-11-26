@@ -145,6 +145,9 @@ export default function PurchaseOrdersPage() {
             doc.setFont("helvetica", "normal");
             doc.text(`NO: #${po.orderNumber || po.id}`, 130, 52);
             doc.text(`TANGGAL: ${new Date(po.date).toLocaleDateString('id-ID')}`, 130, 57);
+            if (po.expectedDeliveryDate) {
+                doc.text(`EST. KEDATANGAN: ${new Date(po.expectedDeliveryDate).toLocaleDateString('id-ID')}`, 130, 62);
+            }
 
             // --- CONTENT SECTION ---
             // Supplier Info
@@ -222,7 +225,8 @@ export default function PurchaseOrdersPage() {
         const cleanPhone = phone.replace(/[^0-9]/g, '');
         const formattedPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
         
-        const message = `Halo ${po.supplier?.name || 'Pemasok'},\n\nKami ingin mengirimkan Pesanan Pembelian kami (Purchase Order) dengan nomor *#${po.orderNumber}*.\n\n*Detail Pesanan:*\n${po.items.map((it: any) => `- ${it.product?.name}: ${it.quantity} ${it.product?.unit}`).join('\n')}\n\n*Total Estimasi:* Rp ${po.totalAmount.toLocaleString('id-ID')}\n\n_File PDF Purchase Order sudah otomatis terunduh di perangkat kami. Mohon ditunggu, akan segera kami lampirkan filenya ke chat ini._\n\nMohon konfirmasinya. Terima kasih.`;
+        const estDateStr = po.expectedDeliveryDate ? `\n*Estimasi Barang Datang:* ${new Date(po.expectedDeliveryDate).toLocaleDateString('id-ID')}` : '';
+        const message = `Halo ${po.supplier?.name || 'Pemasok'},\n\nKami ingin mengirimkan Pesanan Pembelian kami (Purchase Order) dengan nomor *#${po.orderNumber}*.${estDateStr}\n\n*Detail Pesanan:*\n${po.items.map((it: any) => `- ${it.product?.name}: ${it.quantity} ${it.product?.unit}`).join('\n')}\n\n*Total Estimasi:* Rp ${po.totalAmount.toLocaleString('id-ID')}\n\n_File PDF Purchase Order sudah otomatis terunduh di perangkat kami. Mohon ditunggu, akan segera kami lampirkan filenya ke chat ini._\n\nMohon konfirmasinya. Terima kasih.`;
         
         const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
@@ -238,7 +242,8 @@ export default function PurchaseOrdersPage() {
         
         // 2. Prepare Email
         const subject = `Purchase Order #${po.orderNumber} - [Pesanan Baru]`;
-        const body = `Yth. ${po.supplier.name},\n\nTerlampir rincian pesanan kami:\n\nNomor PO: #${po.orderNumber}\nTanggal: ${new Date(po.date).toLocaleDateString()}\nTotal: Rp ${po.totalAmount.toLocaleString('id-ID')}\n\nMohon dicek file PDF Purchase Order yang telah kami lampirkan bersama email ini.\n\nMohon konfirmasi ketersediaan stok barang tersebut.\n\nTerima kasih.`;
+        const estDateLine = po.expectedDeliveryDate ? `\nEstimasi Kedatangan: ${new Date(po.expectedDeliveryDate).toLocaleDateString('id-ID')}` : '';
+        const body = `Yth. ${po.supplier.name},\n\nTerlampir rincian pesanan kami:\n\nNomor PO: #${po.orderNumber}\nTanggal: ${new Date(po.date).toLocaleDateString()}${estDateLine}\nTotal: Rp ${po.totalAmount.toLocaleString('id-ID')}\n\nMohon dicek file PDF Purchase Order yang telah kami lampirkan bersama email ini.\n\nMohon konfirmasi ketersediaan stok barang tersebut.\n\nTerima kasih.`;
         
         const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.location.href = url;
@@ -256,6 +261,7 @@ export default function PurchaseOrdersPage() {
                 return {
                     "No. Referensi (PO)": po.orderNumber,
                     "Tanggal": new Date(po.date).toLocaleDateString('id-ID'),
+                    "Estimasi Kedatangan": po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString('id-ID') : "-",
                     "Supplier": po.supplier?.name || "-",
                     "Total Barang (Unit)": po.items?.length || 0,
                     "Total Nilai (Rp)": totalVal,
@@ -459,10 +465,18 @@ export default function PurchaseOrdersPage() {
                                                 >
                                                     #{po.orderNumber}
                                                 </p>
-                                                <div className="flex items-center gap-3 mt-2">
+                                                <div className="flex flex-wrap items-center gap-2 mt-2">
                                                     <span className="text-[9px] font-black text-slate-500 flex items-center gap-1.5 uppercase tracking-widest italic">
-                                                        <Clock className="h-3 w-3 text-indigo-500" /> {new Date(po.date).toLocaleDateString()}
+                                                        <Clock className="h-3 w-3 text-indigo-500" /> {new Date(po.date).toLocaleDateString('id-ID')}
                                                     </span>
+                                                    {po.expectedDeliveryDate && (
+                                                        <>
+                                                            <span className="h-1 w-1 bg-slate-800 rounded-full"></span>
+                                                            <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg flex items-center gap-1.5 uppercase tracking-widest italic border border-amber-500/20" title="Estimasi Barang Datang">
+                                                                <Truck className="h-3 w-3 text-amber-400" /> Est: {new Date(po.expectedDeliveryDate).toLocaleDateString('id-ID')}
+                                                            </span>
+                                                        </>
+                                                    )}
                                                     <span className="h-1 w-1 bg-slate-800 rounded-full"></span>
                                                     <span className="text-[9px] font-black text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-lg uppercase tracking-widest italic border border-indigo-500/20">
                                                         {po.items?.length || 0} UNITS

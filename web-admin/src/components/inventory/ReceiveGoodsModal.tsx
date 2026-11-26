@@ -88,15 +88,25 @@ export default function ReceiveGoodsModal({ isOpen, onClose, po, onSuccess }: Pr
 
                 <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
                     <form id="receiveForm" onSubmit={handleSubmit} className="space-y-6">
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest italic mb-2">Tanggal Penerimaan</label>
-                            <input
-                                type="date"
-                                required
-                                value={receivedDate}
-                                onChange={(e) => setReceivedDate(e.target.value)}
-                                className="w-full sm:w-64 rounded-xl bg-slate-950 border border-slate-800 px-4 py-3 text-sm text-white focus:border-indigo-500/50 outline-none transition-all"
-                            />
+                        <div className="flex flex-wrap items-center gap-6">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest italic mb-2">Tanggal Penerimaan</label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={receivedDate}
+                                    onChange={(e) => setReceivedDate(e.target.value)}
+                                    className="w-full sm:w-64 rounded-xl bg-slate-950 border border-slate-800 px-4 py-3 text-sm text-white focus:border-indigo-500/50 outline-none transition-all"
+                                />
+                            </div>
+                            {po.expectedDeliveryDate && (
+                                <div className="self-end pb-1 text-xs">
+                                    <span className="text-[10px] font-black uppercase text-amber-500/80 tracking-widest block mb-1">Target Estimasi Datang</span>
+                                    <span className="text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-xl inline-block">
+                                        📅 {new Date(po.expectedDeliveryDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-start sm:items-center gap-2.5">

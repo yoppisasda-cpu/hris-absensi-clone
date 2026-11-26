@@ -34,6 +34,7 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
             [],
             ["ID MANIFES", `#${po.orderNumber?.toUpperCase()}`],
             ["TANGGAL TERBIT", new Date(po.date).toLocaleDateString('id-ID')],
+            ["ESTIMASI KEDATANGAN", po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString('id-ID') : "-"],
             ["INFORMASI PEMASOK", po.supplier?.name || "-"],
             ["STATUS VALIDASI", getStatusLabel(po.status)],
             ["DIBUAT OLEH", po.createdBy?.name || "-"],
@@ -134,8 +135,15 @@ export default function PODetailModal({ isOpen, onClose, po, onApprove, onReject
                             </div>
                             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative overflow-hidden group">
                                 <p className="text-xl font-black text-slate-950 italic tracking-tighter uppercase relative z-10">{po.supplier?.name}</p>
-                                <div className="flex items-center gap-2 mt-4 text-[8px] text-slate-500 font-black uppercase tracking-widest italic relative z-10">
-                                    <Clock className="h-3.5 w-3.5 text-slate-950" /> TANGGAL TERBIT: {new Date(po.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+                                <div className="flex flex-wrap items-center gap-3 mt-4 text-[8px] text-slate-500 font-black uppercase tracking-widest italic relative z-10">
+                                    <span className="flex items-center gap-1.5">
+                                        <Clock className="h-3.5 w-3.5 text-slate-950" /> TANGGAL TERBIT: {new Date(po.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+                                    </span>
+                                    {po.expectedDeliveryDate && (
+                                        <span className="flex items-center gap-1.5 text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                            <Truck className="h-3.5 w-3.5 text-amber-700" /> ESTIMASI DATANG: {new Date(po.expectedDeliveryDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>

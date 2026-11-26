@@ -3677,7 +3677,7 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
   try {
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
-    const { supplierId, date, items, notes, warehouseId, customerId, taxAmount } = req.body;
+    const { supplierId, date, expectedDeliveryDate, items, notes, warehouseId, customerId, taxAmount } = req.body;
     let finalCustomerId = customerId ? parseInt(customerId) : null;
 
     // Fallback: If no customerId provided, link to user if exists
@@ -3701,10 +3701,10 @@ app.post('/api/inventory/purchase-orders', tenantMiddleware, async (req: Request
     // Using Raw SQL for Create to handle warehouseId without regenerating Prisma Client
     const poResult: any[] = await prisma.$queryRawUnsafe(`
       INSERT INTO "PurchaseOrder" 
-      ("companyId", "supplierId", "orderNumber", "date", "totalAmount", "taxAmount", "status", "notes", "createdById", "updatedAt", "warehouseId")
-      VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7, $8, NOW(), $9)
+      ("companyId", "supplierId", "orderNumber", "date", "expectedDeliveryDate", "totalAmount", "taxAmount", "status", "notes", "createdById", "updatedAt", "warehouseId")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', $8, $9, NOW(), $10)
       RETURNING id
-    `, tenantId, parseInt(supplierId), orderNumber, date ? new Date(date) : new Date(), totalAmount, taxAmount ? parseFloat(taxAmount) : 0, notes, userId, warehouseId ? parseInt(warehouseId) : null);
+    `, tenantId, parseInt(supplierId), orderNumber, date ? new Date(date) : new Date(), expectedDeliveryDate ? new Date(expectedDeliveryDate) : null, totalAmount, taxAmount ? parseFloat(taxAmount) : 0, notes, userId, warehouseId ? parseInt(warehouseId) : null);
 
     if (!poResult || poResult.length === 0) throw new Error("Gagal membuat data PO utama.");
     const poId = poResult[0].id;
@@ -3739,7 +3739,7 @@ app.put('/api/inventory/purchase-orders/:id', tenantMiddleware, async (req: Requ
     const tenantId = Number((req as any).tenantId);
     const userId = Number((req as any).userId);
     const poId = parseInt(req.params.id as string);
-    const { supplierId, date, items, notes, warehouseId } = req.body;
+    const { supplierId, date, expectedDeliveryDate, items, notes, warehouseId } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Minimal harus ada 1 barang yang dipesan.' });
@@ -3760,9 +3760,9 @@ app.put('/api/inventory/purchase-orders/:id', tenantMiddleware, async (req: Requ
       // 1. Update PO Header
       await tx.$executeRawUnsafe(`
         UPDATE "PurchaseOrder" 
-        SET "supplierId" = $1, "date" = $2, "totalAmount" = $3, "notes" = $4, "warehouseId" = $5, "updatedAt" = NOW()
-        WHERE "id" = $6
-      `, parseInt(supplierId), date ? new Date(date) : existingPo.date, totalAmount, notes, warehouseId ? parseInt(warehouseId) : existingPo.warehouseId, poId);
+        SET "supplierId" = $1, "date" = $2, "expectedDeliveryDate" = $3, "totalAmount" = $4, "notes" = $5, "warehouseId" = $6, "updatedAt" = NOW()
+        WHERE "id" = $7
+      `, parseInt(supplierId), date ? new Date(date) : existingPo.date, expectedDeliveryDate ? new Date(expectedDeliveryDate) : null, totalAmount, notes, warehouseId ? parseInt(warehouseId) : existingPo.warehouseId, poId);
 
       // 2. Delete old items
       await tx.purchaseOrderItem.deleteMany({
@@ -23160,33 +23160,65 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
     }
     const timezone = await getCompanyTimezone(tenantId);
     const { dayStart } = getDayRange(timezone);
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+    const branchFilter = branchId ? { branchId } : {};
 
-    // Fetch from Pending Bills (active today only)
-    const pendingBills = await prisma.pendingBill.findMany({
+    // 1. Fetch ALL active orders that are PREPARING today (never truncated by limit so kitchen never misses orders)
+    const preparingPendingBills = await prisma.pendingBill.findMany({
       where: {
         companyId: tenantId,
-        kitchenStatus: { in: ['PREPARING', 'READY'] },
-        createdAt: { gte: dayStart }
+        kitchenStatus: 'PREPARING',
+        createdAt: { gte: dayStart },
+        ...branchFilter
       },
-      orderBy: { createdAt: 'asc' },
-      take: 100
+      orderBy: { createdAt: 'asc' }
     });
 
-    // Fetch from Sales (active today only, bounded by take: 100 to prevent full-history scan)
-    const sales = await prisma.sale.findMany({
+    const preparingSales = await prisma.sale.findMany({
       where: {
         companyId: tenantId,
-        kitchenStatus: { in: ['PREPARING', 'READY'] },
-        createdAt: { gte: dayStart }
+        kitchenStatus: 'PREPARING',
+        createdAt: { gte: dayStart },
+        ...branchFilter
       },
       orderBy: { createdAt: 'asc' },
-      take: 100,
       include: {
         SaleItem: {
           include: { product: { select: { id: true, name: true, fnbType: true } } }
         }
       }
     });
+
+    // 2. Fetch the most recent READY orders (needed for Queue Display & Audio Announcements, bounded to recent)
+    const readyPendingBills = await prisma.pendingBill.findMany({
+      where: {
+        companyId: tenantId,
+        kitchenStatus: 'READY',
+        createdAt: { gte: dayStart },
+        ...branchFilter
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30
+    });
+
+    const readySales = await prisma.sale.findMany({
+      where: {
+        companyId: tenantId,
+        kitchenStatus: 'READY',
+        createdAt: { gte: dayStart },
+        ...branchFilter
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        SaleItem: {
+          include: { product: { select: { id: true, name: true, fnbType: true } } }
+        }
+      }
+    });
+
+    const pendingBills = [...preparingPendingBills, ...readyPendingBills];
+    const sales = [...preparingSales, ...readySales];
 
     // Only fetch fnbType for products actually referenced in pendingBills
     const pendingProductIds = new Set<number>();
@@ -23233,8 +23265,10 @@ app.get('/api/kitchen/orders', tenantMiddleware, async (req: Request, res: Respo
         quantity: si.quantity,
         price: si.price,
         fnbType: si.product?.fnbType || 'OTHER',
-        modifiers: typeof si.modifiers === 'string' ? JSON.parse(si.modifiers) : si.modifiers
+        modifiers: typeof si.modifiers === 'string' ? JSON.parse(si.modifiers) : si.modifiers,
+        notes: si.notes || ''
       })),
+      notes: s.notes || '',
       status: s.kitchenStatus,
       queueNumber: s.queueNumber,
       createdAt: s.createdAt,

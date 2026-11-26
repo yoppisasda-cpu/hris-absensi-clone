@@ -17,6 +17,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess, initial
         supplierId: "",
         warehouseId: "",
         date: new Date().toISOString().split('T')[0],
+        expectedDeliveryDate: "",
         notes: "",
         items: [{ productId: "", quantity: 1, price: 0 }]
     });
@@ -122,6 +123,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess, initial
                 supplierId: "",
                 warehouseId: warehouses.find((w: any) => w.isMain)?.id.toString() || (warehouses[0]?.id.toString() || ""),
                 date: new Date().toISOString().split('T')[0],
+                expectedDeliveryDate: "",
                 notes: "",
                 items: [{ productId: "", quantity: 1, price: 0 }]
             });
@@ -155,7 +157,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess, initial
                 <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto flex-1 custom-scrollbar bg-slate-950/20">
                     <div className="space-y-6">
                         {/* Section 1: Header Info */}
-                        <div className="grid grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic ml-1">Sumber Pemenuhan (Vendor / Supplier)</label>
                                 <div className="relative group">
@@ -183,6 +185,18 @@ export default function PurchaseOrderModal({ isOpen, onClose, onSuccess, initial
                                         className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-6 text-[10px] font-black text-white focus:border-indigo-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none"
                                         value={formData.date}
                                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase text-amber-400/80 tracking-[0.2em] italic ml-1">Estimasi Barang Datang</label>
+                                <div className="relative group">
+                                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500/70 group-focus-within:text-amber-400 transition-colors z-10" />
+                                    <input
+                                        type="date"
+                                        className="w-full rounded-2xl bg-slate-950 border border-slate-800 py-3.5 pl-12 pr-6 text-[10px] font-black text-amber-300 focus:border-amber-500/50 outline-none transition-all italic tracking-widest uppercase appearance-none"
+                                        value={formData.expectedDeliveryDate}
+                                        onChange={(e) => setFormData({ ...formData, expectedDeliveryDate: e.target.value })}
                                     />
                                 </div>
                             </div>

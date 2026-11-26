@@ -1217,6 +1217,7 @@ model PurchaseOrder {
   supplierId            Int
   orderNumber           String              @unique
   date                  DateTime            @default(now())
+  expectedDeliveryDate  DateTime?
   totalAmount           Float               @default(0)
   taxAmount             Float?              @default(0)
   status                POStatus            @default(PENDING)
