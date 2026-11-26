@@ -39,7 +39,7 @@ const Header = () => (
       <a href="#finance" className="nav-finance-link">Finance & POS</a>
       <a href="#pricing">Harga</a>
       <a href="https://order.aivola.id" className="btn-login" style={{ background: '#ff7a00', color: 'white', border: 'none' }}>Pesan Makanan</a>
-      <a href="https://admin.Aivola.id" className="btn-login">Masuk</a>
+      <a href="https://admin.aivola.id" className="btn-login">Masuk</a>
     </div>
   </nav>
 );
@@ -57,7 +57,7 @@ const Hero = () => (
         Didesain untuk membantu bisnis Anda tumbuh lebih cepat.
       </p>
       <div className="cta-group">
-        <a href="https://admin.Aivola.id/register" className="btn-primary">Coba Gratis 6 Bulan</a>
+        <a href="https://admin.aivola.id/register" className="btn-primary">Coba Gratis 6 Bulan</a>
         <a href="#demo" className="btn-secondary">Konsultasi Gratis</a>
       </div>
       <div className="store-badges" style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem' }}>

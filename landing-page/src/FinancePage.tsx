@@ -17,7 +17,7 @@ const Header = () => (
       <a href="/">Kembali ke HR</a>
       <a href="#features">Fitur</a>
       <a href="#pricing">Harga</a>
-      <a href="https://admin.Aivola.id.id" className="f-btn-login">Masuk Admin</a>
+      <a href="https://admin.aivola.id" className="f-btn-login">Masuk Admin</a>
     </div>
   </nav>
 );

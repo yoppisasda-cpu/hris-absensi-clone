@@ -400,7 +400,7 @@ export const ComparisonSection: React.FC = () => {
             Mulai uji coba gratis AiVola sekarang dan rasakan kendali bisnis penuh dalam genggaman Anda.
           </p>
           <div className="comp-btn-group">
-            <a href="https://admin.Aivola.id/register" className="btn-comp-primary">
+            <a href="https://admin.aivola.id/register" className="btn-comp-primary">
               Coba Gratis 6 Bulan
             </a>
             <a 
